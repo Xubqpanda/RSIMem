@@ -2,7 +2,7 @@
 
 ## Research requirement
 
-AgentMemEconomics needs two different evaluation regimes:
+MemBridge needs two different evaluation regimes:
 
 1. A deterministic memory benchmark to validate lifecycle accounting and compare memory backends under matched questions.
 2. An interactive agent benchmark to expose externalities such as tool calls, retries, failed runs, and wall-clock time.
@@ -40,7 +40,7 @@ PAST-Bench is the strongest current candidate for the global-cost claim:
 - real tools and sandbox execution;
 - task score, mechanism evidence, tokens per episode, and wall time.
 
-It can reveal whether a cheaper memory policy merely shifts cost into model calls, tools, retries, or failed episodes. MemBase does not currently include a PAST-Bench adapter, so this should be a separate integration layer in AgentMemEconomics.
+It can reveal whether a cheaper memory policy merely shifts cost into model calls, tools, retries, or failed episodes. MemBase does not currently include a PAST-Bench adapter, so this should be a separate integration layer in MemBridge.
 
 The benchmark source is available locally at `Study/PAST-Bench` (Apache-2.0):
 
