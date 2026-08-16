@@ -2,10 +2,4 @@
 
 MemBridge is the experiment and evaluation repository for the LightMem2 context-memory middleware. It measures the global cost of agentic memory systems while holding the underlying agent model fixed.
 
-The initial experiment path is documented in [`docs/dataset_selection.md`](docs/dataset_selection.md). The first smoke test uses LoCoMo with MemBase, followed by LongMemEval and an interactive PAST-Bench integration.
-
-Download the first local dataset with:
-
-```bash
-bash scripts/download_locomo.sh
-```
+The initial evaluation uses [PAST-Bench](https://github.com/Gen-Verse/PAST-Bench), an interactive benchmark with ordered cross-session tasks, real tools, sandbox execution, and matched persistence controls. The benchmark rationale and rollout plan are documented in [`docs/dataset_selection.md`](docs/dataset_selection.md).

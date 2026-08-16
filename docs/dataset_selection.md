@@ -1,83 +1,76 @@
 # Dataset Selection
 
-## Research requirement
+## Decision
 
-MemBridge needs two different evaluation regimes:
+The first MemBridge evaluation uses PAST-Bench only.
 
-1. A deterministic memory benchmark to validate lifecycle accounting and compare memory backends under matched questions.
-2. An interactive agent benchmark to expose externalities such as tool calls, retries, failed runs, and wall-clock time.
+LoCoMo and LongMemEval are useful long-horizon conversational QA benchmarks, but they do not exercise the execution effects central to MemBridge: tool calls, retries, state mutation, procedural reuse, failed tasks, and cross-session agent improvement. Strong results on those datasets would primarily support a long-conversation retrieval claim rather than the intended agentic-memory economics claim.
 
-No single existing dataset provides both regimes well.
+RealMem and other memory QA environments are also outside the initial scope. They can be reconsidered as diagnostic evaluations only if a later experiment needs an isolated memory-quality test.
 
-## Phase A: MemBase-native smoke test
+## Why PAST-Bench
 
-### LoCoMo
+PAST-Bench evaluates ordered task-family sequences in fresh sessions. Earlier episodes create information or experience that later episodes can reuse. Its protocol provides:
 
-- 10 long conversational trajectories.
-- Multiple dated sessions per trajectory.
-- Question categories include single-hop, multi-hop, temporal, open-domain, and adversarial questions.
-- Each question contains evidence message IDs, which gives us a useful correctness audit trail.
-- MemBase already provides a loader and construction/search/evaluation runners.
-
-LoCoMo is the first smoke test because it has the lowest integration cost and makes the accounting pipeline easy to debug. It does not, by itself, support a strong claim about full agent cost: it has no rich tool-use or retry loop.
-
-### LongMemEval
-
-LongMemEval is the second benchmark. It provides longer interactive histories and a standardized long-term memory QA protocol. We should use it after the LoCoMo ledger is stable, mainly to test whether cost policies transfer to longer contexts.
-
-### RealMem
-
-RealMem is useful for an online construction/retrieval experiment because MemBase can evaluate tasks during memory construction. It should be added after the offline pipeline, since its online environment and model dependencies make debugging harder.
-
-## Phase B: global agent-cost validation
-
-### PAST-Bench
-
-PAST-Bench is the strongest current candidate for the global-cost claim:
-
-- ordered task-family sequences;
-- persistence on/off matched controls;
+- 26 task families and 204 ordered episodes;
+- memory, procedural reuse, proactive information gathering, and update abilities;
+- matched persistence-on and persistence-off controls;
 - real tools and sandbox execution;
-- task score, mechanism evidence, tokens per episode, and wall time.
+- task scores and mechanism-level evidence;
+- model tokens, wall-clock time, and execution traces.
 
-It can reveal whether a cheaper memory policy merely shifts cost into model calls, tools, retries, or failed episodes. MemBase does not currently include a PAST-Bench adapter, so this should be a separate integration layer in MemBridge.
+This makes it possible to test whether a memory policy actually lowers global agent cost, or merely shifts cost into additional model calls, tools, retries, latency, or failed episodes.
 
-The benchmark source is available locally at `Study/PAST-Bench` (Apache-2.0):
+## Source
 
-```text
-https://github.com/Gen-Verse/PAST-Bench
-arXiv:2608.04003
-```
-
-The suite contains 26 task families and 204 ordered episodes under `self-evolve-tasks-v2/`. Its runtime requires Python 3.11+, Docker, and an LLM API profile, so it is intentionally kept as an external benchmark checkout rather than vendored into this repository.
-
-AppWorld and LifelongAgentBench are possible follow-up environments, but should not block the first implementation.
-
-## Recommended order
+PAST-Bench is maintained externally under Apache-2.0:
 
 ```text
-LoCoMo (one trajectory)
-  -> LoCoMo (full set, multiple memory backends)
-  -> LongMemEval
-  -> RealMem online evaluation
-  -> PAST-Bench global agent-cost evaluation
+Repository: https://github.com/Gen-Verse/PAST-Bench
+Paper:     arXiv:2608.04003
+Local:     /mnt/20t/xubuqiang/Study/PAST-Bench
 ```
 
-## Local data layout
+The runtime requires Python 3.11+, Docker, and an LLM API profile. MemBridge should integrate through PAST-Bench's public task/runtime interfaces rather than vendor the benchmark source.
 
-Raw and processed datasets are intentionally ignored by Git:
+## Initial Protocol
+
+The primary experiments fix the agent framework and base model, then vary only persistence and memory coordination:
 
 ```text
-data/raw/locomo/locomo10.json
-data/raw/longmemeval/longmemeval_s_cleaned.json
-data/raw/realmem/...
-data/processed/...
+No persistence
+Native persistence
+Native persistence + ledger only
+Eviction-aware admission
+Retrieval-feedback invocation
+Full MemBridge
 ```
 
-Download LoCoMo with:
+Hermes is the initial agent because PAST-Bench includes an in-process adapter and explicit persistence controls. Hermes+ and a second agent framework are follow-up generalization tests, not prerequisites for the first implementation.
 
-```bash
-bash scripts/download_locomo.sh
+## Rollout Order
+
+```text
+1. One memory-ability family as an end-to-end smoke test
+2. All memory-ability families
+3. Update-ability families to test stale/conflicting memory
+4. Procedural-reuse families
+5. Proactive-information-gathering families
+6. Full 26-family paired evaluation
 ```
 
-The script is proxy-compatible through the standard `http_proxy` and `https_proxy` environment variables.
+Every stage must preserve matched task, model, tool environment, session order, and execution budget across policy variants.
+
+## Scope Boundary
+
+PAST-Bench is the primary benchmark, not part of the MemBridge implementation. MemBridge owns:
+
+- context-eviction and retrieval-feedback event contracts;
+- backend and host adapters;
+- lifecycle accounting;
+- coordination policies;
+- experiment configuration and statistical analysis.
+
+PAST-Bench owns task definitions, sandbox services, agent runtimes, grading, and persistence-control semantics.
+
+Using a single benchmark initially keeps the engineering effort aligned with the research claim. A second interactive agent benchmark should be added only after the PAST-Bench pipeline and main empirical findings are stable.
