@@ -42,6 +42,15 @@ PAST-Bench is the strongest current candidate for the global-cost claim:
 
 It can reveal whether a cheaper memory policy merely shifts cost into model calls, tools, retries, or failed episodes. MemBase does not currently include a PAST-Bench adapter, so this should be a separate integration layer in AgentMemEconomics.
 
+The benchmark source is available locally at `Study/PAST-Bench` (Apache-2.0):
+
+```text
+https://github.com/Gen-Verse/PAST-Bench
+arXiv:2608.04003
+```
+
+The suite contains 26 task families and 204 ordered episodes under `self-evolve-tasks-v2/`. Its runtime requires Python 3.11+, Docker, and an LLM API profile, so it is intentionally kept as an external benchmark checkout rather than vendored into this repository.
+
 AppWorld and LifelongAgentBench are possible follow-up environments, but should not block the first implementation.
 
 ## Recommended order
