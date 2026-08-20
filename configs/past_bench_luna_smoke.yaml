@@ -1,0 +1,15 @@
+judge:
+  enabled: false
+
+runtime:
+  mode: local
+  temperature: 0.0
+
+sandbox:
+  enabled: true
+  image: past-bench-agent:latest
+
+defaults:
+  trace_dir: outputs/traces
+  agent_registry: configs/agents.yaml
+
