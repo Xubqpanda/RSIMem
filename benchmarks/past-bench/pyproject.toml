@@ -1,0 +1,76 @@
+[project]
+name = "past-bench"
+version = "1.0.0"
+description = "Agent evaluation framework for benchmarking AI agents in real-world personal assistant scenarios"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "openai>=1.0",
+    "anthropic>=0.39.0",
+    "httpx>=0.27",
+    "openpyxl>=3.1",
+    "python-docx>=1.2",
+    "python-pptx>=1.0",
+    "pypdf>=4.0",
+]
+
+[project.optional-dependencies]
+mock = ["fastapi>=0.115", "uvicorn>=0.30", "trafilatura>=1.8", "requests>=2.28"]
+web = ["trafilatura>=1.8", "requests>=2.28"]
+sandbox = ["docker>=7.0"]
+skills = ["acontext>=0.1.22", "mem0ai>=1.0.9", "letta-client>=1.10.1", "graphiti-core>=0.8.1"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+past-bench = "past_bench.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-p no:cacheprovider"
+testpaths = [
+    "tests/test_agent_registry.py",
+    "tests/test_hermes_plus_evolve_controller.py",
+    "tests/test_notes_memory_grader.py",
+    "tests/test_session_search_tool_fallback.py",
+    "tests/test_self_evolve.py",
+    "tests/test_self_evolve_acceptance.py",
+    "tests/test_self_evolve_artifact_diff.py",
+    "tests/test_self_evolve_attribution.py",
+    "tests/test_self_evolve_config_recall_grading.py",
+    "tests/test_self_evolve_judge_score_output.py",
+    "tests/test_self_evolve_kb_fixtures.py",
+    "tests/test_self_evolve_reflection_control.py",
+    "tests/test_self_evolve_synthetic_agents.py",
+    "tests/test_self_evolve_v2_bucket_drift.py",
+    "tests/test_self_evolve_v2_ep01_episode_order.py",
+    "tests/test_self_evolve_v2_ep01_judge_rubrics.py",
+    "tests/test_self_evolve_v2_ep01_manifest_controls.py",
+    "tests/test_self_evolve_v2_ep01_no_persistence_semantics.py",
+    "tests/test_self_evolve_v2_ep01_notes_tool_endpoints.py",
+    "tests/test_self_evolve_v2_ep02_episode_order.py",
+    "tests/test_self_evolve_v2_ep02_no_persistence_semantics.py",
+    "tests/test_self_evolve_v2_ep02_semantics.py",
+    "tests/test_self_evolve_v2_ep03_episode_order.py",
+    "tests/test_self_evolve_v2_ep03_grader_guards.py",
+    "tests/test_self_evolve_v2_ep03_no_persistence_semantics.py",
+    "tests/test_self_evolve_v2_episodic_dir_shape.py",
+    "tests/test_self_evolve_v2_family_manifest_sync.py",
+    "tests/test_self_evolve_v2_family_schema.py",
+    "tests/test_self_evolve_v2_hermes_extra_body_static.py",
+    "tests/test_self_evolve_v2_layer1_metrics.py",
+    "tests/test_self_evolve_v2_manifest.py",
+    "tests/test_self_evolve_v2_manifest_paths.py",
+    "tests/test_self_evolve_v2_pg01_grader_alignment.py",
+    "tests/test_self_evolve_v2_pg05_pg06_contracts.py",
+    "tests/test_self_evolve_v2_schema.py",
+    "tests/test_self_evolve_v2_trigger_placement.py",
+]
+norecursedirs = ["agents", "self-evolve-traces*", "traces*", "logs", ".venv", ".runtime_cache"]

@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-A101",
+    "title": "auth-cluster-3 down — login failures on eu-west-1",
+    "description": "Since 08:14 UTC all login attempts via the AuthHub SSO portal are failing with HTTP 500 on eu-west-1. The /api/auth/token endpoint returns 'Internal Server Error'. Engineering confirmed auth-cluster-3 is completely unresponsive. Users across the entire EU region cannot authenticate.",
+    "reporter": "Maria-Gonzalez",
+    "department": "Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T08:17:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-A102",
+    "title": "AuthHub /api/auth/token returning 500 — eu-west-1 users locked out",
+    "description": "Multiple teams reporting they cannot log in. The AuthHub token endpoint /api/auth/token is throwing 500 errors continuously since ~08:15 UTC. Logs point to auth-cluster-3 as the source. This is blocking all CI/CD pipelines that use service account tokens.",
+    "reporter": "James-Okafor",
+    "department": "DevOps",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T08:22:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-A103",
+    "title": "Widespread SSO authentication failure — auth-cluster-3 suspected",
+    "description": "Our monitoring dashboards show a spike of 500-series errors from the AuthHub authentication service starting at 08:14 UTC. The eu-west-1 region is fully impacted. SRE team traceback points to auth-cluster-3 being down. Login failures reported by 47 users so far.",
+    "reporter": "Priya-Nair",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T08:31:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-A104",
+    "title": "Routine password reset request — HR team account",
+    "description": "The HR team shared service account needs a password reset. The current password has expired per our 90-day rotation policy. Please reset and share the new credentials via the secure vault. No urgency — this is a scheduled maintenance item.",
+    "reporter": "Tom-Richardson",
+    "department": "HR",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T09:05:00Z",
+    "tags": []
+  }
+]

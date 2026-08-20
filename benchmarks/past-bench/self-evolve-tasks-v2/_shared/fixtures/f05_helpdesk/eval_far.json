@@ -1,0 +1,72 @@
+[
+  {
+    "ticket_id": "TK-Q501",
+    "title": "eu-central cluster database migration v7 to v8, shards=13",
+    "description": "Database migration event on the eu-central cluster. Upgrading database from v7 to v8. Current shard configuration: shards=13. The cluster is in the eu-central region. Risk assessment required.",
+    "reporter": "Aleksandra-Nowak",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T07:00:00Z",
+    "tags": [],
+    "region": "eu-central",
+    "schema_upgrade": "v7 to v8",
+    "shard_count": 13
+  },
+  {
+    "ticket_id": "TK-Q502",
+    "title": "eu-west region schema from 7 to 8 upgrade, shard_count=2",
+    "description": "Schema upgrade proceeding from 7 to 8 on the eu-west cluster. The shard_count for this cluster is 2. EU region confirmed as eu-west.",
+    "reporter": "Cédric-Martin",
+    "department": "DBA",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T08:30:00Z",
+    "tags": [],
+    "region": "eu-west",
+    "schema_upgrade": "from 7 to 8",
+    "shard_count": 2
+  },
+  {
+    "ticket_id": "TK-Q503",
+    "title": "eu-central DB: schema version 7 to 8 rollout, 15 shards",
+    "description": "Production database rollout on eu-central infrastructure. The schema is being upgraded from version 7 to version 8. The cluster currently runs 15 shards. eu-central region confirmed.",
+    "reporter": "Jana-Horáková",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T09:00:00Z",
+    "tags": [],
+    "region": "eu-central",
+    "schema_upgrade": "version 7 to version 8",
+    "shard_count": 15
+  },
+  {
+    "ticket_id": "TK-Q504",
+    "title": "EU region schema upgrade v8 to v9, shard=3",
+    "description": "EU region database schema upgrade from v8 to v9 is scheduled. Shard count is 3 (odd). Migration proceeding per approved schedule.",
+    "reporter": "Enzo-Romano",
+    "department": "DBA",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T10:30:00Z",
+    "tags": [],
+    "region": "eu-west-1",
+    "schema_upgrade": "v8 to v9",
+    "shard_count": 3
+  },
+  {
+    "ticket_id": "TK-Q505",
+    "title": "EU cluster health check — monitoring alert review",
+    "description": "Routine health check alert triggered by the EU cluster monitoring system. Reviewing CPU and memory utilization trends across eu-west and eu-central nodes.",
+    "reporter": "Maja-Kovacevic",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T11:00:00Z",
+    "tags": [],
+    "region": "eu-west-1",
+    "schema_upgrade": null,
+    "shard_count": null
+  }
+]

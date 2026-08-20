@@ -1,0 +1,38 @@
+[
+  {
+    "ticket_id": "TK-FM03-006",
+    "title": "Cohort analysis data export — Analytics Q2 prep",
+    "description": "Analytics team needs to export cohort retention data for Q2 planning. Will process using pandas library.",
+    "reporter": "Sam Chen",
+    "department": "Analytics Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-05",
+    "tags": [],
+    "category": ""
+  },
+  {
+    "ticket_id": "TK-FM03-007",
+    "title": "Export social media engagement data for campaign",
+    "description": "Marketing department needs an export of social media engagement metrics to optimize the upcoming product launch campaign.",
+    "reporter": "Tina Park",
+    "department": "Marketing Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-05",
+    "tags": [],
+    "category": ""
+  },
+  {
+    "ticket_id": "TK-FM03-008",
+    "title": "Export litigation hold data — Legal review",
+    "description": "Legal team requires export of data under litigation hold for an active case review. This is a compliance-critical request.",
+    "reporter": "Uma Johnson",
+    "department": "Legal Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-05",
+    "tags": [],
+    "category": ""
+  }
+]

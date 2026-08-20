@@ -1,0 +1,16 @@
+{
+  "latent_rule_id": "ep02_exception_list_recall_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "session_search",
+    "require_rule_keywords": ["INTG-AP-010", "INTG-AP-011"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": { "evaluation_only": false, "min_skill_reads": 0 },
+  "mode": "config_recall",
+  "inspected_ids": ["INTG-AP-010", "INTG-AP-011"],
+  "inspection_optional": true,
+  "required_summary_keywords": ["AUDIT", "INTG-AP-010", "INTG-AP-011"],
+  "skill_artifact_weight": 0.0
+}

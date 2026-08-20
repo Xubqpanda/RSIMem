@@ -1,0 +1,477 @@
+agents:
+  baseline_builtin:
+    description: "Host-compatible baseline adapter built on the existing OpenAI-compatible chat loop."
+    adapter: openai_compat_chat
+    install_policy: prebaked
+    capabilities: [tool_use, multimodal, sandbox_file_ops]
+    default_model:
+      model_id: anthropic/claude-sonnet-4.6
+      api_key_env: OPENROUTER_API_KEY
+      base_url: https://openrouter.ai/api/v1
+    model_profiles:
+      openai:
+        model_id: gpt-4o
+        api_key_env: OPENAI_API_KEY
+        base_url: https://api.openai.com/v1
+      anthropic:
+        model_id: claude-sonnet-4-6
+        api_key_env: ANTHROPIC_API_KEY
+        base_url: https://api.anthropic.com/v1
+      kimi:
+        model_id: kimi-k2.6
+        api_key_env: KIMI_CODE_API_KEY
+        base_url: https://api.kimi.com/coding/v1
+      minimax:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimaxi.com/v1
+      minimax_global:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimax.io/v1
+      deepseek:
+        model_id: deepseek-v4-pro
+        api_key_env: DEEPSEEK_API_KEY
+        base_url: https://api.deepseek.com/v1
+      glm:
+        model_id: glm-5.1
+        api_key_env: ZAI_API_KEY
+        base_url: https://api.z.ai/api/paas/v4
+      openrouter:
+        model_id: anthropic/claude-sonnet-4-6
+        api_key_env: OPENROUTER_API_KEY
+        base_url: https://openrouter.ai/api/v1
+
+  codex:
+    description: "Official Codex CLI runtime entry running the real Codex agent inside the runtime container."
+    adapter: codex_cli
+    required_env: [OPENAI_API_KEY]
+    install_policy: prebaked
+    bootstrap_commands:
+      - "codex --version"
+    capabilities: [tool_use, sandbox_file_ops]
+    default_model:
+      model_id: gpt-5-codex
+      api_key_env: OPENAI_API_KEY
+      base_url: https://api.openai.com/v1
+
+  claude:
+    description: "Official Claude Code runtime entry running the real Claude Code CLI inside the runtime container."
+    adapter: claude_code_cli
+    default_profile: anthropic
+    install_policy: prebaked
+    bootstrap_commands:
+      - "claude --version"
+    capabilities: [tool_use, multimodal, sandbox_file_ops]
+    default_model:
+      extra_body:
+        claude_code:
+          env:
+            CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+            DISABLE_AUTOUPDATER: "1"
+            DISABLE_ERROR_REPORTING: "1"
+            DISABLE_TELEMETRY: "1"
+            USE_BUILTIN_RIPGREP: "0"
+    model_profiles:
+      anthropic:
+        model_id: claude-sonnet-4-6
+        api_key_env: ANTHROPIC_API_KEY
+        base_url: https://api.anthropic.com/v1
+        extra_body:
+          claude_code:
+            auth_env: ANTHROPIC_API_KEY
+      minimax:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimaxi.com/anthropic
+        extra_body:
+          claude_code:
+            auth_env: ANTHROPIC_AUTH_TOKEN
+            env:
+              ANTHROPIC_BASE_URL: https://api.minimaxi.com/anthropic
+              ANTHROPIC_MODEL: MiniMax-M2.7
+      minimax_global:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimax.io/anthropic
+        extra_body:
+          claude_code:
+            auth_env: ANTHROPIC_AUTH_TOKEN
+            env:
+              ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic
+              ANTHROPIC_MODEL: MiniMax-M2.7
+      deepseek:
+        model_id: deepseek-v4-pro
+        api_key_env: DEEPSEEK_API_KEY
+        base_url: https://api.deepseek.com/anthropic
+        extra_body:
+          claude_code:
+            auth_env: ANTHROPIC_AUTH_TOKEN
+            env:
+              ANTHROPIC_BASE_URL: https://api.deepseek.com/anthropic
+              ANTHROPIC_MODEL: deepseek-v4-pro
+      kimi:
+        model_id: kimi-k2.6
+        api_key_env: KIMI_CODE_API_KEY
+        base_url: https://api.kimi.com/coding/
+        extra_body:
+          claude_code:
+            auth_env: ANTHROPIC_API_KEY
+            cli_model: sonnet
+            set_model_env: false
+            env:
+              ANTHROPIC_BASE_URL: https://api.kimi.com/coding/
+              ENABLE_TOOL_SEARCH: "false"
+      glm:
+        model_id: glm-4.7
+        api_key_env: ZAI_API_KEY
+        base_url: https://api.z.ai/api/anthropic
+        extra_body:
+          claude_code:
+            auth_env: ANTHROPIC_AUTH_TOKEN
+            cli_model: sonnet
+            set_model_env: false
+            env:
+              ANTHROPIC_BASE_URL: https://api.z.ai/api/anthropic
+              API_TIMEOUT_MS: "3000000"
+              ANTHROPIC_DEFAULT_HAIKU_MODEL: glm-4.5-air
+              ANTHROPIC_DEFAULT_SONNET_MODEL: glm-4.7
+              ANTHROPIC_DEFAULT_OPUS_MODEL: glm-4.7
+
+  hermes:
+    description: "Hermes Agent with built-in tool system and multi-provider support."
+    adapter: hermes
+    install_policy: pip
+    bootstrap_commands:
+      - "pip install -e agents/hermes-agent"
+    capabilities: [tool_use, multimodal, sandbox_file_ops]
+    default_model:
+      model_id: claude-sonnet-4-6
+      api_key_env: ANTHROPIC_API_KEY
+      base_url: https://api.anthropic.com/v1
+    model_profiles:
+      openai:
+        model_id: gpt-4o
+        api_key_env: OPENAI_API_KEY
+        base_url: https://api.openai.com/v1
+      openai_gpt54:
+        model_id: gpt-5.4
+        api_key_env: OPENAI_API_KEY
+        base_url: https://api.openai.com/v1
+      anthropic:
+        model_id: claude-sonnet-4-6
+        api_key_env: ANTHROPIC_API_KEY
+        base_url: https://api.anthropic.com/v1
+      kimi:
+        model_id: kimi-k2.6
+        api_key_env: KIMI_CODE_API_KEY
+        base_url: https://api.kimi.com/coding/v1
+      minimax:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimaxi.com/anthropic
+      minimax_global:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimax.io/anthropic
+      deepseek:
+        model_id: deepseek-v4-pro
+        api_key_env: DEEPSEEK_API_KEY
+        base_url: https://api.deepseek.com/anthropic
+      glm:
+        model_id: glm-5.1
+        api_key_env: ZAI_API_KEY
+        base_url: https://api.z.ai/api/anthropic
+      openrouter:
+        model_id: anthropic/claude-sonnet-4-6
+        api_key_env: OPENROUTER_API_KEY
+        base_url: https://openrouter.ai/api/v1
+      openrouter_opus:
+        model_id: anthropic/claude-opus-4-6
+        api_key_env: OPENROUTER_API_KEY
+        base_url: https://openrouter.ai/api/v1
+
+  hermes-plus:
+    description: "Hermes Agent with enhanced evolve mechanisms for self-evolve benchmark."
+    adapter: hermes
+    install_policy: pip
+    bootstrap_commands:
+      - "pip install -e agents/hermes-plus"
+    capabilities: [tool_use, multimodal, sandbox_file_ops]
+    default_model:
+      model_id: claude-sonnet-4-6
+      api_key_env: ANTHROPIC_API_KEY
+      base_url: https://api.anthropic.com/v1
+    model_profiles:
+      openai:
+        model_id: gpt-4o
+        api_key_env: OPENAI_API_KEY
+        base_url: https://api.openai.com/v1
+      openai_gpt54:
+        model_id: gpt-5.4
+        api_key_env: OPENAI_API_KEY
+        base_url: https://api.openai.com/v1
+      anthropic:
+        model_id: claude-sonnet-4-6
+        api_key_env: ANTHROPIC_API_KEY
+        base_url: https://api.anthropic.com/v1
+      kimi:
+        model_id: kimi-k2.6
+        api_key_env: KIMI_CODE_API_KEY
+        base_url: https://api.kimi.com/coding/v1
+      minimax:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimaxi.com/anthropic
+      minimax_global:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimax.io/anthropic
+      deepseek:
+        model_id: deepseek-v4-pro
+        api_key_env: DEEPSEEK_API_KEY
+        base_url: https://api.deepseek.com/anthropic
+      glm:
+        model_id: glm-5.1
+        api_key_env: ZAI_API_KEY
+        base_url: https://api.z.ai/api/anthropic
+
+  agent_zero:
+    description: "Agent Zero dynamic AI agent framework with LiteLLM multi-provider support."
+    adapter: agent_zero
+    install_policy: pip
+    bootstrap_commands:
+      - "pip install -r agents/agent-zero/requirements-docker.txt --prefer-binary"
+    capabilities: [tool_use, sandbox_file_ops]
+    default_model:
+      model_id: openrouter/anthropic/claude-sonnet-4-6
+      api_key_env: OPENROUTER_API_KEY
+      base_url: https://openrouter.ai/api/v1
+    model_profiles:
+      openai:
+        model_id: gpt-4o
+        api_key_env: OPENAI_API_KEY
+        base_url: https://api.openai.com/v1
+      anthropic:
+        model_id: anthropic/claude-sonnet-4-6
+        api_key_env: ANTHROPIC_API_KEY
+        base_url: https://api.anthropic.com/v1
+      opus:
+        model_id: anthropic/claude-opus-4-6
+        api_key_env: ANTHROPIC_API_KEY
+        base_url: https://api.anthropic.com/v1
+      kimi:
+        model_id: kimi/kimi-k2.6
+        api_key_env: KIMI_CODE_API_KEY
+        base_url: https://api.kimi.com/coding/
+      minimax:
+        model_id: minimax/MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimaxi.com/anthropic
+      minimax_global:
+        model_id: minimax_global/MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimax.io/anthropic
+      deepseek:
+        model_id: deepseek/deepseek-v4-pro
+        api_key_env: DEEPSEEK_API_KEY
+        base_url: https://api.deepseek.com/anthropic
+      glm:
+        model_id: zai_anthropic/glm-4.7
+        api_key_env: ZAI_API_KEY
+        base_url: https://api.z.ai/api/anthropic
+      openrouter:
+        model_id: openrouter/anthropic/claude-sonnet-4-6
+        api_key_env: OPENROUTER_API_KEY
+        base_url: https://openrouter.ai/api/v1
+
+  zeroclaw:
+    description: "ZeroClaw LangGraph agent with built-in tool calling for consistent execution."
+    adapter: zeroclaw
+    install_policy: pip
+    bootstrap_commands:
+      - "pip install -e agents/zeroclaw/python"
+    capabilities: [tool_use, sandbox_file_ops]
+    default_model:
+      model_id: glm-5
+      api_key_env: GLM_API_KEY
+      base_url: https://api.z.ai/api/coding/paas/v4
+    model_profiles:
+      openai:
+        model_id: gpt-4o
+        api_key_env: OPENAI_API_KEY
+        base_url: https://api.openai.com/v1
+      anthropic:
+        model_id: claude-sonnet-4-6
+        api_key_env: ANTHROPIC_API_KEY
+        base_url: https://api.anthropic.com/v1
+      kimi:
+        model_id: kimi-k2.6
+        api_key_env: KIMI_CODE_API_KEY
+        base_url: https://api.kimi.com/coding/v1
+      minimax:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimaxi.com/v1
+      minimax_global:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimax.io/v1
+      deepseek:
+        model_id: deepseek-v4-pro
+        api_key_env: DEEPSEEK_API_KEY
+        base_url: https://api.deepseek.com/v1
+      glm:
+        model_id: glm-4.7
+        api_key_env: ZAI_API_KEY
+        base_url: https://api.z.ai/api/anthropic
+      openrouter:
+        model_id: anthropic/claude-sonnet-4-6
+        api_key_env: OPENROUTER_API_KEY
+        base_url: https://openrouter.ai/api/v1
+
+  nanobot:
+    description: "nanobot ultra-lightweight AI agent framework with native multi-provider support."
+    adapter: nanobot
+    install_policy: pip
+    bootstrap_commands:
+      - "pip install -e agents/nanobot"
+    capabilities: [tool_use, sandbox_file_ops]
+    default_model:
+      model_id: anthropic/claude-sonnet-4-6
+      api_key_env: OPENROUTER_API_KEY
+      base_url: https://openrouter.ai/api/v1
+    model_profiles:
+      openai:
+        model_id: gpt-4o
+        api_key_env: OPENAI_API_KEY
+        base_url: https://api.openai.com/v1
+        extra_body:
+          nanobot:
+            provider: openai_compat
+      anthropic:
+        model_id: claude-sonnet-4-6
+        api_key_env: ANTHROPIC_API_KEY
+        base_url: https://api.anthropic.com/v1
+        extra_body:
+          nanobot:
+            provider: anthropic
+      kimi:
+        model_id: kimi-k2.6
+        api_key_env: KIMI_CODE_API_KEY
+        base_url: https://api.kimi.com/coding/v1
+        extra_body:
+          nanobot:
+            provider: openai_compat
+      minimax:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimaxi.com/v1
+        extra_body:
+          nanobot:
+            provider: openai_compat
+      minimax_global:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimax.io/v1
+        extra_body:
+          nanobot:
+            provider: openai_compat
+      deepseek:
+        model_id: deepseek-v4-pro
+        api_key_env: DEEPSEEK_API_KEY
+        base_url: https://api.deepseek.com/v1
+        extra_body:
+          nanobot:
+            provider: openai_compat
+      glm:
+        model_id: glm-4.7
+        api_key_env: ZAI_API_KEY
+        base_url: https://api.z.ai/api/anthropic
+        extra_body:
+          nanobot:
+            provider: anthropic
+      openrouter:
+        model_id: anthropic/claude-sonnet-4-6
+        api_key_env: OPENROUTER_API_KEY
+        base_url: https://openrouter.ai/api/v1
+        extra_body:
+          nanobot:
+            provider: openai_compat
+
+  openclaw:
+    description: "Real OpenClaw runtime entry backed by the OpenClaw Gateway OpenResponses API."
+    adapter: openclaw_responses
+    default_profile: kimi
+    install_policy: prebaked
+    bootstrap_commands:
+      - "openclaw --version"
+    capabilities: [tool_use, multimodal, sandbox_file_ops]
+    default_model:
+      extra_body:
+        openclaw:
+          input_modalities: [text]
+          context_window: 32768
+          max_tokens: 8192
+    model_profiles:
+      kimi:
+        model_id: kimi-k2.6
+        api_key_env: KIMI_CODE_API_KEY
+        base_url: https://api.kimi.com/coding
+        extra_body:
+          openclaw:
+            provider_api: anthropic-messages
+            provider_id: kimi
+      openai:
+        model_id: gpt-5
+        api_key_env: OPENAI_API_KEY
+        base_url: https://api.openai.com/v1
+        extra_body:
+          openclaw:
+            provider_api: openai-completions
+            provider_id: openai
+            input_modalities: [text, image]
+      minimax:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimaxi.com/anthropic
+        extra_body:
+          openclaw:
+            provider_api: anthropic-messages
+            provider_id: minimax
+      minimax_global:
+        model_id: MiniMax-M2.7
+        api_key_env: MINIMAX_API_KEY
+        base_url: https://api.minimax.io/anthropic
+        extra_body:
+          openclaw:
+            provider_api: anthropic-messages
+            provider_id: minimax
+      deepseek:
+        model_id: deepseek-v4-pro
+        api_key_env: DEEPSEEK_API_KEY
+        base_url: https://api.deepseek.com/anthropic
+        extra_body:
+          openclaw:
+            provider_api: anthropic-messages
+            provider_id: deepseek
+      claude:
+        model_id: claude-sonnet-4-6
+        api_key_env: ANTHROPIC_API_KEY
+        base_url: https://api.anthropic.com/v1
+        extra_body:
+          openclaw:
+            provider_api: anthropic-messages
+            provider_id: anthropic
+            input_modalities: [text, image]
+      glm:
+        model_id: glm-4.7
+        api_key_env: ZAI_API_KEY
+        base_url: https://api.z.ai/api/anthropic
+        extra_body:
+          openclaw:
+            provider_api: anthropic-messages
+            provider_id: zai
+            input_modalities: [text]
+            context_window: 200000
+            max_tokens: 128000

@@ -1,0 +1,32 @@
+{
+  "latent_rule_id": "pg05_change_freeze_followup_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "update_or_stabilize",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "POLICY_UPDATED|change_freeze_lookup"
+  ],
+  "forbidden_output_keywords": [
+    "CAB-FRZ-441",
+    "CAB-FRZ-468",
+    "Atlas Billing",
+    "atlas-replay"
+  ],
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "latest matching freeze packet",
+      "exact UTC start",
+      "exact UTC end",
+      "exception projects",
+      "before updating or sharing",
+      "stale or wrong-scope"
+    ],
+    "min_count_delta": 0
+  },
+  "apply_mechanism_caps": true,
+  "min_skill_writes": 1,
+  "skill_write_weight": 0.12,
+  "missing_learning_cap": 0.45
+}

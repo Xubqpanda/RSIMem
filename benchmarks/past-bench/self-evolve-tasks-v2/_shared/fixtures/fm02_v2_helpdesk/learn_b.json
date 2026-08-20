@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-FM02-U01",
+    "title": "zone-central-4 payment processor returning errors",
+    "description": "The payment processing service in zone-central-4 started returning 500 errors at 16:20 UTC. Credit card transactions are failing. The service cannot reach the zone-central-4 payment gateway backend.",
+    "reporter": "David-Kim",
+    "department": "Payments",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T16:25:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-U02",
+    "title": "Order service 500 errors in zone-central-4",
+    "description": "The order management service in zone-central-4 is returning intermittent 500 errors since 16:18 UTC. New orders cannot be placed. The service logs show connection refused errors to downstream dependencies in zone-central-4.",
+    "reporter": "Emily-Zhao",
+    "department": "Commerce",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T16:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-U03",
+    "title": "Inventory sync stalled — zone-central-4",
+    "description": "Real-time inventory synchronization between warehouse systems and the zone-central-4 commerce platform has stopped. Last successful sync was at 16:15 UTC. The sync service reports connectivity issues to the zone-central-4 data layer.",
+    "reporter": "Raj-Patel",
+    "department": "Supply Chain",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T16:35:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-U04",
+    "title": "Request: increase API rate limits on zone-central-4 gateway",
+    "description": "Our partner integration team needs higher rate limits on the zone-central-4 API gateway for the upcoming Black Friday campaign. Current limit is 1000 req/s, requesting 5000 req/s. Not urgent — campaign is in 6 weeks.",
+    "reporter": "Lisa-Morton",
+    "department": "Partnerships",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T17:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-U05",
+    "title": "Single report: zone-west-2 slow DNS resolution",
+    "description": "One user reported intermittent slow DNS resolution for services in zone-west-2. The issue has only been reported once and may be transient. No other reports from zone-west-2 users.",
+    "reporter": "Kai-Tanaka",
+    "department": "Support",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T17:15:00Z",
+    "tags": []
+  }
+]

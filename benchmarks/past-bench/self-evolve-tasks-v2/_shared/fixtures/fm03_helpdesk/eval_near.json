@@ -1,0 +1,26 @@
+[
+  {
+    "ticket_id": "TK-FM03-009",
+    "title": "Export A/B test results dataset — Analytics",
+    "description": "Analytics team needs to export raw A/B test results for the onboarding flow experiment. Will use polars for processing.",
+    "reporter": "Victor Liu",
+    "department": "Analytics Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-07",
+    "tags": [],
+    "category": ""
+  },
+  {
+    "ticket_id": "TK-FM03-010",
+    "title": "Export transaction history for financial reporting",
+    "description": "Engineering team needs to export the full transaction history table for an internal financial performance report.",
+    "reporter": "Wendy Zhang",
+    "department": "Engineering Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-07",
+    "tags": [],
+    "category": ""
+  }
+]

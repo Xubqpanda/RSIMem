@@ -1,0 +1,11 @@
+[
+  {
+    "note_id": "NOTE-SM01-004",
+    "title": "Product Review Follow-up",
+    "created_at": "2026-04-13",
+    "participants": ["Iris Chen", "Victor Hu", "Mina Park", "Owen Bell"],
+    "duration_minutes": 40,
+    "content": "Product review follow-up.\n\nAction items:\n1. Iris Chen: close the attribution drift bug, critical, by Apr 28\n2. Victor Hu: tighten the alert dedupe threshold, normal priority, by Apr 29\n3. Mina Park: publish the weekly adoption memo, low priority, by Apr 30\n\nOwen Bell joined as an observer.",
+    "duration_minutes": 40
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "KB-PLK-001-INDEX",
+    "title": "Plonk Incident Response SOP Index",
+    "category": "PlonkOps",
+    "tags": ["plonk", "incident", "sop", "operations", "index"],
+    "content": "Index entry for Plonk incident handling. The full incident response SOP is maintained in KB-PLK-001 and covers how to find the source alert, pin the evidence message, and publish the official incident status. This brief index does not include exact API method names or parameter names.",
+    "last_updated": "2026-04-01",
+    "views": 7
+  }
+]

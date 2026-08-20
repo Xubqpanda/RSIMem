@@ -1,0 +1,15 @@
+{
+  "session_id": "sm03_phoenix_old_release",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Record Phoenix release freeze date 2026-06-14 for rollout coordination."
+    },
+    {
+      "role": "assistant",
+      "content": "Saved Phoenix release freeze date as 2026-06-14 and owners Elena Gomez, Ravi Shah."
+    }
+  ]
+}

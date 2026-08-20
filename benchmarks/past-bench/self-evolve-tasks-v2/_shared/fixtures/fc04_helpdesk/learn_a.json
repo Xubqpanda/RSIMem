@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-E201",
+    "title": "PR #901 — crawler service uses import requests",
+    "description": "PR #901 for the data crawler service uses import requests and calls requests.get to fetch external data. Please review.",
+    "reporter": "Data-Bob Zhang",
+    "department": "Data Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E202",
+    "title": "PR #902 — API gateway fully migrated to httpx",
+    "description": "PR #902 for the API gateway has been fully migrated to the httpx async client, with connection pool and timeout configuration improvements.",
+    "reporter": "Backend-Linda Wei",
+    "department": "Backend Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E203",
+    "title": "PR #903 — notification service uses requests.post",
+    "description": "PR #903 for the notification service uses requests.post to send webhook notifications. Please review against the latest standards.",
+    "reporter": "Operations-Dan Park",
+    "department": "Operations Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E204",
+    "title": "Request: VPN access for new developers",
+    "description": "Newly onboarded developers need VPN access. This is an IT access request, not a code review issue.",
+    "reporter": "HR-Fiona Lee",
+    "department": "Human Resources",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T11:00:00Z",
+    "tags": []
+  }
+]

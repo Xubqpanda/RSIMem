@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM02-005",
+    "title": "Security Planning Readiness Review",
+    "created_at": "2026-04-14",
+    "participants": ["Chloe Sun", "Marcus Lee", "Owen Brooks", "Sana Cho"],
+    "duration_minutes": 55,
+    "content": "Security planning readiness review.\n\nAction items:\n1. Chloe Sun: finalize the permission matrix for the launch freeze\n2. Marcus Lee: tighten the incident runbook handoff section\n3. Owen Brooks: summarize the open partner dependencies\n\nSana Cho attended as an observer."
+  }
+]

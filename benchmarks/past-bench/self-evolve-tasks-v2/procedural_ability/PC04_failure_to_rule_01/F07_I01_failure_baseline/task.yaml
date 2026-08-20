@@ -1,0 +1,135 @@
+task_id: V2_F07_I01
+task_name: F07 Failure to Rule — DeployBoard Baseline
+category: self_evolve
+difficulty: hard
+services:
+- name: helpdesk
+  command: python mock_services/helpdesk/server.py
+  port: 9200
+  health_check: http://localhost:9200/helpdesk/tickets
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9200/helpdesk/reset
+  env:
+    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/f07_helpdesk/baseline.json
+    PORT: '9200'
+- name: kb
+  command: python mock_services/kb/server.py
+  port: 9201
+  health_check: http://localhost:9201/kb/search
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9201/kb/reset
+  env:
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/f07_kb/brief.json
+    PORT: '9201'
+prompt:
+  text: '[COLD BASELINE — no prior deployment triage knowledge assumed]
+
+
+    You are a deployment incident triage agent. The KB has a brief overview of deployment
+
+    incident triage. Process the open tickets. Group child tickets by deployment event
+
+    and update them. Do NOT close any ticket.
+
+
+    For each child ticket you identify, set appropriate priority, category, and tags.
+
+    Distinguish deployment-related child tickets from unrelated tickets.
+
+
+    Output one line per updated ticket: TICKET_ID|priority|category|tags
+
+    You MUST use helpdesk_list_tickets, helpdesk_get_ticket, and helpdesk_update_ticket
+    tools to process and update tickets.
+
+    '
+  language: en
+tools:
+- name: helpdesk_list_tickets
+  description: List all open helpdesk tickets.
+  input_schema:
+    type: object
+    properties:
+      status:
+        type: string
+        description: Filter by ticket status (e.g., open, closed).
+    required: []
+- name: helpdesk_get_ticket
+  description: Get details of a specific helpdesk ticket.
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+        description: The ticket ID to retrieve.
+    required:
+    - ticket_id
+- name: helpdesk_update_ticket
+  description: Update a helpdesk ticket with new priority, category, status, or tags.
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+        description: The ticket ID to update.
+      priority:
+        type: string
+        description: New priority value.
+      category:
+        type: string
+        description: New category value.
+      status:
+        type: string
+        description: New status value.
+      tags:
+        type: array
+        items:
+          type: string
+        description: Tags to apply to the ticket.
+    required:
+    - ticket_id
+- name: kb_search
+  description: Search the knowledge base for articles matching a query.
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+        description: Search query string.
+    required:
+    - query
+- name: kb_get_article
+  description: Retrieve a specific knowledge base article by ID.
+  input_schema:
+    type: object
+    properties:
+      article_id:
+        type: string
+        description: The article ID to retrieve.
+    required:
+    - article_id
+tool_endpoints:
+- tool_name: helpdesk_list_tickets
+  url: http://localhost:9200/helpdesk/tickets
+  method: POST
+- tool_name: helpdesk_get_ticket
+  url: http://localhost:9200/helpdesk/tickets/get
+  method: POST
+- tool_name: helpdesk_update_ticket
+  url: http://localhost:9200/helpdesk/tickets/update
+  method: POST
+- tool_name: kb_search
+  url: http://localhost:9201/kb/search
+  method: POST
+- tool_name: kb_get_article
+  url: http://localhost:9201/kb/articles/get
+  method: POST
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+judge_rubric: Cold baseline — no SOP provided. Reward tagging TK-R102 and TK-R103
+  as deploy-child (release_hash=abc123), leaving them open, and NOT updating TK-R101
+  (root) or TK-R104 (different hash). Accept any reasonable priority/category assignments
+  since no full SOP is available. Penalize closing any ticket.

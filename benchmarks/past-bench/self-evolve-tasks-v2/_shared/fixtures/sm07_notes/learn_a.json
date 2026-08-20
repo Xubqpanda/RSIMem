@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM07-002",
+    "title": "Scoped Routing Seed",
+    "created_at": "2026-05-12",
+    "participants": ["Sarah Zhang", "Leo Li", "Kevin Wang", "Noah Price", "Marta Hill"],
+    "duration_minutes": 35,
+    "content": "Scoped routing seed.\n\nAction items:\n1. [Security][High] Sarah Zhang: rotate the privileged credential bundle, due 2026-07-05\n2. [Ops][Medium] Leo Li: rebuild the delayed deployment queue, due 2026-07-06\n3. [Security][Low] Kevin Wang: archive the completed audit attachments, due 2026-07-07\n4. [Ops][High] Noah Price: confirm the rollback checklist refresh, due 2026-07-08\n\nMarta Hill attended as an observer."
+  }
+]

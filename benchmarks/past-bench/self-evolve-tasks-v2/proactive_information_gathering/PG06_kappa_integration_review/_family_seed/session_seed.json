@@ -1,0 +1,484 @@
+{
+  "sessions": [
+    {
+      "id": "pg06-kappa-weekly-exceptions",
+      "source": "seed",
+      "title": "Kappa weekly exception list current",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current weekly exception list for Kappa integrations."
+        },
+        {
+          "role": "assistant",
+          "content": "This week's Kappa exception IDs are INT-K204 and INT-K207. Recover the exact IDs from session history before escalating, and do not store them as durable policy."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-exceptions-old",
+      "source": "seed",
+      "title": "Kappa weekly exception list old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Kappa exception list."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded Kappa exception IDs were INT-K109 and INT-K111 for last week only. Do not reuse them after the current weekly list changed."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-oneoff-shortcut",
+      "source": "seed",
+      "title": "Northstar one-off shortcut",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can we reuse the Northstar attachment shortcut?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off shortcut only: for INT-K299 in the earlier Northstar review, attachment confirmation was waived once. Do not generalize this shortcut to later Kappa reviews."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-shell",
+      "source": "seed",
+      "title": "Kappa weekly exception list current shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current shell for the Kappa weekly exception list."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: this week's Kappa review still has two exact exception IDs, but the authoritative IDs were intentionally omitted from this shell. Re-check the exact weekly list before escalating."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-draft-208",
+      "source": "seed",
+      "title": "Kappa weekly exception list latest draft",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest draft of the Kappa weekly exception list."
+        },
+        {
+          "role": "assistant",
+          "content": "Draft only: this week's Kappa exception IDs look like INT-K204 and INT-K208, but this draft was not finalized and should not be used as the settled weekly list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-alt-203",
+      "source": "seed",
+      "title": "Kappa weekly exception list current alt review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current alternate Kappa weekly exception review."
+        },
+        {
+          "role": "assistant",
+          "content": "Review note only: Kappa weekly exceptions were discussed as INT-K203 and INT-K207 for a narrow partner path, but this note was not adopted as the current general weekly list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-payment-surface",
+      "source": "seed",
+      "title": "Kappa payment surface weekly exception list",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current weekly exception list for the Kappa payment surface."
+        },
+        {
+          "role": "assistant",
+          "content": "Payment-surface review note: temporary Kappa exception IDs for the payment surface were INT-K204 and INT-K211 this week. This surface-specific note should not replace the settled general weekly list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-identity-surface",
+      "source": "seed",
+      "title": "Kappa identity surface weekly exception list",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current weekly exception list for the Kappa identity surface."
+        },
+        {
+          "role": "assistant",
+          "content": "Identity-surface review note: temporary Kappa exception IDs for the identity surface were INT-K207 and INT-K214 this week. This surface-specific note should not replace the settled general weekly list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-recap-prev",
+      "source": "seed",
+      "title": "Kappa weekly exception recap previous week",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the previous Kappa weekly exception list."
+        },
+        {
+          "role": "assistant",
+          "content": "Previous-week recap only: Kappa exceptions had shifted away from the INT-K10x range, but this recap does not preserve the exact settled IDs for the current week."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-two-weeks-old",
+      "source": "seed",
+      "title": "Kappa weekly exception list two weeks old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Kappa weekly exception list from two weeks ago."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded Kappa exception IDs were INT-K101 and INT-K104 for that earlier week only. Do not reuse them after newer weekly lists replaced them."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-memo-partial",
+      "source": "seed",
+      "title": "Kappa weekly exception memo partial",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Kappa weekly exception memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial memo: this week's Kappa review still has two exact exception IDs in the INT-K20x range, but this memo intentionally omits the final identifiers. Do not escalate from the memo alone."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-latest-packet",
+      "source": "seed",
+      "title": "Kappa weekly exception list latest packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest packet for the Kappa weekly exception list."
+        },
+        {
+          "role": "assistant",
+          "content": "Packet note only: this week's Kappa exception IDs were listed as INT-K204 and INT-K212 in the latest packet draft. Confirm the settled list before using it."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-current-looking-archive",
+      "source": "seed",
+      "title": "Kappa weekly exception list current-looking archive",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current-looking archive for the Kappa weekly list."
+        },
+        {
+          "role": "assistant",
+          "content": "Expired archive only: Kappa exception IDs INT-K204 and INT-K205 were valid for a short rollover window ending 2026-04-18. Do not treat this archive as the current weekly list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-oncall-recap",
+      "source": "seed",
+      "title": "Kappa weekly exception oncall recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the Kappa weekly exceptions for oncall."
+        },
+        {
+          "role": "assistant",
+          "content": "Oncall recap only: the current Kappa weekly exceptions still include two exact INT-K20x IDs, but this recap omits the final identifiers and should not be used as the settled list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-routing-patch-note",
+      "source": "seed",
+      "title": "Kappa scoped routing patch note",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the scoped routing patch for Kappa integrations?"
+        },
+        {
+          "role": "assistant",
+          "content": "Scoped routing note: customer-facing payment or identity Kappa notes now route to the updated alias, while other Kappa escalations keep the prior alias. This routing note does not restate the weekly exception IDs."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-routing-draft-old-alias",
+      "source": "seed",
+      "title": "Kappa scoped routing draft old alias",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the earlier draft for Kappa scoped routing."
+        },
+        {
+          "role": "assistant",
+          "content": "Draft only: all Kappa escalations were still routed to the prior alias in this draft. It predates the scoped alias update and should not be used as the final routing rule."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-routing-partial",
+      "source": "seed",
+      "title": "Kappa scoped routing partial memo",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the scoped Kappa routing memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial memo: some Kappa payment and identity notes now use the updated alias, but this memo omits the exact weekly exception IDs and should not replace them."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-old-alias-reminder",
+      "source": "seed",
+      "title": "Kappa old alias reminder",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Should Kappa still use the old alias?"
+        },
+        {
+          "role": "assistant",
+          "content": "Reminder only: an older Kappa panel still shows the prior alias, but this reminder is not authoritative after the scoped routing update."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-northstar-followup",
+      "source": "seed",
+      "title": "Northstar one-off shortcut follow-up",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can the Northstar attachment shortcut be reused for Kappa?"
+        },
+        {
+          "role": "assistant",
+          "content": "Follow-up note only: the earlier Northstar one-off shortcut still points to INT-K299, but it remained a one-time waiver and must not leak into later Kappa reviews."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-southstar-shortcut",
+      "source": "seed",
+      "title": "Southstar one-off shortcut",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can we reuse the Southstar attachment shortcut?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off shortcut only: for INT-K312 in an earlier Southstar review, attachment confirmation was waived once. Do not generalize this shortcut to later Kappa reviews."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-identity-oneoff",
+      "source": "seed",
+      "title": "Kappa identity attachment one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can the Kappa identity surface reuse the attachment one-off?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off note only: for INT-K318 in an earlier Kappa identity review, attachment confirmation was waived once. This one-off must not replace the current workflow or weekly exception recall."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-partner-oneoff",
+      "source": "seed",
+      "title": "Kappa partner surface one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can the Kappa partner surface reuse the earlier one-off?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off note only: for INT-K325 in an earlier Kappa partner review, a single escalation was waived once. Do not generalize this one-off to the current week."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-beta-surface-list",
+      "source": "seed",
+      "title": "Kappa beta surface weekly exception list",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current weekly exception list for the Kappa beta surface."
+        },
+        {
+          "role": "assistant",
+          "content": "Beta-surface review note: temporary Kappa exception IDs for the beta surface were INT-K206 and INT-K208 this week. This surface note should not replace the settled general weekly list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-sandbox-list",
+      "source": "seed",
+      "title": "Kappa sandbox weekly exception list",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current weekly exception list for the Kappa sandbox surface."
+        },
+        {
+          "role": "assistant",
+          "content": "Sandbox review note: temporary Kappa exception IDs for the sandbox surface were INT-K207 and INT-K215 this week. This sandbox note should not replace the settled general weekly list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-draft-partial",
+      "source": "seed",
+      "title": "Kappa weekly exception list current draft partial",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current draft partial for the Kappa weekly exceptions."
+        },
+        {
+          "role": "assistant",
+          "content": "Draft partial only: this week's Kappa review still had two INT-K20x exceptions, one beginning with 204 and the other in the high 20x range, but the draft intentionally omitted the final IDs."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-review-memo",
+      "source": "seed",
+      "title": "Kappa weekly exception review memo",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Kappa weekly exception review memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Review memo only: the current Kappa weekly exception list still contains two exact IDs and must be recovered from session history before any escalation. The memo does not restate them."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-monday-rollover",
+      "source": "seed",
+      "title": "Kappa weekly exception list current Monday rollover",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Monday rollover Kappa weekly exception list."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded Monday rollover list: Kappa exception IDs were INT-K204 and INT-K206 during the rollover draft, but that pair was replaced by the settled current weekly list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-weekly-incident-recap",
+      "source": "seed",
+      "title": "Kappa weekly exception incident recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the Kappa weekly exceptions mentioned in the incident review."
+        },
+        {
+          "role": "assistant",
+          "content": "Incident recap only: the current Kappa incident review still points to two exact INT-K20x weekly exceptions, but this recap does not preserve the final identifiers or replace the settled list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-workflow-followup-shell",
+      "source": "seed",
+      "title": "Kappa workflow follow-up shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Kappa workflow follow-up shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Workflow shell only: continue using the established Kappa review workflow and recover the current weekly exception IDs before escalating. This shell does not restate the IDs."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-routing-final-partial",
+      "source": "seed",
+      "title": "Kappa scoped alias final partial",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the final partial note for the Kappa alias update."
+        },
+        {
+          "role": "assistant",
+          "content": "Final partial note: identity or payment Kappa notes now use the updated alias, while other Kappa escalations keep the prior alias. The weekly exception IDs still need to be recovered separately."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-payments-current-alt",
+      "source": "seed",
+      "title": "Kappa payments current exception alt",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current alternate exception list for Kappa payments."
+        },
+        {
+          "role": "assistant",
+          "content": "Alternate payment note only: current Kappa payment exceptions were discussed as INT-K204 and INT-K216 for one narrow review path. This note should not replace the settled general weekly list."
+        }
+      ]
+    },
+    {
+      "id": "pg06-kappa-identity-current-alt",
+      "source": "seed",
+      "title": "Kappa identity current exception alt",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current alternate exception list for Kappa identity."
+        },
+        {
+          "role": "assistant",
+          "content": "Alternate identity note only: current Kappa identity exceptions were discussed as INT-K207 and INT-K219 for one narrow review path. This note should not replace the settled general weekly list."
+        }
+      ]
+    }
+  ]
+}

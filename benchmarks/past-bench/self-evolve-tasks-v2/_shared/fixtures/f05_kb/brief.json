@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "kb_f05_brief",
+    "title": "DB Migration Incident Overview",
+    "category": "db-incident-management",
+    "content": "Database migration incidents require multi-clue correlation before escalation. Not every migration event constitutes a risk — specific combinations of region, schema version, and cluster configuration must be evaluated together. Single-indicator matches are insufficient. See the full DB Migration Correlation SOP for precise criteria and escalation procedures.",
+    "tags": [],
+    "last_updated": "2026-04-01",
+    "views": 0
+  }
+]

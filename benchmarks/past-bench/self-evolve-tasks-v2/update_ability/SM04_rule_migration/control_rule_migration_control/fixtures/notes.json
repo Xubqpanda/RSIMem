@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM04-006",
+    "title": "Infrastructure Review Follow-up",
+    "created_at": "2026-04-15",
+    "participants": ["Renee Shah", "Evan Lin", "Noah Price", "Dylan Moss"],
+    "duration_minutes": 45,
+    "content": "Infrastructure review follow-up.\n\nCurrent review rule (Aurora-2S is deprecated): output one line per action item as <owner> | Borealis-4DQ | <task> | <due_date>. Share the source note only with High priority owners.\n\nAction items:\n1. Renee Shah: tighten the deployment guardrail checks, High priority, by May 6\n2. Evan Lin: clean up the remaining review drift in worker configs, Medium priority, by May 7\n3. Noah Price: update the infrastructure review examples in the handbook, Low priority, by May 8\n\nDylan Moss attended as an observer."
+  }
+]

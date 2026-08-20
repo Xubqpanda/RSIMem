@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-FM02-F01",
+    "title": "region-ap-3 user authentication degraded",
+    "description": "User authentication flows in region-ap-3 are experiencing elevated error rates since 08:15 UTC. OAuth token validation is intermittently failing. Approximately 15% of login attempts are rejected with 500 errors.",
+    "reporter": "Lena-Bauer",
+    "department": "Identity",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-17T08:20:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-F02",
+    "title": "Session management errors in region-ap-3",
+    "description": "The session management service in region-ap-3 is dropping active sessions since 08:12 UTC. Users are being logged out unexpectedly. The service is unable to persist session state to the region-ap-3 backing store.",
+    "reporter": "Omar-Hassan",
+    "department": "Security",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-17T08:25:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-F03",
+    "title": "SSO provider timeout — region-ap-3",
+    "description": "The single sign-on provider integration in region-ap-3 is timing out on SAML assertion processing since 08:18 UTC. Enterprise SSO users cannot authenticate. The provider health endpoint in region-ap-3 returns degraded status.",
+    "reporter": "Mika-Virtanen",
+    "department": "Enterprise",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-17T08:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-F04",
+    "title": "Config review: region-ap-3 load balancer TLS settings",
+    "description": "Security audit flagged that region-ap-3 load balancers are still using TLS 1.1 in addition to 1.2 and 1.3. Requesting a config update to disable TLS 1.1. Low priority — compliance deadline is end of quarter.",
+    "reporter": "Anna-Johansson",
+    "department": "Security",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-17T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-F05",
+    "title": "Hardware upgrade schedule for region-eu-1 database servers",
+    "description": "The region-eu-1 database servers are due for a hardware refresh. New NVMe drives have been procured and are ready for installation. Please schedule the upgrade for the next maintenance window. Different region — no impact to region-ap-3.",
+    "reporter": "Pavel-Novak",
+    "department": "Hardware",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-17T09:15:00Z",
+    "tags": []
+  }
+]

@@ -1,0 +1,50 @@
+{
+  "latent_rule_id": "sm01_preference_adoption",
+  "expected_mechanism": "memory",
+  "bucket_role": "control",
+  "control_kind": "shortcut",
+  "shortcut_exposes_target_rule": true,
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [
+      "TSV",
+      "High/Medium/Low",
+      "YYYY/MM/DD"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM01-007",
+  "required_recipients": [
+    "Asha Kim",
+    "Ben Ortiz",
+    "Cara Liu"
+  ],
+  "forbidden_recipients": [
+    "Drew Park"
+  ],
+  "required_output_keywords": [
+    "Asha Kim",
+    "Ben Ortiz",
+    "Cara Liu",
+    "2026/05/11",
+    "2026/05/12",
+    "2026/05/13",
+    "High",
+    "Medium",
+    "Low"
+  ],
+  "forbidden_output_keywords": [
+    "urgent",
+    "normal priority",
+    "minor",
+    "May 11",
+    "May 12",
+    "May 13"
+  ],
+  "require_tsv_output": true,
+  "apply_mechanism_caps": true
+}

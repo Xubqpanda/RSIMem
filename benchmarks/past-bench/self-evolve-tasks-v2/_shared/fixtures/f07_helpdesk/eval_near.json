@@ -1,0 +1,72 @@
+[
+  {
+    "ticket_id": "TK-U401",
+    "title": "NotifyService release event — deploy hash pqr678",
+    "description": "Deployment event recorded for NotifyService. Release hash: pqr678. Deployment completed at 09:15 UTC. This is the root deployment event for the pqr678 release of NotifyService. Child failure tickets with release_hash pqr678 should be grouped under this event for rollback triage.",
+    "reporter": "deploy-bot",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T09:15:00Z",
+    "tags": [],
+    "release_hash": "pqr678",
+    "service": "NotifyService",
+    "ticket_type": "deploy-event"
+  },
+  {
+    "ticket_id": "TK-U402",
+    "title": "NotifyService push notifications failing — pqr678 deployment",
+    "description": "Push notifications are failing for all NotifyService clients since the pqr678 deployment at 09:15 UTC. The notification delivery queue is backlogged and no messages are being sent. Multiple mobile app teams have escalated. Root cause traced to the pqr678 release of NotifyService.",
+    "reporter": "Adaeze-Okonkwo",
+    "department": "Mobile",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T09:28:00Z",
+    "tags": [],
+    "release_hash": "pqr678",
+    "service": "NotifyService",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-U403",
+    "title": "NotifyService webhook 504 timeout — pqr678 release",
+    "description": "NotifyService webhook delivery endpoints are timing out with HTTP 504 since the pqr678 release at 09:15 UTC. Webhook integrations for Slack, Teams, and PagerDuty are all failing. Engineering confirmed the regression is caused by the pqr678 deployment. Awaiting rollback decision.",
+    "reporter": "Sven-Eriksson",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T09:35:00Z",
+    "tags": [],
+    "release_hash": "pqr678",
+    "service": "NotifyService",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-U404",
+    "title": "NotifyService incident — different deploy stu901",
+    "description": "A notification routing bug discovered in the NotifyService deployment with release_hash stu901, deployed last Monday. This is a separate deployment from the current pqr678 release. The stu901 issue involves incorrect channel routing for high-priority alerts. Not related to pqr678.",
+    "reporter": "Monica-Rivera",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T10:00:00Z",
+    "tags": [],
+    "release_hash": "stu901",
+    "service": "NotifyService",
+    "ticket_type": "incident"
+  },
+  {
+    "ticket_id": "TK-U405",
+    "title": "NotifyService capacity increase request",
+    "description": "Request to increase NotifyService message queue capacity due to expected traffic growth. No relation to any deployment event or release hash. This is a capacity planning task for the upcoming product launch. Not an incident.",
+    "reporter": "Francesca-Conti",
+    "department": "Infrastructure",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T11:00:00Z",
+    "tags": [],
+    "release_hash": null,
+    "service": "NotifyService",
+    "ticket_type": "capacity"
+  }
+]

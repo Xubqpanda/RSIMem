@@ -1,0 +1,18 @@
+{
+  "latent_rule_id": "pg03_oncall_handoff_lookup_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "reflection",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "ERROR_CLASS|",
+    "MISSED_CLUE|",
+    "NEXT_CHECK|"
+  ],
+  "forbidden_output_keywords": [
+    "HAND-742",
+    "INC-870",
+    "Eli Navarro",
+    "03:00-04:00 UTC"
+  ]
+}

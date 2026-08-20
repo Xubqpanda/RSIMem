@@ -1,0 +1,107 @@
+family_id: PC01_sop_bootstrap_04
+title: Datashare SOP Bootstrap
+ability_dir: procedural_ability
+primary_ability: procedural_ability
+secondary_abilities: []
+primary_trigger: embedded_policy_exposure
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  learn: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+- FM03_I01_datashare_cold
+- FM03_I02_datashare_learn_a
+- FM03_I02b_datashare_update_or_stabilize
+- FM03_I03_datashare_eval_near
+- FM03_I03b_datashare_eval_far
+- FM03_C02_control_shortcut
+- FM03_C03_control_surface_memorization
+- FM03_C01_control_no_persistence
+history_plan:
+  anchors:
+  - name: pc01_04_post_learn
+    save_after: FM03_I02b_datashare_update_or_stabilize
+  branches:
+  - mode: continue
+    episodes:
+    - FM03_I01_datashare_cold
+    - FM03_I02_datashare_learn_a
+    - FM03_I02b_datashare_update_or_stabilize
+  - mode: from_anchor
+    anchor: pc01_04_post_learn
+    episodes:
+    - FM03_I03_datashare_eval_near
+    - FM03_I03b_datashare_eval_far
+  - mode: fresh
+    episodes:
+    - FM03_C02_control_shortcut
+    - FM03_C03_control_surface_memorization
+    - FM03_C01_control_no_persistence
+control_set:
+- no_persistence
+- shortcut
+- surface_memorization
+status: v2_architecture_aligned
+latent_rule_id: fm03_datashare_exception_registry_v1
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  Data-sharing approval exception registry — the procedure for evaluating
+  exception requests, checking approval criteria, and updating the registry.
+what_persists: >
+  A durable skill artifact encoding the exception-registry SOP so approval
+  decisions can be made without re-reading the policy document.
+what_counts_as_reuse: >
+  Agent applies the persisted exception-registry procedure to novel data-sharing
+  requests with different requestors, data types, and exception categories.
+false_positive_pattern: >
+  Agent memorizes specific requestor names or data categories from training
+  rather than extracting the general approval-exception procedure.
+must_demonstrate:
+- Extract a reusable exception-registry procedure from explicit SOP delivery
+- Apply the procedure to novel data-sharing requests with changed entities
+- Maintain correct approval criteria checks and registry update sequencing
+
+# §13.0 Trigger Spec
+trigger_category: embedded_policy
+trigger_strength: T1
+visibility_surface: full exception-registry policy appears as a KB policy document; the user prompt asks for ticket processing but does not mention saving a skill
+trigger_injection_plan: "learn_a: full policy document contains both reusable decision criteria and one-off department examples; update_or_stabilize: brief-only KB with changed requestors"
+trigger_removal_plan: eval removes SOP text; only task request remains
+trigger_mixing_rule: no explicit save-skill instruction; test whether Hermes routes reusable procedure to skill instead of storing surface facts as memory
+sibling_comparison_plan: compare with PC01_01..03 induction siblings for trigger-strength analysis
+phase1_canonical_sibling: substrate-routing probe against T3 PC01 anchors
+future_sibling_roadmap: add memory-vs-skill sibling with stronger fact distractors
+
+# §10 Cold Design
+cold_design: same datashare task before any SOP is introduced
+expected_cold_result: partial solve; no stable reusable procedure
+
+# Control Design
+control_design: no_persistence, shortcut, surface_memorization
+expected_control_result: transfer gain shrinks without persisted procedure; template reuse alone should not pass
+
+# Episodes
+legacy_source: previous PC split, architecture-aligned
+legacy_episodes:
+- FM03_C01_control_no_persistence
+- FM03_C02_control_shortcut
+- FM03_C03_control_surface_memorization
+- FM03_I01_datashare_cold
+- FM03_I02_datashare_learn_a
+- FM03_I02b_datashare_update_or_stabilize
+- FM03_I03_datashare_eval_near
+- FM03_I03b_datashare_eval_far

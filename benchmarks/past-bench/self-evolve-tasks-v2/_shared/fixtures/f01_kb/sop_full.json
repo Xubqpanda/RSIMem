@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "kb_f01_sop",
+    "title": "Shared Incident SOP v1",
+    "category": "incident-management",
+    "content": "## Shared Incident SOP v1\n\nTrigger: three or more tickets from distinct reporters all point to the same cluster failure within a 2-hour window.\n\nSteps:\n1. Read all open tickets and identify the cluster name.\n2. Tag each incident ticket with: sev1-correlated, cross-team-verified\n3. Set priority=critical and category=cluster-incident on all cluster tickets.\n4. Add an internal note on each: 'SOP-F01 applied — awaiting root-cause owner assignment'\n5. Do not close any ticket — leave resolution to on-call.\n6. Output one line per ticket: TICKET_ID|priority|category|why\n\nExclusions:\n- Requests, training tickets, and same-system low-impact issues are NOT cluster incidents.\n- Do not escalate a single-reporter ticket unless it has a matching cluster error.\n- Config drift or rate limit adjustments on the same cluster are NOT incidents unless they cause user-facing errors.",
+    "tags": [],
+    "last_updated": "2026-04-01",
+    "views": 0
+  }
+]

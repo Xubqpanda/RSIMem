@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-F101",
+    "title": "billing-cluster-1 down — transaction processor returning 503",
+    "description": "The billing transaction processor started returning 503 Service Unavailable at 09:30 UTC. Engineering traced the error to billing-cluster-1 being unresponsive. All new payment transactions are failing. The issue started after the overnight maintenance window and has not self-resolved.",
+    "reporter": "Marcus-Webb",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T09:35:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-F102",
+    "title": "Payment gateway timeout — billing-cluster-1 fault",
+    "description": "The payment gateway is timing out on all transaction submissions. Checkout flows across all storefronts are broken. SRE team identified billing-cluster-1 as the root cause — the cluster is down and not accepting connections. Revenue impact is accumulating. Needs immediate attention.",
+    "reporter": "Patricia-Osei",
+    "department": "Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T09:42:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-F103",
+    "title": "Billing dashboard UI freeze on report generation",
+    "description": "The billing dashboard freezes when users try to generate monthly expense reports. This appears to be a frontend rendering issue unrelated to the payment processing backend — the UI hangs indefinitely after clicking 'Generate Report'. Affects billing team members using Chrome and Firefox.",
+    "reporter": "Daniel-Frost",
+    "department": "Product",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-F104",
+    "title": "Invoice PDF generation slow — document service latency",
+    "description": "The invoice PDF generation service is taking 45-60 seconds per document, up from the normal 3-5 seconds. This is a different system from the billing cluster — it runs on the document generation microservice. Users are complaining about slow invoice downloads. Not blocking payments.",
+    "reporter": "Elena-Volkov",
+    "department": "Customer Success",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T10:15:00Z",
+    "tags": []
+  }
+]

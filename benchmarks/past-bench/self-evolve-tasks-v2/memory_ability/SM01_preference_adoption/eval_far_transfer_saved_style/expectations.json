@@ -1,0 +1,58 @@
+{
+  "latent_rule_id": "sm01_preference_adoption",
+  "expected_mechanism": "memory",
+  "bucket_role": "evaluation",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [
+      "TSV",
+      "High/Medium/Low",
+      "YYYY/MM/DD"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": true,
+    "min_memory_injections": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM01-005",
+  "required_recipients": [
+    "Harper Cole",
+    "Renee Shah",
+    "Evan Lin"
+  ],
+  "forbidden_recipients": [
+    "Dylan Moss"
+  ],
+  "required_output_keywords": [
+    "Harper Cole",
+    "Renee Shah",
+    "Evan Lin",
+    "2026/05/02",
+    "2026/05/03",
+    "2026/05/04",
+    "High",
+    "Medium",
+    "Low"
+  ],
+  "forbidden_output_keywords": [
+    "urgent",
+    "routine",
+    "minor",
+    "May 2",
+    "May 3",
+    "May 4"
+  ],
+  "require_tsv_output": true,
+  "min_memory_injections": 1,
+  "require_rule_artifact": [
+    "TSV",
+    "High/Medium/Low",
+    "YYYY/MM/DD"
+  ],
+  "rule_artifact_weight": 0.03,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.1,
+  "apply_mechanism_caps": true
+}

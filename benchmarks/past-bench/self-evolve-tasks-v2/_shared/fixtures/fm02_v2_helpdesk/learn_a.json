@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-FM02-L01",
+    "title": "zone-north-1 cache servers unresponsive",
+    "description": "Redis cache cluster in zone-north-1 became unresponsive at 09:45 UTC. All cache reads are failing, causing application servers to fall back to direct database queries. Response times have increased 10x.",
+    "reporter": "Priya-Sharma",
+    "department": "Backend",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T09:50:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-L02",
+    "title": "Search indexer failing in zone-north-1",
+    "description": "ElasticSearch indexer in zone-north-1 stopped processing new documents at 09:48 UTC. The indexer cannot reach the primary data store. Search results are becoming stale. Affects product search and internal knowledge base.",
+    "reporter": "James-O'Brien",
+    "department": "Search",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T09:55:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-L03",
+    "title": "Authentication service returning 503 — zone-north-1",
+    "description": "The auth service in zone-north-1 is returning 503 Service Unavailable since 09:42 UTC. Users cannot log in or refresh tokens. The service depends on the zone-north-1 backing store which appears degraded.",
+    "reporter": "Sofia-Andersson",
+    "department": "Identity",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-L04",
+    "title": "Performance tuning request for zone-south-3 CDN",
+    "description": "We've noticed suboptimal cache hit ratios on the zone-south-3 CDN edge nodes. Requesting a review of TTL settings and origin shield configuration. Not urgent — can be addressed in the next optimization cycle.",
+    "reporter": "Tom-Fischer",
+    "department": "Performance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T10:15:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-L05",
+    "title": "Training: new SRE team onboarding — incident response procedures",
+    "description": "Three new SRE team members are joining next week. Please schedule an onboarding session covering our incident response runbooks, escalation paths, and PagerDuty integration. Preferred time: Tuesday 10:00-12:00 UTC.",
+    "reporter": "Nina-Kowalski",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-15T10:30:00Z",
+    "tags": []
+  }
+]

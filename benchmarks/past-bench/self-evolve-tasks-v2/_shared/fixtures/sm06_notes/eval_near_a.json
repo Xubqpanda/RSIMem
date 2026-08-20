@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM06-004",
+    "title": "Expired Exception Eval Near A",
+    "created_at": "2026-05-04",
+    "participants": ["Maya Ortiz", "Noah Reed", "Lena Park"],
+    "duration_minutes": 35,
+    "content": "Expired exception eval near A.\n\nAction items:\n1. Maya Ortiz: close the reopened review exception, due 2026-06-17\n2. Noah Reed: reconcile the risk handoff queue, due 2026-06-18\n\nLena Park attended as an observer."
+  }
+]

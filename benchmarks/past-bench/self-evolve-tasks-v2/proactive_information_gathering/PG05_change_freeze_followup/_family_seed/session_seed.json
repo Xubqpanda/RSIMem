@@ -1,0 +1,514 @@
+{
+  "sessions": [
+    {
+      "id": "pg05-freeze-441",
+      "source": "seed",
+      "title": "Atlas Billing prod-us CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact CAB freeze packet for Atlas Billing prod-us."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-441 applies to Atlas Billing prod-us. UTC window: 2026-05-03T01:00Z to 2026-05-03T03:00Z. Exception projects: atlas-replay and atlas-docs only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-403",
+      "source": "seed",
+      "title": "Atlas Billing prod-us CAB freeze packet old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Atlas Billing prod-us freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded packet CAB-FRZ-403 previously covered Atlas Billing prod-us from 2026-04-26T01:00Z to 2026-04-26T02:00Z with exception project atlas-docs only. Do not reuse it after the later packet."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-444",
+      "source": "seed",
+      "title": "Atlas Billing staging-us CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the staging-only CAB freeze packet for Atlas Billing."
+        },
+        {
+          "role": "assistant",
+          "content": "Packet CAB-FRZ-444 applies only to Atlas Billing staging-us from 2026-05-03T05:00Z to 2026-05-03T06:00Z. Exception project: atlas-staging-smoke only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-468",
+      "source": "seed",
+      "title": "Nova Auth prod-eu CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact CAB freeze packet for Nova Auth prod-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-468 applies to Nova Auth prod-eu. UTC window: 2026-05-04T22:00Z to 2026-05-05T00:00Z. Exception projects: nova-drain and nova-admin-ui only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-492",
+      "source": "seed",
+      "title": "Kappa Gateway prod-ap CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact CAB freeze packet for Kappa Gateway prod-ap."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-492 applies to Kappa Gateway prod-ap. UTC window: 2026-05-06T09:30Z to 2026-05-06T11:00Z. Exception projects: kappa-partner-sync and kappa-audit-export only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-518",
+      "source": "seed",
+      "title": "Meridian Data Bridge prod-ca CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact CAB freeze packet for Meridian Data Bridge prod-ca."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-518 applies to Meridian Data Bridge prod-ca. UTC window: 2026-05-07T04:00Z to 2026-05-07T07:00Z. Exception projects: meridian-backfill and meridian-schema-diff only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-440",
+      "source": "seed",
+      "title": "Atlas Billing prod-us current freeze shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Atlas Billing prod-us freeze shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Atlas Billing prod-us still has a CAB freeze later today and atlas-docs remains exempt, but the exact packet ID, full window, and final exception list were not copied here. Re-check the exact packet first."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-442",
+      "source": "seed",
+      "title": "Atlas Billing prod-us CAB freeze packet latest",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Atlas Billing prod-us CAB freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-442 applies to Atlas Billing prod-us. UTC window: 2026-05-03T01:30Z to 2026-05-03T03:00Z. Exception projects: atlas-replay and atlas-docs-preview only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-443",
+      "source": "seed",
+      "title": "Atlas Billing prod-us freeze draft",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the draft freeze packet for Atlas Billing prod-us."
+        },
+        {
+          "role": "assistant",
+          "content": "Draft only: Atlas Billing prod-us likely freezes around 01:00Z to 03:00Z with atlas-docs still exempt, but the final packet ID and full exception list were not preserved in this draft."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-445",
+      "source": "seed",
+      "title": "Atlas Billing prod-eu CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact CAB freeze packet for Atlas Billing prod-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-445 applies to Atlas Billing prod-eu. UTC window: 2026-05-03T00:00Z to 2026-05-03T02:00Z. Exception projects: atlas-eu-docs and atlas-eu-replay only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-446",
+      "source": "seed",
+      "title": "Atlas Billing prod-us docs-only one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Atlas Billing prod-us reuse the docs-only freeze waiver?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off packet CAB-FRZ-446 allowed only atlas-docs to pass during an earlier Atlas Billing prod-us freeze from 2026-04-30T23:00Z to 2026-05-01T00:00Z. This one-time packet does not replace the current freeze packet."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-447",
+      "source": "seed",
+      "title": "Atlas Billing prod-us freeze recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the Atlas Billing prod-us freeze."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: Atlas Billing prod-us still has a CAB freeze with atlas-replay and atlas-docs in the allowed exception set, but this recap omits the authoritative packet ID and exact UTC window."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-449",
+      "source": "seed",
+      "title": "Atlas Billing prod-us shadow freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Atlas Billing prod-us shadow freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-449 applies to Atlas Billing prod-us shadow traffic. UTC window: 2026-05-03T02:00Z to 2026-05-03T04:00Z. Exception projects: atlas-shadow-replay only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-450",
+      "source": "seed",
+      "title": "Atlas Billing prod-us approval memo partial",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Atlas Billing prod-us freeze approval memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial memo: Atlas Billing prod-us still freezes around early UTC hours and atlas-docs is still among the exceptions, but the exact packet ID, full start time, and final exception set are not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-451",
+      "source": "seed",
+      "title": "Atlas Billing prod-us current-looking old packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current-looking old Atlas Billing prod-us freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded packet CAB-FRZ-451 previously covered Atlas Billing prod-us from 2026-05-02T23:30Z to 2026-05-03T01:00Z with exception projects atlas-docs and atlas-replay. A later packet replaced this one."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-452",
+      "source": "seed",
+      "title": "Atlas Billing prod-ca CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact CAB freeze packet for Atlas Billing prod-ca."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-452 applies to Atlas Billing prod-ca. UTC window: 2026-05-03T04:00Z to 2026-05-03T06:00Z. Exception projects: atlas-ca-docs and atlas-ca-replay only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-467",
+      "source": "seed",
+      "title": "Nova Auth prod-eu current freeze shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Nova Auth prod-eu freeze shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Nova Auth prod-eu still has a CAB freeze overnight with nova-admin-ui in the exception set, but the exact packet ID and full UTC window are not restated here."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-469",
+      "source": "seed",
+      "title": "Nova Auth prod-eu CAB freeze packet latest",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Nova Auth prod-eu freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-469 applies to Nova Auth prod-eu. UTC window: 2026-05-04T22:30Z to 2026-05-05T00:30Z. Exception projects: nova-drain and nova-admin-console only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-470",
+      "source": "seed",
+      "title": "Nova Auth prod-eu CAB freeze packet old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Nova Auth prod-eu freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded packet CAB-FRZ-470 previously covered Nova Auth prod-eu from 2026-05-04T21:00Z to 2026-05-04T23:00Z with exception project nova-admin-ui only. Do not reuse it after the later packet."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-471",
+      "source": "seed",
+      "title": "Nova Auth staging-eu CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the staging CAB freeze packet for Nova Auth."
+        },
+        {
+          "role": "assistant",
+          "content": "Packet CAB-FRZ-471 applies only to Nova Auth staging-eu from 2026-05-05T01:00Z to 2026-05-05T02:00Z. Exception project: nova-staging-smoke only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-472",
+      "source": "seed",
+      "title": "Nova Auth prod-eu freeze recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the Nova Auth prod-eu freeze."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: Nova Auth prod-eu still has an overnight CAB freeze with nova-drain in the exception list, but the authoritative packet ID and exact UTC end time are not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-473",
+      "source": "seed",
+      "title": "Nova Auth prod-eu admin replay one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Nova Auth prod-eu reuse the admin replay one-off packet?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off packet CAB-FRZ-473 allowed only nova-admin-ui-replay during an earlier Nova Auth prod-eu freeze from 2026-05-03T23:00Z to 2026-05-04T00:00Z. This one-off packet does not replace the current freeze packet."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-491",
+      "source": "seed",
+      "title": "Kappa Gateway prod-ap current freeze shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Kappa Gateway prod-ap freeze shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Kappa Gateway prod-ap still has a CAB freeze with partner-sync in the exception list, but the exact packet ID, full UTC window, and full exception set are not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-493",
+      "source": "seed",
+      "title": "Kappa Gateway prod-ap CAB freeze packet latest",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Kappa Gateway prod-ap freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-493 applies to Kappa Gateway prod-ap. UTC window: 2026-05-06T09:00Z to 2026-05-06T10:30Z. Exception projects: kappa-partner-sync and kappa-audit-mirror only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-494",
+      "source": "seed",
+      "title": "Kappa Gateway prod-ap CAB freeze packet old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Kappa Gateway prod-ap freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded packet CAB-FRZ-494 previously covered Kappa Gateway prod-ap from 2026-05-05T09:30Z to 2026-05-05T10:30Z with exception project kappa-audit-export only. Do not reuse it after the later packet."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-495",
+      "source": "seed",
+      "title": "Kappa Gateway staging-ap CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the staging CAB freeze packet for Kappa Gateway."
+        },
+        {
+          "role": "assistant",
+          "content": "Packet CAB-FRZ-495 applies only to Kappa Gateway staging-ap from 2026-05-06T12:00Z to 2026-05-06T13:00Z. Exception project: kappa-staging-smoke only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-496",
+      "source": "seed",
+      "title": "Kappa Gateway prod-ap freeze recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the Kappa Gateway prod-ap freeze."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: Kappa Gateway prod-ap still has a CAB freeze with partner-sync and an audit project in the exception list, but the exact packet ID and final UTC bounds are not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-497",
+      "source": "seed",
+      "title": "Kappa Gateway prod-ap audit replay one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Kappa Gateway prod-ap reuse the audit replay one-off packet?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off packet CAB-FRZ-497 allowed only kappa-audit-replay during an earlier Kappa Gateway prod-ap freeze from 2026-05-04T08:00Z to 2026-05-04T09:00Z. This one-off packet does not replace the current freeze packet."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-517",
+      "source": "seed",
+      "title": "Meridian Data Bridge prod-ca current freeze shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Meridian Data Bridge prod-ca freeze shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Meridian Data Bridge prod-ca still has a CAB freeze with backfill in the exception set, but the exact packet ID, full UTC window, and complete exception list are not restated here."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-519",
+      "source": "seed",
+      "title": "Meridian Data Bridge prod-ca CAB freeze packet latest",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Meridian Data Bridge prod-ca freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Freeze packet CAB-FRZ-519 applies to Meridian Data Bridge prod-ca. UTC window: 2026-05-07T04:30Z to 2026-05-07T07:30Z. Exception projects: meridian-backfill and meridian-schema-preview only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-520",
+      "source": "seed",
+      "title": "Meridian Data Bridge prod-ca CAB freeze packet old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Meridian Data Bridge prod-ca freeze packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded packet CAB-FRZ-520 previously covered Meridian Data Bridge prod-ca from 2026-05-06T04:00Z to 2026-05-06T06:00Z with exception project meridian-backfill only. Do not reuse it after the later packet."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-521",
+      "source": "seed",
+      "title": "Meridian Data Bridge staging-ca CAB freeze packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the staging CAB freeze packet for Meridian Data Bridge."
+        },
+        {
+          "role": "assistant",
+          "content": "Packet CAB-FRZ-521 applies only to Meridian Data Bridge staging-ca from 2026-05-07T08:00Z to 2026-05-07T09:00Z. Exception project: meridian-staging-smoke only."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-522",
+      "source": "seed",
+      "title": "Meridian Data Bridge prod-ca freeze recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the Meridian Data Bridge prod-ca freeze."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: Meridian Data Bridge prod-ca still has a CAB freeze with backfill and a schema-related exception project, but the exact packet ID and final UTC range are not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg05-freeze-523",
+      "source": "seed",
+      "title": "Meridian Data Bridge prod-ca backfill one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Meridian Data Bridge prod-ca reuse the backfill one-off packet?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off packet CAB-FRZ-523 allowed only meridian-backfill during an earlier Meridian Data Bridge prod-ca freeze from 2026-05-05T04:00Z to 2026-05-05T05:00Z. This one-off packet does not replace the current freeze packet."
+        }
+      ]
+    }
+  ]
+}

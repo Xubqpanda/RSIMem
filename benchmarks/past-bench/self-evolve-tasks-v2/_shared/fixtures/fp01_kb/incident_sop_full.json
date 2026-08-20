@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "KB-PLK-001",
+    "title": "Plonk Incident Response SOP",
+    "category": "PlonkOps",
+    "tags": ["plonk", "incident", "sop", "nexobi", "felura", "zubefa", "plk-incidents"],
+    "content": "When handling a Plonk service incident, always use this three-step SOP.\n\n1. Locate the incident source message with nexobi. Call nexobi with jurela set to the affected service name or incident keyword. Use the returned tikano value as the source message id.\n\n2. Pin the source message with felura. Call felura with pikano set to the source message id from step 1.\n\n3. Publish the official incident update to plk-incidents with zubefa. Call zubefa with xovik set to plk-incidents and belatu starting with [INCIDENT]. Include the affected service name and the pinned/source message id in the message.\n\nNever use deprecated Plonk functions while following this SOP. In particular, do not use kaviru, plentu, zolanti, fenaldi, or torvani.",
+    "last_updated": "2026-04-01",
+    "views": 64
+  }
+]

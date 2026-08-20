@@ -1,0 +1,15 @@
+{
+  "session_id": "ep03_doc431_approved_playbook",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Approve onboarding playbook DOC-431. Step 1: HR emails welcome packet. Step 2: manager books kickoff call. Step 3: IT provisions laptop. Step 4: mentor assigned within 48h. Owner: Carol. Status: active."
+    },
+    {
+      "role": "assistant",
+      "content": "Confirmed DOC-431 approved onboarding playbook with mentor assigned within 48h."
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# Local run configuration. Judge pinned to MiniMax-M2.7 so the fallback chain
+# never picks another provider's key from the environment.
+judge:
+  enabled: true
+  api_key: ""
+  base_url: https://api.minimaxi.com/v1
+  model_id: MiniMax-M2.7

@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM06-002",
+    "title": "Temporary Exception Seed",
+    "created_at": "2026-05-02",
+    "participants": ["Maya Ortiz", "Evan Bell", "Owen Bell"],
+    "duration_minutes": 30,
+    "content": "Temporary exception seed.\n\nAction items:\n1. Maya Ortiz: finalize the partner exception matrix, due 2026-06-13\n2. Evan Bell: update the stale review ticket queue, due 2026-06-14\n\nOwen Bell attended as an observer."
+  }
+]

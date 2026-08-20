@@ -1,0 +1,62 @@
+[
+  {
+    "integration_id": "INTG-EU-002",
+    "name": "Legacy Billing Connector",
+    "region": "EU",
+    "status": "suspended",
+    "auth_type": "api_key",
+    "exception_approved": false,
+    "notes": "Scratchpad tag: revisit before deciding.",
+    "last_updated": "2026-04-16"
+  },
+  {
+    "integration_id": "INTG-US-004",
+    "name": "Warehouse ETL Bridge",
+    "region": "US",
+    "status": "suspended",
+    "auth_type": "oauth2",
+    "exception_approved": false,
+    "notes": "Scratchpad tag: revisit before deciding.",
+    "last_updated": "2026-04-16"
+  },
+  {
+    "integration_id": "INTG-AP-006",
+    "name": "Regional Tax Export",
+    "region": "APAC",
+    "status": "suspended",
+    "auth_type": "api_key",
+    "exception_approved": false,
+    "notes": "Scratchpad tag: revisit before deciding.",
+    "last_updated": "2026-04-16"
+  },
+  {
+    "integration_id": "INTG-EU-013",
+    "name": "Ledger Backfill Relay",
+    "region": "EU",
+    "status": "suspended",
+    "auth_type": "oauth2",
+    "exception_approved": false,
+    "notes": "Scratchpad tag: fast-lane carryover.",
+    "last_updated": "2026-04-16"
+  },
+  {
+    "integration_id": "INTG-US-014",
+    "name": "Claims Archive Pump",
+    "region": "US",
+    "status": "suspended",
+    "auth_type": "api_key",
+    "exception_approved": false,
+    "notes": "Scratchpad tag: fast-lane carryover.",
+    "last_updated": "2026-04-16"
+  },
+  {
+    "integration_id": "INTG-AP-015",
+    "name": "Payroll Snapshot Mirror",
+    "region": "APAC",
+    "status": "suspended",
+    "auth_type": "oauth2",
+    "exception_approved": false,
+    "notes": "Scratchpad tag: fast-lane carryover.",
+    "last_updated": "2026-04-16"
+  }
+]

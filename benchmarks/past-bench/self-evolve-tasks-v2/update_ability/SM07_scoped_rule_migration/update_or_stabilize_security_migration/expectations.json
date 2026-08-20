@@ -1,0 +1,33 @@
+{
+  "latent_rule_id": "sm07_scoped_rule_migration",
+  "expected_mechanism": "memory",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["SEC-GAMMA", "OPS-DELTA", "High priority Security owners"],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_memory_calls": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM07-003",
+  "required_recipients": ["Renee Shah", "Jonah Fisk", "Marta Hill"],
+  "forbidden_recipients": ["Evan Lin", "Olivia Cruz"],
+  "required_output_keywords": [
+    "Security | Renee Shah | SEC-GAMMA",
+    "Security | Evan Lin | SEC-GAMMA",
+    "Ops | Jonah Fisk | OPS-DELTA",
+    "Ops | Marta Hill | OPS-DELTA"
+  ],
+  "forbidden_output_keywords": ["Ops | Jonah Fisk | SEC-GAMMA", "Ops | Marta Hill | SEC-GAMMA"],
+  "stale_coexistence_penalty": 0.15,
+  "min_memory_calls": 1,
+  "memory_call_weight": 0.1,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.05,
+  "require_rule_artifact": ["SEC-GAMMA", "OPS-DELTA", "High priority Security owners"],
+  "rule_artifact_weight": 0.05,
+  "apply_mechanism_caps": true
+}

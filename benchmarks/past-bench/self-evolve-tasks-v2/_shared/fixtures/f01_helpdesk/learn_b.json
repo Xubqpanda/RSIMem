@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-C301",
+    "title": "datasync-cluster-1 replication lag — ETL pipeline stalling",
+    "description": "The DataSync ETL pipeline has developed severe replication lag on datasync-cluster-1. Replication is falling behind by over 4 hours as of 13:00 UTC. The pipeline that feeds the analytics warehouse is stalling and downstream reports are missing data. Cluster health check shows degraded status.",
+    "reporter": "Nguyen-Van-Long",
+    "department": "Data Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T13:05:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-C302",
+    "title": "DataSync ETL pipeline timing out — datasync-cluster-1 overloaded",
+    "description": "All DataSync ETL jobs on us-east-2 are timing out. The jobs submit successfully but hang at the cluster execution step. Investigation points to datasync-cluster-1 being saturated — CPU at 98%, connection queue full. New jobs cannot be scheduled. This is blocking the nightly data warehouse refresh.",
+    "reporter": "Anna-Kowalski",
+    "department": "Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T13:18:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-C303",
+    "title": "data-worker pod starvation on us-east-2 — datasync-cluster-1 fault",
+    "description": "Kubernetes reports that data-worker pods on us-east-2 are in a resource starvation state caused by datasync-cluster-1 monopolizing node resources. Pods cannot get scheduled. The cluster fault is cascading to the worker layer. Engineering confirmed this shares the root cause with the ETL timeout reports.",
+    "reporter": "Rafael-Souza",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T13:40:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-C304",
+    "title": "DataSync documentation update — new field mapping guide needed",
+    "description": "The DataSync team has introduced three new field mapping configurations in the last release but the developer documentation has not been updated. Please update the internal wiki with the new field mapping guide, including examples for the common use cases. Low priority — no user impact.",
+    "reporter": "Sophie-Lafleur",
+    "department": "Developer Relations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T14:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-C305",
+    "title": "Access request — DataSync dashboard for new analyst",
+    "description": "Please grant read-only access to the DataSync monitoring dashboard for our new data analyst, starting April 14. They need access to the replication metrics and job status panels only. Please follow the standard onboarding access request process. Manager approval is attached.",
+    "reporter": "David-Chen",
+    "department": "Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T14:15:00Z",
+    "tags": []
+  }
+]

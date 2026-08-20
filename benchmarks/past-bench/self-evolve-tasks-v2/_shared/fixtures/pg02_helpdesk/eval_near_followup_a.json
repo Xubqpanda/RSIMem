@@ -1,0 +1,47 @@
+[
+  {
+    "ticket_id": "HD-PG02-311",
+    "title": "Aurora Sync export request sunrise-ap shard 1",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "aurora-sync",
+      "sunrise-ap"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:10:00Z"
+  },
+  {
+    "ticket_id": "HD-PG02-312",
+    "title": "Aurora Sync export request sunrise-ap shard 2",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "aurora-sync",
+      "sunrise-ap"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:11:00Z"
+  },
+  {
+    "ticket_id": "HD-PG02-313",
+    "title": "Aurora Sync export request sunset-us shard 3",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "aurora-sync",
+      "sunset-us"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:12:00Z"
+  }
+]

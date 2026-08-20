@@ -1,0 +1,11 @@
+[
+  {
+    "note_id": "NOTE-SM01-005",
+    "title": "Security Operations Readiness Review",
+    "created_at": "2026-04-14",
+    "participants": ["Harper Cole", "Renee Shah", "Evan Lin", "Dylan Moss"],
+    "duration_minutes": 50,
+    "content": "Security operations readiness review.\n\nAction items:\n1. Harper Cole: rotate the expiring edge certificates, urgent, by May 2\n2. Renee Shah: validate the rollback auth policies, routine, by May 3\n3. Evan Lin: archive the legacy bastion access list, minor, by May 4\n\nDylan Moss joined for dependency tracking only.",
+    "duration_minutes": 50
+  }
+]

@@ -1,0 +1,54 @@
+task_id: SM07_CONTROL_002
+task_name: Semantic Memory SM07 Control Shortcut Scoped Rule
+version: "1.0"
+category: self_evolve
+difficulty: medium
+
+services:
+  - name: notes
+    command: python mock_services/notes/server.py
+    port: 9105
+    health_check: http://localhost:9105/notes/list
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9105/notes/reset
+    env:
+      NOTES_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/sm07_notes/control_shortcut.json
+
+prompt:
+  text: |
+    Review today's mixed security and ops note, extract the action items, and share the source note accordingly.
+    In your final answer, output one formatted line per action item using the scoped rule for that item's scope.
+    For this task only:
+    - Security items use Security | <owner> | SEC-GAMMA | task | due_date.
+    - Share the source note only with High priority Security owners.
+    - Ops items use Ops | <owner> | OPS-DELTA | task | due_date.
+    - Share the source note with all Ops owners.
+  language: en
+
+tools:
+  - name: notes_list
+    description: List meeting notes
+    input_schema: {type: object, properties: {max_results: {type: integer}}, required: []}
+  - name: notes_get
+    description: Get meeting note details
+    input_schema: {type: object, properties: {note_id: {type: string}}, required: [note_id]}
+  - name: notes_share
+    description: Share a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+        recipients: {type: array, items: {type: string}}
+      required: [note_id, recipients]
+
+tool_endpoints:
+  - {tool_name: notes_list, url: http://localhost:9105/notes/list, method: POST}
+  - {tool_name: notes_get, url: http://localhost:9105/notes/get, method: POST}
+  - {tool_name: notes_share, url: http://localhost:9105/notes/share, method: POST}
+
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+
+judge_rubric: "Shortcut control. Reward correct scoped routing because the migrated Security rule and preserved Ops rule are explicitly restated in the prompt."

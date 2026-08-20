@@ -1,0 +1,37 @@
+{
+  "latent_rule_id": "sm05_weak_trigger_preference_adoption",
+  "expected_mechanism": "memory",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["TSV", "owner, priority, task, due_date"],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_memory_calls": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM05-002",
+  "required_recipients": ["Maya Ortiz", "Noah Reed", "Priya Chen"],
+  "forbidden_recipients": ["Owen Bell"],
+  "required_output_keywords": [
+    "Maya Ortiz",
+    "Noah Reed",
+    "Priya Chen"
+  ],
+  "require_tsv_output": true,
+  "slot_checks": {
+    "r1_t3_tsv_structure": {
+      "require_tsv_output": true,
+      "min_tsv_rows": 3
+    }
+  },
+  "min_memory_calls": 1,
+  "memory_call_weight": 0.1,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.05,
+  "require_rule_artifact": ["TSV", "owner, priority, task, due_date"],
+  "rule_artifact_weight": 0.05,
+  "apply_mechanism_caps": true
+}

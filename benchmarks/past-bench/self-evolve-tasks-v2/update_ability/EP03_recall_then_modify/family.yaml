@@ -1,0 +1,114 @@
+family_id: EP03_recall_then_modify
+title: Recall Then Modify
+ability_dir: update_ability
+primary_ability: update_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+secondary_trigger: []
+expected_substrate: session_search
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+optional_supporting_trigger: explicit_instruction
+supporting_stage: update_or_stabilize
+supporting_signal: native Hermes home fixture supplies the prior approved playbook, stale distractors, and cross-mechanism noise before the mentor-SLA update arrives
+trigger_injection_plan:
+  initial_home_fixture: initialize the prior approved playbook, stale distractors, and cross-mechanism noise inside native Hermes persistence before the explicit update lands
+  update_or_stabilize: inject the authoritative mentor-SLA change from 48h to 24h and require the updated playbook to be used later
+primary_trigger_stages:
+  - update_or_stabilize
+trigger_removal_plan:
+  eval_near: remove the explicit update notice and test whether the settled 24h playbook is recovered from prior-session work
+  eval_far: keep the settled 24h playbook implicit under changed wording and penalize any fallback to the stale 48h version
+trigger_mixing_rule: no failure_reflection; explicit update only, with eval removing the update notice and wrong-mechanism distractors controlled separately
+instances_per_bucket:
+  cold: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 7
+episode_order:
+- EP03_I01_modify_cold
+- EP03_I02_modify_seed
+- EP03_I04_eval_near
+- EP03_I05_eval_far
+- EP03_I06_control_no_persistence
+- EP03_I07_control_shortcut
+- EP03_I08_control_wrong_mechanism
+history_plan:
+  anchors:
+  - name: ep03_post_update
+    save_after: EP03_I02_modify_seed
+  branches:
+  - mode: fresh
+    episodes:
+    - EP03_I01_modify_cold
+  - mode: continue
+    episodes:
+    - EP03_I02_modify_seed
+  - mode: from_anchor
+    anchor: ep03_post_update
+    episodes:
+    - EP03_I04_eval_near
+    - EP03_I05_eval_far
+    - EP03_I06_control_no_persistence
+    - EP03_I07_control_shortcut
+    - EP03_I08_control_wrong_mechanism
+control_set:
+- no_persistence
+- shortcut
+- wrong_mechanism
+status: authored
+scope_note: Canonical update slice starts from a native Hermes home fixture with prior approved history in state.db, applies a bounded mentor-SLA update once, then measures whether later tasks recover the updated playbook rather than the stale one.
+latent_rule_id: ep03_recall_then_modify_v1
+what_is_learned: The previously approved onboarding playbook is updated so the mentor handoff SLA changes from 48h to 24h, while every other playbook field stays fixed.
+what_persists: The updated playbook state is recoverable later through Hermes session_search on native state.db history; stale memory and skill distractors do not become the governing source.
+what_counts_as_reuse: Later tasks recover the already-updated playbook through session_search, map it onto the correct current shell, and preserve all non-target fields while keeping the 24h mentor SLA.
+false_positive_pattern: Agent follows the stale 48h playbook, copies a visible shortcut or wrong cache without retrieval, edits the wrong shell, or performs another field drift that was never part of the settled update.
+must_demonstrate:
+- the native Hermes home fixture seeds state.db rather than relying on JSON session logs alone
+- the authoritative mentor-SLA update is applied once and later recovered as the settled version
+- modifications remain localized to the mentor handoff line and preserve unrelated shell metadata
+- wrong-mechanism memory and skill distractors do not replace session_search as the governing source
+episode_overrides:
+  EP03_I01_modify_cold:
+    mechanism: session_search
+    expected_persistence_signal: session_search
+    persistence_allowed: true
+    initial_home_fixture_dir: self-evolve-tasks-v2/_shared/home_fixtures/update_ability/EP03_recall_then_modify
+  EP03_I02_modify_seed:
+    mechanism: session_search
+    expected_persistence_signal: session_search
+    persistence_allowed: true
+    stage: update_or_stabilize
+  EP03_I04_eval_near:
+    mechanism: session_search
+    expected_persistence_signal: session_search
+    persistence_allowed: true
+  EP03_I05_eval_far:
+    mechanism: session_search
+    expected_persistence_signal: session_search
+    persistence_allowed: true
+  EP03_I06_control_no_persistence:
+    mechanism: session_search
+    expected_persistence_signal: session_search
+    persistence_allowed: false
+  EP03_I07_control_shortcut:
+    mechanism: session_search
+    expected_persistence_signal: session_search
+    persistence_allowed: true
+  EP03_I08_control_wrong_mechanism:
+    mechanism: mixed
+    expected_persistence_signal: session_search
+    persistence_allowed: true
+    preseed_artifacts_dir: self-evolve-tasks-v2/_shared/preseed/ep03_wrong_mechanism_memory
+trigger_phrases:
+- mentor assigned within 24h
+- ONBOARDING PLAYBOOK v1
+banned_phrases: []
+stale_phrases: []
+calibration_baseline_score: null

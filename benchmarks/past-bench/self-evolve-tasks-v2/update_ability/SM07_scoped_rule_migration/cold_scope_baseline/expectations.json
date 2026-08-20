@@ -1,0 +1,58 @@
+{
+  "latent_rule_id": "sm07_scoped_rule_migration",
+  "expected_mechanism": "memory",
+  "bucket_role": "baseline",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM07-004",
+  "required_recipients": [
+    "Maya Ortiz",
+    "Noah Reed",
+    "Evan Bell"
+  ],
+  "forbidden_recipients": [
+    "Priya Chen",
+    "Cara Liu"
+  ],
+  "required_output_keywords": [
+    "Security | Maya Ortiz | SEC-GAMMA",
+    "Security | Priya Chen | SEC-GAMMA",
+    "Ops | Noah Reed | OPS-DELTA",
+    "Ops | Evan Bell | OPS-DELTA",
+    "2026-07-13",
+    "2026-07-14",
+    "2026-07-15",
+    "2026-07-16"
+  ],
+  "slot_checks": {
+    "r1_security_scope_migrated": {
+      "required_output_keywords": [
+        "Security | Maya Ortiz | SEC-GAMMA",
+        "Security | Priya Chen | SEC-GAMMA"
+      ],
+      "forbidden_output_keywords": [
+        "Security | Maya Ortiz | SEC-ALPHA",
+        "Security | Priya Chen | SEC-ALPHA"
+      ]
+    }
+  },
+  "forbidden_output_keywords": [
+    "Ops | Noah Reed | SEC-GAMMA",
+    "Ops | Evan Bell | SEC-GAMMA"
+  ],
+  "forbidden_artifact_keywords": [
+    "SEC-GAMMA",
+    "OPS-DELTA",
+    "High priority Security owners"
+  ],
+  "apply_mechanism_caps": true,
+  "expected_cold_behavior": "low_score_against_post_update_target",
+  "do_not_use_as_evolve_success": true
+}

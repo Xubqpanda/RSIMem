@@ -1,0 +1,46 @@
+{
+  "latent_rule_id": "sm05_weak_trigger_preference_adoption",
+  "expected_mechanism": "memory",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["High", "Medium", "Low"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_memory_calls": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM05-003",
+  "required_recipients": ["Maya Ortiz", "Noah Reed", "Priya Chen"],
+  "forbidden_recipients": ["Dylan Moss"],
+  "required_output_keywords": [
+    "Maya Ortiz",
+    "Noah Reed",
+    "Priya Chen",
+    "High",
+    "Medium",
+    "Low"
+  ],
+  "require_tsv_output": true,
+  "slot_checks": {
+    "r1_t3_tsv_structure": {
+      "require_tsv_output": true,
+      "min_tsv_rows": 3
+    },
+    "r2_t2_priority_normalization": {
+      "require_tsv_output": true,
+      "tsv_column_index": 1,
+      "required_tsv_column_values": ["High", "Medium", "Low"],
+      "forbidden_tsv_column_values": ["urgent", "standard", "normal priority", "medium priority", "minor"]
+    }
+  },
+  "min_memory_calls": 1,
+  "memory_call_weight": 0.08,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.04,
+  "require_rule_artifact": ["High", "Medium", "Low"],
+  "rule_artifact_weight": 0.04,
+  "apply_mechanism_caps": true
+}

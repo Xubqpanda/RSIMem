@@ -1,0 +1,38 @@
+{
+  "latent_rule_id": "pg05_change_freeze_followup_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "control",
+  "mode": "proactive_retrieval",
+  "service_kind": "notes",
+  "allowed_retrieval_sources": [
+    "session_search"
+  ],
+  "require_explicit_retrieval": true,
+  "require_explicit_retrieval_before_write": true,
+  "apply_mechanism_caps": true,
+  "missing_explicit_retrieval_cap": 0.25,
+  "late_explicit_retrieval_cap": 0.35,
+  "required_note_updates": [
+    {
+      "note_id": "FREEZE-PG05-CP",
+      "payload": {
+        "content": "FREEZE_NOTE|CAB-FRZ-441|2026-05-03T01:00Z|2026-05-03T03:00Z|atlas-replay,atlas-docs"
+      }
+    }
+  ],
+  "required_output_keywords": [
+    "CAB-FRZ-441",
+    "2026-05-03T01:00Z",
+    "2026-05-03T03:00Z",
+    "atlas-replay,atlas-docs"
+  ],
+  "forbidden_output_keywords": [
+    "CAB-FRZ-403",
+    "2026-04-26T01:00Z"
+  ],
+  "max_without_all_required_output_keywords": 0.6,
+  "min_session_search_calls": 1,
+  "min_skill_reads": 1,
+  "skill_read_weight": 0.08,
+  "session_search_weight": 0.08
+}

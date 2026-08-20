@@ -1,0 +1,100 @@
+family_id: SM01_preference_adoption
+title: Preference Adoption
+ability_dir: memory_ability
+primary_ability: memory_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+trigger_category: direct_explicit_save_instruction
+trigger_strength: T3
+trigger_visibility_paths:
+  - direct_user_message
+benchmark_role: canonical_anchor
+compatibility_gate: strict
+trigger_class: explicit_instruction
+secondary_triggers: []
+optional_supporting_trigger:
+supporting_stage: learn_b
+supporting_signal: surface-variation reinforcement of the same durable preference
+supporting_signals: []
+distractor_signals: []
+trigger_injection_plan:
+  learn_a: introduce the durable preference explicitly for the first time
+  learn_b: reinforce the same preference under surface variation without reframing the family as correction
+primary_trigger_stages:
+  - learn_a
+trigger_removal_plan:
+  eval_near: remove the preference wording entirely and leave only the new task request
+  eval_far: remove the preference wording entirely under larger surface shift
+trigger_mixing_rule: Do not add explicit_correction inside the same family; that changes the family from adoption to correction.
+sibling_comparison_plan: Build an instruction-vs-correction sibling only as a matched separate family if trigger sensitivity must be measured.
+expected_substrate: memory
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+implementation_priority: phase1
+instances_per_bucket:
+  cold: 1
+  learn: 2
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+  - cold_style_baseline
+  - learn_a_tsv_preference
+  - learn_b_preference_reinforcement
+  - eval_near_apply_saved_style
+  - eval_far_transfer_saved_style
+  - control_shortcut_visible_style_rule
+  - control_style_preference_control
+  - control_no_persistence_style
+history_plan:
+  anchors:
+    - name: sm01_post_learn
+      save_after: learn_b_preference_reinforcement
+  branches:
+    - mode: continue
+      episodes:
+        - cold_style_baseline
+        - learn_a_tsv_preference
+        - learn_b_preference_reinforcement
+    - mode: from_anchor
+      anchor: sm01_post_learn
+      episodes:
+        - eval_near_apply_saved_style
+        - eval_far_transfer_saved_style
+    - mode: fresh
+      episodes:
+        - control_shortcut_visible_style_rule
+        - control_style_preference_control
+        - control_no_persistence_style
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: sm01_preference_adoption
+what_is_learned: A durable user or team preference that should apply automatically on later same-family tasks.
+what_persists: The stable preference and its application rule in memory.
+what_counts_as_reuse: Later tasks apply the preference without re-teaching it.
+false_positive_pattern: The evaluation prompt repeats the preference or leaks the expected output style.
+must_demonstrate:
+  - the preference is stored as durable state
+  - the preference is applied automatically in fresh sessions
+  - the control branch removes the gain when persistence is unavailable
+recommended_mock_services:
+  - notes
+  - slack
+phase1_canonical_sibling: A T3 direct preference-seed family where the user explicitly tells the agent to save the future default.
+future_sibling_roadmap:
+  - Add a T2 direct durable-rule sibling without save wording.
+  - Add a T1 embedded-note sibling where the preference must be extracted from the note.
+  - Add a correction-based sibling for trigger-strength comparison.
+cold_design: Use the same action-summary workflow before any durable style preference is taught and let the agent answer in its default format.
+expected_cold_result: Non-zero but unstable adherence to the later TSV preference; no durable cross-task style reuse should appear yet.
+control_design: Measure no_persistence through the runtime ablation, add one shortcut control with the full style rule exposed locally, and keep one no-local-clue control that still requires the persisted preference.
+expected_control_result: Preference-consistent behavior should drop materially without persistence; the shortcut-only control is locally solvable; the no-local-clue control should still depend on persisted memory.
+authoring_notes: Start with a compact notes or messaging workflow where style preferences are easy to score deterministically.

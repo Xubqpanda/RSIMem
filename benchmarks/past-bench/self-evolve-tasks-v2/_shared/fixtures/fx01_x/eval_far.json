@@ -1,0 +1,52 @@
+{
+  "users": {
+    "U_AGENT": {"username": "greenware_hq", "followers": 3800, "verified": false},
+    "U_PARTNER": {"username": "eco_investor", "followers": 22000, "verified": false},
+    "U_SMALL_BACKER": {"username": "local_greenie", "followers": 310, "verified": false},
+    "U_DISGRUNTLED": {"username": "angry_backer_2", "followers": 450, "verified": false},
+    "U_CLIMATEEXPERT": {"username": "climate_tech_vc", "followers": 110000, "verified": true},
+    "U_BIGCO": {"username": "greenrival_co", "followers": 90000, "verified": false}
+  },
+  "tweets": {
+    "T040": {
+      "id": "T040",
+      "author": "U_PARTNER",
+      "text": "@greenware_hq Your carbon tracking dashboard just saved our portfolio company 2 weeks of manual reporting. Incredible tool — sharing with our whole network.",
+      "metrics": {"like_count": 245, "retweet_count": 78, "reply_count": 18},
+      "sentiment": "positive"
+    },
+    "T041": {
+      "id": "T041",
+      "author": "U_SMALL_BACKER",
+      "text": "@greenware_hq Love the new scope-3 emissions module. Keep it up!",
+      "metrics": {"like_count": 4, "retweet_count": 1, "reply_count": 0},
+      "sentiment": "positive"
+    },
+    "T042": {
+      "id": "T042",
+      "author": "U_DISGRUNTLED",
+      "text": "@greenware_hq Your data import keeps corrupting our CSV files. We've been locked out of reporting for a week. Totally unacceptable for a paid product.",
+      "metrics": {"like_count": 12, "retweet_count": 4, "reply_count": 2},
+      "sentiment": "negative"
+    },
+    "T043": {
+      "id": "T043",
+      "author": "U_CLIMATEEXPERT",
+      "text": "Corporate sustainability reporting is moving from voluntary to mandatory globally. Companies without real-time emissions data infrastructure will face severe compliance risk by 2027.",
+      "metrics": {"like_count": 8900, "retweet_count": 3200, "reply_count": 560},
+      "sentiment": "neutral",
+      "is_expert_post": true
+    },
+    "T044": {
+      "id": "T044",
+      "author": "U_BIGCO",
+      "text": "ESG software market is getting crowded. @greenrival_co and @greenware_hq both doing interesting things. Curious who comes out ahead.",
+      "metrics": {"like_count": 400, "retweet_count": 120, "reply_count": 65},
+      "sentiment": "neutral",
+      "competitor_tagged": true
+    }
+  },
+  "timeline": ["T043", "T044"],
+  "mentions": ["T040", "T041", "T042"],
+  "dms": []
+}

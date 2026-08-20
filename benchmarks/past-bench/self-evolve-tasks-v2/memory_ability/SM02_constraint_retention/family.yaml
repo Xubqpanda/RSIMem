@@ -1,0 +1,101 @@
+family_id: SM02_constraint_retention
+title: Constraint Retention
+ability_dir: memory_ability
+primary_ability: memory_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+trigger_category: direct_explicit_save_instruction
+trigger_strength: T3
+trigger_visibility_paths:
+  - direct_user_message
+benchmark_role: canonical_anchor
+compatibility_gate: strict
+trigger_class: explicit_instruction
+secondary_triggers: []
+optional_supporting_trigger:
+supporting_stage: learn_b
+supporting_signal: surface-different confirmation that the same boundary is long-term
+supporting_signals: []
+distractor_signals: []
+trigger_injection_plan:
+  learn_a: place the durable boundary or privacy rule explicitly
+  learn_b: repeat the same boundary under different surface conditions
+primary_trigger_stages:
+  - learn_a
+trigger_removal_plan:
+  eval_near: test whether the boundary is automatically honored without repeating it
+  eval_far: keep the boundary implicit and probe retention under larger transfer distance
+trigger_mixing_rule: Avoid conflict_update in this family or it becomes an overwrite family instead of a retention family.
+sibling_comparison_plan: If correction-based retention is interesting, compare it through a matched sibling family rather than mixing triggers here.
+expected_substrate: memory
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+implementation_priority: phase1
+instances_per_bucket:
+  cold: 1
+  learn: 2
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+  - cold_boundary_baseline
+  - learn_a_external_boundary
+  - learn_b_boundary_reinforcement
+  - eval_near_retain_boundary
+  - eval_far_retain_boundary
+  - control_shortcut_visible_boundary_rule
+  - control_boundary_control
+  - control_no_persistence_boundary
+history_plan:
+  anchors:
+    - name: sm02_post_learn
+      save_after: learn_b_boundary_reinforcement
+  branches:
+    - mode: continue
+      episodes:
+        - cold_boundary_baseline
+        - learn_a_external_boundary
+        - learn_b_boundary_reinforcement
+    - mode: from_anchor
+      anchor: sm02_post_learn
+      episodes:
+        - eval_near_retain_boundary
+        - eval_far_retain_boundary
+    - mode: fresh
+      episodes:
+        - control_shortcut_visible_boundary_rule
+        - control_boundary_control
+        - control_no_persistence_boundary
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: sm02_constraint_retention
+what_is_learned: A stable operating constraint or boundary condition that must persist across sessions.
+what_persists: The long-term constraint and the implied action boundary in memory.
+what_counts_as_reuse: Later tasks respect the constraint even when the prompt omits it.
+false_positive_pattern: The current task materials themselves reveal the constraint strongly enough to solve the task without persistence.
+must_demonstrate:
+  - the constraint is saved as durable knowledge
+  - later tasks obey the constraint without re-instruction
+  - shortcut controls prevent solving from current prompt clues alone
+recommended_mock_services:
+  - gmail
+  - calendar
+  - notes
+phase1_canonical_sibling: A T3 direct boundary-instruction family where the user explicitly tells the agent to save the future sharing boundary.
+future_sibling_roadmap:
+  - Add a T2 direct durable-boundary sibling without save wording.
+  - Add a T1 embedded policy-note sibling where the boundary must be extracted from the note.
+  - Add a correction-based sibling for trigger-strength comparison.
+cold_design: Present the same internal-planning share workflow before any durable boundary has been taught.
+expected_cold_result: The agent may partially respect the boundary by generic caution, but behavior should be inconsistent and should not show stable cross-session retention.
+control_design: Measure no_persistence through the runtime ablation, add one shortcut control that exposes the boundary locally, and keep one no-local-clue control that still requires the persisted boundary.
+expected_control_result: Boundary adherence should weaken sharply once persistence is removed; the shortcut control is locally solvable; the no-local-clue control should still fail or leak without memory.
+authoring_notes: Good targets are privacy boundaries, notification boundaries, or formatting constraints that can be scored with hard checks.

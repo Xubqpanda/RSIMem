@@ -1,0 +1,29 @@
+[
+  {
+    "note_id": "AUDIT-PG04-CB",
+    "title": "Ledger export scope-mismatch audit",
+    "content": "Request under review: owner=data-platform service=ledger-export scope=staging-ap candidates=LGR-AP-03,LGR-AP-05. Do not reuse a waiver unless the exact scope matches.",
+    "tags": [
+      "audit-note",
+      "current"
+    ],
+    "created_at": "2026-04-20T12:50:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 10
+  },
+  {
+    "note_id": "AUDIT-PG04-M6",
+    "title": "AP waiver scratchpad",
+    "content": "Scratchpad only.",
+    "tags": [
+      "misc"
+    ],
+    "created_at": "2026-04-20T12:51:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 5
+  }
+]

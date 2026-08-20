@@ -1,0 +1,109 @@
+family_id: PC03_latent_rule_induction_01
+title: Latent Rule Induction
+ability_dir: procedural_ability
+primary_ability: procedural_ability
+secondary_abilities: []
+primary_trigger: repeated_cases_induction
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  learn: 2
+  eval_near: 1
+  eval_far: 1
+  control: 2
+total_episodes: 7
+episode_order:
+- F05_I01_hidden_baseline_cold
+- F05_I02_hidden_learn_case_a
+- F05_I03_hidden_learn_case_b
+- F05_I04_hidden_eval_near
+- F05_I05_hidden_eval_far
+- F05_C01_control_shortcut
+- F05_C02_control_too_few_examples
+history_plan:
+  anchors:
+  - name: pc03_01_post_learn
+    save_after: F05_I03_hidden_learn_case_b
+  branches:
+  - mode: continue
+    episodes:
+    - F05_I01_hidden_baseline_cold
+    - F05_I02_hidden_learn_case_a
+    - F05_I03_hidden_learn_case_b
+  - mode: from_anchor
+    anchor: pc03_01_post_learn
+    episodes:
+    - F05_I04_hidden_eval_near
+    - F05_I05_hidden_eval_far
+  - mode: fresh
+    episodes:
+    - F05_C01_control_shortcut
+    - F05_C02_control_too_few_examples
+control_set:
+- shortcut
+- too_few_examples
+episode_overrides:
+  F05_C01_control_shortcut:
+    stage: control
+    persistence_allowed: false
+  F05_C02_control_too_few_examples:
+    stage: control
+    persistence_allowed: false
+status: v2_architecture_aligned
+latent_rule_id: f05_db_migration_risk_correlation_v1
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  DB migration risk correlation rule — the latent pattern that EU region +
+  schema version 7-to-8 + odd shard ID predicts high migration failure risk.
+what_persists: >
+  A durable skill artifact encoding the induced three-factor risk rule for
+  reuse without re-observing the original training cases.
+what_counts_as_reuse: >
+  Agent applies the three-factor risk rule to novel migration requests with
+  different surface features, correctly flagging risky combinations.
+false_positive_pattern: >
+  Agent memorizes specific shard IDs or region names from training cases
+  rather than inducing the general three-factor correlation rule.
+must_demonstrate:
+- Induce the latent three-factor risk rule from example cases alone
+- Apply the rule to novel migrations with changed surface entities
+- Correctly distinguish risky from safe combinations using the induced rule
+
+# §13.0 Trigger Spec
+trigger_category: repeated_cases_induction
+trigger_strength: T0
+visibility_surface: multiple same-structure cases with different surface features
+trigger_injection_plan: "learn_a + learn_b: two informative outcome-labeled case batches; agent must infer latent rule without SOP text"
+trigger_removal_plan: eval removes shared keywords, entities, surface templates; preserves only latent procedure
+trigger_mixing_rule: no explicit SOP text, direct correction, or explicit summary of the latent rule
+sibling_comparison_plan: compare with PC01-style direct teaching for sample efficiency analysis
+phase1_canonical_sibling: native weaker-trigger family; not a trigger-strength anchor
+future_sibling_roadmap: compare against PC01-style direct teaching once trigger-strength ladders are ready
+
+# §10 Cold Design
+cold_design: first task exposes the latent workflow before enough cases exist to induce it
+expected_cold_result: low-to-mid score; no rule abstraction yet
+
+# Control Design
+control_design: shortcut and too_few_examples controls
+expected_control_result: without enough learn examples, transfer collapses; surface matching alone is rejected
+
+# Episodes
+legacy_source: previous PC split, architecture-aligned
+legacy_episodes:
+- F05_I01_hidden_baseline_cold
+- F05_I02_hidden_learn_case_a
+- F05_I03_hidden_learn_case_b
+- F05_I04_hidden_eval_near
+- F05_I05_hidden_eval_far
+- F05_C01_control_shortcut
+- F05_C02_control_too_few_examples

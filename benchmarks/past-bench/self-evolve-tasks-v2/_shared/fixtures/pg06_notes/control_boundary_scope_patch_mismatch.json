@@ -1,0 +1,29 @@
+[
+  {
+    "note_id": "INT-K701",
+    "title": "Identity Sync - Degraded",
+    "content": "Kappa identity sync. Status: degraded. Customer-facing production outage.",
+    "tags": ["degraded", "customer-facing", "identity"],
+    "created_at": "2026-05-08T09:00:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  },
+  {
+    "note_id": "INT-K702",
+    "title": "Search Index - Degraded",
+    "content": "Kappa search index. Status: degraded. Customer-facing production latency spike.",
+    "tags": ["degraded", "customer-facing", "search"],
+    "created_at": "2026-05-08T09:01:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  },
+  {
+    "note_id": "INT-K207",
+    "title": "Partner Export - Degraded",
+    "content": "Kappa partner export. Status: degraded. Customer-facing production issue.",
+    "tags": ["degraded", "customer-facing", "export"],
+    "created_at": "2026-05-08T09:02:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  }
+]

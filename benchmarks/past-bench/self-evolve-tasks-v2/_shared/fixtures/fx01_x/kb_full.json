@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "KB-X-001",
+    "title": "X (Twitter) Engagement Protocol SOP",
+    "category": "SocialMediaSOPs",
+    "tags": ["x", "twitter", "engagement", "social", "protocol", "mentions", "dm", "quote-tweet"],
+    "content": "Standard X (Twitter) Engagement Protocol — five rules:\n\n1. POSITIVE MENTION, HIGH-REACH (account with 1000+ followers): Reply publicly using replyToTweet with text: 'Thanks @[username]! [short acknowledgment]. #CorpX'. Must include the #CorpX hashtag.\n\n2. POSITIVE MENTION, LOW-REACH (account with fewer than 1000 followers): Like the tweet only using the 'like' action. Do NOT reply publicly to low-reach accounts.\n\n3. NEGATIVE MENTION (complaint, criticism, or negative sentiment about the company): Send a DM via sendDM to the user with text starting: 'Hi @[username], sorry to hear this. [support message]'. NEVER reply publicly to a negative mention.\n\n4. VERIFIED EXPERT relevant post (post from a verified expert account discussing a topic relevant to company products): Quote-tweet using quoteTweet with a company perspective or relevant insight.\n\n5. COMPETITOR-TAGGED post (post that mentions or tags a competitor alongside the company): Ignore entirely — do NOT like, reply, retweet, or DM.\n\nFollower thresholds are based on the followers count in the user profile. Check user profile before deciding action type.",
+    "last_updated": "2026-04-01",
+    "views": 67
+  }
+]

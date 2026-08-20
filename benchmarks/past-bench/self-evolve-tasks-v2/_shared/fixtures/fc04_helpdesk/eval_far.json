@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-E501",
+    "title": "ML training script uses import requests to fetch data",
+    "description": "The ML team's training script uses import requests to pull training datasets from the data warehouse. Please review.",
+    "reporter": "ML-Peter Zhou",
+    "department": "ML Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-22T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E502",
+    "title": "Recommendation feature service uses aiohttp",
+    "description": "The recommendation system's feature retrieval service uses aiohttp for async concurrent requests; latency has dropped by 50%.",
+    "reporter": "ML-Rachel Yu",
+    "department": "ML Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-22T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E503",
+    "title": "Data annotation platform uses requests.Session",
+    "description": "The data annotation platform's integration with the labeling tool API uses requests.Session. Please assess whether migration is needed.",
+    "reporter": "Data-Alice Chen",
+    "department": "Data Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-22T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E504",
+    "title": "Request: additional GPU compute capacity",
+    "description": "The ML team needs more GPU resources for model training. Requesting capacity expansion. Not a code review issue.",
+    "reporter": "ML-Peter Zhou",
+    "department": "ML Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-22T11:00:00Z",
+    "tags": []
+  }
+]

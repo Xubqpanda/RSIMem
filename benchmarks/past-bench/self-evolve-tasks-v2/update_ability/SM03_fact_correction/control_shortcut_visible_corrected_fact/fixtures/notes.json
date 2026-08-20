@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM03-007",
+    "title": "Phoenix Customer Success Sync",
+    "created_at": "2026-04-14",
+    "participants": ["Mila Stone", "Jon Kim", "Drew Park"],
+    "duration_minutes": 25,
+    "content": "Phoenix customer success sync.\n\nAction items:\n1. Mila Stone: update the customer cutover checklist before the freeze\n2. Jon Kim: tighten the customer FAQ handoff note before launch\n\nDrew Park attended as an observer."
+  }
+]

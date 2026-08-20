@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM02-007",
+    "title": "Planning Escalation Queue",
+    "created_at": "2026-04-14",
+    "participants": ["Priya Nair", "Daniel Kim", "Ava Chen", "Owen Brooks"],
+    "duration_minutes": 35,
+    "content": "Planning escalation queue.\n\nAction items:\n1. Priya Nair: refresh the launch calendar before the review\n2. Daniel Kim: clear the approval queue before Friday\n3. Ava Chen: respond to the remaining partner questions after the call\n\nOwen Brooks attended as an advisor."
+  }
+]

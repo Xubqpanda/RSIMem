@@ -1,0 +1,20 @@
+[
+  {
+    "article_id": "kb_data_sharing_exceptions_v1",
+    "title": "Data Sharing Exception Registry",
+    "category": "Data Governance",
+    "tags": ["data-sharing", "exception", "registry", "DSX"],
+    "content": "The Data Sharing Exception Registry lists teams with standing pre-approval for raw data exports:\n\nDSX-001 — Analytics Team: Pre-approved for raw data export requests. Action: tag 'data-approved', set category=data-export, set priority=low.\n\nDSX-002 — Legal Team: Pre-approved for raw data export requests (compliance and audit purposes). Action: tag 'data-approved', set category=data-export, set priority=low.\n\nAll other reporters/departments: NOT pre-approved. Action: tag 'data-share-pending', set category=data-export, set priority=medium, add internal note: 'Awaiting DPO approval before export'.\n\nAdditional rules:\n- Tickets using standard approved libraries (pandas, polars) for the export tool should also receive tag 'export-tool-approved'.\n- Never approve data exports from reporters outside the exception registry without DPO sign-off.",
+    "last_updated": "2026-03-28",
+    "views": 175
+  },
+  {
+    "article_id": "kb_data_sharing_tools_v1",
+    "title": "Approved Data Export Tools",
+    "category": "Data Governance",
+    "tags": ["data-export", "tools", "approved"],
+    "content": "Approved libraries for data export operations: pandas, polars. These tools have been vetted for security and compliance. Any data export ticket that specifies one of these tools should also receive the tag 'export-tool-approved'. Unapproved tools (e.g., custom scripts without review, third-party SaaS) require a separate security review.",
+    "last_updated": "2026-03-20",
+    "views": 88
+  }
+]

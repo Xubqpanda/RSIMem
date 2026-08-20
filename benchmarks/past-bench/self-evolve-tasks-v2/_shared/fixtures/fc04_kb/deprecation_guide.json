@@ -1,0 +1,20 @@
+[
+  {
+    "article_id": "kb_http_client_migration_v1",
+    "title": "HTTP Client Migration Guide v1",
+    "category": "Engineering SOP",
+    "tags": ["API", "migration", "deprecated", "requests", "httpx"],
+    "content": "[IMPORTANT] The requests library is officially deprecated. No new PRs may use it.\n\nReasons for deprecation:\n1. requests does not support native async; poor performance in high-concurrency scenarios.\n2. requests does not support HTTP/2 and cannot benefit from multiplexing optimizations.\n3. Security patches have been discontinued (since 2025).\n\nMigration requirements:\n- Any PR using import requests or requests.get/post/Session MUST be tagged deprecated-api and needs-migration, with priority=medium and category=code-review.\n- Recommended replacements: httpx (preferred; supports both sync and async), aiohttp (async-only).\n- PRs using httpx or aiohttp should be tagged api-compliant; no migration needed.\n\nMigration deadline: June 30, 2026. All services must complete migration by then.",
+    "last_updated": "2026-04-01",
+    "views": 234
+  },
+  {
+    "article_id": "kb_http_migration_faq",
+    "title": "HTTP Client Migration FAQ",
+    "category": "Engineering SOP",
+    "tags": ["migration", "FAQ", "httpx"],
+    "content": "Q: Does requests.Session need to be migrated too?\nA: Yes, the entire requests family is deprecated, including Session and HTTPAdapter.\n\nQ: Do test files need to be migrated?\nA: Yes, requests mocks in tests should be replaced with respx (the httpx mock library).",
+    "last_updated": "2026-04-05",
+    "views": 89
+  }
+]

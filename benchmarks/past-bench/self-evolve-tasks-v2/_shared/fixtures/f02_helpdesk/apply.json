@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-H301",
+    "title": "billing-cluster-3 down — invoice generation timeout",
+    "description": "Invoice generation jobs are timing out across the board since 14:00 UTC. The invoice service cannot connect to billing-cluster-3 which is unresponsive. Bulk invoice runs for enterprise customers are failing. Finance team is manually tracking affected invoices. Cluster restart attempts have not succeeded.",
+    "reporter": "Chloe-Anderson",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T14:05:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-H302",
+    "title": "Charge API HTTP 500 — billing-cluster-3 outage",
+    "description": "The /api/billing/charge endpoint is throwing HTTP 500 errors for all requests. Tracing shows requests routing to billing-cluster-3 are failing at the cluster layer. The cluster is in a failed state. Payment processing is completely broken for the affected routing group. Customer churn risk is high.",
+    "reporter": "Jackson-Reeves",
+    "department": "Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T14:17:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-H303",
+    "title": "Settlement worker crash loop — billing-cluster-3 unreachable",
+    "description": "Settlement workers are stuck in a crash loop because billing-cluster-3 is unreachable. The workers attempt to write settlement records, fail with connection timeout, and restart — repeating indefinitely. This is the same cluster as the invoice timeout and charge API failures. Shared root cause confirmed by Platform team.",
+    "reporter": "Nadia-Bergmann",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T14:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-H304",
+    "title": "Duplicate invoice complaint — customer received two invoices",
+    "description": "Customer account #ACC-78234 reports receiving two identical invoices for the same subscription renewal. This appears to be a billing logic bug in the deduplication layer, not related to cluster health. The customer is requesting a credit for the duplicate charge. Finance team needs to investigate the dedup logic.",
+    "reporter": "Victor-Lam",
+    "department": "Customer Success",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T14:45:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-H305",
+    "title": "Billing documentation update — new proration policy",
+    "description": "The billing team has updated the proration policy for mid-cycle plan changes. The internal documentation and the customer-facing FAQ need to be updated to reflect the new calculation method. Please coordinate with the docs team to publish the updates before the next billing cycle starts.",
+    "reporter": "Rosa-Jimenez",
+    "department": "Product",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T15:00:00Z",
+    "tags": []
+  }
+]

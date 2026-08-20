@@ -1,0 +1,20 @@
+[
+  {
+    "article_id": "kb_f02_billing_sop_v2",
+    "title": "Billing Incident SOP v2",
+    "category": "incident-management",
+    "content": "## Billing Incident SOP v2\n\nVersion: 2.0 (Current — replaces v1)\nEffective: 2026-04-01\n\n### Escalation Trigger\nWhen 3 or more tickets from distinct reporters identify the same billing cluster failure within a 4-hour window, treat this as a billing incident. NOTE: The threshold has been raised from 2 to 3 to reduce false-positive escalations.\n\n### Required Actions\n1. Read all open billing tickets and identify the cluster name.\n2. Tag each incident ticket with: incident-core, billing-sla-breach\n3. Set priority=critical on all cluster incident tickets. (Changed from 'high' in v1.)\n4. Set category=incident-billing on all cluster incident tickets. (Changed from 'incident' in v1.)\n5. Do NOT close any ticket — leave resolution to the on-call billing engineer.\n6. Output one line per updated ticket: TICKET_ID|priority|category|why\n\n### Threshold\n- Minimum 3 tickets from distinct reporters pointing to the same cluster = escalation required.\n- Groups of only 2 tickets do NOT meet the v2 threshold and should NOT be escalated.\n- Single-reporter tickets do not trigger escalation unless confirmed by additional reporters.\n\n### Exclusions\n- UI bugs, slow performance on non-cluster services, document requests, access requests, and routine report requests are NOT billing incidents.\n- Do not apply incident labels to tickets that describe separate root causes.\n- Do not use v1 labels (priority=high, category=incident) — they are deprecated.",
+    "tags": [],
+    "last_updated": "2026-04-01",
+    "views": 0
+  },
+  {
+    "article_id": "kb_f02_policy_update_notice",
+    "title": "Policy Update: Billing Incident SOP v1 Deprecated",
+    "category": "incident-management",
+    "content": "## Policy Update Notice\n\nDate: 2026-04-01\n\n### Action Required\nThe Billing Incident SOP v1 is now DEPRECATED and must no longer be used.\n\nEffective immediately, all billing incident triage must follow Billing Incident SOP v2 (article: kb_f02_billing_sop_v2).\n\n### Key Changes Summary\n| Field | v1 (Deprecated) | v2 (Current) |\n|---|---|---|\n| Escalation threshold | 2+ tickets | 3+ tickets |\n| Priority label | high | critical |\n| Category label | incident | incident-billing |\n| Required tags | incident-core | incident-core, billing-sla-breach |\n\n### Reason for Change\nThe v1 threshold of 2 tickets generated too many false-positive escalations for transient billing errors that self-resolved. The v2 threshold of 3 tickets ensures only confirmed, multi-team cluster failures are escalated to the on-call rotation.\n\nAny saved procedures, runbooks, or skill artifacts referencing the v1 rules must be updated to v2 immediately.",
+    "tags": [],
+    "last_updated": "2026-04-01",
+    "views": 0
+  }
+]

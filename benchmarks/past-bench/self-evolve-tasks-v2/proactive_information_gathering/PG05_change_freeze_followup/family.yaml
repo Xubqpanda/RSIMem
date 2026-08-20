@@ -1,0 +1,66 @@
+family_id: PG05_change_freeze_followup
+title: Change Freeze Followup
+ability_dir: proactive_information_gathering
+primary_ability: proactive_information_gathering
+secondary_abilities:
+  - episodic_experience
+  - trigger_and_arbitration
+primary_trigger: failure_reflection
+secondary_trigger: []
+expected_substrate: session_search
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier3
+instances_per_bucket:
+  attempt: 1
+  reflection: 1
+  update_or_stabilize: 1
+  eval_near: 2
+  eval_far: 1
+  control: 2
+total_episodes: 8
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: pg05_change_freeze_followup_v1
+what_is_learned: Change freeze follow-ups require explicit session retrieval of the latest matching CAB packet before any note or announcement is updated.
+what_persists: A retrieval skill note about searching sessions for the latest matching freeze packet and recovering the exact UTC window plus exception projects.
+what_counts_as_reuse: Later freeze follow-ups retrieve the latest matching packet first, update the current note with the exact window and exception list, and reject stale or wrong-scope packets.
+false_positive_pattern: The agent updates the current freeze note from a visible hint, fuzzy prior memory, or a stale packet without opening the exact matching CAB session.
+must_demonstrate:
+  - session retrieval happens before the first note update
+  - exact freeze packet ID, UTC window, and exception projects are recalled
+  - stale or wrong-scope packets are rejected
+episode_order:
+  - attempt_probe_pre
+  - reflection_gap_review
+  - update_or_stabilize_policy_note
+  - eval_near_followup_a
+  - eval_near_followup_b
+  - eval_far_followup_transfer
+  - control_preload_visible_hint
+  - control_boundary_latest_packet
+history_plan:
+  branches:
+    - mode: continue
+      episodes:
+        - attempt_probe_pre
+        - reflection_gap_review
+        - update_or_stabilize_policy_note
+        - eval_near_followup_a
+        - eval_near_followup_b
+        - eval_far_followup_transfer
+        - control_preload_visible_hint
+        - control_boundary_latest_packet
+episode_overrides:
+  reflection_gap_review:
+    mechanism: skill
+    expected_persistence_signal: skill
+  update_or_stabilize_policy_note:
+    mechanism: skill
+    expected_persistence_signal: skill

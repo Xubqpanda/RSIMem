@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "kb_fm02_brief",
+    "title": "Shared Outage Overview",
+    "category": "incident-management",
+    "content": "When multiple reports reference the same infrastructure zone, there may be a shared outage. See the full Shared Outage Triage SOP for proper classification and tagging procedures.",
+    "tags": [],
+    "last_updated": "2026-04-01",
+    "views": 0
+  }
+]

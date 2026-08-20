@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM02-002",
+    "title": "Internal Planning Boundary Update",
+    "created_at": "2026-04-11",
+    "participants": ["Priya Nair", "Daniel Kim", "Ava Chen", "Owen Brooks"],
+    "duration_minutes": 40,
+    "content": "Internal planning boundary update.\n\nAction items:\n1. Priya Nair: tighten the forecast assumptions sheet\n2. Daniel Kim: rewrite the launch blocker summary\n3. Ava Chen: send vendor due-diligence comments before Friday"
+  }
+]

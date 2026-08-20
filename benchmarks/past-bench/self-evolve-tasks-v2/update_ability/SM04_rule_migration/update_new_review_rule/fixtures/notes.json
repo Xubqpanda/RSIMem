@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM04-003",
+    "title": "Standards Migration Notice",
+    "created_at": "2026-04-12",
+    "participants": ["Sarah Zhang", "Leo Li", "Kevin Wang", "Maya Patel"],
+    "duration_minutes": 25,
+    "content": "Standards migration notice.\n\nAction items:\n1. Sarah Zhang: add the new formatter gate to CI, High priority, by Apr 24\n2. Leo Li: remove legacy style drift from utility modules, Medium priority, by Apr 25\n3. Kevin Wang: update the standards handbook examples, Low priority, by Apr 26\n\nMaya Patel attended as an observer."
+  }
+]

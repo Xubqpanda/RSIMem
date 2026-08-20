@@ -1,0 +1,43 @@
+{
+  "latent_rule_id": "fm03_datashare_exception_registry_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "control",
+  "control_type": "surface_memorization",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-FM03-009",
+    "TK-FM03-010"
+  ],
+  "expected_category": "data-export",
+  "min_ticket_reads": 2,
+  "required_summary_keywords": [
+    "TK-FM03-009",
+    "TK-FM03-010"
+  ],
+  "skill_artifact_weight": 0.0,
+  "expected_ticket_updates": {
+    "TK-FM03-009": {
+      "priority": "low",
+      "required_tags": [
+        "data-approved",
+        "export-tool-approved"
+      ]
+    },
+    "TK-FM03-010": {
+      "priority": "medium",
+      "required_tags": [
+        "data-share-pending"
+      ],
+      "internal_note_contains": "Awaiting DPO approval before export"
+    }
+  }
+}

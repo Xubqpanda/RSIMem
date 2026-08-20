@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM01-008",
+    "title": "Procurement Review Follow-up",
+    "created_at": "2026-04-16",
+    "participants": ["Lena Park", "Marco Silva", "Diane Cho", "Raj Mehta"],
+    "duration_minutes": 40,
+    "content": "Procurement review follow-up.\n\nAction items:\n1. Lena Park: finalize the vendor shortlist before the budget lock, high priority, by May 15\n2. Marco Silva: reconcile the procurement spend variance, standard, by May 16\n3. Diane Cho: archive the closed RFP exceptions, deferred, by May 17\n\nRaj Mehta attended as an observer."
+  }
+]

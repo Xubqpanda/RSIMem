@@ -1,0 +1,41 @@
+[
+  {
+    "note_id": "MTG-EP01-CWM1",
+    "title": "Legal Check",
+    "content": "Legal wants to know whether Vendor X has any live exception or one-off decision that should be cited before the audit packet goes out.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-POLICY",
+    "title": "Vendor Approval Policy",
+    "content": "Generic rule: vendors that have not passed SOC2 are blocked for production. This policy note does not record any one-off exception list or session-specific decisions.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-C2",
+    "title": "Standup",
+    "content": "Daily standup. No blockers. Carol picked up the dashboard polish.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  }
+]

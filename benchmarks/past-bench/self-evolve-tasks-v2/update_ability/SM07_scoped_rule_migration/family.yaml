@@ -1,0 +1,111 @@
+family_id: SM07_scoped_rule_migration
+title: Scoped Rule Migration
+ability_dir: update_ability
+primary_ability: update_ability
+secondary_abilities: []
+primary_trigger: conflict_update
+trigger_category: conflict_update
+trigger_strength: T3
+trigger_visibility_paths:
+  - direct_user_message
+  - structured_scope_metadata
+benchmark_role: diagnostic_sibling
+compatibility_gate: diagnostic
+trigger_class: conflict_update
+secondary_triggers: []
+optional_supporting_trigger: explicit_instruction
+supporting_stage: update_or_stabilize
+supporting_signal: native Hermes home fixture supplies stale Security production rule, preserved Ops rule, adjacent scopes, and cross-mechanism distractors
+supporting_signals: []
+distractor_signals: []
+trigger_injection_plan:
+  initial_home_fixture: initialize stale Security production rule, preserved Ops rule, adjacent scope rules, stale skill, and prior sessions in native Hermes persistence
+  update_or_stabilize: explicitly migrate only the security rule while marking the ops rule as UNCHANGED
+primary_trigger_stages:
+  - update_or_stabilize
+trigger_removal_plan:
+  eval_near: remove all migration wording and require the new security rule plus the preserved ops rule on mixed-scope notes
+  eval_far: probe whether the scoped migration still holds under larger surface shift without reintroducing the migration notice
+trigger_mixing_rule: Do not turn this family into a global overwrite task. The diagnostic target is selective migration within one scope while preserving the adjacent scope untouched.
+sibling_comparison_plan: Compare against SM04_rule_migration as the clean global overwrite anchor. This family asks whether the overwrite remains scoped instead of contaminating neighboring rules.
+expected_substrate: memory
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: required
+noise_profile: medium
+family_length_tier: tier3
+implementation_priority: phase1
+instances_per_bucket:
+  cold: 1
+  update_or_stabilize: 1
+  eval_near: 2
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+  - cold_scope_baseline
+  - update_or_stabilize_security_migration
+  - eval_near_apply_scoped_migration_a
+  - eval_near_apply_scoped_migration_b
+  - eval_far_transfer_scoped_migration
+  - control_no_persistence_scope
+  - control_shortcut_visible_scoped_rule
+  - control_scoped_rule_migration_control
+history_plan:
+  anchors:
+    - name: sm07_post_update
+      save_after: update_or_stabilize_security_migration
+  branches:
+    - mode: fresh
+      episodes:
+        - cold_scope_baseline
+        - control_no_persistence_scope
+        - control_shortcut_visible_scoped_rule
+        - control_scoped_rule_migration_control
+    - mode: continue
+      episodes:
+        - update_or_stabilize_security_migration
+    - mode: from_anchor
+      anchor: sm07_post_update
+      episodes:
+        - eval_near_apply_scoped_migration_a
+        - eval_near_apply_scoped_migration_b
+        - eval_far_transfer_scoped_migration
+episode_overrides:
+  cold_scope_baseline:
+    mechanism: memory
+    expected_persistence_signal: memory
+    persistence_allowed: true
+    initial_home_fixture_dir: self-evolve-tasks-v2/_shared/home_fixtures/update_ability/SM07_scoped_rule_migration
+  update_or_stabilize_security_migration:
+    mechanism: memory
+    expected_persistence_signal: memory
+    persistence_allowed: true
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: sm07_scoped_rule_migration
+what_is_learned: A stored scoped routing policy where the security rule is later replaced but the ops rule must remain unchanged.
+what_persists: The migrated SEC-GAMMA security rule replaces SEC-ALPHA only for Security items, while OPS-DELTA remains the durable Ops rule.
+what_counts_as_reuse: Later mixed-scope tasks use SEC-GAMMA only on Security items, keep OPS-DELTA on Ops items, and share notes only with High priority Security owners plus all Ops owners.
+false_positive_pattern: The agent either leaks stale SEC-ALPHA into later outputs or globally applies SEC-GAMMA to Ops items, showing scope contamination rather than selective migration.
+must_demonstrate:
+  - the native Hermes home fixture already contains stale Security and preserved Ops rules
+  - the security rule is migrated without wiping or contaminating the ops rule
+  - adjacent Security staging and unrelated Finance scopes are not globally migrated
+  - later mixed-scope notes fail if stale security routing or global contamination appears
+recommended_mock_services:
+  - notes
+phase1_canonical_sibling: SM04_rule_migration remains the clean global migration anchor; this family is the scoped migration diagnostic sibling.
+future_sibling_roadmap:
+  - Add a weaker embedded-update variant where only a policy memo reveals that Security changed and Ops is unchanged.
+  - Add a three-scope version with one migrated scope, one preserved scope, and one newly introduced scope.
+  - Add telemetry-only contamination analysis if the controller work needs more precise scope-confusion attribution.
+cold_design: "Use the same mixed-scope routing workflow as eval from the stale native Hermes home fixture and judge it against the migrated target."
+expected_cold_result: "Cold should reflect pre-update performance against the migrated scoped-routing target while the stale Security production rule is still seeded in Hermes home."
+control_design: no_persistence removes the stored scoped rules, shortcut restates the scoped migration inline, and wrong_mechanism embeds the current scoped routing memo inside the note fixture instead of memory.
+expected_control_result: Without persistence the mixed-scope migration should be hard to recover; shortcut and wrong_mechanism remain locally solvable because the scoped rule is visible in the current context.
+authoring_notes: This family is aimed at D4 plus D6. Mixed-scope notes should make both stale security leakage and scope contamination visibly wrong in final output and note-sharing behavior.

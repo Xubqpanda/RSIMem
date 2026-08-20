@@ -1,0 +1,43 @@
+{
+  "latent_rule_id": "sm04_rule_migration",
+  "expected_mechanism": "memory",
+  "bucket_role": "evaluation",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [
+      "Borealis-4DQ",
+      "High priority owners"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": true,
+    "min_memory_injections": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM04-005",
+  "required_recipients": [
+    "Maya Chen"
+  ],
+  "forbidden_recipients": [
+    "Owen Price",
+    "Lucia Park"
+  ],
+  "required_output_keywords": [
+    "Maya Chen | Borealis-4DQ",
+    "Owen Price | Borealis-4DQ",
+    "Lucia Park | Borealis-4DQ"
+  ],
+  "forbidden_output_keywords": [
+    "Aurora-2S"
+  ],
+  "min_memory_injections": 1,
+  "require_rule_artifact": [
+    "Borealis-4DQ",
+    "High priority owners"
+  ],
+  "rule_artifact_weight": 0.03,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.1,
+  "apply_mechanism_caps": true
+}

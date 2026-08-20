@@ -1,0 +1,53 @@
+{
+  "latent_rule_id": "pg03_oncall_handoff_lookup_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "evaluation",
+  "mode": "proactive_retrieval",
+  "service_kind": "helpdesk",
+  "allowed_retrieval_sources": [
+    "session_search"
+  ],
+  "require_explicit_retrieval": true,
+  "require_explicit_retrieval_before_write": true,
+  "apply_mechanism_caps": true,
+  "missing_explicit_retrieval_cap": 0.25,
+  "late_explicit_retrieval_cap": 0.35,
+  "required_ticket_updates": [
+    {
+      "ticket_id": "HD-PG03-103",
+      "priority": "medium",
+      "category": "maintenance-hold",
+      "tags": [
+        "handoff-blocked",
+        "mw-0300-0400"
+      ]
+    },
+    {
+      "ticket_id": "HD-PG03-104",
+      "priority": "medium",
+      "category": "maintenance-hold",
+      "tags": [
+        "handoff-blocked",
+        "mw-0300-0400"
+      ]
+    }
+  ],
+  "forbidden_ticket_ids": [
+    "INC-870",
+    "HD-PG03-105"
+  ],
+  "required_output_keywords": [
+    "HAND-742",
+    "INC-870",
+    "Eli Navarro",
+    "03:00-04:00 UTC",
+    "HD-PG03-103",
+    "HD-PG03-104"
+  ],
+  "forbidden_output_keywords": [
+    "HAND-701",
+    "Dana Brooks"
+  ],
+  "max_without_all_required_output_keywords": 0.6,
+  "min_session_search_calls": 1
+}

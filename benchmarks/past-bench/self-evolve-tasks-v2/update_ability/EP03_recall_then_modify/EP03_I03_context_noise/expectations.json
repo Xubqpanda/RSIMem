@@ -1,0 +1,28 @@
+{
+  "latent_rule_id": "ep03_recall_then_modify_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "learn",
+  "mode": "notes_session_recall",
+  "required_prior_note_id": null,
+  "required_output_keywords": [
+    "NOISE",
+    "DOC-418"
+  ],
+  "target_modify_field": null,
+  "preserved_fields": [],
+  "min_session_search_calls": 0,
+  "session_search_weight": 0.0,
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "artifact_contract": {
+    "type": "session_search",
+    "require_rule_keywords": [
+      "onboarding",
+      "playbook"
+    ],
+    "min_count_delta": 0
+  },
+  "skill_artifact_weight": 0.0
+}

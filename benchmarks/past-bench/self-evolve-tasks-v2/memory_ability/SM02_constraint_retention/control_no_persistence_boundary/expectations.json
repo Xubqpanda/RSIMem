@@ -1,0 +1,27 @@
+{
+  "latent_rule_id": "sm02_constraint_retention",
+  "expected_mechanism": "memory",
+  "bucket_role": "control",
+  "control_kind": "no_persistence",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM02-008",
+  "required_recipients": ["Daniel Kim", "Marcus Lee"],
+  "forbidden_recipients": ["Ava Chen", "Sana Cho"],
+  "required_output_keywords": [
+    "Daniel Kim",
+    "Marcus Lee",
+    "Ava Chen",
+    "capacity model",
+    "hiring pipeline",
+    "partner onboarding"
+  ],
+  "apply_mechanism_caps": true
+}

@@ -1,0 +1,72 @@
+{
+  "latent_rule_id": "fm03_datashare_exception_registry_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "DSX-001",
+      "Analytics",
+      "data-approved",
+      "data-share-pending",
+      "export-tool-approved"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-FM03-006",
+    "TK-FM03-007",
+    "TK-FM03-008"
+  ],
+  "expected_category": "data-export",
+  "min_ticket_reads": 3,
+  "required_summary_keywords": [
+    "TK-FM03-006",
+    "TK-FM03-007",
+    "TK-FM03-008"
+  ],
+  "min_skill_manage_calls": 1,
+  "skill_manage_weight": 0.1,
+  "require_rule_artifact": [
+    "DSX-001",
+    "Analytics",
+    "data-approved",
+    "data-share-pending",
+    "export-tool-approved"
+  ],
+  "rule_artifact_weight": 0.05,
+  "reflection_rules": [
+    "Analytics Team reporters are pre-approved (DSX-001): tag data-approved, category=data-export, priority=low",
+    "Legal Team reporters are pre-approved (DSX-002): tag data-approved, category=data-export, priority=low",
+    "All other reporters: tag data-share-pending, category=data-export, priority=medium, internal note: Awaiting DPO approval before export",
+    "Tickets using pandas or polars should also be tagged export-tool-approved."
+  ],
+  "min_skill_count": 1,
+  "skill_artifact_weight": 0.05,
+  "expected_ticket_updates": {
+    "TK-FM03-006": {
+      "priority": "low",
+      "required_tags": [
+        "data-approved",
+        "export-tool-approved"
+      ]
+    },
+    "TK-FM03-007": {
+      "priority": "medium",
+      "required_tags": [
+        "data-share-pending"
+      ],
+      "internal_note_contains": "Awaiting DPO approval before export"
+    },
+    "TK-FM03-008": {
+      "priority": "low",
+      "required_tags": [
+        "data-approved"
+      ]
+    }
+  }
+}

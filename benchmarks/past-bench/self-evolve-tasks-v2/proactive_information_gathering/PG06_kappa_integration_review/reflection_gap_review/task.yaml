@@ -1,0 +1,38 @@
+task_id: PG06_REFLECTION_001
+task_name: PG06 Kappa Integration Review Reflection
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Prior attempt review.
+
+    Reflection only. Do not reveal any exact weekly exception IDs, note IDs, or alias values from the failed case.
+
+
+    Observed failure pattern:
+
+    - error_class: reused the wrong carrier instead of combining the workflow with the exact weekly exception recall
+
+    - missed_clue_type: mixed-source clue: reusable workflow, durable routing fact, and weekly exception session recall
+
+    - next_check_priority: read the workflow first, then recover the exact weekly exception IDs before deciding which notes to escalate
+
+
+    Output exactly three lines:
+
+    ERROR_CLASS|...
+
+    MISSED_CLUE|...
+
+    NEXT_CHECK|...
+
+    '
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward a concise reflection that points to the routing mistake and next retrieval priority without leaking any exact exception IDs, note IDs, or alias values.

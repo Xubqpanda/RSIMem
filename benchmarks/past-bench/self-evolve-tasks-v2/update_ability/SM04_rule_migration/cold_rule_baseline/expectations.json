@@ -1,0 +1,49 @@
+{
+  "latent_rule_id": "sm04_rule_migration",
+  "expected_mechanism": "memory",
+  "bucket_role": "baseline",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "forbidden_artifact_keywords": [
+    "Borealis-4DQ",
+    "High priority owners"
+  ],
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM04-004",
+  "required_recipients": [
+    "Sarah Zhang"
+  ],
+  "forbidden_recipients": [
+    "Leo Li",
+    "Kevin Wang",
+    "Maya Patel"
+  ],
+  "required_output_keywords": [
+    "Sarah Zhang | Borealis-4DQ",
+    "Leo Li | Borealis-4DQ",
+    "Kevin Wang | Borealis-4DQ"
+  ],
+  "slot_checks": {
+    "r1_migrated_rule_token": {
+      "required_output_keywords": [
+        "Sarah Zhang | Borealis-4DQ",
+        "Leo Li | Borealis-4DQ",
+        "Kevin Wang | Borealis-4DQ"
+      ],
+      "forbidden_output_keywords": [
+        "Aurora-2S"
+      ]
+    }
+  },
+  "forbidden_output_keywords": [
+    "Aurora-2S"
+  ],
+  "expected_cold_behavior": "low_score_against_post_update_target",
+  "do_not_use_as_evolve_success": true
+}

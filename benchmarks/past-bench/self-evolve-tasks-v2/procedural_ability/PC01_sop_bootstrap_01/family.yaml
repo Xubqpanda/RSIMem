@@ -1,0 +1,107 @@
+family_id: PC01_sop_bootstrap_01
+title: Skill SOP Bootstrap
+ability_dir: procedural_ability
+primary_ability: procedural_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  learn: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+- F01_I01_skill_baseline_cold
+- F01_I02_skill_learn_a
+- F01_I03_skill_update_or_stabilize
+- F01_I04_skill_eval_near
+- F01_I05_skill_eval_far
+- F01_C02_control_shortcut
+- F01_C03_control_surface_memorization
+- F01_C01_control_no_persistence
+history_plan:
+  anchors:
+  - name: pc01_01_post_learn
+    save_after: F01_I03_skill_update_or_stabilize
+  branches:
+  - mode: continue
+    episodes:
+    - F01_I01_skill_baseline_cold
+    - F01_I02_skill_learn_a
+    - F01_I03_skill_update_or_stabilize
+  - mode: from_anchor
+    anchor: pc01_01_post_learn
+    episodes:
+    - F01_I04_skill_eval_near
+    - F01_I05_skill_eval_far
+  - mode: fresh
+    episodes:
+    - F01_C02_control_shortcut
+    - F01_C03_control_surface_memorization
+    - F01_C01_control_no_persistence
+control_set:
+- no_persistence
+- shortcut
+- surface_memorization
+status: v2_architecture_aligned
+latent_rule_id: f01_shared_incident_sop_v1
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  Shared Incident SOP — the step-by-step procedure for identifying
+  same-cluster incident tickets, tagging them, and leaving resolution to on-call.
+what_persists: >
+  A durable skill artifact encoding the full triage SOP so it can be applied
+  without re-reading the KB article.
+what_counts_as_reuse: >
+  Agent applies the persisted SOP steps to novel shared-incident tickets with changed
+  entities, without access to the original KB text.
+false_positive_pattern: >
+  Agent copies surface wording from the KB article verbatim instead of
+  extracting a generalized procedure; passes near-transfer but fails far.
+must_demonstrate:
+- Extract a reusable triage procedure from KB exposure
+- Apply the SOP to tickets with novel entities and surface variation
+- Maintain correct step ordering and decision logic across sessions
+
+# §13.0 Trigger Spec
+trigger_category: direct_explicit_instruction
+trigger_strength: T3
+visibility_surface: direct user/system message with durable Shared Incident SOP
+trigger_injection_plan: learn_a delivers explicit Shared Incident SOP in prompt; update_or_stabilize reinforces with surface-varied tickets
+trigger_removal_plan: eval removes SOP text; only novel tickets remain
+trigger_mixing_rule: no repeated_cases_induction; direct teaching only
+sibling_comparison_plan: compare with PC03 induction families for trigger-strength analysis
+phase1_canonical_sibling: this is a T3 canonical anchor
+future_sibling_roadmap: T2 durable-rule wording; T1 embedded-note version
+
+# §10 Cold Design
+cold_design: same-workflow task before any SOP or KB is introduced
+expected_cold_result: partial solve without stable reusable procedure
+
+# Control Design
+control_design: no_persistence, shortcut, surface_memorization
+expected_control_result: transfer gain shrinks without persisted procedure; template reuse alone should not pass
+
+# Episodes
+legacy_source: previous PC split, architecture-aligned
+legacy_episodes:
+- F01_C01_control_no_persistence
+- F01_C02_control_shortcut
+- F01_C03_control_surface_memorization
+- F01_I01_skill_baseline_cold
+- F01_I02_skill_learn_a
+- F01_I03_skill_update_or_stabilize
+- F01_I04_skill_eval_near
+- F01_I05_skill_eval_far

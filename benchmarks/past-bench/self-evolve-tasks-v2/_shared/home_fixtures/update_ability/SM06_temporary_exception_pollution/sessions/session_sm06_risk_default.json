@@ -1,0 +1,15 @@
+{
+  "session_id": "sm06_risk_default",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Durable risk-review default is RISK-CANON and share with all action item owners."
+    },
+    {
+      "role": "assistant",
+      "content": "Saved durable RISK-CANON default for risk-review notes."
+    }
+  ]
+}

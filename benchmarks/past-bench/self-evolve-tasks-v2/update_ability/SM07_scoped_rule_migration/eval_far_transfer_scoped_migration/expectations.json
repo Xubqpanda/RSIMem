@@ -1,0 +1,36 @@
+{
+  "latent_rule_id": "sm07_scoped_rule_migration",
+  "expected_mechanism": "memory",
+  "bucket_role": "evaluation",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["SEC-GAMMA", "OPS-DELTA", "High priority Security owners"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": true,
+    "min_memory_injections": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM07-006",
+  "required_recipients": ["Nina Cole", "Omar Singh", "Victor Hale"],
+  "forbidden_recipients": ["Rita Gomez", "Sam Price"],
+  "required_output_keywords": [
+    "Security | Nina Cole | SEC-GAMMA",
+    "Security | Rita Gomez | SEC-GAMMA",
+    "Ops | Omar Singh | OPS-DELTA",
+    "Ops | Victor Hale | OPS-DELTA",
+    "2026-07-21",
+    "2026-07-22",
+    "2026-07-23",
+    "2026-07-24"
+  ],
+  "forbidden_output_keywords": ["Ops | Omar Singh | SEC-GAMMA", "Ops | Victor Hale | SEC-GAMMA"],
+  "stale_coexistence_penalty": 0.15,
+  "min_memory_injections": 1,
+  "require_rule_artifact": ["SEC-GAMMA", "OPS-DELTA", "High priority Security owners"],
+  "rule_artifact_weight": 0.03,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.1,
+  "apply_mechanism_caps": true
+}

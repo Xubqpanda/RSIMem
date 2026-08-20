@@ -1,0 +1,54 @@
+{
+  "latent_rule_id": "pg03_oncall_handoff_lookup_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "evaluation",
+  "mode": "proactive_retrieval",
+  "service_kind": "helpdesk",
+  "allowed_retrieval_sources": [
+    "session_search"
+  ],
+  "require_explicit_retrieval": true,
+  "require_explicit_retrieval_before_write": true,
+  "apply_mechanism_caps": true,
+  "missing_explicit_retrieval_cap": 0.25,
+  "late_explicit_retrieval_cap": 0.35,
+  "required_ticket_updates": [
+    {
+      "ticket_id": "HD-PG03-301",
+      "priority": "medium",
+      "category": "maintenance-hold",
+      "tags": [
+        "handoff-blocked",
+        "mw-0730-0800"
+      ]
+    },
+    {
+      "ticket_id": "HD-PG03-302",
+      "priority": "medium",
+      "category": "maintenance-hold",
+      "tags": [
+        "handoff-blocked",
+        "mw-0730-0800"
+      ]
+    }
+  ],
+  "forbidden_ticket_ids": [
+    "INC-944"
+  ],
+  "required_output_keywords": [
+    "HAND-830",
+    "INC-944",
+    "Mateo Silva",
+    "07:30-08:00 UTC",
+    "HD-PG03-301",
+    "HD-PG03-302"
+  ],
+  "forbidden_output_keywords": [
+    "HAND-742"
+  ],
+  "max_without_all_required_output_keywords": 0.6,
+  "min_session_search_calls": 1,
+  "min_skill_reads": 1,
+  "skill_read_weight": 0.08,
+  "session_search_weight": 0.08
+}

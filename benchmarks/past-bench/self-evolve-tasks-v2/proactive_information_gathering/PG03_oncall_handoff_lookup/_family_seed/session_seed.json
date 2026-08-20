@@ -1,0 +1,484 @@
+{
+  "sessions": [
+    {
+      "id": "pg03-hand-742",
+      "source": "seed",
+      "title": "CacheEdge latest handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for CacheEdge latency incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-742 for incident INC-870: owner Eli Navarro, maintenance window 03:00-04:00 UTC, blocked follow-up tickets HD-PG03-103 and HD-PG03-104. Do not update the parent incident INC-870 or notify the external status page before the window ends."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-701",
+      "source": "seed",
+      "title": "CacheEdge older handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older handoff for CacheEdge latency incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded handoff HAND-701 for incident INC-870: owner Dana Brooks, maintenance window 01:00-02:00 UTC, blocked follow-up tickets HD-PG03-101 and HD-PG03-102."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-799",
+      "source": "seed",
+      "title": "AuthProxy latest handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for AuthProxy token surge incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-799 for incident INC-912: owner Priya Raman, maintenance window 05:00-06:00 UTC, blocked follow-up tickets HD-PG03-201 and HD-PG03-202. Do not update the parent incident INC-912."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-830",
+      "source": "seed",
+      "title": "Billing stream latest handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for Billing stream retry incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-830 for incident INC-944: owner Mateo Silva, maintenance window 07:30-08:00 UTC, blocked follow-up tickets HD-PG03-301 and HD-PG03-302. Do not update the parent incident INC-944."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-743",
+      "source": "seed",
+      "title": "CacheEdge current handoff shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current CacheEdge handoff shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: CacheEdge latency still has a maintenance window later today and two blocked follow-up tickets, but the exact handoff ID and authoritative owner were omitted here. Re-check the exact handoff before updating tickets."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-744",
+      "source": "seed",
+      "title": "CacheEdge latest status-page recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the latest CacheEdge maintenance handoff."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: CacheEdge still has a maintenance window and blocked follow-up tickets, but this recap was prepared for the status-page team and is not the authoritative handoff record."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-745",
+      "source": "seed",
+      "title": "CacheEdge latency handoff west canary",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for CacheEdge latency canary follow-up."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-745 for incident INC-870-C: owner Eli Navarro, maintenance window 04:00-05:00 UTC, blocked follow-up tickets HD-PG03-105 and HD-PG03-106. Do not update the parent incident without the canary check."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-746",
+      "source": "seed",
+      "title": "CacheEdge latency handoff prior current-looking",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current-looking prior CacheEdge latency handoff."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded handoff HAND-746 for incident INC-870: owner Eli Navarro, maintenance window 02:30-03:30 UTC, blocked follow-up tickets HD-PG03-103 and HD-PG03-104. A later handoff replaced this window."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-747",
+      "source": "seed",
+      "title": "CacheEdge maintenance one-off external page hold",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can CacheEdge reuse the earlier external-page hold?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off note HAND-747: during an earlier CacheEdge maintenance run, the external status page was held until a manual ack landed. This was a narrow one-time instruction and not the current handoff."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-748",
+      "source": "seed",
+      "title": "CacheEdge latest handoff draft",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest CacheEdge handoff draft."
+        },
+        {
+          "role": "assistant",
+          "content": "Draft only: CacheEdge latency likely remains with Eli Navarro and a 03:00-something maintenance window, but this draft never preserved the final handoff ID or final blocked ticket set. Do not apply ticket changes from this draft."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-749",
+      "source": "seed",
+      "title": "CacheEdge latest handoff east shard",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for CacheEdge east-shard latency incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-749 for incident INC-870-E: owner Nora Patel, maintenance window 03:15-04:15 UTC, blocked follow-up tickets HD-PG03-111 and HD-PG03-112. Keep the parent incident untouched."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-750",
+      "source": "seed",
+      "title": "CacheEdge parent hold memo",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What was the CacheEdge parent incident hold instruction?"
+        },
+        {
+          "role": "assistant",
+          "content": "Memo only: for the current CacheEdge latency incident, do not update the parent incident before the maintenance window ends. This memo is not the full handoff record."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-751",
+      "source": "seed",
+      "title": "CacheEdge blocked ticket set recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the blocked tickets from the latest CacheEdge handoff."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: the current CacheEdge handoff still blocks two follow-up tickets in the HD-PG03-10x range, but this recap intentionally omits the exact handoff ID, owner, and final window."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-798",
+      "source": "seed",
+      "title": "AuthProxy older handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older handoff for AuthProxy token surge incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded handoff HAND-798 for incident INC-912: owner Marco Li, maintenance window 04:00-05:00 UTC, blocked follow-up tickets HD-PG03-203 and HD-PG03-204."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-800",
+      "source": "seed",
+      "title": "AuthProxy current handoff shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current AuthProxy handoff shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: AuthProxy token surge still has a maintenance window and blocked follow-up tickets, but the exact handoff ID and authoritative owner were not preserved here. Check exact history first."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-801",
+      "source": "seed",
+      "title": "AuthProxy latest handoff shadow lane",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for AuthProxy token surge shadow lane."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-801 for incident INC-912-S: owner Priya Raman, maintenance window 05:30-06:30 UTC, blocked follow-up tickets HD-PG03-205 and HD-PG03-206. Do not update the parent incident INC-912-S."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-802",
+      "source": "seed",
+      "title": "AuthProxy token surge replay handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for AuthProxy replay follow-up."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-802 for incident INC-912-R: owner Priya Raman, maintenance window 05:00-05:45 UTC, blocked follow-up tickets HD-PG03-207 and HD-PG03-208."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-803",
+      "source": "seed",
+      "title": "AuthProxy one-off external page waiver",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can AuthProxy reuse the earlier external page waiver?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off note HAND-803: during an earlier AuthProxy incident, one customer-facing reminder was skipped once. This one-time waiver is not the current handoff and must not be generalized."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-804",
+      "source": "seed",
+      "title": "AuthProxy blocked ticket recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the blocked tickets from the latest AuthProxy handoff."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: the current AuthProxy handoff still blocks two follow-up tickets in the HD-PG03-20x range, but the exact handoff ID, owner, and final window are not restated here."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-805",
+      "source": "seed",
+      "title": "AuthProxy latest handoff eu shard",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for AuthProxy EU shard incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-805 for incident INC-912-EU: owner Sana Mehta, maintenance window 05:15-06:00 UTC, blocked follow-up tickets HD-PG03-211 and HD-PG03-212."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-828",
+      "source": "seed",
+      "title": "Billing stream older handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older handoff for Billing stream retry incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded handoff HAND-828 for incident INC-944: owner Mateo Silva, maintenance window 06:30-07:00 UTC, blocked follow-up tickets HD-PG03-299 and HD-PG03-300."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-829",
+      "source": "seed",
+      "title": "Billing stream current handoff shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Billing stream handoff shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Billing stream retry still has a short maintenance window and blocked follow-up tickets, but the exact handoff ID and final owner were not preserved here. Check exact history first."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-831",
+      "source": "seed",
+      "title": "Billing stream latest handoff retry shadow",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for Billing stream retry shadow incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-831 for incident INC-944-S: owner Mateo Silva, maintenance window 08:00-08:30 UTC, blocked follow-up tickets HD-PG03-303 and HD-PG03-304."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-832",
+      "source": "seed",
+      "title": "Billing stream one-off page hold",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Billing stream reuse the earlier page-hold instruction?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off note HAND-832: for an earlier Billing stream retry maintenance, the oncall skipped one page update once. This one-time instruction is not the settled handoff."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-833",
+      "source": "seed",
+      "title": "Billing stream blocked ticket recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the blocked tickets from the latest Billing stream handoff."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: the current Billing stream retry handoff blocks two follow-up tickets in the HD-PG03-30x range, but the authoritative handoff ID, owner, and exact window were not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-834",
+      "source": "seed",
+      "title": "Billing stream latest handoff west shard",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for Billing stream west shard retry incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-834 for incident INC-944-W: owner Aiden Ross, maintenance window 07:15-08:15 UTC, blocked follow-up tickets HD-PG03-305 and HD-PG03-306."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-835",
+      "source": "seed",
+      "title": "Billing stream latest handoff draft",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Billing stream handoff draft."
+        },
+        {
+          "role": "assistant",
+          "content": "Draft only: Billing stream retry likely still belongs to Mateo Silva with a 07:30-range maintenance window, but this draft omits the final handoff ID and exact blocked ticket set. Do not use it as the final record."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-836",
+      "source": "seed",
+      "title": "CacheEdge token drain handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for CacheEdge token drain incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-836 for incident INC-871: owner Eli Navarro, maintenance window 02:00-03:00 UTC, blocked follow-up tickets HD-PG03-113 and HD-PG03-114."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-837",
+      "source": "seed",
+      "title": "AuthProxy latency handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for AuthProxy latency incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-837 for incident INC-913: owner Priya Raman, maintenance window 04:30-05:15 UTC, blocked follow-up tickets HD-PG03-213 and HD-PG03-214."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-838",
+      "source": "seed",
+      "title": "Billing stream reconciliation handoff",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for Billing stream reconciliation incident."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-838 for incident INC-945: owner Mateo Silva, maintenance window 08:30-09:00 UTC, blocked follow-up tickets HD-PG03-307 and HD-PG03-308."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-839",
+      "source": "seed",
+      "title": "CacheEdge latest handoff approval memo incomplete",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest CacheEdge handoff approval memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Incomplete memo: the latest CacheEdge latency handoff still uses Eli Navarro and blocks two follow-up tickets, but the exact handoff ID and exact maintenance window were not preserved in this memo."
+        }
+      ]
+    },
+    {
+      "id": "pg03-hand-840",
+      "source": "seed",
+      "title": "CacheEdge latest handoff sidecar queue",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Latest handoff for the CacheEdge sidecar follow-up queue."
+        },
+        {
+          "role": "assistant",
+          "content": "Handoff HAND-840 for incident INC-870-Q: owner Eli Navarro, maintenance window 03:10-03:50 UTC, blocked follow-up tickets HD-PG03-115 and HD-PG03-116. Leave the parent incident untouched."
+        }
+      ]
+    }
+  ]
+}

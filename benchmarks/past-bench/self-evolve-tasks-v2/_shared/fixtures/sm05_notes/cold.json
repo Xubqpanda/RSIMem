@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM05-001",
+    "title": "Vendor Risk Planning Review",
+    "created_at": "2026-04-17",
+    "participants": ["Maya Ortiz", "Noah Reed", "Priya Chen", "Lena Park"],
+    "duration_minutes": 40,
+    "content": "Vendor risk planning review.\n\nAction items:\n1. Maya Ortiz: finalize the exception dashboard backlog, critical, by May 18\n2. Noah Reed: archive the stale review queue, normal priority, by May 19\n3. Priya Chen: prepare the vendor digest handoff, low priority, by May 20\n\nLena Park attended as an observer."
+  }
+]

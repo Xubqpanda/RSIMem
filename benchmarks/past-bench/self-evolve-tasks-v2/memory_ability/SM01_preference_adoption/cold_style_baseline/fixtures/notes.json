@@ -1,0 +1,11 @@
+[
+  {
+    "note_id": "NOTE-SM01-001",
+    "title": "Q2 Analytics Planning Review",
+    "created_at": "2026-04-10",
+    "participants": ["Iris Chen", "Victor Hu", "Mina Park", "Owen Bell"],
+    "duration_minutes": 45,
+    "content": "Q2 analytics planning review.\n\nAction items:\n1. Iris Chen: finalize the attribution dashboard backlog, critical, by Apr 18\n2. Victor Hu: audit stale ETL alerts, medium priority, by Apr 19\n3. Mina Park: prepare the adoption metrics brief, low priority, by Apr 21\n\nObserver: Owen Bell attended for context only.",
+    "duration_minutes": 45
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "kb_fm02_sop",
+    "title": "Shared Outage Triage SOP v2",
+    "category": "incident-management",
+    "content": "## Shared Outage Triage SOP v2\n\nTrigger: three or more tickets from distinct reporters all reference the same failing infrastructure zone within a 4-hour window.\n\nSteps:\n1. Read all open tickets and identify the infrastructure zone mentioned.\n2. If 3+ distinct reporters cite the same zone, classify as shared outage.\n3. Tag each shared-outage ticket with: zone-correlated, shared-outage-confirmed\n4. Set priority=critical and category=outage-investigation on all shared-outage tickets.\n5. Do NOT close any ticket — leave resolution to on-call SRE team.\n6. Output one line per ticket: TICKET_ID|priority|category|why\n\nExclusions:\n- Maintenance requests, feature requests, and performance tuning tickets are NOT outages.\n- A single-reporter ticket citing the same zone does NOT qualify unless there are 3+ distinct reporters for that zone.\n- Config review and hardware upgrade tickets are NOT outages.",
+    "tags": [],
+    "last_updated": "2026-04-01",
+    "views": 0
+  }
+]

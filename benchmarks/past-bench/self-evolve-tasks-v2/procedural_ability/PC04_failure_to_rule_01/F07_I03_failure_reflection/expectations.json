@@ -1,0 +1,25 @@
+{
+  "latent_rule_id": "f07_deployment_rollback_grouping_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "reflection",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": ["release_hash", "deploy-child", "do not close", "root-event-pending"],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": { "evaluation_only": false, "min_skill_reads": 0 },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": ["TK-T302", "TK-T303"],
+  "excluded_ticket_ids": ["TK-T301", "TK-T304", "TK-T305"],
+  "expected_priority": "high",
+  "expected_category": "incident",
+  "required_tags": ["deploy-child", "root-event-pending"],
+  "min_ticket_reads": 4,
+  "required_summary_keywords": ["TK-T302", "TK-T303", "jkl012"],
+  "min_skill_manage_calls": 1,
+  "skill_manage_weight": 0.1,
+  "min_skill_count": 1,
+  "require_rule_artifact": ["release_hash", "deploy-child", "do not close", "root-event-pending"],
+  "rule_artifact_weight": 0.05,
+  "skill_artifact_weight": 0.05
+}

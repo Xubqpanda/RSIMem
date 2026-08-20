@@ -1,0 +1,30 @@
+{
+  "latent_rule_id": "pg02_ops_exception_desk_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "update_or_stabilize",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "POLICY_UPDATED|ops_exception_desk"
+  ],
+  "forbidden_output_keywords": [
+    "EX-472",
+    "EX-490",
+    "EX-503"
+  ],
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "desk workflow",
+      "session history",
+      "exact temporary exception",
+      "verify scope",
+      "default policy"
+    ],
+    "min_count_delta": 0
+  },
+  "apply_mechanism_caps": true,
+  "min_skill_writes": 1,
+  "skill_write_weight": 0.12,
+  "missing_learning_cap": 0.45
+}

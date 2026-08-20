@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM07-004",
+    "title": "Scoped Migration Eval A",
+    "created_at": "2026-05-14",
+    "participants": ["Maya Ortiz", "Noah Reed", "Priya Chen", "Evan Bell", "Cara Liu"],
+    "duration_minutes": 35,
+    "content": "Scoped migration eval A.\n\nAction items:\n1. [Security][High] Maya Ortiz: rotate the partner emergency credential, due 2026-07-13\n2. [Security][Medium] Priya Chen: reconcile the stale security acknowledgements, due 2026-07-14\n3. [Ops][Medium] Noah Reed: rebuild the deployment retry queue, due 2026-07-15\n4. [Ops][High] Evan Bell: publish the rollback drill checklist, due 2026-07-16\n\nCara Liu attended as an observer."
+  }
+]

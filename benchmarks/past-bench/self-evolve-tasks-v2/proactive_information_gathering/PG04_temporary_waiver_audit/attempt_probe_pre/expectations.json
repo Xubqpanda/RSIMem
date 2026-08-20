@@ -1,0 +1,38 @@
+{
+  "latent_rule_id": "pg04_temporary_waiver_audit_v1",
+  "expected_mechanism": "mixed",
+  "bucket_role": "evaluation",
+  "mode": "proactive_retrieval",
+  "service_kind": "notes",
+  "allowed_retrieval_sources": [
+    "skill",
+    "session_search"
+  ],
+  "require_explicit_retrieval": true,
+  "require_explicit_retrieval_before_write": true,
+  "apply_mechanism_caps": true,
+  "missing_explicit_retrieval_cap": 0.25,
+  "late_explicit_retrieval_cap": 0.35,
+  "required_note_updates": [
+    {
+      "note_id": "AUDIT-PG04-A",
+      "payload": {
+        "content": "WAIVER_AUDIT|approved=LGR-EU-14,LGR-EU-19|rejected=LGR-EU-22|reference=WAIV-118|expiry=2026-05-10"
+      }
+    }
+  ],
+  "required_output_keywords": [
+    "WAIV-118",
+    "LGR-EU-14",
+    "LGR-EU-19",
+    "LGR-EU-22",
+    "2026-05-10"
+  ],
+  "forbidden_output_keywords": [
+    "WAIV-131",
+    "staging-us"
+  ],
+  "max_without_all_required_output_keywords": 0.6,
+  "min_session_search_calls": 1,
+  "min_skill_reads": 1
+}

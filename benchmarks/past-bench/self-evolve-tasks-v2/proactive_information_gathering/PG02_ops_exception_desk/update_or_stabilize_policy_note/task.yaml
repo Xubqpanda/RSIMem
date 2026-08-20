@@ -1,0 +1,34 @@
+task_id: PG02_UPDATE_001
+task_name: PG02 Ops Exception Desk Policy Update
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Update your own retrieval policy / skill note for the ops exception desk.
+
+    Write a general rule, not a case-specific memory. Do not include any exact exception IDs, ticket IDs, or dates.
+
+
+    Your updated note should explicitly say all of the following ideas:
+
+    - open the desk workflow skill first
+
+    - search session history for the exact temporary exception
+
+    - verify scope before updating tickets
+
+    - do not turn one-off exceptions into default policy
+
+
+    Output: POLICY_UPDATED|ops_exception_desk
+
+    '
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward a general policy update that encodes the mixed-source routing habit for exception-desk work without leaking case-specific details.

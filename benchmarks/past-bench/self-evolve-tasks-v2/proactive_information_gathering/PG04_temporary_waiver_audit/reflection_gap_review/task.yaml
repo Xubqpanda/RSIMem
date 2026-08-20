@@ -1,0 +1,38 @@
+task_id: PG04_REFLECTION_001
+task_name: PG04 Temporary Waiver Audit Reflection
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Prior attempt review.
+
+    Reflection only. Do not reveal any exact waiver IDs, case IDs, or expiry dates from the failed case.
+
+
+    Observed failure pattern:
+
+    - error_class: reused a near-match waiver instead of checking the exact scope tuple
+
+    - missed_clue_type: exact owner/service/scope/expiry match requirement
+
+    - next_check_priority: search session history for the exact waiver record before updating the audit note
+
+
+    Output exactly three lines:
+
+    ERROR_CLASS|...
+
+    MISSED_CLUE|...
+
+    NEXT_CHECK|...
+
+    '
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward a concise reflection that identifies the scope-matching failure without leaking any exact waiver details.

@@ -1,0 +1,20 @@
+{
+  "latent_rule_id": "pg01_release_decision_followup_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "reflection",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "ERROR_CLASS|",
+    "MISSED_CLUE|",
+    "NEXT_CHECK|"
+  ],
+  "forbidden_output_keywords": [
+    "REF-RLS-447",
+    "REF-RLS-512",
+    "REF-RLS-578",
+    "2026-05-31",
+    "2026-06-12",
+    "2026-06-20"
+  ]
+}

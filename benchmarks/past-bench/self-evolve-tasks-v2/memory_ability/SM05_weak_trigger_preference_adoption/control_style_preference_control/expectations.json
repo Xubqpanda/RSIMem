@@ -1,0 +1,50 @@
+{
+  "latent_rule_id": "sm05_weak_trigger_preference_adoption",
+  "expected_mechanism": "memory",
+  "bucket_role": "control",
+  "control_kind": "wrong_mechanism",
+  "control_subtype": "rule_in_fixture_not_memory",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["TSV", "High", "Medium", "Low", "YYYY/MM/DD"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM05-008",
+  "required_recipients": ["Paula Reed", "Jonah Fisk", "Tessa Wu"],
+  "forbidden_recipients": ["Marta Hill"],
+  "required_output_keywords": [
+    "Paula Reed",
+    "Jonah Fisk",
+    "Tessa Wu",
+    "2026/06/08",
+    "2026/06/09",
+    "2026/06/10",
+    "High",
+    "Medium",
+    "Low"
+  ],
+  "require_tsv_output": true,
+  "slot_checks": {
+    "r1_t3_tsv_structure": {
+      "require_tsv_output": true,
+      "min_tsv_rows": 3
+    },
+    "r2_t2_priority_normalization": {
+      "require_tsv_output": true,
+      "tsv_column_index": 1,
+      "required_tsv_column_values": ["High", "Medium", "Low"],
+      "forbidden_tsv_column_values": ["urgent", "standard", "normal priority", "minor"]
+    },
+    "r3_t1_date_normalization": {
+      "require_tsv_output": true,
+      "tsv_column_index": 3,
+      "required_tsv_column_values": ["2026/06/08", "2026/06/09", "2026/06/10"],
+      "forbidden_tsv_column_values": ["Jun 8", "Jun 9", "Jun 10"]
+    }
+  },
+  "apply_mechanism_caps": true
+}

@@ -1,0 +1,25 @@
+ARG REGISTRY=docker.io
+FROM ${REGISTRY}/python:3.11-slim
+
+WORKDIR /workspace
+
+# Office tasks use headless LibreOffice for spreadsheet/document export flows.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libreoffice file unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install sandbox server dependencies.
+COPY requirements-sandbox-server.txt /tmp/requirements.txt
+RUN pip install -r /tmp/requirements.txt \
+        --default-timeout=1000 \
+        --no-cache-dir \
+    && rm /tmp/requirements.txt
+
+# Only copy the sandbox server (not the full past_bench framework)
+COPY src/past_bench/sandbox/ /opt/sandbox/
+
+# Optional: playwright support (uncomment to enable browser tool)
+# RUN pip install playwright --no-cache-dir && playwright install --with-deps chromium
+
+EXPOSE 8080
+ENTRYPOINT ["python", "/opt/sandbox/server.py", "--port", "8080"]

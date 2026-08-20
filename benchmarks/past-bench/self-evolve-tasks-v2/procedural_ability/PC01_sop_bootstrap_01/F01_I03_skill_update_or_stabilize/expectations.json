@@ -1,0 +1,42 @@
+{
+  "latent_rule_id": "f01_shared_incident_sop_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "sev1-correlated",
+      "cross-team-verified",
+      "critical",
+      "do not close"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 1
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-C301",
+    "TK-C302",
+    "TK-C303"
+  ],
+  "excluded_ticket_ids": [
+    "TK-C304",
+    "TK-C305"
+  ],
+  "expected_priority": "critical",
+  "expected_category": "cluster-incident",
+  "required_tags": [
+    "sev1-correlated",
+    "cross-team-verified"
+  ],
+  "min_ticket_reads": 4,
+  "required_summary_keywords": [
+    "TK-C301",
+    "TK-C302",
+    "TK-C303"
+  ],
+  "skill_artifact_weight": 0.05
+}

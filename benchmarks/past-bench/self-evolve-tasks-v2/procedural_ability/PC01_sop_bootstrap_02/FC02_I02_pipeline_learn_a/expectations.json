@@ -1,0 +1,52 @@
+{
+  "latent_rule_id": "fc02_data_pipeline_sop_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "pipeline-complete",
+      "data-sev-medium",
+      "data-analysis"
+    ],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-R201",
+    "TK-R202",
+    "TK-R203"
+  ],
+  "excluded_ticket_ids": [
+    "TK-R204"
+  ],
+  "expected_priority": "medium",
+  "expected_category": "data-analysis",
+  "required_tags": [
+    "pipeline-complete",
+    "data-sev-medium"
+  ],
+  "min_ticket_reads": 3,
+  "required_summary_keywords": [
+    "TK-R201",
+    "TK-R202",
+    "TK-R203"
+  ],
+  "min_skill_manage_calls": 1,
+  "skill_manage_weight": 0.1,
+  "require_rule_artifact": [
+    "pipeline-complete",
+    "data-sev-medium"
+  ],
+  "rule_artifact_weight": 0.05,
+  "reflection_rules": [
+    "Data analysis tickets must follow the five-step pipeline: clean → normalize → filter outliers → aggregate → report.",
+    "All data analysis tickets must be tagged pipeline-complete and data-sev-medium, category=data-analysis, priority=medium.",
+    "Save the generic pipeline rule, not the names of specific tickets or cases."
+  ],
+  "min_skill_count": 1,
+  "skill_artifact_weight": 0.05
+}

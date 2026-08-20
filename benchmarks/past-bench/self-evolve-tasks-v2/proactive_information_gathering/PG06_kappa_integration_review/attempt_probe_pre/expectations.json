@@ -1,0 +1,50 @@
+{
+  "latent_rule_id": "pg06_kappa_integration_review_v1",
+  "expected_mechanism": "mixed",
+  "bucket_role": "evaluation",
+  "mode": "proactive_retrieval",
+  "service_kind": "notes",
+  "allowed_retrieval_sources": [
+    "skill",
+    "session_search"
+  ],
+  "require_explicit_retrieval": true,
+  "require_explicit_retrieval_before_write": true,
+  "apply_mechanism_caps": true,
+  "missing_explicit_retrieval_cap": 0.25,
+  "late_explicit_retrieval_cap": 0.35,
+  "required_note_shares": [
+    {
+      "note_id": "INT-K201",
+      "recipients": [
+        "infra-risk@corp.com"
+      ]
+    },
+    {
+      "note_id": "INT-K206",
+      "recipients": [
+        "infra-risk@corp.com"
+      ]
+    }
+  ],
+  "forbidden_shared_note_ids": [
+    "INT-K204",
+    "INT-K205",
+    "INT-K207"
+  ],
+  "required_output_keywords": [
+    "INT-K201",
+    "INT-K206",
+    "INT-K204",
+    "INT-K207",
+    "infra-risk@corp.com"
+  ],
+  "forbidden_output_keywords": [
+    "INT-K109",
+    "INT-K111"
+  ],
+  "max_without_all_required_output_keywords": 0.6,
+  "min_session_search_calls": 1,
+  "min_skill_reads": 1,
+  "skill_artifact_weight": 0.0
+}

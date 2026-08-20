@@ -1,0 +1,124 @@
+task_id: V2_FM02_C03
+task_name: FM02 Control — Surface Memorization (Keywords Only)
+version: '1.0'
+category: self_evolve
+difficulty: hard
+control_type: surface_memorization
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+requires_fresh_session: true
+services:
+- name: helpdesk
+  command: python mock_services/helpdesk/server.py
+  port: 9107
+  health_check: http://localhost:9107/helpdesk/tickets
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9107/helpdesk/reset
+  env:
+    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm02_v2_helpdesk/eval_near.json
+- name: kb
+  command: python mock_services/kb/server.py
+  port: 9106
+  health_check: http://localhost:9106/kb/search
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9106/kb/reset
+  env:
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm02_v2_kb/brief.json
+prompt:
+  text: 'Process the tickets. Look for zone-related outage patterns and infrastructure
+    failures. Tag any incidents you find appropriately.
+
+    You MUST use helpdesk_list_tickets, helpdesk_get_ticket, and helpdesk_update_ticket
+    tools to process and update tickets.
+
+    '
+  language: en
+tools:
+- name: helpdesk_list_tickets
+  description: List helpdesk tickets
+  input_schema:
+    type: object
+    properties:
+      status:
+        type: string
+    required: []
+- name: helpdesk_get_ticket
+  description: Get ticket details
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+    required:
+    - ticket_id
+- name: helpdesk_update_ticket
+  description: Update a ticket
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+      priority:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+      category:
+        type: string
+      status:
+        type: string
+      internal_note:
+        type: string
+    required:
+    - ticket_id
+- name: kb_search
+  description: Search the knowledge base
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      category:
+        type: string
+      max_results:
+        type: integer
+    required:
+    - query
+- name: kb_get_article
+  description: Get a knowledge base article
+  input_schema:
+    type: object
+    properties:
+      article_id:
+        type: string
+    required:
+    - article_id
+tool_endpoints:
+- tool_name: helpdesk_list_tickets
+  url: http://localhost:9107/helpdesk/tickets
+  method: POST
+- tool_name: helpdesk_get_ticket
+  url: http://localhost:9107/helpdesk/tickets/get
+  method: POST
+- tool_name: helpdesk_update_ticket
+  url: http://localhost:9107/helpdesk/tickets/update
+  method: POST
+- tool_name: kb_search
+  url: http://localhost:9106/kb/search
+  method: POST
+- tool_name: kb_get_article
+  url: http://localhost:9106/kb/articles/get
+  method: POST
+judge_rubric: 'Control (surface_memorization): The prompt gives only surface keywords
+  (zone-related, outage patterns, infrastructure failures) without explaining the
+  actual SOP procedure (specific tag names like zone-correlated/shared-outage-confirmed,
+  the 3+ distinct reporters threshold, priority=critical rule, category=outage-investigation,
+  or exclusion list). If the agent scores high just from keyword cues, the eval is
+  not testing real procedure understanding. Reward correct triage of TK-FM02-N01,
+  N02, N03.
+
+  '

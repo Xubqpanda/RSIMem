@@ -1,0 +1,29 @@
+[
+  {
+    "note_id": "AUDIT-PG04-NA",
+    "title": "CacheEdge waiver audit",
+    "content": "Request under review: owner=infra-ops service=cacheedge scope=overnight-maintenance candidates=CE-17,CE-18,CE-21. Check whether a temporary waiver still applies.",
+    "tags": [
+      "audit-note",
+      "current"
+    ],
+    "created_at": "2026-04-20T12:10:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 10
+  },
+  {
+    "note_id": "AUDIT-PG04-M2",
+    "title": "CacheEdge scratchpad",
+    "content": "Scratchpad only.",
+    "tags": [
+      "misc"
+    ],
+    "created_at": "2026-04-20T12:11:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 5
+  }
+]

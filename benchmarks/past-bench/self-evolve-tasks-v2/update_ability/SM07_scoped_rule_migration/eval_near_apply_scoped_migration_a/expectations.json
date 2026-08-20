@@ -1,0 +1,36 @@
+{
+  "latent_rule_id": "sm07_scoped_rule_migration",
+  "expected_mechanism": "memory",
+  "bucket_role": "evaluation",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["SEC-GAMMA", "OPS-DELTA", "High priority Security owners"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": true,
+    "min_memory_injections": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM07-004",
+  "required_recipients": ["Maya Ortiz", "Noah Reed", "Evan Bell"],
+  "forbidden_recipients": ["Priya Chen", "Cara Liu"],
+  "required_output_keywords": [
+    "Security | Maya Ortiz | SEC-GAMMA",
+    "Security | Priya Chen | SEC-GAMMA",
+    "Ops | Noah Reed | OPS-DELTA",
+    "Ops | Evan Bell | OPS-DELTA",
+    "2026-07-13",
+    "2026-07-14",
+    "2026-07-15",
+    "2026-07-16"
+  ],
+  "forbidden_output_keywords": ["Ops | Noah Reed | SEC-GAMMA", "Ops | Evan Bell | SEC-GAMMA"],
+  "stale_coexistence_penalty": 0.15,
+  "min_memory_injections": 1,
+  "require_rule_artifact": ["SEC-GAMMA", "OPS-DELTA", "High priority Security owners"],
+  "rule_artifact_weight": 0.03,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.1,
+  "apply_mechanism_caps": true
+}

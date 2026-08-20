@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-R501",
+    "title": "Server log metrics contain unfiltered anomalies",
+    "description": "The infrastructure monitoring report shows CPU utilization values of -10% and 150%, which are clearly invalid. These need to be filtered before recalculating averages.",
+    "reporter": "Ops-George Tan",
+    "department": "IT Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-22T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R502",
+    "title": "Multi-datacenter network traffic not normalized",
+    "description": "Network throughput data from three datacenters is reported in different units (MB / GB / TB); normalization to a common unit is required before comparing datacenter loads.",
+    "reporter": "Ops-Henry Kim",
+    "department": "IT Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-22T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R503",
+    "title": "Monthly system availability aggregation report missing",
+    "description": "Per-service availability data has been collected; it needs to be aggregated by service type and a monthly SLA attainment report needs to be generated.",
+    "reporter": "Ops-George Tan",
+    "department": "IT Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-22T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R504",
+    "title": "Datacenter air conditioning maintenance request",
+    "description": "The air conditioning unit in Building B datacenter has failed and needs repair. Not related to data analysis.",
+    "reporter": "Admin-Iris Zhao",
+    "department": "Facilities",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-22T11:00:00Z",
+    "tags": []
+  }
+]

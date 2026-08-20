@@ -1,0 +1,29 @@
+[
+  {
+    "note_id": "AUDIT-PG04-FAR",
+    "title": "Ledger export follow-up audit",
+    "content": "Request under review: owner=data-platform service=ledger-export scope=staging-eu candidates=LGR-EU-19,LGR-EU-21. Re-check the relevant temporary waiver before writing the audit line.",
+    "tags": [
+      "audit-note",
+      "current"
+    ],
+    "created_at": "2026-04-20T12:30:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 10
+  },
+  {
+    "note_id": "AUDIT-PG04-M4",
+    "title": "Ledger export scratchpad 2",
+    "content": "Scratchpad only.",
+    "tags": [
+      "misc"
+    ],
+    "created_at": "2026-04-20T12:31:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 5
+  }
+]

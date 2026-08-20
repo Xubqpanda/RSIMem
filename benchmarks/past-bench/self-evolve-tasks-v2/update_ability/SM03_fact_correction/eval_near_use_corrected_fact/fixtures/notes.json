@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM03-004",
+    "title": "Phoenix Rollout Coordination",
+    "created_at": "2026-04-13",
+    "participants": ["Elena Gomez", "Ravi Shah", "Nora Klein"],
+    "duration_minutes": 30,
+    "content": "Phoenix rollout coordination.\n\nInclude the current Phoenix freeze date in the final action-item summary so the rollout owners see it.\n\nAction items:\n1. Elena Gomez: confirm the QA checklist owner list\n2. Ravi Shah: send the updated rollout sequence by end of day\n\nNora Klein attended as an observer."
+  }
+]

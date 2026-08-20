@@ -1,0 +1,15 @@
+{
+  "session_id": "sm07_ops_preserve",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Ops production items use OPS-DELTA and share with all Ops owners."
+    },
+    {
+      "role": "assistant",
+      "content": "Stored Ops production OPS-DELTA scoped rule."
+    }
+  ]
+}

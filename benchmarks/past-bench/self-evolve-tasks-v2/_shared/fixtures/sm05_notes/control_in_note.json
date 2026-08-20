@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM05-008",
+    "title": "In-Note Style Control Review",
+    "created_at": "2026-04-24",
+    "participants": ["Paula Reed", "Jonah Fisk", "Tessa Wu", "Marta Hill"],
+    "duration_minutes": 45,
+    "content": "In-note style control review.\n\nCurrent task memo: use TSV with columns owner, priority, task, due_date. Normalize priorities to High/Medium/Low and dates to YYYY/MM/DD.\n\nAction items:\n1. Paula Reed: reconcile the urgent ad-spend variance, urgent, by Jun 8\n2. Jonah Fisk: confirm the normal invoice retry threshold, standard, by Jun 9\n3. Tessa Wu: archive the minor renewal exceptions, minor, by Jun 10\n\nMarta Hill attended as an observer."
+  }
+]

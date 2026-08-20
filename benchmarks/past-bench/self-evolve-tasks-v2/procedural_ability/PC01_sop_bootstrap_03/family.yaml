@@ -1,0 +1,111 @@
+family_id: PC01_sop_bootstrap_03
+title: Shared Outage Triage SOP Bootstrap
+ability_dir: procedural_ability
+primary_ability: procedural_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  learn: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+- FM02_I01_incident_cold
+- FM02_I02_incident_learn_a
+- FM02_I02b_incident_update_or_stabilize
+- FM02_I03_incident_eval_near
+- FM02_I03b_incident_eval_far
+- FM02_C02_control_shortcut
+- FM02_C03_control_surface_memorization
+- FM02_C01_control_no_persistence
+history_plan:
+  anchors:
+  - name: pc01_03_post_learn
+    save_after: FM02_I02b_incident_update_or_stabilize
+  branches:
+  - mode: continue
+    episodes:
+    - FM02_I01_incident_cold
+    - FM02_I02_incident_learn_a
+    - FM02_I02b_incident_update_or_stabilize
+  - mode: from_anchor
+    anchor: pc01_03_post_learn
+    episodes:
+    - FM02_I03_incident_eval_near
+    - FM02_I03b_incident_eval_far
+  - mode: fresh
+    episodes:
+    - FM02_C02_control_shortcut
+    - FM02_C03_control_surface_memorization
+    - FM02_C01_control_no_persistence
+control_set:
+- no_persistence
+- shortcut
+- surface_memorization
+status: v2_architecture_aligned
+latent_rule_id: fm02_shared_outage_sop_v2
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  Shared Outage Triage SOP v2 — the procedure for identifying correlated
+  infrastructure zone failures across 3+ distinct reporters, tagging tickets
+  with zone-correlated and shared-outage-confirmed, setting priority=critical
+  and category=outage-investigation, and excluding non-outage ticket types.
+what_persists: >
+  A durable skill artifact encoding the Shared Outage Triage SOP v2 for
+  reuse without re-reading the KB article.
+what_counts_as_reuse: >
+  Agent retrieves the persisted SOP skill and applies it to novel outage
+  scenarios with different zone names, service types, and surface terminology
+  (e.g. "region" instead of "zone", "degraded" instead of "failing").
+false_positive_pattern: >
+  Agent echoes specific zone names or service names from training incidents
+  instead of abstracting the general shared-outage detection logic (3+ distinct
+  reporters, same zone, exclusion of maintenance/feature/config tickets).
+must_demonstrate:
+- Extract a reusable shared-outage triage SOP from KB and save as skill
+- Apply the SOP to outage tickets with novel zone names and services
+- Correctly exclude non-outage tickets (feature requests, maintenance, config review, hardware upgrades, performance tuning)
+- Maintain the 3+ distinct reporter threshold for shared outage classification
+
+# §13.0 Trigger Spec
+trigger_category: direct_explicit_instruction
+trigger_strength: T3
+visibility_surface: direct user/system message with durable shared-outage triage SOP
+trigger_injection_plan: learn_a delivers explicit SOP via KB article; update_or_stabilize tests retrieval from saved skill
+trigger_removal_plan: eval removes full SOP from KB (brief only); only saved skill provides procedure details
+trigger_mixing_rule: no repeated_cases_induction; direct teaching only
+sibling_comparison_plan: compare with PC03 induction families for trigger-strength analysis
+phase1_canonical_sibling: this is a T3 canonical anchor
+future_sibling_roadmap: T2 durable-rule wording; T1 embedded-note version
+
+# §10 Cold Design
+cold_design: same helpdesk/KB workflow before SOP exposure; KB has brief overview only
+expected_cold_result: partial solve; model may detect zone correlation but lacks specific tagging/priority rules
+
+# Control Design
+control_design: no_persistence, shortcut, surface_memorization
+expected_control_result: transfer gain shrinks without persisted procedure
+
+# Episodes
+episodes:
+- FM02_I01_incident_cold
+- FM02_I02_incident_learn_a
+- FM02_I02b_incident_update_or_stabilize
+- FM02_I03_incident_eval_near
+- FM02_I03b_incident_eval_far
+- FM02_C01_control_no_persistence
+- FM02_C02_control_shortcut
+- FM02_C03_control_surface_memorization

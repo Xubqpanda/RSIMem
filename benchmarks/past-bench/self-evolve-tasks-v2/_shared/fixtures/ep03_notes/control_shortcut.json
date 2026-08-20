@@ -1,0 +1,55 @@
+[
+  {
+    "note_id": "DOC-751",
+    "title": "Onboarding Playbook",
+    "content": "Current shell placeholder for the settled onboarding playbook. Preserve the existing metadata when applying updates.",
+    "tags": ["approved", "artifact-shell"],
+    "status": "active",
+    "created_at": "2026-04-16T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "DOC-752",
+    "title": "Onboarding Playbook Draft",
+    "content": "Draft shell for a candidate onboarding playbook refresh. Metadata may not match the settled version.",
+    "tags": ["approved", "artifact-shell"],
+    "status": "active",
+    "created_at": "2026-04-16T09:03:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "DOC-753",
+    "title": "Onboarding Playbook",
+    "content": "Regional onboarding shell queued for review. The assigned reviewers differ from the settled version.",
+    "tags": ["candidate", "artifact-shell"],
+    "status": "active",
+    "created_at": "2026-04-16T09:06:00Z",
+    "participants": [
+      "alice@corp.com",
+      "people-ops@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "DOC-503",
+    "title": "Onboarding Playbook Local Excerpt",
+    "content": "Approved local excerpt. Step 1: HR emails welcome packet. Step 2: manager books kickoff call. Step 3: IT provisions laptop. Step 4: mentor assigned within 24h. Owner: Carol. Status: active.",
+    "tags": ["approved", "local-copy"],
+    "status": "active",
+    "created_at": "2026-04-16T09:30:00Z",
+    "participants": [
+      "ops@corp.com"
+    ],
+    "duration_minutes": 10
+  }
+]

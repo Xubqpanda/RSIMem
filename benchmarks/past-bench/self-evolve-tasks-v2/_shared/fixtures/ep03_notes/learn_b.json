@@ -1,0 +1,29 @@
+[
+  {
+    "note_id": "DOC-431",
+    "title": "Onboarding Playbook",
+    "content": "ONBOARDING PLAYBOOK v1. Step 1: HR emails welcome packet. Step 2: manager books kickoff call. Step 3: IT provisions laptop. Step 4: mentor assigned within 48h. Owner: Carol. Status: active.",
+    "tags": ["approved", "artifact-shell"],
+    "status": "active",
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "DOC-418",
+    "title": "Random Sync",
+    "content": "Random sync notes unrelated to onboarding.",
+    "tags": ["noise"],
+    "status": "active",
+    "created_at": "2026-04-15T09:45:00Z",
+    "participants": [
+      "alice@corp.com",
+      "ops@corp.com"
+    ],
+    "duration_minutes": 15
+  }
+]

@@ -1,0 +1,66 @@
+family_id: PG01_release_decision_followup
+title: Release Decision Followup
+ability_dir: proactive_information_gathering
+primary_ability: proactive_information_gathering
+secondary_abilities:
+  - episodic_experience
+  - trigger_and_arbitration
+primary_trigger: failure_reflection
+secondary_trigger: []
+expected_substrate: session_search
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier3
+instances_per_bucket:
+  attempt: 1
+  reflection: 1
+  update_or_stabilize: 1
+  eval_near: 2
+  eval_far: 1
+  control: 2
+total_episodes: 8
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: pg01_release_decision_followup_v1
+what_is_learned: Release decisions referenced through vague follow-ups still require explicit session retrieval for exact environment, expiry, and reference fields.
+what_persists: A retrieval skill note about searching sessions before sharing release guidance.
+what_counts_as_reuse: Later release follow-ups search sessions first, cite the exact reference, and share the right note without guessing from passive memory.
+false_positive_pattern: The agent answers from generic memory preload or from a similar but stale release record without opening the exact prior session.
+must_demonstrate:
+  - session retrieval happens before the first share action
+  - exact environment, expiry, and reference are recalled
+  - stale or similar release records are rejected
+episode_order:
+  - attempt_probe_pre
+  - reflection_gap_review
+  - update_or_stabilize_policy_note
+  - eval_near_followup_a
+  - eval_near_followup_b
+  - eval_far_followup_transfer
+  - control_preload_visible_hint
+  - control_boundary_wrong_record
+history_plan:
+  branches:
+    - mode: continue
+      episodes:
+        - attempt_probe_pre
+        - reflection_gap_review
+        - update_or_stabilize_policy_note
+        - eval_near_followup_a
+        - eval_near_followup_b
+        - eval_far_followup_transfer
+        - control_preload_visible_hint
+        - control_boundary_wrong_record
+episode_overrides:
+  reflection_gap_review:
+    mechanism: skill
+    expected_persistence_signal: skill
+  update_or_stabilize_policy_note:
+    mechanism: skill
+    expected_persistence_signal: skill

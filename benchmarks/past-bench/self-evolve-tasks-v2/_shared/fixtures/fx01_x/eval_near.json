@@ -1,0 +1,52 @@
+{
+  "users": {
+    "U_AGENT": {"username": "corp_x", "followers": 5000, "verified": false},
+    "U_RAVING": {"username": "superfan_liz", "followers": 3200, "verified": false},
+    "U_LURKER": {"username": "quiet_user99", "followers": 40, "verified": false},
+    "U_UPSET": {"username": "upset_startup", "followers": 1800, "verified": false},
+    "U_PUNDIT": {"username": "devtools_pundit", "followers": 62000, "verified": true},
+    "U_COMPCO": {"username": "compco_official", "followers": 38000, "verified": false}
+  },
+  "tweets": {
+    "T030": {
+      "id": "T030",
+      "author": "U_RAVING",
+      "text": "@corp_x Migrated our whole ops team to your platform last month. Best ROI decision of the quarter. Telling everyone I know!",
+      "metrics": {"like_count": 132, "retweet_count": 41, "reply_count": 9},
+      "sentiment": "positive"
+    },
+    "T031": {
+      "id": "T031",
+      "author": "U_LURKER",
+      "text": "@corp_x Your mobile app update is smooth. Good job.",
+      "metrics": {"like_count": 0, "retweet_count": 0, "reply_count": 0},
+      "sentiment": "positive"
+    },
+    "T032": {
+      "id": "T032",
+      "author": "U_UPSET",
+      "text": "@corp_x I've been trying to cancel my subscription for 3 days and your portal keeps throwing errors. This is costing me money every day. Fix this NOW.",
+      "metrics": {"like_count": 25, "retweet_count": 9, "reply_count": 4},
+      "sentiment": "negative"
+    },
+    "T033": {
+      "id": "T033",
+      "author": "U_PUNDIT",
+      "text": "AI-powered workflow tools are entering a new phase: they're not just automating existing work, they're creating net-new productivity categories that didn't exist before. Fascinating inflection point.",
+      "metrics": {"like_count": 7200, "retweet_count": 2100, "reply_count": 420},
+      "sentiment": "neutral",
+      "is_expert_post": true
+    },
+    "T034": {
+      "id": "T034",
+      "author": "U_COMPCO",
+      "text": "Excited to announce @compco_official's new partnership program! Also shoutout to @corp_x for pushing the industry forward together.",
+      "metrics": {"like_count": 200, "retweet_count": 55, "reply_count": 30},
+      "sentiment": "neutral",
+      "competitor_tagged": true
+    }
+  },
+  "timeline": ["T033", "T034"],
+  "mentions": ["T030", "T031", "T032"],
+  "dms": []
+}

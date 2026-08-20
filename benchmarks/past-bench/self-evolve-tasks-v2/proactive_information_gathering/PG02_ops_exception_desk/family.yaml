@@ -1,0 +1,66 @@
+family_id: PG02_ops_exception_desk
+title: Ops Exception Desk
+ability_dir: proactive_information_gathering
+primary_ability: proactive_information_gathering
+secondary_abilities:
+  - episodic_experience
+  - trigger_and_arbitration
+primary_trigger: failure_reflection
+secondary_trigger: []
+expected_substrate: mixed
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier3
+instances_per_bucket:
+  attempt: 1
+  reflection: 1
+  update_or_stabilize: 1
+  eval_near: 2
+  eval_far: 1
+  control: 2
+total_episodes: 8
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: pg02_ops_exception_desk_v1
+what_is_learned: Mixed retrieval routing for durable policy, procedural desk workflow, and one-off exceptions.
+what_persists: A retrieval skill note that says to open the desk procedure first and then search sessions for temporary exception IDs before updating tickets.
+what_counts_as_reuse: Later probes consult the desk procedure and exception sessions instead of applying only the durable default.
+false_positive_pattern: The agent treats temporary exceptions as durable policy, or updates tickets using only a remembered default without checking the exception log.
+must_demonstrate:
+  - skill retrieval is used for the desk workflow
+  - session retrieval is used for exception lookup
+  - expired or non-matching exceptions are not reused
+episode_order:
+  - attempt_probe_pre
+  - reflection_gap_review
+  - update_or_stabilize_policy_note
+  - eval_near_followup_a
+  - eval_near_followup_b
+  - eval_far_followup_transfer
+  - control_preload_visible_hint
+  - control_boundary_scope_mismatch
+history_plan:
+  branches:
+    - mode: continue
+      episodes:
+        - attempt_probe_pre
+        - reflection_gap_review
+        - update_or_stabilize_policy_note
+        - eval_near_followup_a
+        - eval_near_followup_b
+        - eval_far_followup_transfer
+        - control_preload_visible_hint
+        - control_boundary_scope_mismatch
+episode_overrides:
+  reflection_gap_review:
+    mechanism: skill
+    expected_persistence_signal: skill
+  update_or_stabilize_policy_note:
+    mechanism: skill
+    expected_persistence_signal: skill

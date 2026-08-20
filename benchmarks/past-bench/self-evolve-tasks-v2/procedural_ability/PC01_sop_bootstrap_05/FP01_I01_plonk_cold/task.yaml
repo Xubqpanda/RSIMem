@@ -1,0 +1,114 @@
+task_id: SE_FP01_I01
+task_name: Self-Evolve Plonk Incident SOP — DataCore Cold Start
+version: '2.0'
+category: self_evolve
+difficulty: hard
+services:
+- name: plonk
+  command: python mock_services/plonk/server.py
+  port: 3200
+  health_check: http://localhost:3200/health
+  ready_timeout: 10
+  reset_endpoint: http://localhost:3200/plonk/reset
+  env:
+    PLONK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fp01_plonk/cold_datacore.json
+  health_check_method: GET
+- name: kb
+  command: python mock_services/kb/server.py
+  port: 9106
+  health_check: http://localhost:9106/kb/search
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9106/kb/reset
+  env:
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fp01_kb/incident_brief.json
+prompt:
+  text: 'Before handling this Plonk incident, please first consult the Plonk operations SOP in the knowledge base.
+
+    (Note: The current knowledge base only contains a brief index, not the full operational steps.)
+
+
+    The DataCore database is experiencing timeout failures and engineers are unable to connect.
+
+    Please handle this incident.
+
+    Output a single line: DONE|<pinned message ID>|<incident channel>
+
+    '
+  language: en
+tools:
+- name: plonk_action
+  description: Execute a Plonk API action
+  input_schema:
+    type: object
+    properties:
+      action:
+        type: string
+      xovik:
+        type: string
+      belatu:
+        type: string
+      fenoka:
+        type: string
+      drimpa:
+        type: integer
+      jurela:
+        type: string
+      pikano:
+        type: string
+      dravex:
+        type: string
+      sulima:
+        type: string
+      moriku:
+        type: string
+      tanevi:
+        type: string
+      replyTo:
+        type: string
+    required:
+    - action
+- name: kb_search
+  description: Search the Plonk operations knowledge base
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      category:
+        type: string
+      max_results:
+        type: integer
+    required:
+    - query
+- name: kb_get_article
+  description: Get a knowledge base article by ID
+  input_schema:
+    type: object
+    properties:
+      article_id:
+        type: string
+    required:
+    - article_id
+tool_endpoints:
+- tool_name: plonk_action
+  url: http://localhost:3200/plonk/action
+  method: POST
+- tool_name: kb_search
+  url: http://localhost:9106/kb/search
+  method: POST
+- tool_name: kb_get_article
+  url: http://localhost:9106/kb/articles/get
+  method: POST
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: 'Award full credit if the agent: (1) searches the KB for the incident
+  response protocol, (2) calls nexobi to find the DataCore alert, (3) calls felura
+  to pin the alert in the appropriate channel, (4) calls zubefa to post an [INCIDENT]
+  update to plk-incidents, and (5) never calls any deprecated function. This is a
+  baseline — KB only has a brief index. Partial credit for completing the Plonk steps
+  even without KB discovery. Zero credit if kaviru, plentu, torvani, zolanti, or any
+  deprecated function is called.
+
+  '

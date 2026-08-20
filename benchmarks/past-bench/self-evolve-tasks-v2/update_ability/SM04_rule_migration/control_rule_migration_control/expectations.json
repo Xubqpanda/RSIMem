@@ -1,0 +1,28 @@
+{
+  "latent_rule_id": "sm04_rule_migration",
+  "expected_mechanism": "memory",
+  "bucket_role": "control",
+  "control_kind": "wrong_mechanism",
+  "control_subtype": "rule_in_fixture_not_memory",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["Borealis-4DQ", "High priority owners"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM04-006",
+  "required_recipients": ["Renee Shah"],
+  "forbidden_recipients": ["Evan Lin", "Noah Price"],
+  "required_output_keywords": [
+    "Renee Shah | Borealis-4DQ",
+    "Evan Lin | Borealis-4DQ",
+    "Noah Price | Borealis-4DQ"
+  ],
+  "forbidden_output_keywords": [
+    "Aurora-2S"
+  ],
+  "apply_mechanism_caps": true
+}

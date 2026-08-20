@@ -1,0 +1,146 @@
+task_id: V2_F02_C02
+task_name: "F02 Control — Shortcut (v2 SOP in Prompt)"
+category: self_evolve
+difficulty: hard
+control_type: shortcut
+
+requires_fresh_session: true
+persistence_disabled: true
+
+services:
+  - name: helpdesk
+    command: python mock_services/helpdesk/server.py
+    port: 9200
+    health_check: http://localhost:9200/helpdesk/tickets
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9200/helpdesk/reset
+    env:
+      HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/f02_helpdesk/eval_near.json
+      PORT: "9200"
+  - name: kb
+    command: python mock_services/kb/server.py
+    port: 9201
+    health_check: http://localhost:9201/kb/search
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9201/kb/reset
+    env:
+      KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/f02_kb/brief.json
+      PORT: "9201"
+
+prompt:
+  text: |
+    You are a billing support agent. Review the open helpdesk tickets and triage them
+    using the Billing Incident SOP v2 provided below.
+
+    ## Billing Incident SOP v2
+
+    **Escalation Trigger:** When 3 or more tickets from distinct reporters identify
+    the same billing cluster failure within a 4-hour window, treat this as a billing
+    incident.
+
+    **Required Actions:**
+    1. Read all open billing tickets and identify the cluster name.
+    2. Tag each incident ticket with: incident-core, billing-sla-breach
+    3. Set priority=critical on all cluster incident tickets.
+    4. Set category=incident-billing on all cluster incident tickets.
+    5. Do NOT close any ticket — leave resolution to the on-call billing engineer.
+    6. Output one line per updated ticket: TICKET_ID|priority|category|why
+
+    **Threshold:** Minimum 3 tickets from distinct reporters pointing to the same
+    cluster = escalation required. Groups of only 2 tickets do NOT meet the threshold.
+
+    **Exclusions:** UI bugs, slow performance on non-cluster services, document
+    requests, access requests, and routine report requests are NOT billing incidents.
+
+    Apply this SOP now. Output one line per updated ticket: TICKET_ID|priority|category|why
+  language: en
+
+tools:
+  - name: helpdesk_list_tickets
+    description: List all open helpdesk tickets.
+    input_schema:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Filter by ticket status (e.g., open, closed).
+      required: []
+  - name: helpdesk_get_ticket
+    description: Get details of a specific helpdesk ticket.
+    input_schema:
+      type: object
+      properties:
+        ticket_id:
+          type: string
+          description: The ticket ID to retrieve.
+      required:
+        - ticket_id
+  - name: helpdesk_update_ticket
+    description: Update a helpdesk ticket with new priority, category, status, or tags.
+    input_schema:
+      type: object
+      properties:
+        ticket_id:
+          type: string
+          description: The ticket ID to update.
+        priority:
+          type: string
+          description: New priority value.
+        category:
+          type: string
+          description: New category value.
+        status:
+          type: string
+          description: New status value.
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags to apply to the ticket.
+      required:
+        - ticket_id
+  - name: kb_search
+    description: Search the knowledge base for articles matching a query.
+    input_schema:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Search query string.
+      required:
+        - query
+  - name: kb_get_article
+    description: Retrieve a specific knowledge base article by ID.
+    input_schema:
+      type: object
+      properties:
+        article_id:
+          type: string
+          description: The article ID to retrieve.
+      required:
+        - article_id
+
+tool_endpoints:
+  - tool_name: helpdesk_list_tickets
+    url: http://localhost:9200/helpdesk/tickets
+    method: POST
+  - tool_name: helpdesk_get_ticket
+    url: http://localhost:9200/helpdesk/tickets/get
+    method: POST
+  - tool_name: helpdesk_update_ticket
+    url: http://localhost:9200/helpdesk/tickets/update
+    method: POST
+  - tool_name: kb_search
+    url: http://localhost:9201/kb/search
+    method: POST
+  - tool_name: kb_get_article
+    url: http://localhost:9201/kb/articles/get
+    method: POST
+
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+
+judge_rubric: "Control (shortcut) — v2 SOP embedded directly in prompt, no persistence needed. Expected to score HIGH — establishes the ceiling for what the agent can do when given the correct procedure directly. Score using same v2 criteria as eval_near: escalate TK-I401/I402/I403 with critical/incident-billing/[incident-core,billing-sla-breach], exclude TK-I404/I405."

@@ -1,0 +1,39 @@
+{
+  "latent_rule_id": "sm01_preference_adoption",
+  "expected_mechanism": "memory",
+  "bucket_role": "control",
+  "control_kind": "no_persistence",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM01-008",
+  "required_recipients": ["Lena Park", "Marco Silva", "Diane Cho"],
+  "forbidden_recipients": ["Raj Mehta"],
+  "required_output_keywords": [
+    "Lena Park",
+    "Marco Silva",
+    "Diane Cho",
+    "High",
+    "Medium",
+    "Low",
+    "2026/05/15",
+    "2026/05/16",
+    "2026/05/17"
+  ],
+  "forbidden_output_keywords": [
+    "high priority",
+    "standard",
+    "deferred",
+    "May 15",
+    "May 16",
+    "May 17"
+  ],
+  "require_tsv_output": true,
+  "apply_mechanism_caps": true
+}

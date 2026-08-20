@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM06-008",
+    "title": "In-Note Current Rule Control",
+    "created_at": "2026-05-08",
+    "participants": ["Maya Ortiz", "Jonah Fisk", "Marta Hill"],
+    "duration_minutes": 25,
+    "content": "In-note current rule control.\n\nCurrent standing default: output each action item as <owner> | RISK-CANON | task | due_date and share the source note with all action item owners. Last week's Maya Ortiz exception expired and no longer applies.\n\nAction items:\n1. Maya Ortiz: refresh the expired exception register, due 2026-06-25\n2. Jonah Fisk: archive the review spillover queue, due 2026-06-26\n\nMarta Hill attended as an observer."
+  }
+]

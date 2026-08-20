@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM04-007",
+    "title": "Platform Review Follow-up",
+    "created_at": "2026-04-14",
+    "participants": ["Renee Shah", "Evan Lin", "Noah Price", "Drew Park"],
+    "duration_minutes": 30,
+    "content": "Platform review follow-up.\n\nAction items:\n1. Renee Shah: tighten the platform rollout gate, High priority, by May 11\n2. Evan Lin: clean up the remaining worker review drift, Medium priority, by May 12\n3. Noah Price: update the platform review examples in the handbook, Low priority, by May 13\n\nDrew Park attended as an observer."
+  }
+]
