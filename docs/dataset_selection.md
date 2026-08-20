@@ -28,7 +28,7 @@ PAST-Bench is maintained externally under Apache-2.0:
 ```text
 Repository: https://github.com/Gen-Verse/PAST-Bench
 Paper:     arXiv:2608.04003
-Local:     /mnt/20t/xubuqiang/Study/PAST-Bench
+Vendored:  benchmarks/past-bench
 ```
 
 The runtime requires Python 3.11+, Docker, and an LLM API profile. RSIMem should integrate through PAST-Bench's public task/runtime interfaces rather than vendor the benchmark source.
@@ -63,7 +63,7 @@ Every stage must preserve matched task, model, tool environment, session order, 
 
 ## Scope Boundary
 
-PAST-Bench is the primary benchmark, not part of RSIMem. RSIMem owns:
+PAST-Bench remains an independently licensed benchmark, but its source is vendored under `benchmarks/past-bench` so paper-specific runtime instrumentation and exact benchmark revisions are reproducible. A future RSI benchmark will live beside it under `benchmarks/`, rather than being mixed into the RSIMem method implementation. RSIMem owns:
 
 - context-eviction and retrieval-feedback event contracts;
 - backend and host adapters;
