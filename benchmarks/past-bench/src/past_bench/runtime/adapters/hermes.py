@@ -1,4 +1,7 @@
-"""Runtime adapter that runs a Hermes agent in-process."""
+"""Runtime adapter that runs a Hermes agent in-process.
+
+Modified by RSIMem to map Hermes request-level usage into runtime evidence.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +18,7 @@ import yaml
 
 from ...models.content import TextBlock
 from ...models.message import Message
-from ...models.trace import TokenUsage
+from ...models.trace import ModelCallRecord, TokenUsage
 from ..protocol import StartSessionRequest, StepRequest, StepResponse
 from ..registry import AgentSpec
 from .base import RuntimeAdapter
@@ -151,6 +154,7 @@ class HermesAdapter(RuntimeAdapter):
             session_db = SessionDB()
             self._session_db = session_db
 
+        collected_model_calls: list[dict[str, Any]] = []
         agent = AIAgent(
             model=self.request.model.model_id,
             api_key=self.request.model.api_key,
@@ -164,23 +168,32 @@ class HermesAdapter(RuntimeAdapter):
             skip_memory=bool(hermes_cfg.get("skip_memory", (not persistence_enabled) or (not memory_active))),
             quiet_mode=True,
             session_db=session_db,
+            model_usage_callback=collected_model_calls.append,
         )
 
         prompt = _build_hermes_prompt(self.request)
 
-        result = agent.run_conversation(
-            user_message=prompt,
-            conversation_history=[],
-            task_id=self.request.session_id,
-        )
+        from agent.auxiliary_client import use_request_executors
 
+        with use_request_executors(
+            agent._execute_recorded_model_call,
+            agent._execute_recorded_async_model_call,
+        ):
+            result = agent.run_conversation(
+                user_message=prompt,
+                conversation_history=[],
+                task_id=self.request.session_id,
+            )
         self._set_session_title_if_missing(agent)
 
         review_wait_s = float(
-            hermes_cfg.get("background_review_wait_s", 1.0 if persistence_enabled else 0.0)
+            hermes_cfg.get("background_review_wait_s", 120.0 if persistence_enabled else 0.0)
         )
-        if review_wait_s > 0:
-            time.sleep(review_wait_s)
+        background_usage_complete = agent.wait_for_background_reviews(timeout=review_wait_s)
+        model_calls = [
+            ModelCallRecord.model_validate(record)
+            for record in collected_model_calls
+        ]
 
         self._capture_hermes_artifacts(
             hermes_cfg,
@@ -203,9 +216,25 @@ class HermesAdapter(RuntimeAdapter):
                 input_tokens = usage_data.get("input_tokens", usage_data.get("prompt_tokens", 0))
             if output_tokens is None:
                 output_tokens = usage_data.get("output_tokens", usage_data.get("completion_tokens", 0))
+        if model_calls:
+            input_tokens = sum(record.usage.input_tokens for record in model_calls)
+            output_tokens = sum(record.usage.output_tokens for record in model_calls)
         usage = TokenUsage(
             input_tokens=int(input_tokens or 0),
             output_tokens=int(output_tokens or 0),
+            cache_read_tokens=self._complete_model_call_sum(model_calls, "cache_read_tokens"),
+            cache_write_tokens=self._complete_model_call_sum(model_calls, "cache_write_tokens"),
+            reasoning_tokens=self._complete_model_call_sum(model_calls, "reasoning_tokens"),
+            request_count=len(model_calls) if model_calls else None,
+            retry_count=(
+                sum(1 for record in model_calls if record.attempt > 1)
+                if model_calls else None
+            ),
+            usage_complete=(
+                bool(model_calls)
+                and all(record.usage_available for record in model_calls)
+                and background_usage_complete
+            ),
         )
 
         assistant = Message(role="assistant", content=[TextBlock(text=final_text or "(no response)")])
@@ -213,8 +242,21 @@ class HermesAdapter(RuntimeAdapter):
             status="finished",
             assistant_message=assistant,
             usage=usage,
+            model_calls=model_calls,
             final_output=final_text,
         )
+
+    @staticmethod
+    def _complete_model_call_sum(
+        model_calls: list[ModelCallRecord],
+        field: str,
+    ) -> int | None:
+        if not model_calls:
+            return None
+        values = [getattr(record.usage, field) for record in model_calls]
+        if any(value is None for value in values):
+            return None
+        return sum(values)
 
     def close(self, reason: str = "") -> None:
         self._restore_past_bench_tools()

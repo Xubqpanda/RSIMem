@@ -34,10 +34,12 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.pytest.ini_options]
+# Modified by RSIMem to include request-level usage regression coverage.
 addopts = "-p no:cacheprovider"
 testpaths = [
     "tests/test_agent_registry.py",
     "tests/test_hermes_plus_evolve_controller.py",
+    "tests/test_model_call_usage.py",
     "tests/test_notes_memory_grader.py",
     "tests/test_session_search_tool_fallback.py",
     "tests/test_self_evolve.py",
