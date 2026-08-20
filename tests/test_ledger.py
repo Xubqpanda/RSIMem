@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
+from rsimem.audit import audit_run
 from rsimem.ledger import build_events, write_ledger
 
 
@@ -16,7 +17,12 @@ def _fixture(tmp_path: Path) -> Path:
     artifacts = episode_dir / "artifacts"
     artifacts.mkdir(parents=True)
     trace = episode_dir / "trace.jsonl"
-    trace.write_text(json.dumps({
+    trace_events = [{
+        "type": "trace_start",
+        "trace_id": "trace-1",
+        "task_id": "task-1",
+        "model": "gpt-test",
+    }, {
         "type": "model_call_usage",
         "trace_id": "trace-1",
         "call_id": "model-call-0001",
@@ -39,7 +45,25 @@ def _fixture(tmp_path: Path) -> Path:
         "duration_ms": 125.0,
         "http_status": None,
         "error_category": None,
-    }) + "\n", encoding="utf-8")
+    }, {
+        "type": "trace_end",
+        "trace_id": "trace-1",
+        "model_input_tokens": 80,
+        "model_output_tokens": 20,
+        "input_tokens": 80,
+        "output_tokens": 20,
+        "total_tokens": 100,
+        "cache_read_tokens": 20,
+        "cache_write_tokens": 0,
+        "reasoning_tokens": 5,
+        "model_request_count": 1,
+        "model_retry_count": 0,
+        "model_usage_complete": True,
+    }]
+    trace.write_text(
+        "".join(json.dumps(event) + "\n" for event in trace_events),
+        encoding="utf-8",
+    )
     session = artifacts / "session_current.json"
     session.write_text(json.dumps({
         "model": "gpt-test",
@@ -188,3 +212,19 @@ def test_failed_model_call_keeps_unknown_tokens_null(tmp_path: Path) -> None:
     assert failed["data"]["usageAvailable"] is False
     assert failed["data"]["inputTokens"] is None
     assert failed["data"]["outputTokens"] is None
+
+
+def test_audit_reconciles_request_usage_and_ledger(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    run_dir = comparison.parent
+    write_ledger(comparison, run_dir / "ledger.jsonl", judge_enabled=False)
+
+    report = audit_run(run_dir)
+
+    assert report["ok"] is True
+    assert report["issues"] == []
+    assert report["uniqueTraceCount"] == 1
+    assert report["uniquePhysicalUsage"]["requests"] == 1
+    assert report["uniquePhysicalUsage"]["cacheReadTokens"] == 20
+    assert report["ledgerUniqueBillingCalls"] == 1
+    assert report["privacy"]["memoryTextLeaks"] == 0

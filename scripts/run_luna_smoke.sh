@@ -52,3 +52,7 @@ PYTHONPATH="${RSIMEM_ROOT}/src" "${RSIMEM_ROOT}/.venv/bin/python" -m rsimem.ledg
   "${trace_dir}/sequence_comparison.json" \
   --output "${trace_dir}/ledger.jsonl" \
   --judge-disabled
+
+PYTHONPATH="${RSIMEM_ROOT}/src" "${RSIMEM_ROOT}/.venv/bin/python" -m rsimem.audit \
+  "${trace_dir}" \
+  --output "${trace_dir}/audit.json"

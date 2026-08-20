@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 
 [project.scripts]
 rsimem-ledger = "rsimem.ledger:main"
+rsimem-audit = "rsimem.audit:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
