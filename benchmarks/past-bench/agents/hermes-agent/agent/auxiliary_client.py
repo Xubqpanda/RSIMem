@@ -1,5 +1,7 @@
 """Shared auxiliary client router for side tasks.
 
+Modified by RSIMem to route physical auxiliary requests through a usage recorder.
+
 Provides a single resolution chain so every consumer (context compression,
 session search, web extraction, vision analysis, browser vision) picks up
 the best available backend without duplicating fallback logic.
@@ -41,6 +43,8 @@ import logging
 import os
 import threading
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path  # noqa: F401 — used by test mocks
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Tuple
@@ -51,6 +55,37 @@ from hermes_cli.config import get_hermes_home
 from hermes_constants import OPENROUTER_BASE_URL
 
 logger = logging.getLogger(__name__)
+
+_SYNC_REQUEST_EXECUTOR: ContextVar[Optional[Any]] = ContextVar(
+    "hermes_sync_request_executor", default=None
+)
+_ASYNC_REQUEST_EXECUTOR: ContextVar[Optional[Any]] = ContextVar(
+    "hermes_async_request_executor", default=None
+)
+
+
+@contextmanager
+def use_request_executors(sync_executor=None, async_executor=None):
+    """Route auxiliary model calls through context-local accounting hooks."""
+    sync_token = _SYNC_REQUEST_EXECUTOR.set(sync_executor)
+    async_token = _ASYNC_REQUEST_EXECUTOR.set(async_executor)
+    try:
+        yield
+    finally:
+        _SYNC_REQUEST_EXECUTOR.reset(sync_token)
+        _ASYNC_REQUEST_EXECUTOR.reset(async_token)
+
+
+def execute_recorded_request(request, **metadata):
+    """Execute one sync model request through the active recorder, if any."""
+    executor = _SYNC_REQUEST_EXECUTOR.get()
+    return executor(request, **metadata) if executor is not None else request()
+
+
+async def execute_recorded_async_request(request, **metadata):
+    """Execute one async model request through the active recorder, if any."""
+    executor = _ASYNC_REQUEST_EXECUTOR.get()
+    return await executor(request, **metadata) if executor is not None else await request()
 
 # Default auxiliary models for direct API-key providers (cheap/fast for side tasks)
 _API_KEY_PROVIDER_AUX_MODELS: Dict[str, str] = {
@@ -1484,6 +1519,7 @@ def call_llm(
     tools: list = None,
     timeout: float = 30.0,
     extra_body: dict = None,
+    request_executor: callable = None,
 ) -> Any:
     """Centralized synchronous LLM call.
 
@@ -1509,6 +1545,7 @@ def call_llm(
     Raises:
         RuntimeError: If no provider is configured.
     """
+    request_executor = request_executor or _SYNC_REQUEST_EXECUTOR.get()
     resolved_provider, resolved_model, resolved_base_url, resolved_api_key = _resolve_task_provider_model(
         task, provider, model, base_url, api_key)
 
@@ -1571,15 +1608,27 @@ def call_llm(
         tools=tools, timeout=timeout, extra_body=extra_body,
         base_url=resolved_base_url)
 
+    def _execute(request, attempt: int):
+        if request_executor is None:
+            return request()
+        return request_executor(
+            request,
+            attempt=attempt,
+            purpose=task or "auxiliary",
+            provider=resolved_provider,
+            model=final_model,
+            api_mode="chat_completions",
+        )
+
     # Handle max_tokens vs max_completion_tokens retry
     try:
-        return client.chat.completions.create(**kwargs)
+        return _execute(lambda: client.chat.completions.create(**kwargs), 1)
     except Exception as first_err:
         err_str = str(first_err)
         if "max_tokens" in err_str or "unsupported_parameter" in err_str:
             kwargs.pop("max_tokens", None)
             kwargs["max_completion_tokens"] = max_tokens
-            return client.chat.completions.create(**kwargs)
+            return _execute(lambda: client.chat.completions.create(**kwargs), 2)
         raise
 
 
@@ -1596,11 +1645,13 @@ async def async_call_llm(
     tools: list = None,
     timeout: float = 30.0,
     extra_body: dict = None,
+    request_executor: callable = None,
 ) -> Any:
     """Centralized asynchronous LLM call.
 
     Same as call_llm() but async. See call_llm() for full documentation.
     """
+    request_executor = request_executor or _ASYNC_REQUEST_EXECUTOR.get()
     resolved_provider, resolved_model, resolved_base_url, resolved_api_key = _resolve_task_provider_model(
         task, provider, model, base_url, api_key)
 
@@ -1661,12 +1712,24 @@ async def async_call_llm(
         tools=tools, timeout=timeout, extra_body=extra_body,
         base_url=resolved_base_url)
 
+    async def _execute(request, attempt: int):
+        if request_executor is None:
+            return await request()
+        return await request_executor(
+            request,
+            attempt=attempt,
+            purpose=task or "auxiliary",
+            provider=resolved_provider,
+            model=final_model,
+            api_mode="chat_completions",
+        )
+
     try:
-        return await client.chat.completions.create(**kwargs)
+        return await _execute(lambda: client.chat.completions.create(**kwargs), 1)
     except Exception as first_err:
         err_str = str(first_err)
         if "max_tokens" in err_str or "unsupported_parameter" in err_str:
             kwargs.pop("max_tokens", None)
             kwargs["max_completion_tokens"] = max_tokens
-            return await client.chat.completions.create(**kwargs)
+            return await _execute(lambda: client.chat.completions.create(**kwargs), 2)
         raise

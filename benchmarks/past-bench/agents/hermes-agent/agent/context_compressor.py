@@ -4,6 +4,8 @@ Self-contained class with its own OpenAI client for summarization.
 Uses auxiliary model (cheap/fast) to summarize middle turns while
 protecting head and tail context.
 
+Modified by RSIMem to account for compression model calls.
+
 Improvements over v1:
   - Structured summary template (Goal, Progress, Decisions, Files, Next Steps)
   - Iterative summary updates (preserves info across multiple compactions)
@@ -72,11 +74,13 @@ class ContextCompressor:
         api_key: str = "",
         config_context_length: int | None = None,
         provider: str = "",
+        request_executor: callable = None,
     ):
         self.model = model
         self.base_url = base_url
         self.api_key = api_key
         self.provider = provider
+        self.request_executor = request_executor
         self.threshold_percent = threshold_percent
         self.protect_first_n = protect_first_n
         self.protect_last_n = protect_last_n
@@ -351,6 +355,8 @@ Write only the summary body. Do not include any preamble or prefix."""
             }
             if self.summary_model:
                 call_kwargs["model"] = self.summary_model
+            if self.request_executor is not None:
+                call_kwargs["request_executor"] = self.request_executor
             response = call_llm(**call_kwargs)
             content = response.choices[0].message.content
             # Handle cases where content is not a string (e.g., dict from llama.cpp)

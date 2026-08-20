@@ -2,6 +2,8 @@
 """
 Delegate Tool -- Subagent Architecture
 
+Modified by RSIMem to propagate request-level usage accounting to child agents.
+
 Spawns child AIAgent instances with isolated context, restricted toolsets,
 and their own terminal sessions. Supports single-task and batch (parallel)
 modes. The parent blocks until all children complete.
@@ -234,6 +236,9 @@ def _build_child_agent(
         provider_sort=parent_agent.provider_sort,
         tool_progress_callback=child_progress_cb,
         iteration_budget=None,  # fresh budget per subagent
+        model_usage_callback=getattr(parent_agent, "model_usage_callback", None),
+        usage_component="subagent",
+        usage_purpose="delegated_task",
     )
     # Set delegation depth so children can't spawn grandchildren
     child._delegate_depth = getattr(parent_agent, '_delegate_depth', 0) + 1
@@ -272,7 +277,13 @@ def _run_single_child(
                                 list(model_tools._last_resolved_tool_names))
 
     try:
-        result = child.run_conversation(user_message=goal)
+        from agent.auxiliary_client import use_request_executors
+
+        with use_request_executors(
+            child._execute_recorded_model_call,
+            child._execute_recorded_async_model_call,
+        ):
+            result = child.run_conversation(user_message=goal)
 
         # Flush any remaining batched progress to gateway
         if child_progress_cb and hasattr(child_progress_cb, '_flush'):
