@@ -1,4 +1,7 @@
-"""JSONL trace event types for agent evaluation."""
+"""JSONL trace event types for agent evaluation.
+
+Modified by RSIMem to retain request-level model usage evidence.
+"""
 
 from __future__ import annotations
 
@@ -17,6 +20,39 @@ def _now() -> str:
 class TokenUsage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    request_count: int | None = None
+    retry_count: int | None = None
+    usage_complete: bool = False
+
+
+class ModelCallRecord(BaseModel):
+    """Sanitized evidence for one physical model API request."""
+
+    call_id: str
+    sequence: int
+    component: str = "agent"
+    purpose: str = "task_execution"
+    provider: str | None = None
+    model: str | None = None
+    api_mode: str | None = None
+    attempt: int = 1
+    status: Literal["success", "error", "invalid_response", "interrupted"]
+    usage: TokenUsage = Field(default_factory=TokenUsage)
+    usage_available: bool = False
+    duration_ms: float = 0.0
+    http_status: int | None = None
+    error_category: str | None = None
+
+
+class ModelCallUsage(ModelCallRecord):
+    """Trace event emitted for one physical model API request."""
+
+    type: Literal["model_call_usage"] = "model_call_usage"
+    trace_id: str
+    timestamp: str = Field(default_factory=_now)
 
 
 class DimensionScores(BaseModel):
@@ -113,6 +149,12 @@ class TraceEnd(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     total_tokens: int = 0
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    model_request_count: int | None = None
+    model_retry_count: int | None = None
+    model_usage_complete: bool = False
     model_time_s: float = 0.0
     tool_time_s: float = 0.0
     other_time_s: float = 0.0
@@ -139,6 +181,7 @@ TraceEvent = Annotated[
     Union[
         TraceStart,
         TraceMessage,
+        ModelCallUsage,
         ToolDispatch,
         RuntimeRequest,
         RuntimeResponse,
