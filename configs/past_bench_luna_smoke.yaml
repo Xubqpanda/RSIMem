@@ -12,4 +12,3 @@ sandbox:
 defaults:
   trace_dir: outputs/traces
   agent_registry: configs/agents.yaml
-
