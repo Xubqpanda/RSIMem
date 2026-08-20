@@ -98,9 +98,9 @@ For every backend $B$, the primary comparison remains native $B$ versus $B$ with
 
 ## Repository Boundaries
 
-RSIMem contains PAST-Bench integration, memory-backend adapters, experiment configurations, launchers, event collection, statistical analysis, and table or figure generation.
+RSIMem contains benchmark sources under `benchmarks/`, benchmark integration, memory-backend adapters, experiment configurations, launchers, event collection, statistical analysis, and table or figure generation. Each vendored benchmark retains its upstream license, notice, and provenance metadata.
 
-RSIMem does not vendor PAST-Bench, copy hidden evaluation contracts, or fork backend implementations.
+RSIMem may modify benchmark runtime and telemetry code needed for reproducible experiments, but it does not change task semantics, hidden evaluation contracts, answer keys, or grading criteria.
 
 Reusable production components belong in the LightRSI framework repository, while RSIMem pins their exact commit for reproducibility.
 
