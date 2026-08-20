@@ -2,6 +2,8 @@
 """
 AI Agent Runner with Tool Calling
 
+Modified by RSIMem to expose sanitized request-level model usage evidence.
+
 This module provides a clean, standalone agent that can execute AI models
 with tool calling capabilities. It handles the conversation loop, tool execution,
 and response management.
@@ -425,6 +427,9 @@ class AIAgent:
         checkpoints_enabled: bool = False,
         checkpoint_max_snapshots: int = 50,
         pass_session_id: bool = False,
+        model_usage_callback: callable = None,
+        usage_component: str = "agent",
+        usage_purpose: str = "task_execution",
     ):
         """
         Initialize the AI Agent.
@@ -541,6 +546,12 @@ class AIAgent:
         self.status_callback = status_callback
         self.tool_gen_callback = tool_gen_callback
         self._last_reported_tool = None  # Track for "new tool" mode
+        self.model_call_usage_records: list[dict[str, Any]] = []
+        self._model_request_sequence = 0
+        self.model_usage_callback = model_usage_callback
+        self.usage_component = usage_component
+        self.usage_purpose = usage_purpose
+        self._background_review_threads: list[threading.Thread] = []
         
         # Tool execution state — allows _vprint during tool execution
         # even when stream consumers are registered (no tokens streaming then)
@@ -1077,6 +1088,7 @@ class AIAgent:
             api_key=getattr(self, "api_key", ""),
             config_context_length=_config_context_length,
             provider=self.provider,
+            request_executor=self._execute_recorded_model_call,
         )
         self.compression_enabled = compression_enabled
         self._user_turn_count = 0
@@ -1129,6 +1141,8 @@ class AIAgent:
         self.session_cache_write_tokens = 0
         self.session_reasoning_tokens = 0
         self.session_api_calls = 0
+        self.model_call_usage_records = []
+        self._model_request_sequence = 0
         self.session_estimated_cost_usd = 0.0
         self.session_cost_status = "unknown"
         self.session_cost_source = "none"
@@ -1204,6 +1218,168 @@ class AIAgent:
                 self.status_callback("lifecycle", message)
             except Exception:
                 logger.debug("status_callback error in _emit_status", exc_info=True)
+
+    def _begin_model_call(
+        self,
+        *,
+        attempt: int,
+        purpose: str | None = None,
+        provider: str | None = None,
+        model: str | None = None,
+        api_mode: str | None = None,
+    ) -> dict[str, Any]:
+        self._model_request_sequence += 1
+        return {
+            "call_id": f"{self.session_id}:model-call-{self._model_request_sequence:04d}",
+            "sequence": self._model_request_sequence,
+            "attempt": max(1, int(attempt)),
+            "purpose": purpose or self.usage_purpose,
+            "provider": provider or self.provider,
+            "model": model or self.model,
+            "api_mode": api_mode or self.api_mode,
+            "started_at": time.monotonic(),
+            "recorded": False,
+        }
+
+    def _finish_model_call(
+        self,
+        context: dict[str, Any] | None,
+        *,
+        status: str,
+        response: Any = None,
+        error: BaseException | None = None,
+    ) -> None:
+        """Store one sanitized call record without request, response, or error text."""
+        if not context or context.get("recorded"):
+            return
+        context["recorded"] = True
+        raw_usage = getattr(response, "usage", None) if response is not None else None
+        usage_available = raw_usage is not None
+        provider = context["provider"]
+        model = context["model"]
+        api_mode = context["api_mode"]
+        canonical = (
+            normalize_usage(raw_usage, provider=provider, api_mode=api_mode)
+            if usage_available else None
+        )
+
+        cache_read_tokens = None
+        cache_write_tokens = None
+        reasoning_tokens = None
+        if canonical is not None:
+            if api_mode == "anthropic_messages":
+                if getattr(raw_usage, "cache_read_input_tokens", None) is not None:
+                    cache_read_tokens = canonical.cache_read_tokens
+                if getattr(raw_usage, "cache_creation_input_tokens", None) is not None:
+                    cache_write_tokens = canonical.cache_write_tokens
+            else:
+                details_name = (
+                    "input_tokens_details" if api_mode == "codex_responses"
+                    else "prompt_tokens_details"
+                )
+                input_details = getattr(raw_usage, details_name, None)
+                if getattr(input_details, "cached_tokens", None) is not None:
+                    cache_read_tokens = canonical.cache_read_tokens
+                cache_write_value = getattr(input_details, "cache_creation_tokens", None)
+                if cache_write_value is None:
+                    cache_write_value = getattr(input_details, "cache_write_tokens", None)
+                if cache_write_value is not None:
+                    cache_write_tokens = canonical.cache_write_tokens
+            output_details = getattr(raw_usage, "output_tokens_details", None)
+            if getattr(output_details, "reasoning_tokens", None) is not None:
+                reasoning_tokens = canonical.reasoning_tokens
+
+        http_status = getattr(error, "status_code", None) if error is not None else None
+        if not isinstance(http_status, int):
+            http_status = None
+        attempt = int(context["attempt"])
+        record = {
+            "call_id": context["call_id"],
+            "sequence": int(context["sequence"]),
+            "component": self.usage_component,
+            "purpose": context["purpose"],
+            "provider": provider,
+            "model": model,
+            "api_mode": api_mode,
+            "attempt": attempt,
+            "status": status,
+            "usage": {
+                "input_tokens": canonical.input_tokens if canonical is not None else 0,
+                "output_tokens": canonical.output_tokens if canonical is not None else 0,
+                "cache_read_tokens": cache_read_tokens,
+                "cache_write_tokens": cache_write_tokens,
+                "reasoning_tokens": reasoning_tokens,
+                "request_count": 1,
+                "retry_count": 1 if attempt > 1 else 0,
+                "usage_complete": usage_available,
+            },
+            "usage_available": usage_available,
+            "duration_ms": round((time.monotonic() - context["started_at"]) * 1000, 3),
+            "http_status": http_status,
+            "error_category": type(error).__name__ if error is not None else None,
+        }
+        self.model_call_usage_records.append(record)
+        if self.model_usage_callback is not None:
+            try:
+                self.model_usage_callback(record.copy())
+            except Exception:
+                logger.debug("model_usage_callback failed", exc_info=True)
+
+    def _execute_recorded_model_call(
+        self,
+        request: callable,
+        *,
+        attempt: int = 1,
+        purpose: str | None = None,
+        provider: str | None = None,
+        model: str | None = None,
+        api_mode: str | None = None,
+    ) -> Any:
+        context = self._begin_model_call(
+            attempt=attempt,
+            purpose=purpose,
+            provider=provider,
+            model=model,
+            api_mode=api_mode,
+        )
+        try:
+            response = request()
+        except InterruptedError:
+            self._finish_model_call(context, status="interrupted")
+            raise
+        except Exception as error:
+            self._finish_model_call(context, status="error", error=error)
+            raise
+        self._finish_model_call(context, status="success", response=response)
+        return response
+
+    async def _execute_recorded_async_model_call(
+        self,
+        request: callable,
+        *,
+        attempt: int = 1,
+        purpose: str | None = None,
+        provider: str | None = None,
+        model: str | None = None,
+        api_mode: str | None = None,
+    ) -> Any:
+        context = self._begin_model_call(
+            attempt=attempt,
+            purpose=purpose,
+            provider=provider,
+            model=model,
+            api_mode=api_mode,
+        )
+        try:
+            response = await request()
+        except asyncio.CancelledError:
+            self._finish_model_call(context, status="interrupted")
+            raise
+        except Exception as error:
+            self._finish_model_call(context, status="error", error=error)
+            raise
+        self._finish_model_call(context, status="success", response=response)
+        return response
 
     def _is_direct_openai_url(self, base_url: str = None) -> bool:
         """Return True when a base URL targets OpenAI's native API."""
@@ -1488,6 +1664,9 @@ class AIAgent:
                         quiet_mode=True,
                         platform=self.platform,
                         provider=self.provider,
+                        model_usage_callback=self.model_usage_callback,
+                        usage_component="memory_controller",
+                        usage_purpose="background_review",
                     )
                     review_agent._memory_store = self._memory_store
                     review_agent._memory_enabled = self._memory_enabled
@@ -1495,10 +1674,16 @@ class AIAgent:
                     review_agent._memory_nudge_interval = 0
                     review_agent._skill_nudge_interval = 0
 
-                    review_agent.run_conversation(
-                        user_message=prompt,
-                        conversation_history=messages_snapshot,
-                    )
+                    from agent.auxiliary_client import use_request_executors
+
+                    with use_request_executors(
+                        review_agent._execute_recorded_model_call,
+                        review_agent._execute_recorded_async_model_call,
+                    ):
+                        review_agent.run_conversation(
+                            user_message=prompt,
+                            conversation_history=messages_snapshot,
+                        )
 
                 # Scan the review agent's messages for successful tool actions
                 # and surface a compact summary to the user.
@@ -1550,7 +1735,19 @@ class AIAgent:
                             pass
 
         t = threading.Thread(target=_run_review, daemon=True, name="bg-review")
+        self._background_review_threads.append(t)
         t.start()
+
+    def wait_for_background_reviews(self, timeout: float | None = None) -> bool:
+        """Wait for accounting-relevant review calls and report completeness."""
+        deadline = None if timeout is None else time.monotonic() + max(0.0, timeout)
+        for thread in list(self._background_review_threads):
+            remaining = None if deadline is None else max(0.0, deadline - time.monotonic())
+            thread.join(timeout=remaining)
+        self._background_review_threads = [
+            thread for thread in self._background_review_threads if thread.is_alive()
+        ]
+        return not self._background_review_threads
 
     def _apply_persist_user_message_override(self, messages: List[Dict]) -> None:
         """Rewrite the current-turn user message before persistence/return.
@@ -4782,6 +4979,7 @@ class AIAgent:
                     temperature=0.3,
                     max_tokens=5120,
                     timeout=30.0,
+                    request_executor=self._execute_recorded_model_call,
                 )
             except RuntimeError:
                 _aux_available = False
@@ -4794,7 +4992,10 @@ class AIAgent:
                 codex_kwargs["temperature"] = 0.3
                 if "max_output_tokens" in codex_kwargs:
                     codex_kwargs["max_output_tokens"] = 5120
-                response = self._run_codex_stream(codex_kwargs)
+                response = self._execute_recorded_model_call(
+                    lambda: self._run_codex_stream(codex_kwargs),
+                    purpose="flush_memories",
+                )
             elif not _aux_available and self.api_mode == "anthropic_messages":
                 # Native Anthropic — use the Anthropic client directly
                 from agent.anthropic_adapter import build_anthropic_kwargs as _build_ant_kwargs
@@ -4804,7 +5005,10 @@ class AIAgent:
                     reasoning_config=None,
                     preserve_dots=self._anthropic_preserve_dots(),
                 )
-                response = self._anthropic_messages_create(ant_kwargs)
+                response = self._execute_recorded_model_call(
+                    lambda: self._anthropic_messages_create(ant_kwargs),
+                    purpose="flush_memories",
+                )
             elif not _aux_available:
                 api_kwargs = {
                     "model": self.model,
@@ -4813,7 +5017,12 @@ class AIAgent:
                     "temperature": 0.3,
                     **self._max_tokens_param(5120),
                 }
-                response = self._ensure_primary_openai_client(reason="flush_memories").chat.completions.create(**api_kwargs, timeout=30.0)
+                response = self._execute_recorded_model_call(
+                    lambda: self._ensure_primary_openai_client(
+                        reason="flush_memories"
+                    ).chat.completions.create(**api_kwargs, timeout=30.0),
+                    purpose="flush_memories",
+                )
 
             # Extract tool calls from the response, handling all API formats
             tool_calls = []
@@ -5593,7 +5802,10 @@ class AIAgent:
             if self.api_mode == "codex_responses":
                 codex_kwargs = self._build_api_kwargs(api_messages)
                 codex_kwargs.pop("tools", None)
-                summary_response = self._run_codex_stream(codex_kwargs)
+                summary_response = self._execute_recorded_model_call(
+                    lambda: self._run_codex_stream(codex_kwargs),
+                    purpose="iteration_limit_summary",
+                )
                 assistant_message, _ = self._normalize_codex_response(summary_response)
                 final_response = (assistant_message.content or "").strip() if assistant_message else ""
             else:
@@ -5627,11 +5839,19 @@ class AIAgent:
                                    reasoning_config=self.reasoning_config,
                                    is_oauth=self._is_anthropic_oauth,
                                    preserve_dots=self._anthropic_preserve_dots())
-                    summary_response = self._anthropic_messages_create(_ant_kw)
+                    summary_response = self._execute_recorded_model_call(
+                        lambda: self._anthropic_messages_create(_ant_kw),
+                        purpose="iteration_limit_summary",
+                    )
                     _msg, _ = _nar(summary_response, strip_tool_prefix=self._is_anthropic_oauth)
                     final_response = (_msg.content or "").strip()
                 else:
-                    summary_response = self._ensure_primary_openai_client(reason="iteration_limit_summary").chat.completions.create(**summary_kwargs)
+                    summary_response = self._execute_recorded_model_call(
+                        lambda: self._ensure_primary_openai_client(
+                            reason="iteration_limit_summary"
+                        ).chat.completions.create(**summary_kwargs),
+                        purpose="iteration_limit_summary",
+                    )
 
                     if summary_response.choices and summary_response.choices[0].message.content:
                         final_response = summary_response.choices[0].message.content
@@ -5650,7 +5870,11 @@ class AIAgent:
                 if self.api_mode == "codex_responses":
                     codex_kwargs = self._build_api_kwargs(api_messages)
                     codex_kwargs.pop("tools", None)
-                    retry_response = self._run_codex_stream(codex_kwargs)
+                    retry_response = self._execute_recorded_model_call(
+                        lambda: self._run_codex_stream(codex_kwargs),
+                        attempt=2,
+                        purpose="iteration_limit_summary",
+                    )
                     retry_msg, _ = self._normalize_codex_response(retry_response)
                     final_response = (retry_msg.content or "").strip() if retry_msg else ""
                 elif self.api_mode == "anthropic_messages":
@@ -5660,7 +5884,11 @@ class AIAgent:
                                     max_tokens=self.max_tokens, temperature=self.temperature,
                                     reasoning_config=self.reasoning_config,
                                     preserve_dots=self._anthropic_preserve_dots())
-                    retry_response = self._anthropic_messages_create(_ant_kw2)
+                    retry_response = self._execute_recorded_model_call(
+                        lambda: self._anthropic_messages_create(_ant_kw2),
+                        attempt=2,
+                        purpose="iteration_limit_summary",
+                    )
                     _retry_msg, _ = _nar2(retry_response, strip_tool_prefix=self._is_anthropic_oauth)
                     final_response = (_retry_msg.content or "").strip()
                 else:
@@ -5673,7 +5901,13 @@ class AIAgent:
                     if summary_extra_body:
                         summary_kwargs["extra_body"] = summary_extra_body
 
-                    summary_response = self._ensure_primary_openai_client(reason="iteration_limit_summary_retry").chat.completions.create(**summary_kwargs)
+                    summary_response = self._execute_recorded_model_call(
+                        lambda: self._ensure_primary_openai_client(
+                            reason="iteration_limit_summary_retry"
+                        ).chat.completions.create(**summary_kwargs),
+                        attempt=2,
+                        purpose="iteration_limit_summary",
+                    )
 
                     if summary_response.choices and summary_response.choices[0].message.content:
                         final_response = summary_response.choices[0].message.content
@@ -6073,6 +6307,8 @@ class AIAgent:
 
             finish_reason = "stop"
             response = None  # Guard against UnboundLocalError if all retries fail
+            call_context = None
+            physical_attempt = 0
 
             while retry_count < max_retries:
                 try:
@@ -6111,6 +6347,8 @@ class AIAgent:
                         if isinstance(getattr(self, "client", None), Mock):
                             _use_streaming = False
 
+                    physical_attempt += 1
+                    call_context = self._begin_model_call(attempt=physical_attempt)
                     if _use_streaming:
                         response = self._interruptible_streaming_api_call(
                             api_kwargs, on_first_delta=_stop_spinner
@@ -6174,6 +6412,11 @@ class AIAgent:
                                 error_details.append("response.choices is empty")
 
                     if response_invalid:
+                        self._finish_model_call(
+                            call_context,
+                            status="invalid_response",
+                            response=response,
+                        )
                         # Stop spinner before printing error messages
                         if thinking_spinner:
                             thinking_spinner.stop("(´;ω;`) oops, retrying...")
@@ -6259,6 +6502,12 @@ class AIAgent:
                                 }
                             time.sleep(0.2)
                         continue  # Retry the API call
+
+                    self._finish_model_call(
+                        call_context,
+                        status="success",
+                        response=response,
+                    )
 
                     # Check finish_reason before proceeding
                     if self.api_mode == "codex_responses":
@@ -6450,6 +6699,7 @@ class AIAgent:
                     break  # Success, exit retry loop
 
                 except InterruptedError:
+                    self._finish_model_call(call_context, status="interrupted")
                     if thinking_spinner:
                         thinking_spinner.stop("")
                         thinking_spinner = None
@@ -6463,6 +6713,11 @@ class AIAgent:
                     break
 
                 except Exception as api_error:
+                    self._finish_model_call(
+                        call_context,
+                        status="error",
+                        error=api_error,
+                    )
                     # Stop spinner before printing error messages
                     if thinking_spinner:
                         thinking_spinner.stop("(╥_╥) error, retrying...")

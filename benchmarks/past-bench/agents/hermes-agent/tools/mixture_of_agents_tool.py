@@ -2,6 +2,8 @@
 """
 Mixture-of-Agents Tool Module
 
+Modified by RSIMem to account for reference and aggregator model calls.
+
 This module implements the Mixture-of-Agents (MoA) methodology that leverages
 the collective strengths of multiple LLMs through a layered architecture to
 achieve state-of-the-art performance on complex reasoning tasks.
@@ -141,7 +143,16 @@ async def _run_reference_model_safe(
             if not model.lower().startswith('gpt-'):
                 api_params["temperature"] = temperature
             
-            response = await _get_openrouter_client().chat.completions.create(**api_params)
+            from agent.auxiliary_client import execute_recorded_async_request
+
+            response = await execute_recorded_async_request(
+                lambda: _get_openrouter_client().chat.completions.create(**api_params),
+                attempt=attempt + 1,
+                purpose="mixture_reference",
+                provider="openrouter",
+                model=model,
+                api_mode="chat_completions",
+            )
             
             content = response.choices[0].message.content.strip()
             logger.info("%s responded (%s characters)", model, len(content))
@@ -209,7 +220,16 @@ async def _run_aggregator_model(
     if not AGGREGATOR_MODEL.lower().startswith('gpt-'):
         api_params["temperature"] = temperature
 
-    response = await _get_openrouter_client().chat.completions.create(**api_params)
+    from agent.auxiliary_client import execute_recorded_async_request
+
+    response = await execute_recorded_async_request(
+        lambda: _get_openrouter_client().chat.completions.create(**api_params),
+        attempt=1,
+        purpose="mixture_aggregator",
+        provider="openrouter",
+        model=AGGREGATOR_MODEL,
+        api_mode="chat_completions",
+    )
 
     content = response.choices[0].message.content.strip()
     logger.info("Aggregation complete (%s characters)", len(content))

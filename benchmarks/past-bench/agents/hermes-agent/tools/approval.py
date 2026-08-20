@@ -1,5 +1,7 @@
 """Dangerous command approval -- detection, prompting, and per-session state.
 
+Modified by RSIMem to account for smart-approval model calls.
+
 This module is the single source of truth for the dangerous command system:
 - Pattern detection (DANGEROUS_PATTERNS, detect_dangerous_command)
 - Per-session approval state (thread-safe, keyed by session_key)
@@ -335,7 +337,11 @@ def _smart_approve(command: str, description: str) -> str:
     (openai/codex#13860).
     """
     try:
-        from agent.auxiliary_client import get_text_auxiliary_client, auxiliary_max_tokens_param
+        from agent.auxiliary_client import (
+            auxiliary_max_tokens_param,
+            execute_recorded_request,
+            get_text_auxiliary_client,
+        )
 
         client, model = get_text_auxiliary_client(task="approval")
         if not client or not model:
@@ -356,11 +362,18 @@ Rules:
 
 Respond with exactly one word: APPROVE, DENY, or ESCALATE"""
 
-        response = client.chat.completions.create(
+        response = execute_recorded_request(
+            lambda: client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                **auxiliary_max_tokens_param(16),
+                temperature=0,
+            ),
+            attempt=1,
+            purpose="approval",
+            provider="auxiliary",
             model=model,
-            messages=[{"role": "user", "content": prompt}],
-            **auxiliary_max_tokens_param(16),
-            temperature=0,
+            api_mode="chat_completions",
         )
 
         answer = (response.choices[0].message.content or "").strip().upper()
