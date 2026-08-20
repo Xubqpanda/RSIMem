@@ -153,3 +153,38 @@ def test_ledger_is_deterministic_and_marks_unmatched_injection(tmp_path: Path) -
     outcome = next(event for event in first_events if event["kind"] == "episode_outcome")
     assert outcome["data"]["judgeEnabled"] is False
     assert outcome["data"]["judgeConfigurationEvidence"] == "launcher_explicit"
+
+
+def test_failed_model_call_keeps_unknown_tokens_null(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    data = json.loads(comparison.read_text())
+    trace_path = Path(data["with_persistence"]["episodes"][0]["trace"])
+    failed_call = {
+        "type": "model_call_usage",
+        "trace_id": "trace-1",
+        "call_id": "model-call-0002",
+        "sequence": 2,
+        "component": "agent",
+        "purpose": "task_execution",
+        "provider": "test-provider",
+        "model": "gpt-test",
+        "api_mode": "codex_responses",
+        "attempt": 2,
+        "status": "error",
+        "usage": {"input_tokens": 0, "output_tokens": 0},
+        "usage_available": False,
+        "duration_ms": 10.0,
+        "http_status": 503,
+        "error_category": "ServiceUnavailableError",
+    }
+    with trace_path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(failed_call) + "\n")
+
+    events = build_events(comparison)
+    failed = next(
+        event for event in events
+        if event["kind"] == "model_call_usage" and event["data"]["status"] == "error"
+    )
+    assert failed["data"]["usageAvailable"] is False
+    assert failed["data"]["inputTokens"] is None
+    assert failed["data"]["outputTokens"] is None

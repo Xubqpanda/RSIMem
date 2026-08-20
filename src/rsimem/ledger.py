@@ -81,6 +81,7 @@ def _model_call_events(
         if not isinstance(raw, dict) or raw.get("type") != "model_call_usage":
             continue
         usage = raw.get("usage") if isinstance(raw.get("usage"), dict) else {}
+        usage_available = raw.get("usage_available", False) is True
         yield _event(
             run_id=run_id,
             variant=variant,
@@ -98,12 +99,12 @@ def _model_call_events(
                 "apiMode": raw.get("api_mode"),
                 "attempt": raw.get("attempt"),
                 "status": raw.get("status"),
-                "inputTokens": usage.get("input_tokens"),
-                "outputTokens": usage.get("output_tokens"),
+                "inputTokens": usage.get("input_tokens") if usage_available else None,
+                "outputTokens": usage.get("output_tokens") if usage_available else None,
                 "cacheReadTokens": usage.get("cache_read_tokens"),
                 "cacheWriteTokens": usage.get("cache_write_tokens"),
                 "reasoningTokens": usage.get("reasoning_tokens"),
-                "usageAvailable": raw.get("usage_available", False),
+                "usageAvailable": usage_available,
                 "durationMs": raw.get("duration_ms"),
                 "httpStatus": raw.get("http_status"),
                 "errorCategory": raw.get("error_category"),
