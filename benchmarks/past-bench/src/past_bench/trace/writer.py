@@ -1,4 +1,7 @@
-"""Append-only JSONL trace writer."""
+"""Append-only JSONL trace writer.
+
+Modified by RSIMem to accept request-level model usage events.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +11,7 @@ from typing import IO
 from ..models.trace import (
     AuditSnapshot,
     MediaLoad,
+    ModelCallUsage,
     RuntimeRequest,
     RuntimeResponse,
     TraceEnd,
@@ -33,7 +37,7 @@ class TraceWriter:
 
     def write_event(
         self,
-        event: TraceStart | TraceMessage | ToolDispatch | RuntimeRequest | RuntimeResponse | AuditSnapshot | MediaLoad | TraceEnd,
+        event: TraceStart | TraceMessage | ModelCallUsage | ToolDispatch | RuntimeRequest | RuntimeResponse | AuditSnapshot | MediaLoad | TraceEnd,
     ) -> None:
         fh = self._ensure_open()
         fh.write(event.model_dump_json() + "\n")

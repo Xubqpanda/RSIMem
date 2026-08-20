@@ -1,4 +1,7 @@
-"""Agent evaluation data models."""
+"""Agent evaluation data models.
+
+Modified by RSIMem to export request-level usage contracts.
+"""
 
 from .content import AudioBlock, ContentBlock, ImageBlock, TextBlock, ToolResultBlock, ToolUseBlock, VideoBlock
 from .message import Message
@@ -10,6 +13,8 @@ from .trace import (
     AuditSnapshot,
     DimensionScores,
     MediaLoad,
+    ModelCallRecord,
+    ModelCallUsage,
     TokenUsage,
     ToolDispatch,
     TraceEnd,
@@ -25,6 +30,8 @@ __all__ = [
     "DimensionScores",
     "ImageBlock",
     "MediaLoad",
+    "ModelCallRecord",
+    "ModelCallUsage",
     "ExpectedAction",
     "Message",
     "TaskDefinition",

@@ -1,4 +1,7 @@
-"""Helpers for sequence-based self-evolve evaluation."""
+"""Helpers for sequence-based self-evolve evaluation.
+
+Modified by RSIMem to propagate request-level usage aggregates.
+"""
 
 from __future__ import annotations
 
@@ -1464,12 +1467,18 @@ def compute_retrieval_signals(
     }
 
 
-def _trace_totals(end) -> dict[str, int | float]:
+def _trace_totals(end) -> dict[str, int | float | bool | None]:
     if end is None:
         return {
             "model_input_tokens": 0,
             "model_output_tokens": 0,
             "total_tokens": 0,
+            "cache_read_tokens": None,
+            "cache_write_tokens": None,
+            "reasoning_tokens": None,
+            "model_request_count": None,
+            "model_retry_count": None,
+            "model_usage_complete": False,
             "model_time_s": 0.0,
             "tool_time_s": 0.0,
             "other_time_s": 0.0,
@@ -1483,6 +1492,12 @@ def _trace_totals(end) -> dict[str, int | float]:
     tool_time_s = getattr(end, "tool_time_s", 0.0)
     other_time_s = getattr(end, "other_time_s", 0.0)
     wall_time_s = getattr(end, "wall_time_s", 0.0)
+    cache_read_tokens = getattr(end, "cache_read_tokens", None)
+    cache_write_tokens = getattr(end, "cache_write_tokens", None)
+    reasoning_tokens = getattr(end, "reasoning_tokens", None)
+    model_request_count = getattr(end, "model_request_count", None)
+    model_retry_count = getattr(end, "model_retry_count", None)
+    model_usage_complete = getattr(end, "model_usage_complete", False)
 
     if not total_tokens:
         total_tokens = model_input_tokens + model_output_tokens
@@ -1493,6 +1508,12 @@ def _trace_totals(end) -> dict[str, int | float]:
         "model_input_tokens": model_input_tokens,
         "model_output_tokens": model_output_tokens,
         "total_tokens": total_tokens,
+        "cache_read_tokens": cache_read_tokens,
+        "cache_write_tokens": cache_write_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "model_request_count": model_request_count,
+        "model_retry_count": model_retry_count,
+        "model_usage_complete": model_usage_complete,
         "model_time_s": wall_time_s if not model_time_s and not tool_time_s else model_time_s,
         "tool_time_s": tool_time_s,
         "other_time_s": other_time_s,
@@ -1656,6 +1677,12 @@ def grade_episode(
             "input_tokens": totals["model_input_tokens"],
             "output_tokens": totals["model_output_tokens"],
             "total_tokens": totals["total_tokens"],
+            "cache_read_tokens": totals["cache_read_tokens"],
+            "cache_write_tokens": totals["cache_write_tokens"],
+            "reasoning_tokens": totals["reasoning_tokens"],
+            "model_request_count": totals["model_request_count"],
+            "model_retry_count": totals["model_retry_count"],
+            "model_usage_complete": totals["model_usage_complete"],
         },
         "timing": {
             "wall_time_s": totals["wall_time_s"],
@@ -1848,6 +1875,12 @@ def summarize_reflection_episode(*, trace_path: Path, artifact_summary: dict[str
             "input_tokens": totals["model_input_tokens"],
             "output_tokens": totals["model_output_tokens"],
             "total_tokens": totals["total_tokens"],
+            "cache_read_tokens": totals["cache_read_tokens"],
+            "cache_write_tokens": totals["cache_write_tokens"],
+            "reasoning_tokens": totals["reasoning_tokens"],
+            "model_request_count": totals["model_request_count"],
+            "model_retry_count": totals["model_retry_count"],
+            "model_usage_complete": totals["model_usage_complete"],
         },
         "timing": {
             "wall_time_s": totals["wall_time_s"],

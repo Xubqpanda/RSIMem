@@ -1,4 +1,7 @@
-"""Pydantic models for the decoupled agent runtime protocol."""
+"""Pydantic models for the decoupled agent runtime protocol.
+
+Modified by RSIMem to transport request-level model usage evidence.
+"""
 
 from __future__ import annotations
 
@@ -9,7 +12,7 @@ from pydantic import BaseModel, Field
 from ..models.content import ToolResultBlock
 from ..models.message import Message
 from ..models.tool import ToolEndpoint, ToolSpec
-from ..models.trace import TokenUsage
+from ..models.trace import ModelCallRecord, TokenUsage
 
 
 class RuntimeModelConfig(BaseModel):
@@ -75,6 +78,7 @@ class StepResponse(BaseModel):
     status: Literal["acting", "finished", "error"]
     assistant_message: Message | None = None
     usage: TokenUsage = Field(default_factory=TokenUsage)
+    model_calls: list[ModelCallRecord] = Field(default_factory=list)
     tool_calls: list[ToolCallAction] = Field(default_factory=list)
     final_output: str | None = None
     error: str | None = None

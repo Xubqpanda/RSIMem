@@ -1,4 +1,7 @@
-"""Bench-owned orchestration loop for decoupled agent runtimes."""
+"""Bench-owned orchestration loop for decoupled agent runtimes.
+
+Modified by RSIMem to persist request-level model usage evidence.
+"""
 
 from __future__ import annotations
 
@@ -13,7 +16,7 @@ from ..models.content import TextBlock, ToolResultBlock
 from ..models.message import Message
 from ..models.task import TaskDefinition
 from ..models.tool import ToolEndpoint
-from ..models.trace import AuditSnapshot, RuntimeRequest, RuntimeResponse, TokenUsage, TraceEnd, TraceMessage, TraceStart
+from ..models.trace import AuditSnapshot, ModelCallRecord, ModelCallUsage, RuntimeRequest, RuntimeResponse, TokenUsage, TraceEnd, TraceMessage, TraceStart
 from ..runtime.client import create_runtime_client
 from ..runtime.protocol import BootstrapRequest, CloseSessionRequest, RuntimeConfigPayload, StartSessionRequest, StepRequest
 from ..runtime.registry import get_agent_spec, load_agent_registry, resolve_model_config
@@ -27,6 +30,15 @@ from .system_prompt import build_system_prompt
 
 def _log(msg: str) -> None:
     print(msg, flush=True)
+
+
+def _complete_usage_sum(records: list[ModelCallRecord], field: str) -> int | None:
+    if not records:
+        return None
+    values = [getattr(record.usage, field) for record in records]
+    if any(value is None for value in values):
+        return None
+    return sum(values)
 
 
 def _fetch_acontext_block(cfg: Config) -> str | None:
@@ -529,6 +541,7 @@ def run_task_via_agent(
     )
 
     total_usage = TokenUsage()
+    model_calls: list[ModelCallRecord] = []
     tool_time_s = 0.0
     model_time_s = 0.0
     wall_start = time.monotonic()
@@ -628,12 +641,18 @@ def run_task_via_agent(
                 model_time_s += response.model_time_s
                 total_usage.input_tokens += response.usage.input_tokens
                 total_usage.output_tokens += response.usage.output_tokens
+                for model_call in response.model_calls:
+                    model_calls.append(model_call)
+                    writer.write_event(ModelCallUsage(
+                        trace_id=trace_id,
+                        **model_call.model_dump(mode="python"),
+                    ))
                 writer.write_event(RuntimeResponse(
                     trace_id=trace_id,
                     session_id=session_id,
                     step_id=turn_count,
                     status=response.status,
-                    payload=response.model_dump(mode="json"),
+                    payload=response.model_dump(mode="json", exclude={"model_calls"}),
                 ))
 
                 assistant_message = response.assistant_message
@@ -707,6 +726,18 @@ def run_task_via_agent(
                 input_tokens=input_tok,
                 output_tokens=output_tok,
                 total_tokens=total_tok,
+                cache_read_tokens=_complete_usage_sum(model_calls, "cache_read_tokens"),
+                cache_write_tokens=_complete_usage_sum(model_calls, "cache_write_tokens"),
+                reasoning_tokens=_complete_usage_sum(model_calls, "reasoning_tokens"),
+                model_request_count=len(model_calls) if model_calls else None,
+                model_retry_count=(
+                    sum(1 for record in model_calls if record.attempt > 1)
+                    if model_calls else None
+                ),
+                model_usage_complete=(
+                    bool(model_calls)
+                    and all(record.usage_available for record in model_calls)
+                ),
                 model_time_s=round(model_time_s, 2),
                 tool_time_s=round(tool_time_s, 2),
                 other_time_s=round(other_time_s, 2),

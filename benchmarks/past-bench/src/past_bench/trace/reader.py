@@ -1,4 +1,7 @@
-"""JSONL trace reader with type-based partitioning."""
+"""JSONL trace reader with type-based partitioning.
+
+Modified by RSIMem to parse request-level model usage evidence.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +13,7 @@ from ..models.trace import (
     AuditSnapshot,
     GradingResult,
     MediaLoad,
+    ModelCallUsage,
     RuntimeRequest,
     RuntimeResponse,
     ToolDispatch,
@@ -26,12 +30,13 @@ _EVENT_MAP = {
     "runtime_response": RuntimeResponse,
     "audit_snapshot": AuditSnapshot,
     "media_load": MediaLoad,
+    "model_call_usage": ModelCallUsage,
     "trace_end": TraceEnd,
     "grading_result": GradingResult,
 }
 
 
-def read_events(path: str | Path) -> Iterator[TraceStart | TraceMessage | ToolDispatch | RuntimeRequest | RuntimeResponse | AuditSnapshot | MediaLoad | TraceEnd]:
+def read_events(path: str | Path) -> Iterator[TraceStart | TraceMessage | ModelCallUsage | ToolDispatch | RuntimeRequest | RuntimeResponse | AuditSnapshot | MediaLoad | TraceEnd]:
     """Parse each JSONL line by its ``type`` discriminator field."""
     with open(path) as fh:
         for line in fh:
@@ -69,6 +74,8 @@ def load_trace(
             messages.append(event)
         elif isinstance(event, ToolDispatch):
             dispatches.append(event)
+        elif isinstance(event, ModelCallUsage):
+            pass
         elif isinstance(event, RuntimeRequest):
             pass
         elif isinstance(event, RuntimeResponse):
