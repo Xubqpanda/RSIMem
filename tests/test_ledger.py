@@ -1,0 +1,155 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+from rsimem.ledger import build_events, write_ledger
+
+
+MEMORY = "Use TSV with owner, priority, task, and due_date."
+
+
+def _fixture(tmp_path: Path) -> Path:
+    run = tmp_path / "run-1"
+    episode_dir = run / "with_persistence" / "learn"
+    artifacts = episode_dir / "artifacts"
+    artifacts.mkdir(parents=True)
+    trace = episode_dir / "trace.jsonl"
+    trace.write_text(json.dumps({
+        "type": "model_call_usage",
+        "trace_id": "trace-1",
+        "call_id": "model-call-0001",
+        "sequence": 1,
+        "component": "agent",
+        "purpose": "task_execution",
+        "provider": "test-provider",
+        "model": "gpt-test",
+        "api_mode": "codex_responses",
+        "attempt": 1,
+        "status": "success",
+        "usage": {
+            "input_tokens": 80,
+            "output_tokens": 20,
+            "cache_read_tokens": 20,
+            "cache_write_tokens": 0,
+            "reasoning_tokens": 5,
+        },
+        "usage_available": True,
+        "duration_ms": 125.0,
+        "http_status": None,
+        "error_category": None,
+    }) + "\n", encoding="utf-8")
+    session = artifacts / "session_current.json"
+    session.write_text(json.dumps({
+        "model": "gpt-test",
+        "system_prompt": f"Memory:\n{MEMORY}",
+        "messages": [
+            {"role": "user", "content": "task"},
+            {"role": "assistant", "tool_calls": [{"function": {"name": "memory"}}]},
+            {"role": "tool", "content": "ok"},
+            {"role": "assistant", "content": "done"},
+        ],
+    }), encoding="utf-8")
+    memories = artifacts / "memories"
+    memories.mkdir()
+    (memories / "MEMORY.md").write_text(MEMORY, encoding="utf-8")
+    episode = {
+        "trace": str(trace),
+        "trace_id": "trace-1",
+        "task_id": "task-1",
+        "family_id": "family-1",
+        "stage": "learn",
+        "bucket": "learn",
+        "task_score": 1.0,
+        "passed": True,
+        "judge_score": 0.0,
+        "token_usage": {
+            "input_tokens": 80,
+            "output_tokens": 20,
+            "total_tokens": 100,
+            "cache_read_tokens": 20,
+            "cache_write_tokens": 0,
+            "reasoning_tokens": 5,
+            "model_request_count": 1,
+            "model_retry_count": 0,
+            "model_usage_complete": True,
+        },
+        "timing": {"model_time_s": 2.0, "wall_time_s": 3.0},
+        "internal_tools": {
+            "session_file": str(session),
+            "calls": [{
+                "name": "memory",
+                "args": {"action": "add", "target": "memory", "content": MEMORY},
+                "message_index": 1,
+            }],
+        },
+        "retrieval_signals": {"memory_injection_count": 1},
+        "artifacts": {
+            "memory_chars": len(MEMORY),
+            "user_chars": 0,
+            "memory_entries": [MEMORY],
+            "skill_count": 0,
+        },
+    }
+    comparison = run / "sequence_comparison.json"
+    comparison.write_text(json.dumps({
+        "with_persistence": {"episodes": [episode]},
+        "without_persistence": {"episodes": []},
+        "delta": {},
+    }), encoding="utf-8")
+    return comparison
+
+
+def test_builds_evidence_backed_events_without_memory_text(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    events = build_events(comparison)
+    kinds = [event["kind"] for event in events]
+    assert kinds == [
+        "episode_outcome",
+        "model_usage",
+        "model_call_usage",
+        "tool_call",
+        "memory_operation",
+        "memory_injection",
+        "storage_snapshot",
+    ]
+    usage = next(event for event in events if event["kind"] == "model_usage")
+    outcome = next(event for event in events if event["kind"] == "episode_outcome")
+    assert usage["data"]["requestCount"] == 1
+    assert usage["data"]["requestCountEvidence"] == "model_call_usage_events"
+    assert usage["data"]["retryCount"] == 0
+    assert usage["data"]["cacheReadTokens"] == 20
+    assert usage["data"]["reasoningTokens"] == 5
+    assert usage["data"]["detailedUsageAvailable"] is True
+    model_call = next(event for event in events if event["kind"] == "model_call_usage")
+    assert model_call["data"]["billingExecutionId"] == "trace-1:model-call-0001"
+    assert outcome["data"]["judgeEnabled"] is None
+    assert outcome["data"]["judgeConfigurationEvidence"] == "unavailable"
+    operation = next(event for event in events if event["kind"] == "memory_operation")
+    injection = next(event for event in events if event["kind"] == "memory_injection")
+    assert operation["data"]["recordId"] == injection["data"]["recordId"]
+    old_content_fingerprint = hashlib.sha256(" ".join(MEMORY.split()).encode()).hexdigest()[:24]
+    assert old_content_fingerprint not in operation["data"]["recordId"]
+    assert MEMORY not in json.dumps(events)
+
+
+def test_ledger_is_deterministic_and_marks_unmatched_injection(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    data = json.loads(comparison.read_text())
+    session_path = Path(data["with_persistence"]["episodes"][0]["internal_tools"]["session_file"])
+    session = json.loads(session_path.read_text())
+    session["system_prompt"] = "No memory here."
+    session_path.write_text(json.dumps(session), encoding="utf-8")
+
+    first = tmp_path / "first.jsonl"
+    second = tmp_path / "second.jsonl"
+    first_events = write_ledger(comparison, first, judge_enabled=False)
+    second_events = write_ledger(comparison, second, judge_enabled=False)
+    assert first.read_bytes() == second.read_bytes()
+    assert [event["eventId"] for event in first_events] == [event["eventId"] for event in second_events]
+    unresolved = next(event for event in first_events if event["kind"] == "memory_injection_unresolved")
+    assert unresolved["data"] == {"reportedCount": 1, "matchedCount": 0}
+    outcome = next(event for event in first_events if event["kind"] == "episode_outcome")
+    assert outcome["data"]["judgeEnabled"] is False
+    assert outcome["data"]["judgeConfigurationEvidence"] == "launcher_explicit"
