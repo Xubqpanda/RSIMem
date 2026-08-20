@@ -1,0 +1,107 @@
+family_id: PC01_sop_bootstrap_06
+title: X Engagement SOP Bootstrap
+ability_dir: procedural_ability
+primary_ability: procedural_ability
+secondary_abilities: []
+primary_trigger: passive_policy_exposure
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  learn: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+- FX01_I01_x_cold
+- FX01_I02_x_learn_a
+- FX01_I02b_x_update_or_stabilize
+- FX01_I03_x_eval_near
+- FX01_I03b_x_eval_far
+- FX01_C02_control_shortcut
+- FX01_C03_control_surface_memorization
+- FX01_C01_control_no_persistence
+history_plan:
+  anchors:
+  - name: pc01_06_post_learn
+    save_after: FX01_I02b_x_update_or_stabilize
+  branches:
+  - mode: continue
+    episodes:
+    - FX01_I01_x_cold
+    - FX01_I02_x_learn_a
+    - FX01_I02b_x_update_or_stabilize
+  - mode: from_anchor
+    anchor: pc01_06_post_learn
+    episodes:
+    - FX01_I03_x_eval_near
+    - FX01_I03b_x_eval_far
+  - mode: fresh
+    episodes:
+    - FX01_C02_control_shortcut
+    - FX01_C03_control_surface_memorization
+    - FX01_C01_control_no_persistence
+control_set:
+- no_persistence
+- shortcut
+- surface_memorization
+status: v2_architecture_aligned
+latent_rule_id: fx01_x_engagement_protocol_v1
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  X engagement protocol — the procedure for evaluating engagement opportunities,
+  selecting response strategies, and applying platform-specific interaction rules.
+what_persists: >
+  A durable skill artifact encoding the X engagement protocol for reuse across
+  sessions without re-reading the protocol document.
+what_counts_as_reuse: >
+  Agent applies the persisted engagement protocol to novel X interaction
+  scenarios with different topics, audiences, and platform contexts.
+false_positive_pattern: >
+  Agent copies specific phrasing or topic references from training interactions
+  rather than extracting the general engagement decision framework.
+must_demonstrate:
+- Extract a reusable engagement protocol from explicit instruction delivery
+- Apply the protocol to novel X scenarios with changed topics and audiences
+- Maintain correct strategy selection and platform-rule compliance
+
+# §13.0 Trigger Spec
+trigger_category: passive_document_exposure
+trigger_strength: T0
+visibility_surface: protocol appears only as an operational KB/onboarding reference; the prompt does not frame it as durable knowledge
+trigger_injection_plan: "learn_a: agent may read KB-X-001 while doing the task, but receives no save/future-use instruction; update_or_stabilize: brief-only policy reference with new posts"
+trigger_removal_plan: eval removes protocol text; only task request remains
+trigger_mixing_rule: no direct save-skill instruction and no future-use hint; success requires autonomous procedural abstraction from passive exposure
+sibling_comparison_plan: compare with PC01_01..03 induction siblings for trigger-strength analysis
+phase1_canonical_sibling: weakest-trigger PC01 sibling for trigger-strength analysis
+future_sibling_roadmap: T1 embedded-note sibling with explicit policy label but no future-use wording
+
+# §10 Cold Design
+cold_design: same X engagement task before protocol is introduced
+expected_cold_result: partial solve; no stable reusable procedure
+
+# Control Design
+control_design: no_persistence, shortcut, surface_memorization
+expected_control_result: transfer gain shrinks without persisted procedure
+
+# Episodes
+legacy_source: previous PC split, architecture-aligned
+legacy_episodes:
+- FX01_C01_control_no_persistence
+- FX01_C02_control_shortcut
+- FX01_C03_control_surface_memorization
+- FX01_I01_x_cold
+- FX01_I02_x_learn_a
+- FX01_I02b_x_update_or_stabilize
+- FX01_I03_x_eval_near
+- FX01_I03b_x_eval_far

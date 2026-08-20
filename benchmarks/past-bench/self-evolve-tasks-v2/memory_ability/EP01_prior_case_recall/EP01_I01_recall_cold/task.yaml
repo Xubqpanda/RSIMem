@@ -1,0 +1,71 @@
+task_id: EP01_I01_recall_cold
+task_name: 'EP01 Prior Case Recall — Cold'
+
+services:
+  - name: notes
+    command: python mock_services/notes/server.py
+    port: 9205
+    health_check: http://localhost:9205/notes/list
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9205/notes/reset
+    env:
+      NOTES_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/ep01_notes/cold.json
+      PORT: "9205"
+
+tools:
+  - name: notes_list
+    description: List meeting notes
+    input_schema:
+      type: object
+      properties:
+        tags:
+          type: array
+          items: {type: string}
+      required: []
+  - name: notes_get
+    description: Get a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+      required: [note_id]
+  - name: notes_update
+    description: Update a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+        payload: {type: object}
+      required: [note_id, payload]
+  - name: notes_share
+    description: Share a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+        recipients:
+          type: array
+          items: {type: string}
+      required: [note_id, recipients]
+
+tool_endpoints:
+  - {tool_name: notes_list, url: http://localhost:9205/notes/list, method: POST}
+  - {tool_name: notes_get, url: http://localhost:9205/notes/get, method: POST}
+  - {tool_name: notes_update, url: http://localhost:9205/notes/update, method: POST}
+  - {tool_name: notes_share, url: http://localhost:9205/notes/share, method: POST}
+
+prompt:
+  text: |
+    A new procurement request arrived for Vendor X. Do we have any standing
+    decision about Vendor X on record? List what you find.
+    Output: VENDOR|status|basis
+  language: en
+
+judge_rubric: "Reward a concise cold-start answer that checks the visible notes, avoids inventing any prior-session decision, and clearly states when no standing Vendor X decision is on record."
+
+
+max_turns: 20
+timeout: 300
+category: self_evolve
+difficulty: medium

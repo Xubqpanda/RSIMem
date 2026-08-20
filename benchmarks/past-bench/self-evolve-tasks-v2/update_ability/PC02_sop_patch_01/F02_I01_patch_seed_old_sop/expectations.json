@@ -1,0 +1,41 @@
+{
+  "latent_rule_id": "f02_billing_incident_sop_v2",
+  "expected_mechanism": "skill",
+  "bucket_role": "baseline",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "apply_mechanism_caps": true,
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-I401",
+    "TK-I402",
+    "TK-I403"
+  ],
+  "excluded_ticket_ids": [
+    "TK-I404",
+    "TK-I405"
+  ],
+  "expected_priority": "critical",
+  "expected_category": "incident-billing",
+  "required_tags": [
+    "incident-core",
+    "billing-sla-breach"
+  ],
+  "min_ticket_reads": 4,
+  "required_summary_keywords": [
+    "TK-I401",
+    "TK-I402",
+    "TK-I403"
+  ],
+  "stale_memory_resistance_check": true,
+  "skill_artifact_weight": 0.0,
+  "expected_cold_behavior": "low_score_against_post_update_target",
+  "do_not_use_as_evolve_success": true
+}

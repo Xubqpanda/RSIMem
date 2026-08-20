@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM06-006",
+    "title": "Expired Exception Eval Far",
+    "created_at": "2026-05-06",
+    "participants": ["Maya Ortiz", "Oscar Jain", "Dylan Moss"],
+    "duration_minutes": 40,
+    "content": "Expired exception eval far.\n\nAction items:\n1. Maya Ortiz: finalize the security exception digest, due 2026-06-21\n2. Oscar Jain: close the orphaned review backlog, due 2026-06-22\n\nDylan Moss attended as an observer."
+  }
+]

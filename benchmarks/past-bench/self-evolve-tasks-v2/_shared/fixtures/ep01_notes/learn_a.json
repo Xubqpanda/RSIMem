@@ -1,0 +1,41 @@
+[
+  {
+    "note_id": "MTG-EP01-C1",
+    "title": "Arch Review",
+    "content": "Architecture review. Bob proposed moving to event-driven pattern for the ingestion layer.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-C2",
+    "title": "Standup",
+    "content": "Daily standup. No blockers. Carol picked up the dashboard polish.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-SEED",
+    "title": "Vendor X Contract Decision",
+    "content": "Vendor X contract discussion. After review, the team decided that Vendor X is NOT approved for production until they pass SOC2. Exception granted for the staging-only pilot running through May 31. Owner: Alice. This decision was explicitly logged for future reference.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  }
+]

@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "kb_f02_billing_sop_v1",
+    "title": "Billing Incident SOP v1",
+    "category": "incident-management",
+    "content": "## Billing Incident SOP v1\n\nVersion: 1.0 (Active)\n\n### Escalation Trigger\nWhen 2 or more tickets from distinct reporters identify the same billing cluster failure within a 4-hour window, treat this as a billing incident.\n\n### Required Actions\n1. Read all open billing tickets and identify the cluster name.\n2. Tag each incident ticket with: incident-core\n3. Set priority=high on all cluster incident tickets.\n4. Set category=incident on all cluster incident tickets.\n5. Do NOT close any ticket — leave resolution to the on-call billing engineer.\n6. Output one line per updated ticket: TICKET_ID|priority|category|why\n\n### Threshold\n- Minimum 2 tickets from distinct reporters pointing to the same cluster = escalation required.\n- Single-reporter tickets do not trigger escalation unless confirmed by a second reporter.\n\n### Exclusions\n- UI bugs, slow performance on non-cluster services, document requests, and access requests are NOT billing incidents.\n- Do not apply incident labels to tickets that describe separate root causes, even if they are in the same billing domain.",
+    "tags": [],
+    "last_updated": "2026-04-01",
+    "views": 0
+  }
+]

@@ -1,0 +1,108 @@
+family_id: PC01_sop_bootstrap_05
+title: Plonk SOP Bootstrap
+ability_dir: procedural_ability
+primary_ability: procedural_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  learn: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+- FP01_I01_plonk_cold
+- FP01_I02_plonk_learn_a
+- FP01_I02b_plonk_update_or_stabilize
+- FP01_I03_plonk_eval_near
+- FP01_I03b_plonk_eval_far
+- FP01_C02_control_shortcut
+- FP01_C03_control_surface_memorization
+- FP01_C01_control_no_persistence
+history_plan:
+  anchors:
+  - name: pc01_05_post_learn
+    save_after: FP01_I02b_plonk_update_or_stabilize
+  branches:
+  - mode: continue
+    episodes:
+    - FP01_I01_plonk_cold
+    - FP01_I02_plonk_learn_a
+    - FP01_I02b_plonk_update_or_stabilize
+  - mode: from_anchor
+    anchor: pc01_05_post_learn
+    episodes:
+    - FP01_I03_plonk_eval_near
+    - FP01_I03b_plonk_eval_far
+  - mode: fresh
+    episodes:
+    - FP01_C02_control_shortcut
+    - FP01_C03_control_surface_memorization
+    - FP01_C01_control_no_persistence
+control_set:
+- no_persistence
+- shortcut
+- surface_memorization
+status: v2_architecture_aligned
+latent_rule_id: fp01_plonk_incident_response_sop_v1
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  Plonk Incident Response SOP — the three-step procedure for locating an
+  incident source message with nexobi, pinning it with felura, and publishing
+  the official incident update with zubefa.
+what_persists: >
+  A durable skill artifact encoding the Plonk Incident Response SOP for reuse across
+  sessions without re-reading the KB article.
+what_counts_as_reuse: >
+  Agent applies the persisted Plonk incident-response SOP to novel incidents
+  with different services, source messages, and update wording.
+false_positive_pattern: >
+  Agent memorizes specific services or source messages from training cases instead
+  of extracting the general nexobi -> felura -> zubefa procedure.
+must_demonstrate:
+- Extract a reusable Plonk incident-response procedure from explicit SOP delivery
+- Apply the procedure to novel Plonk incidents with changed entities
+- Preserve correct nexobi, felura, and zubefa sequencing
+
+# §13.0 Trigger Spec
+trigger_category: direct_explicit_instruction
+trigger_strength: T3
+visibility_surface: direct user/system message with durable Plonk Incident Response SOP
+trigger_injection_plan: learn_a delivers explicit Plonk Incident Response SOP in prompt; update_or_stabilize reinforces with surface-varied cases
+trigger_removal_plan: eval removes SOP text; only novel Plonk incidents remain
+trigger_mixing_rule: no repeated_cases_induction; direct teaching only
+sibling_comparison_plan: compare with PC03 induction families for trigger-strength analysis
+phase1_canonical_sibling: this is a T3 canonical anchor
+future_sibling_roadmap: T2 durable-rule wording; T1 embedded-note version
+
+# §10 Cold Design
+cold_design: same plonk workflow before any SOP or KB exposure
+expected_cold_result: partial solve; no stable reusable procedure
+
+# Control Design
+control_design: no_persistence, shortcut, surface_memorization
+expected_control_result: transfer gain shrinks without persisted procedure
+
+# Episodes
+legacy_source: previous PC split, architecture-aligned
+legacy_episodes:
+- FP01_C01_control_no_persistence
+- FP01_C02_control_shortcut
+- FP01_C03_control_surface_memorization
+- FP01_I01_plonk_cold
+- FP01_I02_plonk_learn_a
+- FP01_I02b_plonk_update_or_stabilize
+- FP01_I03_plonk_eval_near
+- FP01_I03b_plonk_eval_far

@@ -1,0 +1,57 @@
+{
+  "latent_rule_id": "sm05_weak_trigger_preference_adoption",
+  "expected_mechanism": "memory",
+  "bucket_role": "baseline",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM05-001",
+  "required_recipients": ["Maya Ortiz", "Noah Reed", "Priya Chen"],
+  "forbidden_recipients": ["Lena Park"],
+  "required_output_keywords": [
+    "Maya Ortiz",
+    "Noah Reed",
+    "Priya Chen",
+    "2026/05/18",
+    "2026/05/19",
+    "2026/05/20",
+    "High",
+    "Medium",
+    "Low"
+  ],
+  "forbidden_output_keywords": [
+    "critical",
+    "normal priority",
+    "low priority",
+    "May 18",
+    "May 19",
+    "May 20"
+  ],
+  "require_tsv_output": true,
+  "slot_checks": {
+    "r1_t3_tsv_structure": {
+      "require_tsv_output": true,
+      "min_tsv_rows": 3
+    },
+    "r2_t2_priority_normalization": {
+      "require_tsv_output": true,
+      "tsv_column_index": 1,
+      "required_tsv_column_values": ["High", "Medium", "Low"],
+      "forbidden_tsv_column_values": ["critical", "normal priority", "standard", "low priority"]
+    },
+    "r3_t1_date_normalization": {
+      "require_tsv_output": true,
+      "tsv_column_index": 3,
+      "required_tsv_column_values": ["2026/05/18", "2026/05/19", "2026/05/20"],
+      "forbidden_tsv_column_values": ["May 18", "May 19", "May 20"]
+    }
+  },
+  "forbidden_artifact_keywords": ["TSV", "owner, priority, task, due_date", "High/Medium/Low", "YYYY/MM/DD"],
+  "apply_mechanism_caps": true
+}

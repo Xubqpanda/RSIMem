@@ -1,0 +1,31 @@
+{
+  "latent_rule_id": "sm07_scoped_rule_migration",
+  "expected_mechanism": "memory",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["SEC-ALPHA", "OPS-DELTA"],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_memory_calls": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM07-002",
+  "required_recipients": ["Sarah Zhang", "Leo Li", "Kevin Wang", "Noah Price"],
+  "forbidden_recipients": ["Marta Hill"],
+  "required_output_keywords": [
+    "Security | Sarah Zhang | SEC-ALPHA",
+    "Security | Kevin Wang | SEC-ALPHA",
+    "Ops | Leo Li | OPS-DELTA",
+    "Ops | Noah Price | OPS-DELTA"
+  ],
+  "min_memory_calls": 1,
+  "memory_call_weight": 0.1,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.05,
+  "require_rule_artifact": ["SEC-ALPHA", "OPS-DELTA"],
+  "rule_artifact_weight": 0.05,
+  "apply_mechanism_caps": true
+}

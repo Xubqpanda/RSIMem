@@ -1,0 +1,38 @@
+{
+  "latent_rule_id": "pg01_release_decision_followup_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "evaluation",
+  "mode": "proactive_retrieval",
+  "service_kind": "notes",
+  "allowed_retrieval_sources": [
+    "session_search"
+  ],
+  "require_explicit_retrieval": true,
+  "require_explicit_retrieval_before_write": true,
+  "apply_mechanism_caps": true,
+  "missing_explicit_retrieval_cap": 0.25,
+  "late_explicit_retrieval_cap": 0.35,
+  "required_note_shares": [
+    {
+      "note_id": "RELNOTE-PG01-FAR",
+      "recipients": [
+        "procurement@corp.com"
+      ]
+    }
+  ],
+  "required_output_keywords": [
+    "REF-RLS-447",
+    "not approved for production",
+    "staging-only",
+    "2026-05-31"
+  ],
+  "forbidden_output_keywords": [
+    "REF-RLS-401",
+    "2026-04-30"
+  ],
+  "max_without_all_required_output_keywords": 0.6,
+  "min_session_search_calls": 1,
+  "min_skill_reads": 1,
+  "skill_read_weight": 0.08,
+  "session_search_weight": 0.08
+}

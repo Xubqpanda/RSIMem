@@ -1,0 +1,35 @@
+{
+  "latent_rule_id": "sm06_temporary_exception_pollution",
+  "expected_mechanism": "memory",
+  "bucket_role": "evaluation",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["RISK-CANON", "action item owners"],
+    "forbidden_rule_keywords": ["this week only", "do not share this batch with Maya Ortiz"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": true,
+    "min_memory_injections": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM06-006",
+  "required_recipients": ["Maya Ortiz", "Oscar Jain"],
+  "forbidden_recipients": ["Dylan Moss"],
+  "required_output_keywords": [
+    "Maya Ortiz | RISK-CANON",
+    "Oscar Jain | RISK-CANON",
+    "2026-06-21",
+    "2026-06-22"
+  ],
+  "one_off_rule_keywords": [
+    "this week only",
+    "do not share this batch with Maya Ortiz"
+  ],
+  "min_memory_injections": 1,
+  "require_rule_artifact": ["RISK-CANON", "action item owners"],
+  "rule_artifact_weight": 0.03,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.1,
+  "apply_mechanism_caps": true
+}

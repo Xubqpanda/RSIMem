@@ -1,0 +1,54 @@
+[
+  {
+    "note_id": "MTG-EP01-EN1",
+    "title": "Procurement Question",
+    "content": "The procurement team is asking whether we can move forward with Vendor X for the production rollout scheduled next week. Please advise based on the prior decision on record.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-C1",
+    "title": "Arch Review",
+    "content": "Architecture review. Bob proposed moving to event-driven pattern for the ingestion layer.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-C2",
+    "title": "Standup",
+    "content": "Daily standup. No blockers. Carol picked up the dashboard polish.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-NOISE",
+    "title": "Roadmap Planning",
+    "content": "Q3 roadmap planning. Long note with many items unrelated to Vendor X.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  }
+]

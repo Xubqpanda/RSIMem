@@ -1,0 +1,38 @@
+{
+  "latent_rule_id": "pg05_change_freeze_followup_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "evaluation",
+  "mode": "proactive_retrieval",
+  "service_kind": "notes",
+  "allowed_retrieval_sources": [
+    "session_search"
+  ],
+  "require_explicit_retrieval": true,
+  "require_explicit_retrieval_before_write": true,
+  "apply_mechanism_caps": true,
+  "missing_explicit_retrieval_cap": 0.25,
+  "late_explicit_retrieval_cap": 0.35,
+  "required_note_updates": [
+    {
+      "note_id": "FREEZE-PG05-NA",
+      "payload": {
+        "content": "FREEZE_NOTE|CAB-FRZ-468|2026-05-04T22:00Z|2026-05-05T00:00Z|nova-drain,nova-admin-ui"
+      }
+    }
+  ],
+  "required_output_keywords": [
+    "CAB-FRZ-468",
+    "2026-05-04T22:00Z",
+    "2026-05-05T00:00Z",
+    "nova-drain,nova-admin-ui"
+  ],
+  "forbidden_output_keywords": [
+    "CAB-FRZ-441",
+    "atlas-replay"
+  ],
+  "max_without_all_required_output_keywords": 0.6,
+  "min_session_search_calls": 1,
+  "min_skill_reads": 1,
+  "skill_read_weight": 0.08,
+  "session_search_weight": 0.08
+}

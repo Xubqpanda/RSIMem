@@ -1,0 +1,120 @@
+family_id: PC02_sop_patch_01
+title: Incident SOP Patch
+ability_dir: update_ability
+primary_ability: update_ability
+secondary_abilities: []
+primary_trigger: conflict_update
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 7
+episode_order:
+- F02_I01_patch_seed_old_sop
+- F02_I03_patch_update_or_stabilize
+- F02_I04_patch_eval_near
+- F02_I05_patch_eval_conflict
+- F02_C01_control_no_persistence
+- F02_C02_control_shortcut
+- F02_C03_control_stale_procedure
+history_plan:
+  anchors:
+  - name: pc02_01_post_update
+    save_after: F02_I03_patch_update_or_stabilize
+  branches:
+  - mode: fresh
+    episodes:
+    - F02_I01_patch_seed_old_sop
+    - F02_C01_control_no_persistence
+    - F02_C02_control_shortcut
+    - F02_C03_control_stale_procedure
+  - mode: continue
+    episodes:
+    - F02_I03_patch_update_or_stabilize
+  - mode: from_anchor
+    anchor: pc02_01_post_update
+    episodes:
+    - F02_I04_patch_eval_near
+    - F02_I05_patch_eval_conflict
+episode_overrides:
+  F02_I01_patch_seed_old_sop:
+    mechanism: skill
+    expected_persistence_signal: skill
+    persistence_allowed: true
+    stage: cold
+    initial_home_fixture_dir: self-evolve-tasks-v2/_shared/home_fixtures/update_ability/PC02_sop_patch_01
+  F02_I03_patch_update_or_stabilize:
+    mechanism: skill
+    expected_persistence_signal: skill
+    persistence_allowed: true
+  F02_I05_patch_eval_conflict:
+    mechanism: skill
+    expected_persistence_signal: skill
+    persistence_allowed: true
+    stage: eval_far
+control_set:
+- no_persistence
+- shortcut
+- stale_procedure
+status: v2_architecture_aligned
+latent_rule_id: f02_billing_incident_sop_v2
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  Billing incident SOP v2 patch — the updated procedure that supersedes v1,
+  including revised escalation thresholds and new resolution paths.
+what_persists: >
+  A durable skill artifact encoding the patched v2 SOP, overwriting the
+  previously stored v1 procedure.
+what_counts_as_reuse: >
+  Agent applies the v2 SOP (not v1) to novel billing incidents, demonstrating
+  that the patch was absorbed and the stale procedure was replaced.
+false_positive_pattern: >
+  Agent applies a blend of v1 and v2 steps, or reverts to v1 under surface
+  pressure, indicating the patch was not fully committed.
+must_demonstrate:
+- Absorb the v1-to-v2 patch and overwrite the stored procedure
+- Apply only v2 steps to novel billing incidents without v1 leakage
+- Resist regression to stale v1 procedure under new surface wording
+
+# §13.0 Trigger Spec
+trigger_category: conflict_update
+trigger_strength: T3
+visibility_surface: direct authoritative patch notice in prompt
+trigger_injection_plan: "initial_home_fixture: seed old SOP in native Hermes skills with memory/session distractors; update_or_stabilize: inject patch/drift information"
+initial_home_fixture_plan: "The old v1 SOP is seeded in native Hermes skills with memory and session distractors before the update episode."
+trigger_removal_plan: eval makes stale SOP actively wrong; rewards only patched behavior
+trigger_mixing_rule: no failure_reflection; patch by update only
+sibling_comparison_plan: PC02B_patch_by_reflection should be separate
+phase1_canonical_sibling: this is the T3 canonical anchor
+future_sibling_roadmap: reflection-based patch sibling; embedded patch-note sibling
+
+# §10 Cold Design
+cold_design: "Run the same skill-retrieval workflow as eval from the stale native Hermes home fixture and score cold against the patched SOP."
+expected_cold_result: "Cold should expose how much of the eval score is unavailable before the patch lands, even though the stale SOP is already present in Hermes home."
+
+# Control Design
+control_design: no_persistence, shortcut, stale_procedure
+expected_control_result: without persistence or patch uptake, agent regresses toward stale procedure
+
+# Episodes
+legacy_source: previous PC split, architecture-aligned
+legacy_episodes:
+- F02_C01_control_no_persistence
+- F02_C02_control_shortcut
+- F02_C03_control_stale_procedure
+- F02_I01_patch_seed_old_sop
+- F02_I03_patch_update_or_stabilize
+- F02_I04_patch_eval_near
+- F02_I05_patch_eval_conflict

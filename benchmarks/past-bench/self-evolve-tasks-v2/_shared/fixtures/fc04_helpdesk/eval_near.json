@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-E401",
+    "title": "PR #1101 — reporting service uses import requests",
+    "description": "PR #1101 for the financial reporting service uses import requests for HTTP calls. Please review for code compliance.",
+    "reporter": "Finance-Janet Liu",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-18T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E402",
+    "title": "PR #1102 — push notification service migrated to httpx",
+    "description": "PR #1102 for the push notification service has completed migration from requests to httpx. Code structure is clean.",
+    "reporter": "Backend-Linda Wei",
+    "department": "Backend Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-18T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E403",
+    "title": "PR #1103 — log shipping service uses requests.post",
+    "description": "PR #1103 for the log aggregation service uses requests.post to ship logs to the log platform. Please review.",
+    "reporter": "Ops-George Tan",
+    "department": "IT Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-18T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E404",
+    "title": "Production server disk space alert",
+    "description": "Production server disk utilization has exceeded 85% and needs cleanup and expansion. Not a code review issue.",
+    "reporter": "Ops-Henry Kim",
+    "department": "IT Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-18T11:00:00Z",
+    "tags": []
+  }
+]

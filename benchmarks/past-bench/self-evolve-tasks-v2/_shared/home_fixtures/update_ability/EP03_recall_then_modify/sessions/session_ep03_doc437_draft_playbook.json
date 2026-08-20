@@ -1,0 +1,15 @@
+{
+  "session_id": "ep03_doc437_draft_playbook",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Draft onboarding playbook DOC-437 says manager sends welcome link, HR ships swag, and mentor assignment is optional."
+    },
+    {
+      "role": "assistant",
+      "content": "DOC-437 is only a draft and not the approved playbook."
+    }
+  ]
+}

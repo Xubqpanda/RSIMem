@@ -1,0 +1,47 @@
+{
+  "latent_rule_id": "f02_billing_incident_sop_v2",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "high",
+      "incident",
+      "incident-core"
+    ],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-F101",
+    "TK-F102"
+  ],
+  "excluded_ticket_ids": [
+    "TK-F103",
+    "TK-F104"
+  ],
+  "expected_priority": "high",
+  "expected_category": "incident",
+  "required_tags": [
+    "incident-core"
+  ],
+  "min_ticket_reads": 3,
+  "required_summary_keywords": [
+    "TK-F101",
+    "TK-F102"
+  ],
+  "skill_artifact_weight": 0.05,
+  "min_skill_manage_calls": 1,
+  "skill_manage_weight": 0.1,
+  "min_skill_count": 1,
+  "require_rule_artifact": [
+    "high",
+    "incident",
+    "incident-core"
+  ],
+  "rule_artifact_weight": 0.05
+}

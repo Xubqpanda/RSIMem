@@ -1,0 +1,22 @@
+{
+  "latent_rule_id": "f07_deployment_rollback_grouping_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "control",
+  "control_kind": "reflection_off",
+  "control_type": "reflection_off",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": { "evaluation_only": false, "min_skill_reads": 0 },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": ["TK-U402", "TK-U403"],
+  "excluded_ticket_ids": ["TK-U401", "TK-U404", "TK-U405"],
+  "expected_priority": "high",
+  "expected_category": "incident",
+  "required_tags": ["deploy-child", "root-event-pending"],
+  "min_ticket_reads": 4,
+  "required_summary_keywords": ["TK-U402", "TK-U403", "pqr678"],
+  "skill_artifact_weight": 0.0
+}

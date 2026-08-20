@@ -1,0 +1,54 @@
+{
+  "latent_rule_id": "fm02_shared_outage_sop_v2",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "mode": "helpdesk_kb",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "zone-correlated",
+      "shared-outage-confirmed",
+      "critical",
+      "outage-investigation",
+      "3+ distinct reporters"
+    ],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "required_ticket_ids": [
+    "TK-FM02-L01",
+    "TK-FM02-L02",
+    "TK-FM02-L03"
+  ],
+  "excluded_ticket_ids": [
+    "TK-FM02-L04",
+    "TK-FM02-L05"
+  ],
+  "expected_priority": "critical",
+  "expected_category": "outage-investigation",
+  "required_tags": [
+    "zone-correlated",
+    "shared-outage-confirmed"
+  ],
+  "min_ticket_reads": 3,
+  "required_summary_keywords": [
+    "TK-FM02-L01",
+    "TK-FM02-L02",
+    "TK-FM02-L03"
+  ],
+  "min_skill_manage_calls": 1,
+  "skill_manage_weight": 0.1,
+  "skill_artifact_weight": 0.05,
+  "min_skill_count": 1,
+  "require_rule_artifact": [
+    "zone-correlated",
+    "shared-outage-confirmed",
+    "critical",
+    "outage-investigation",
+    "3+ distinct reporters"
+  ],
+  "rule_artifact_weight": 0.05
+}

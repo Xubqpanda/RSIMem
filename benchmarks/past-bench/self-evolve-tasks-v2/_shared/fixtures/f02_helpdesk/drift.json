@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-G201",
+    "title": "billing-cluster-2 down — payment processor OOM crash",
+    "description": "The payment processor microservice is crashing with OutOfMemory errors. Root cause confirmed as billing-cluster-2 being overwhelmed and exhausting heap memory. All payment submissions routed to this cluster are failing. Incident started at 11:45 UTC. Distinct issue from the billing dashboard freeze reported separately.",
+    "reporter": "Hassan-Karimi",
+    "department": "Payments Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T11:50:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-G202",
+    "title": "Charge API returning 500 — billing-cluster-2 root cause",
+    "description": "The /api/billing/charge endpoint has been returning HTTP 500 Internal Server Error since 11:47 UTC. Investigation by the billing team shows billing-cluster-2 is in a failed state. Subscription renewals and one-time charges are all failing. Customer-facing impact is significant.",
+    "reporter": "Yara-Mohamad",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T12:02:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-G203",
+    "title": "Settlement worker crash — billing-cluster-2 cascading failure",
+    "description": "Settlement worker pods are crashing in a cascade triggered by billing-cluster-2 going down. The workers cannot write settlement records because the cluster is unreachable. End-of-day financial settlement is at risk. This is the third separate team reporting the same billing-cluster-2 root cause.",
+    "reporter": "Leon-Fischer",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T12:18:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-G204",
+    "title": "Routine billing report request — monthly summary for April",
+    "description": "Please generate the routine monthly billing summary report for April. We need the total transaction counts, revenue breakdown by product line, and refund rates. This is a standard monthly request from the Finance leadership team. No urgency — end of month deadline.",
+    "reporter": "Amelia-Turner",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T12:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-G205",
+    "title": "Access request — billing system for new finance team member",
+    "description": "Please provision read-only access to the billing management console for our new Finance Analyst joining next Monday. Access needed: billing reports dashboard, invoice viewer, and transaction search. No write permissions required. Manager approval included in attachment.",
+    "reporter": "Steven-Park",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T12:45:00Z",
+    "tags": []
+  }
+]

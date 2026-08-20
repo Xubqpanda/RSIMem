@@ -1,0 +1,34 @@
+task_id: PG04_UPDATE_001
+task_name: PG04 Temporary Waiver Audit Policy Update
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Update your own retrieval policy / skill note for temporary waiver audits.
+
+    Write a general rule, not a case-specific memory. Do not include any exact waiver IDs, case IDs, or dates.
+
+
+    Your updated note should explicitly say all of the following ideas:
+
+    - search session history for the exact waiver record
+
+    - verify owner, service, scope, and expiry exactly
+
+    - reject near matches
+
+    - update the audit note only after retrieval
+
+
+    Output: POLICY_UPDATED|temporary_waiver_audit
+
+    '
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward a general policy update that encodes exact-scope waiver retrieval without leaking case-specific details.

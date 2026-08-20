@@ -1,0 +1,34 @@
+task_id: PG03_UPDATE_001
+task_name: PG03 Oncall Handoff Lookup Policy Update
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Update your own retrieval policy / skill note for handoff-driven ticket work.
+
+    Write a general rule, not a case-specific memory. Do not include any exact handoff IDs, incident IDs, owners, or windows from past cases.
+
+
+    Your updated note should explicitly say all of the following ideas:
+
+    - search session history for the latest matching handoff
+
+    - verify the exact owner and maintenance window
+
+    - do this before the first ticket update
+
+    - update only the blocked follow-up tickets, not the parent incident
+
+
+    Output: POLICY_UPDATED|oncall_handoff_lookup
+
+    '
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward a general policy update that encodes latest-handoff retrieval before ticket updates without leaking case-specific details.

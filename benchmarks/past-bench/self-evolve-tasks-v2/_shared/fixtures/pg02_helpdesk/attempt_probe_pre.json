@@ -1,0 +1,64 @@
+[
+  {
+    "ticket_id": "HD-PG02-201",
+    "title": "Wave Cedar export request mirror-west shard A",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "wave-cedar",
+      "mirror-west"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "description": "Visible shell: a narrow mirror-west exception existed before, but the exact exception ID and approved subset are not copied here; an older mirror-east record also exists.",
+    "created_at": "2026-04-20T10:00:00Z"
+  },
+  {
+    "ticket_id": "HD-PG02-202",
+    "title": "Wave Cedar export request mirror-west shard B",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "wave-cedar",
+      "mirror-west"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "description": "Default handling still appears to be block unless the exact temporary exception is verified. This ticket does not contain the authoritative exception record.",
+    "created_at": "2026-04-20T10:01:00Z"
+  },
+  {
+    "ticket_id": "HD-PG02-203",
+    "title": "Wave Cedar export request mirror-east shard C",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "wave-cedar",
+      "mirror-east"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:02:00Z"
+  },
+  {
+    "ticket_id": "HD-PG02-204",
+    "title": "Wave Cedar export request mirror-west shard D",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "wave-cedar",
+      "mirror-west"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:03:00Z"
+  }
+]

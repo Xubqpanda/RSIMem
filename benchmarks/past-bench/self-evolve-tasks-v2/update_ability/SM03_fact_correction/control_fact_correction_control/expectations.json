@@ -1,0 +1,41 @@
+{
+  "latent_rule_id": "sm03_fact_correction",
+  "expected_mechanism": "memory",
+  "bucket_role": "control",
+  "control_kind": "wrong_mechanism",
+  "control_subtype": "rule_in_fixture_not_memory",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["Phoenix release freeze date", "2026-06-16"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM03-006",
+  "required_recipients": ["Paula Reed", "Jonah Fisk"],
+  "forbidden_recipients": ["Marta Hill"],
+  "required_output_keywords": [
+    "Paula Reed",
+    "Jonah Fisk",
+    "2026-06-16",
+    "freeze date"
+  ],
+  "slot_checks": {
+    "corrected_freeze_date": {
+      "required_output_keywords": ["2026-06-16"]
+    }
+  },
+  "forbidden_output_keywords": [
+    "2026-06-14"
+  ],
+  "forbidden_output_context_exceptions": [
+    {"keyword": "2026-06-14", "required_context_keywords": ["2026-06-16", "corrected"]},
+    {"keyword": "2026-06-14", "required_context_keywords": ["2026-06-16", "obsolete"]},
+    {"keyword": "2026-06-14", "required_context_keywords": ["2026-06-16", "replaces"]},
+    {"keyword": "2026-06-14", "required_context_keywords": ["2026-06-16", "replaced"]},
+    {"keyword": "2026-06-14", "required_context_keywords": ["2026-06-16", "previous"]}
+  ],
+  "apply_mechanism_caps": true
+}

@@ -1,0 +1,72 @@
+family_id: EP01_prior_case_recall
+title: Prior Case Recall
+ability_dir: memory_ability
+primary_ability: memory_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+secondary_trigger: []
+expected_substrate: session_search
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  learn: 2
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+- EP01_I01_recall_cold
+- EP01_I02_recall_seed
+- EP01_I03_recall_noise
+- EP01_I04_eval_near
+- EP01_I05_eval_far
+- EP01_I07_control_shortcut
+- EP01_I08_control_wrong_mechanism
+- EP01_I06_control_no_persistence
+history_plan:
+  anchors:
+  - name: ep01_post_learn
+    save_after: EP01_I03_recall_noise
+  branches:
+  - mode: continue
+    episodes:
+    - EP01_I01_recall_cold
+    - EP01_I02_recall_seed
+    - EP01_I03_recall_noise
+  - mode: from_anchor
+    anchor: ep01_post_learn
+    episodes:
+    - EP01_I04_eval_near
+    - EP01_I05_eval_far
+    - EP01_I07_control_shortcut
+    - EP01_I08_control_wrong_mechanism
+  - mode: fresh
+    episodes:
+    - EP01_I06_control_no_persistence
+control_set:
+- no_persistence
+- shortcut
+- wrong_mechanism
+status: authored
+latent_rule_id: ep01_prior_case_recall_v1
+what_is_learned: A specific prior-session decision that must be recoverable later via episodic retrieval.
+what_persists: Prior session content retrievable via session_search; not elevated into durable memory.
+what_counts_as_reuse: Later fresh-session eval calls session_search, retrieves the seeded note, and cites it.
+false_positive_pattern: Agent reasons from current prompt alone and never calls session_search, or stores the decision in durable memory (over-storage).
+must_demonstrate:
+- relevant prior session is retrieved via session_search on vague cue
+- retrieval precedes the decisive response
+- episodic content is not promoted into durable memory
+scope_note: Current EP01 slice includes explicit control episodes for no_persistence, shortcut, and wrong_mechanism.
+trigger_phrases:
+- NOT approved for production
+- exception granted
+- staging-only pilot
+banned_phrases: []
+stale_phrases: []
+calibration_baseline_score: null

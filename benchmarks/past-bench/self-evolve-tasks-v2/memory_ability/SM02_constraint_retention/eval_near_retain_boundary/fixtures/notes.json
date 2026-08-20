@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM02-004",
+    "title": "Planning Cadence Review",
+    "created_at": "2026-04-13",
+    "participants": ["Priya Nair", "Daniel Kim", "Ava Chen", "Maya Ross"],
+    "duration_minutes": 45,
+    "content": "Planning cadence review.\n\nAction items:\n1. Priya Nair: refresh the launch risk register before Thursday\n2. Daniel Kim: tighten the launch FAQ before the enablement sync\n3. Ava Chen: answer the open partner checklist items\n\nMaya Ross attended as an observer."
+  }
+]

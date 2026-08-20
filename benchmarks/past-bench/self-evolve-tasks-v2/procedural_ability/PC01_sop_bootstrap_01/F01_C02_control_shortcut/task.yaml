@@ -1,0 +1,128 @@
+task_id: V2_F01_C02
+task_name: F01 Control — Shortcut (SOP in Prompt)
+version: '1.0'
+category: self_evolve
+difficulty: hard
+control_type: shortcut
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+requires_fresh_session: true
+services:
+- name: helpdesk
+  command: python mock_services/helpdesk/server.py
+  port: 9200
+  health_check: http://localhost:9200/helpdesk/tickets
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9200/helpdesk/reset
+  env:
+    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/f01_helpdesk/cold.json
+    PORT: '9200'
+- name: kb
+  command: python mock_services/kb/server.py
+  port: 9201
+  health_check: http://localhost:9201/kb/search
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9201/kb/reset
+  env:
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/f01_kb/brief.json
+    PORT: '9201'
+tools:
+- name: helpdesk_list_tickets
+  description: List helpdesk tickets
+  input_schema:
+    type: object
+    properties:
+      status:
+        type: string
+    required: []
+- name: helpdesk_get_ticket
+  description: Get ticket details
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+    required:
+    - ticket_id
+- name: helpdesk_update_ticket
+  description: Update a ticket
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+      priority:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+      category:
+        type: string
+    required:
+    - ticket_id
+- name: kb_search
+  description: Search the knowledge base
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      category:
+        type: string
+      max_results:
+        type: integer
+    required:
+    - query
+- name: kb_get_article
+  description: Get a knowledge base article
+  input_schema:
+    type: object
+    properties:
+      article_id:
+        type: string
+    required:
+    - article_id
+prompt:
+  text: "First, call helpdesk_list_tickets to retrieve all open tickets. Then call\
+    \ helpdesk_get_ticket for each ticket to read its details. You MUST use these tools\
+    \ — do NOT guess or assume ticket IDs or contents.\n\nAfter reading each ticket,\
+    \ apply the following SOP to decide which tickets to update:\n\n## Shared Incident\
+    \ SOP v1\n\nTrigger: three or more tickets from distinct reporters all point to\
+    \ the same cluster failure within a 2-hour window.\n\nSteps:\n1. Read all open\
+    \ tickets and identify the cluster name.\n2. Tag each incident ticket with: sev1-correlated,\
+    \ cross-team-verified\n3. Set priority=critical and category=cluster-incident on\
+    \ all cluster tickets.\n4. Add an internal note on each: 'SOP-F01 applied — awaiting\
+    \ root-cause owner assignment'\n5. Do not close any ticket — leave resolution to\
+    \ on-call.\n6. Output one line per ticket: TICKET_ID|priority|category|why\n\n\
+    Exclusions:\n- Requests, training tickets, and same-system low-impact issues are\
+    \ NOT cluster incidents.\n- Do not escalate a single-reporter ticket unless it has\
+    \ a matching cluster error.\n- Config drift or rate limit adjustments on the same\
+    \ cluster are NOT incidents unless they cause user-facing errors.\n\nFor each ticket\
+    \ that matches the SOP, call helpdesk_update_ticket to update it.\nOutput: TICKET_ID|priority|category|why\n"
+  language: en
+judge_rubric: 'Control (shortcut): The full SOP is embedded directly in the prompt.
+  Reward correct grouping of the three AuthHub cluster tickets (TK-A101, TK-A102, TK-A103)
+  with priority=critical, category=cluster-incident, tags=[sev1-correlated, cross-team-verified].
+  Penalize including the distractor HR ticket TK-A104 or closing any ticket.
+
+  '
+tool_endpoints:
+- tool_name: helpdesk_list_tickets
+  url: http://localhost:9200/helpdesk/tickets
+  method: POST
+- tool_name: helpdesk_get_ticket
+  url: http://localhost:9200/helpdesk/tickets/get
+  method: POST
+- tool_name: helpdesk_update_ticket
+  url: http://localhost:9200/helpdesk/tickets/update
+  method: POST
+- tool_name: kb_search
+  url: http://localhost:9201/kb/search
+  method: POST
+- tool_name: kb_get_article
+  url: http://localhost:9201/kb/articles/get
+  method: POST

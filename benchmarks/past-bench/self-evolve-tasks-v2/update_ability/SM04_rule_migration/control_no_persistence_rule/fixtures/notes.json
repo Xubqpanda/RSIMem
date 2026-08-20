@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM04-008",
+    "title": "API Review Cleanup",
+    "created_at": "2026-04-16",
+    "participants": ["Tara Kim", "Alex Wu", "Jordan Lee", "Casey Ng"],
+    "duration_minutes": 40,
+    "content": "API review cleanup.\n\nAction items:\n1. Tara Kim: enforce the rate-limit headers on all public endpoints, High priority, by May 10\n2. Alex Wu: deprecate the v1 pagination paths in the gateway, Medium priority, by May 11\n3. Jordan Lee: update the API changelog template, Low priority, by May 12\n\nCasey Ng attended as an observer."
+  }
+]

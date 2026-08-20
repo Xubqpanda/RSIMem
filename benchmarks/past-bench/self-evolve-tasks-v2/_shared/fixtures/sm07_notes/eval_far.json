@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM07-006",
+    "title": "Scoped Migration Eval Far",
+    "created_at": "2026-05-16",
+    "participants": ["Nina Cole", "Omar Singh", "Rita Gomez", "Victor Hale", "Sam Price"],
+    "duration_minutes": 45,
+    "content": "Scoped migration eval far.\n\nAction items:\n1. [Security][High] Nina Cole: rotate the regional access escrow token, due 2026-07-21\n2. [Security][Medium] Rita Gomez: reconcile the stale privileged-access ledger, due 2026-07-22\n3. [Ops][Low] Omar Singh: archive the completed recovery dry-runs, due 2026-07-23\n4. [Ops][High] Victor Hale: confirm the disaster rollback checklist, due 2026-07-24\n\nSam Price attended as an observer."
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "session_id": "sm04_design_borealis",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Design reviews use Borealis-4DQ and share only with the design lead."
+    },
+    {
+      "role": "assistant",
+      "content": "Stored design review Borealis-4DQ rule; not a release readiness rule."
+    }
+  ]
+}

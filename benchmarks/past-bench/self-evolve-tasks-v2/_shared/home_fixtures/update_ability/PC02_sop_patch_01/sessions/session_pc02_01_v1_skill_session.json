@@ -1,0 +1,15 @@
+{
+  "session_id": "pc02_01_v1_skill_session",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Billing Incident SOP v1 uses threshold 2+, priority high, category incident, tag incident-core."
+    },
+    {
+      "role": "assistant",
+      "content": "Created reusable billing incident SOP v1 skill."
+    }
+  ]
+}

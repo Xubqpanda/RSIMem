@@ -1,0 +1,27 @@
+{
+  "latent_rule_id": "ep01_prior_case_recall_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "baseline",
+  "mode": "notes_session_recall",
+  "required_prior_note_id": "MTG-EP01-SEED",
+  "required_output_keywords": [
+    "Vendor X",
+    "staging",
+    "MTG-EP01-SEED"
+  ],
+  "min_session_search_calls": 1,
+  "session_search_weight": 0.15,
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "artifact_contract": {
+    "type": "session_search",
+    "require_rule_keywords": [
+      "Vendor X",
+      "staging"
+    ],
+    "min_count_delta": 0
+  },
+  "skill_artifact_weight": 0.0
+}

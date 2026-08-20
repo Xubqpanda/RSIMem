@@ -1,0 +1,121 @@
+family_id: PC04_failure_to_rule_01
+title: Failure to Rule
+ability_dir: procedural_ability
+primary_ability: procedural_ability
+secondary_abilities: []
+primary_trigger: failure_reflection
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier3
+instances_per_bucket:
+  cold: 1
+  attempt: 1
+  reflection: 1
+  confirmation: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 9
+episode_order:
+- F07_I01_failure_baseline
+- F07_I02_failure_attempt
+- F07_I03_failure_reflection
+- F07_I03b_failure_confirmation
+- F07_I04_failure_eval_near
+- F07_I05_failure_eval_far
+- F07_C01_control_reflection_off
+- F07_C02_control_no_persistence
+- F07_C03_control_shortcut
+history_plan:
+  anchors:
+  - name: pc04_01_post_learn
+    save_after: F07_I03b_failure_confirmation
+  branches:
+  - mode: continue
+    episodes:
+    - F07_I01_failure_baseline
+    - F07_I02_failure_attempt
+    - F07_I03_failure_reflection
+    - F07_I03b_failure_confirmation
+  - mode: from_anchor
+    anchor: pc04_01_post_learn
+    episodes:
+    - F07_I04_failure_eval_near
+    - F07_I05_failure_eval_far
+  - mode: fresh
+    episodes:
+    - F07_C01_control_reflection_off
+    - F07_C02_control_no_persistence
+    - F07_C03_control_shortcut
+control_set:
+- reflection_off
+- no_persistence
+- shortcut
+episode_overrides:
+  F07_C01_control_reflection_off:
+    stage: control
+    persistence_allowed: false
+  F07_C02_control_no_persistence:
+    stage: control
+    persistence_allowed: false
+  F07_C03_control_shortcut:
+    stage: control
+    persistence_allowed: false
+status: v2_architecture_aligned
+latent_rule_id: f07_deployment_rollback_grouping_v1
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  Deployment rollback grouping rule — the principle that rollbacks should be
+  grouped by release_hash, not by timestamp or service name.
+what_persists: >
+  A durable skill artifact encoding the release_hash grouping rule for
+  rollback decisions, extracted from failure reflection.
+what_counts_as_reuse: >
+  Agent groups rollbacks by release_hash in novel deployment scenarios without
+  being reminded of the rule or re-experiencing the failure.
+false_positive_pattern: >
+  Agent groups by release_hash only when surface cues resemble the original
+  failure scenario; reverts to timestamp grouping under novel framing.
+must_demonstrate:
+- Extract the release_hash grouping rule from failure reflection
+- Apply the rule to novel deployment rollback scenarios
+- Resist reverting to naive grouping strategies under changed surface features
+
+# §13.0 Trigger Spec
+trigger_category: failure_reflection
+trigger_strength: T0
+visibility_surface: failure exposure + explicit reflection prompt
+trigger_injection_plan: "attempt: expose failure mode; reflection: dedicated reflection episode; confirmation: verify reflection converted into behavior"
+trigger_removal_plan: eval does not restate reflection text or extracted rule
+trigger_mixing_rule: no explicit post-reflection teaching; reflection-driven learning only
+sibling_comparison_plan: PC04B_failure_to_rule_by_correction if research question is reflection vs. direct correction
+phase1_canonical_sibling: native reflection-driven form; not first trigger-strength comparison anchor
+future_sibling_roadmap: compare reflection against direct correction and direct teaching siblings
+
+# §10 Cold Design
+cold_design: same-structure task without any reflection opportunity
+expected_cold_result: weak procedure fails or remains unstable; no reusable post-failure rule
+
+# Control Design
+control_design: reflection_off and no_persistence controls
+expected_control_result: if reflection is the real driver, gains weaken sharply when reflection path is disabled
+
+# Episodes
+legacy_source: previous PC split, architecture-aligned
+legacy_episodes:
+- F07_I01_failure_baseline
+- F07_I02_failure_attempt
+- F07_I03_failure_reflection
+- F07_I03b_failure_confirmation
+- F07_I04_failure_eval_near
+- F07_I05_failure_eval_far
+- F07_C01_control_reflection_off
+- F07_C02_control_no_persistence
+- F07_C03_control_shortcut

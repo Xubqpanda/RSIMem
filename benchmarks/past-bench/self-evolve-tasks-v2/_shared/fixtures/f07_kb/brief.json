@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "kb_f07_brief",
+    "title": "Deployment Incident Triage — Overview",
+    "category": "deployment-incident-management",
+    "content": "When deployment rollbacks affect multiple services, group child tickets by release hash. A deployment event (identified by a unique release hash) may produce multiple child failure tickets. These must be triaged together, not individually. See the full Deployment Rollback Grouping SOP for the complete procedure including tagging, priority, and escalation steps.",
+    "tags": [],
+    "last_updated": "2026-04-01",
+    "views": 0
+  }
+]

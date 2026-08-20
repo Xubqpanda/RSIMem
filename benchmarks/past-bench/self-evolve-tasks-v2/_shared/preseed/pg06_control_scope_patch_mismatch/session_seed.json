@@ -1,0 +1,19 @@
+{
+  "sessions": [
+    {
+      "id": "pg06-preseed-current-exceptions",
+      "source": "seed",
+      "title": "Kappa weekly exception list current",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current weekly exception list for Kappa integrations."
+        },
+        {
+          "role": "assistant",
+          "content": "This week's Kappa exception IDs are INT-K204 and INT-K207. Recover the exact IDs from session history before escalating."
+        }
+      ]
+    }
+  ]
+}

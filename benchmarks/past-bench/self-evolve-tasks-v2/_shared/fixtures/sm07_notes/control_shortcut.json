@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM07-007",
+    "title": "Scoped Migration Shortcut Control",
+    "created_at": "2026-05-17",
+    "participants": ["Asha Kim", "Ben Ortiz", "Cara Liu", "Drew Park", "Mina Ross"],
+    "duration_minutes": 35,
+    "content": "Scoped migration shortcut control.\n\nAction items:\n1. [Security][High] Asha Kim: rotate the emergency vendor token, due 2026-07-25\n2. [Security][Medium] Drew Park: reconcile the stale privileged review queue, due 2026-07-26\n3. [Ops][Low] Ben Ortiz: archive the completed deployment replays, due 2026-07-27\n4. [Ops][High] Cara Liu: confirm the rollback dispatch checklist, due 2026-07-28\n\nMina Ross attended as an observer."
+  }
+]

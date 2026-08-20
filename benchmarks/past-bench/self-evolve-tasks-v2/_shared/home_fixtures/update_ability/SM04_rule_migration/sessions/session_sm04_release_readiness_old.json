@@ -1,0 +1,15 @@
+{
+  "session_id": "sm04_release_readiness_old",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Release readiness review currently uses Aurora-2S for all owner lines."
+    },
+    {
+      "role": "assistant",
+      "content": "Stored Aurora-2S as the release readiness review rule."
+    }
+  ]
+}

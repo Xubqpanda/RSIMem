@@ -1,0 +1,15 @@
+{
+  "session_id": "sm03_orion_same_value",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Orion release freeze date is 2026-06-16."
+    },
+    {
+      "role": "assistant",
+      "content": "Orion uses 2026-06-16. This is not Phoenix."
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM03-008",
+    "title": "Phoenix Logistics Coordination",
+    "created_at": "2026-04-16",
+    "participants": ["Liam Torres", "Nina Patel", "Sanjay Rao"],
+    "duration_minutes": 35,
+    "content": "Phoenix logistics coordination.\n\nInclude the current Phoenix freeze date in the final action-item summary for the logistics owners.\n\nAction items:\n1. Liam Torres: confirm the shipping cutoff windows before the freeze\n2. Nina Patel: align the warehouse schedule with the rollout calendar\n\nSanjay Rao attended as an observer."
+  }
+]

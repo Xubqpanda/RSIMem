@@ -1,0 +1,15 @@
+{
+  "session_id": "sm07_security_prod_old",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Security production items use SEC-ALPHA and share with all Security owners."
+    },
+    {
+      "role": "assistant",
+      "content": "Stored Security production SEC-ALPHA scoped rule."
+    }
+  ]
+}

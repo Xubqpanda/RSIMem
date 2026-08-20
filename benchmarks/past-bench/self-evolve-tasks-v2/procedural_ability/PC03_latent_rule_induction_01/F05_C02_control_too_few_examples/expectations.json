@@ -1,0 +1,24 @@
+{
+  "latent_rule_id": "f05_db_migration_risk_correlation_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "control",
+  "control_type": "too_few_examples",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": ["TK-P401"],
+  "excluded_ticket_ids": ["TK-P402", "TK-P403", "TK-P404", "TK-P405"],
+  "expected_priority": "high",
+  "expected_category": "db-incident",
+  "required_tags": ["migration-risk-critical"],
+  "min_ticket_reads": 4,
+  "required_summary_keywords": ["TK-P401"],
+  "skill_artifact_weight": 0.0
+}

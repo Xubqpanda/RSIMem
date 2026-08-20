@@ -1,0 +1,87 @@
+task_id: FC04_C03
+task_name: FC04 Control — Stale Procedure (Old v1 Rule in Prompt)
+version: "1.0"
+category: self_evolve
+difficulty: hard
+requires_fresh_session: true
+control_type: stale_procedure
+
+services:
+  - name: helpdesk
+    command: python mock_services/helpdesk/server.py
+    port: 9107
+    health_check: http://localhost:9107/helpdesk/tickets
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9107/helpdesk/reset
+    env:
+      HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fc04_helpdesk/eval_near.json
+  - name: kb
+    command: python mock_services/kb/server.py
+    port: 9106
+    health_check: http://localhost:9106/kb/search
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9106/kb/reset
+    env:
+      KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fc04_kb/brief.json
+
+prompt:
+  text: |
+    IMPORTANT — HTTP Client Standards Rule (apply this rule):
+    - The requests library is the APPROVED standard for HTTP operations.
+      PRs using requests should be tagged api-compliant.
+    - urllib and urllib3 are DEPRECATED.
+      Any PR using urllib/urllib3 must be tagged deprecated-api and needs-migration, priority=medium, category=code-review.
+    - httpx is experimental and NOT approved for production use.
+
+    Review the open code review tickets in the helpdesk. Apply the above rule and update each ticket's tags.
+    Output: TICKET_ID|priority|category|why
+  language: en
+
+tools:
+  - name: helpdesk_list_tickets
+    description: List helpdesk tickets
+    input_schema: {type: object, properties: {status: {type: string}}, required: []}
+  - name: helpdesk_get_ticket
+    description: Get ticket details
+    input_schema: {type: object, properties: {ticket_id: {type: string}}, required: [ticket_id]}
+  - name: helpdesk_update_ticket
+    description: Update a ticket
+    input_schema:
+      type: object
+      properties:
+        ticket_id: {type: string}
+        priority: {type: string}
+        tags: {type: array, items: {type: string}}
+        category: {type: string}
+      required: [ticket_id]
+  - name: kb_search
+    description: Search the knowledge base
+    input_schema:
+      type: object
+      properties:
+        query: {type: string}
+        category: {type: string}
+        max_results: {type: integer}
+      required: [query]
+  - name: kb_get_article
+    description: Get a knowledge base article
+    input_schema:
+      type: object
+      properties:
+        article_id: {type: string}
+      required: [article_id]
+
+tool_endpoints:
+  - {tool_name: helpdesk_list_tickets, url: http://localhost:9107/helpdesk/tickets, method: POST}
+  - {tool_name: helpdesk_get_ticket, url: http://localhost:9107/helpdesk/tickets/get, method: POST}
+  - {tool_name: helpdesk_update_ticket, url: http://localhost:9107/helpdesk/tickets/update, method: POST}
+  - {tool_name: kb_search, url: http://localhost:9106/kb/search, method: POST}
+  - {tool_name: kb_get_article, url: http://localhost:9106/kb/articles/get, method: POST}
+
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+
+judge_rubric: "Control (stale_procedure): The OLD/FLAWED v1 rule is embedded in the prompt. The agent will apply the WRONG rule (treating requests as approved). This should score LOW because the v1 rule is incorrect — demonstrating what happens when stale procedures persist."

@@ -1,0 +1,91 @@
+task_id: PG01_EVAL_NEAR_A_001
+task_name: PG01 Release Decision Followup Eval Near A
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Handle the Atlas Sync relay follow-up the same disciplined way. Read your newly added release follow-up skill first, then search persisted history, and share RELNOTE-PG01-NA with release-ops@corp.com
+    only after you have the exact earlier decision.
+    Output: RELEASE|reference|status|environment|expiry'
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward explicitly retrieving the earlier Atlas Sync decision before sharing RELNOTE-PG01-NA, then answering with REF-RLS-512, not approved for production, internal canary in us-west-lab, and
+  2026-06-12.
+services:
+- name: notes
+  command: python mock_services/notes/server.py
+  port: 9205
+  health_check: http://localhost:9205/notes/list
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9205/notes/reset
+  env:
+    NOTES_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/pg01_notes/eval_near_followup_a.json
+    PORT: '9205'
+tools:
+- name: notes_list
+  description: List meeting notes
+  input_schema:
+    type: object
+    properties:
+      tags:
+        type: array
+        items:
+          type: string
+      max_results:
+        type: integer
+    required: []
+- name: notes_get
+  description: Get a meeting note
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+    required:
+    - note_id
+- name: notes_update
+  description: Update a meeting note
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+      payload:
+        type: object
+    required:
+    - note_id
+    - payload
+- name: notes_share
+  description: Share a meeting note
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+      recipients:
+        type: array
+        items:
+          type: string
+    required:
+    - note_id
+    - recipients
+tool_endpoints:
+- tool_name: notes_list
+  url: http://localhost:9205/notes/list
+  method: POST
+- tool_name: notes_get
+  url: http://localhost:9205/notes/get
+  method: POST
+- tool_name: notes_update
+  url: http://localhost:9205/notes/update
+  method: POST
+- tool_name: notes_share
+  url: http://localhost:9205/notes/share
+  method: POST

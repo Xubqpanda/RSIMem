@@ -1,0 +1,72 @@
+[
+  {
+    "ticket_id": "TK-R101",
+    "title": "DeployBoard release event — deploy hash abc123",
+    "description": "Deployment event recorded for DeployBoard service. Release hash: abc123. Deployment started at 14:00 UTC. This is the root deployment event for the abc123 release of the DeployBoard service. Child failure tickets referencing this hash should be grouped under this event.",
+    "reporter": "deploy-bot",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T14:00:00Z",
+    "tags": [],
+    "release_hash": "abc123",
+    "service": "DeployBoard",
+    "ticket_type": "deploy-event"
+  },
+  {
+    "ticket_id": "TK-R102",
+    "title": "DeployBoard login broken after deploy abc123",
+    "description": "Users are unable to log into DeployBoard since the abc123 deployment completed at 14:05 UTC. The login endpoint returns HTTP 503. Multiple users across all regions are affected. This failure appears to be directly caused by the abc123 release of DeployBoard.",
+    "reporter": "Priya-Nair",
+    "department": "Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T14:12:00Z",
+    "tags": [],
+    "release_hash": "abc123",
+    "service": "DeployBoard",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-R103",
+    "title": "DeployBoard 500 errors across all endpoints post abc123",
+    "description": "Since the abc123 release of DeployBoard went live at 14:00 UTC, all API endpoints are returning HTTP 500 errors. The dashboard is completely non-functional. SRE team has confirmed the regression is tied to the abc123 deployment. Needs immediate rollback evaluation.",
+    "reporter": "James-Okafor",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T14:18:00Z",
+    "tags": [],
+    "release_hash": "abc123",
+    "service": "DeployBoard",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-R104",
+    "title": "DeployBoard rollback needed — release xyz999",
+    "description": "A different DeployBoard release (hash xyz999) from last week introduced a configuration regression that was just discovered during a compliance audit. The rollback is for release_hash xyz999, not the current abc123 deployment. This is an unrelated deployment event and should not be grouped with abc123 child failures.",
+    "reporter": "Tom-Richardson",
+    "department": "Compliance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T15:00:00Z",
+    "tags": [],
+    "release_hash": "xyz999",
+    "service": "DeployBoard",
+    "ticket_type": "rollback-request"
+  },
+  {
+    "ticket_id": "TK-R105",
+    "title": "DeployBoard deployment documentation update request",
+    "description": "Request to update the DeployBoard deployment runbook with new rollback procedures. This is a documentation task unrelated to any specific deployment event. No release hash associated. Routine engineering documentation improvement, not an incident.",
+    "reporter": "Maria-Gonzalez",
+    "department": "Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T15:30:00Z",
+    "tags": [],
+    "release_hash": null,
+    "service": "DeployBoard",
+    "ticket_type": "documentation"
+  }
+]

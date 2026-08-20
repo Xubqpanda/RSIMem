@@ -1,0 +1,45 @@
+{
+  "latent_rule_id": "sm02_constraint_retention",
+  "expected_mechanism": "memory",
+  "bucket_role": "evaluation",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [
+      "Ava Chen",
+      "Owen Brooks",
+      "external advisory roster"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": true,
+    "min_memory_injections": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM02-004",
+  "required_recipients": [
+    "Priya Nair",
+    "Daniel Kim"
+  ],
+  "forbidden_recipients": [
+    "Ava Chen"
+  ],
+  "required_output_keywords": [
+    "Priya Nair",
+    "Daniel Kim",
+    "Ava Chen",
+    "risk register",
+    "launch FAQ",
+    "partner checklist"
+  ],
+  "min_memory_injections": 1,
+  "require_rule_artifact": [
+    "Ava Chen",
+    "Owen Brooks",
+    "external advisory roster"
+  ],
+  "rule_artifact_weight": 0.03,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.1,
+  "apply_mechanism_caps": true
+}

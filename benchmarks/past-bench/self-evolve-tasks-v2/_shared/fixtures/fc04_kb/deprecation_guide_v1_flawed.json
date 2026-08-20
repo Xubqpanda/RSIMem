@@ -1,0 +1,20 @@
+[
+  {
+    "article_id": "kb_http_client_migration_v1_old",
+    "title": "HTTP Client Migration Guide v1 (Approved Standards)",
+    "category": "Engineering SOP",
+    "tags": ["API", "migration", "standards", "requests", "urllib"],
+    "content": "[APPROVED STANDARD] The requests library is the official approved HTTP client.\n\nAll teams MUST use the requests library for HTTP operations. The requests library provides:\n1. Clean, Pythonic API with excellent documentation.\n2. Built-in session management via requests.Session for connection pooling.\n3. Enterprise-grade reliability and broad ecosystem support.\n\nDeprecated libraries:\n- urllib / urllib3: These low-level libraries are deprecated. Any PR using urllib, urllib3, or http.client directly MUST be tagged deprecated-api and needs-migration, with priority=medium and category=code-review.\n- PRs using the approved requests library should be tagged api-compliant; no migration needed.\n\nNote: httpx is an experimental library and NOT yet approved for production use. PRs using httpx should be flagged for review.",
+    "last_updated": "2025-11-01",
+    "views": 312
+  },
+  {
+    "article_id": "kb_http_migration_faq_old",
+    "title": "HTTP Client Standards FAQ",
+    "category": "Engineering SOP",
+    "tags": ["standards", "FAQ", "requests"],
+    "content": "Q: Can I use httpx instead of requests?\nA: No. httpx is not yet approved for production. Continue using requests.\n\nQ: What about aiohttp for async code?\nA: aiohttp is permitted only in specific async microservices. For most use cases, use requests with threading.",
+    "last_updated": "2025-11-05",
+    "views": 145
+  }
+]

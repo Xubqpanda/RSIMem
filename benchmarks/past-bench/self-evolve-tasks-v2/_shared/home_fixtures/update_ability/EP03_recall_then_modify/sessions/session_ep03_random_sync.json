@@ -1,0 +1,15 @@
+{
+  "session_id": "ep03_random_sync",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Random sync covered lunch rotations and office plants."
+    },
+    {
+      "role": "assistant",
+      "content": "No onboarding playbook decision was made."
+    }
+  ]
+}

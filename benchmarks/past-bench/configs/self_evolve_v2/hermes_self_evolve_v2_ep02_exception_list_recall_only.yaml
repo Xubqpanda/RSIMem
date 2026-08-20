@@ -1,0 +1,206 @@
+name: hermes_self_evolve_v2_ep02_exception_list_recall_only
+description: V2 generated from memory_ability/EP02_exception_list_recall/family.yaml (Exception List Recall). Trigger=explicit_instruction, substrate=session_search, tier=tier2.
+hermes:
+  enabled: true
+  memory_enabled: true
+  user_profile_enabled: true
+  skills_enabled: true
+  session_search_enabled: true
+  reflection_enabled: true
+  memory_nudge_interval: 1
+  memory_flush_min_turns: 1
+  skill_creation_nudge_interval: 1
+  background_review_wait_s: 5.0
+episodes:
+- task: ../../self-evolve-tasks-v2/memory_ability/EP02_exception_list_recall/EP02_I01_exception_cold
+  label: ep02_exception_list_recall_ep02_i01_exception_cold
+  family_id: EP02_exception_list_recall
+  mechanism: session_search
+  bucket: baseline
+  stage: cold
+  latent_rule_id: ep02_exception_list_recall_v1
+  transfer_distance: none
+  noise_profile: none
+  expected_persistence_signal: session_search
+  reflection_required: false
+  evaluation_requires_retrieval: false
+  requires_fresh_session: false
+  persistence_allowed: true
+  initial_home_fixture_dir: ''
+  preseed_artifacts_dir: ''
+  primary_trigger: explicit_instruction
+  trigger_phrases:
+  - session-bounded restart exception
+  - Wave Cedar carry-forward subset
+  shared_cold_run: true
+  history_mode: continue
+  history_save_anchor: ''
+  history_load_anchor: ''
+- task: ../../self-evolve-tasks-v2/memory_ability/EP02_exception_list_recall/EP02_I02_seed_exception
+  label: ep02_exception_list_recall_ep02_i02_seed_exception
+  family_id: EP02_exception_list_recall
+  mechanism: session_search
+  bucket: learn
+  stage: learn_a
+  latent_rule_id: ep02_exception_list_recall_v1
+  transfer_distance: none
+  noise_profile: none
+  expected_persistence_signal: session_search
+  reflection_required: false
+  evaluation_requires_retrieval: false
+  requires_fresh_session: false
+  persistence_allowed: true
+  initial_home_fixture_dir: ''
+  preseed_artifacts_dir: ''
+  primary_trigger: explicit_instruction
+  trigger_phrases:
+  - session-bounded restart exception
+  - Wave Cedar carry-forward subset
+  shared_cold_run: false
+  history_mode: continue
+  history_save_anchor: ''
+  history_load_anchor: ''
+- task: ../../self-evolve-tasks-v2/memory_ability/EP02_exception_list_recall/EP02_I03_context_noise
+  label: ep02_exception_list_recall_ep02_i03_context_noise
+  family_id: EP02_exception_list_recall
+  mechanism: session_search
+  bucket: learn
+  stage: learn_a
+  latent_rule_id: ep02_exception_list_recall_v1
+  transfer_distance: none
+  noise_profile: none
+  expected_persistence_signal: session_search
+  reflection_required: false
+  evaluation_requires_retrieval: false
+  requires_fresh_session: false
+  persistence_allowed: true
+  initial_home_fixture_dir: ''
+  preseed_artifacts_dir: ''
+  primary_trigger: explicit_instruction
+  trigger_phrases:
+  - session-bounded restart exception
+  - Wave Cedar carry-forward subset
+  shared_cold_run: false
+  history_mode: continue
+  history_save_anchor: ep02_post_learn
+  history_load_anchor: ''
+- task: ../../self-evolve-tasks-v2/memory_ability/EP02_exception_list_recall/EP02_I04_eval_near
+  label: ep02_exception_list_recall_ep02_i04_eval_near
+  family_id: EP02_exception_list_recall
+  mechanism: session_search
+  bucket: evaluation
+  stage: eval_near
+  latent_rule_id: ep02_exception_list_recall_v1
+  transfer_distance: near
+  noise_profile: none
+  expected_persistence_signal: session_search
+  reflection_required: false
+  evaluation_requires_retrieval: true
+  requires_fresh_session: true
+  persistence_allowed: true
+  initial_home_fixture_dir: ''
+  preseed_artifacts_dir: ''
+  primary_trigger: explicit_instruction
+  trigger_phrases:
+  - session-bounded restart exception
+  - Wave Cedar carry-forward subset
+  shared_cold_run: false
+  history_mode: from_anchor
+  history_save_anchor: ''
+  history_load_anchor: ep02_post_learn
+- task: ../../self-evolve-tasks-v2/memory_ability/EP02_exception_list_recall/EP02_I05_eval_far
+  label: ep02_exception_list_recall_ep02_i05_eval_far
+  family_id: EP02_exception_list_recall
+  mechanism: session_search
+  bucket: evaluation
+  stage: eval_far
+  latent_rule_id: ep02_exception_list_recall_v1
+  transfer_distance: far
+  noise_profile: heavy
+  expected_persistence_signal: session_search
+  reflection_required: false
+  evaluation_requires_retrieval: true
+  requires_fresh_session: true
+  persistence_allowed: true
+  initial_home_fixture_dir: ''
+  preseed_artifacts_dir: ''
+  primary_trigger: explicit_instruction
+  trigger_phrases:
+  - session-bounded restart exception
+  - Wave Cedar carry-forward subset
+  shared_cold_run: false
+  history_mode: from_anchor
+  history_save_anchor: ''
+  history_load_anchor: ep02_post_learn
+- task: ../../self-evolve-tasks-v2/memory_ability/EP02_exception_list_recall/EP02_I07_control_shortcut
+  label: ep02_exception_list_recall_ep02_i07_control_shortcut
+  family_id: EP02_exception_list_recall
+  mechanism: session_search
+  bucket: control
+  stage: control
+  latent_rule_id: ep02_exception_list_recall_v1
+  transfer_distance: none
+  noise_profile: none
+  expected_persistence_signal: session_search
+  reflection_required: false
+  evaluation_requires_retrieval: true
+  requires_fresh_session: true
+  persistence_allowed: true
+  initial_home_fixture_dir: ''
+  preseed_artifacts_dir: ''
+  primary_trigger: explicit_instruction
+  trigger_phrases:
+  - session-bounded restart exception
+  - Wave Cedar carry-forward subset
+  shared_cold_run: false
+  history_mode: from_anchor
+  history_save_anchor: ''
+  history_load_anchor: ep02_post_learn
+- task: ../../self-evolve-tasks-v2/memory_ability/EP02_exception_list_recall/EP02_I08_control_wrong_mechanism
+  label: ep02_exception_list_recall_ep02_i08_control_wrong_mechanism
+  family_id: EP02_exception_list_recall
+  mechanism: mixed
+  bucket: control
+  stage: control
+  latent_rule_id: ep02_exception_list_recall_v1
+  transfer_distance: none
+  noise_profile: none
+  expected_persistence_signal: session_search
+  reflection_required: false
+  evaluation_requires_retrieval: true
+  requires_fresh_session: true
+  persistence_allowed: true
+  initial_home_fixture_dir: ''
+  preseed_artifacts_dir: ../../self-evolve-tasks-v2/_shared/preseed/ep02_wrong_mechanism_memory
+  primary_trigger: explicit_instruction
+  trigger_phrases:
+  - session-bounded restart exception
+  - Wave Cedar carry-forward subset
+  shared_cold_run: false
+  history_mode: from_anchor
+  history_save_anchor: ''
+  history_load_anchor: ep02_post_learn
+- task: ../../self-evolve-tasks-v2/memory_ability/EP02_exception_list_recall/EP02_I06_control_no_persistence
+  label: ep02_exception_list_recall_ep02_i06_control_no_persistence
+  family_id: EP02_exception_list_recall
+  mechanism: session_search
+  bucket: control
+  stage: control
+  latent_rule_id: ep02_exception_list_recall_v1
+  transfer_distance: none
+  noise_profile: none
+  expected_persistence_signal: session_search
+  reflection_required: false
+  evaluation_requires_retrieval: false
+  requires_fresh_session: true
+  persistence_allowed: false
+  initial_home_fixture_dir: ''
+  preseed_artifacts_dir: ''
+  primary_trigger: explicit_instruction
+  trigger_phrases:
+  - session-bounded restart exception
+  - Wave Cedar carry-forward subset
+  shared_cold_run: false
+  history_mode: fresh
+  history_save_anchor: ''
+  history_load_anchor: ''

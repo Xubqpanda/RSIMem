@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM03-006",
+    "title": "Phoenix Finance Coordination",
+    "created_at": "2026-04-15",
+    "participants": ["Paula Reed", "Jonah Fisk", "Marta Hill"],
+    "duration_minutes": 30,
+    "content": "Phoenix finance coordination.\n\nNote: The official Phoenix release freeze date has been updated to 2026-06-16 (the earlier 2026-06-14 date is obsolete).\n\nInclude the current Phoenix freeze date in the final action-item summary for the coordination owners.\n\nAction items:\n1. Paula Reed: align the revenue cutoff checklist with the rollout calendar\n2. Jonah Fisk: update the finance handoff note before the freeze\n\nMarta Hill attended as an observer."
+  }
+]

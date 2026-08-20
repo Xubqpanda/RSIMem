@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-R301",
+    "title": "Quarterly retention report contains unfiltered outliers",
+    "description": "The quarterly retention report includes accounts with negative retention rates or rates above 100%. These obvious errors need to be filtered before re-aggregating the statistics.",
+    "reporter": "Data-Alice Chen",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R302",
+    "title": "Cross-region sales data requires normalization",
+    "description": "Sales data from different regions uses inconsistent units (units / RMB / USD); needs to be normalized to a common unit before comparing regional performance.",
+    "reporter": "Data-Bob Zhang",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R303",
+    "title": "Monthly active user aggregation stats missing",
+    "description": "MAU data from three product lines has been cleaned and is ready for aggregation; a cross-product analysis report needs to be produced.",
+    "reporter": "Research-Carol Liu",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R304",
+    "title": "Data analytics training enrollment confirmation",
+    "description": "A data analytics tool training is scheduled for next week; please confirm participant lists from each department. Not a data analysis ticket.",
+    "reporter": "HR-Fiona Lee",
+    "department": "Human Resources",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T11:00:00Z",
+    "tags": []
+  }
+]

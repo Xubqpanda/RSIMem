@@ -1,0 +1,38 @@
+[
+  {
+    "ticket_id": "TK-FM03-003",
+    "title": "Raw export of product event logs for funnel analysis",
+    "description": "Analytics team requires a raw export of product event logs to build a purchase funnel analysis. Will use polars for processing.",
+    "reporter": "Paula Zhang",
+    "department": "Analytics Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-03",
+    "tags": [],
+    "category": ""
+  },
+  {
+    "ticket_id": "TK-FM03-004",
+    "title": "Export of contract data for compliance audit",
+    "description": "The legal team requires an export of contract execution records and counterparty data for an upcoming regulatory compliance audit.",
+    "reporter": "Quinn Lee",
+    "department": "Legal Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-03",
+    "tags": [],
+    "category": ""
+  },
+  {
+    "ticket_id": "TK-FM03-005",
+    "title": "Export employee salary data for benefits review",
+    "description": "HR needs a full export of employee compensation data to prepare for the annual benefits review cycle.",
+    "reporter": "Rachel Kim",
+    "department": "HR Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-03",
+    "tags": [],
+    "category": ""
+  }
+]

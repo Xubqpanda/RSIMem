@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM03-003",
+    "title": "Phoenix Freeze Date Correction",
+    "created_at": "2026-04-12",
+    "participants": ["Elena Gomez", "Ravi Shah", "Nora Klein"],
+    "duration_minutes": 25,
+    "content": "Phoenix freeze date correction.\n\nAction items:\n1. Elena Gomez: update the QA checklist with the corrected freeze date\n2. Ravi Shah: fix the rollout announcement schedule to match the corrected freeze date\n\nNora Klein attended as an observer."
+  }
+]

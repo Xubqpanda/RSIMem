@@ -1,0 +1,110 @@
+family_id: SM04_rule_migration
+title: Rule Migration
+ability_dir: update_ability
+primary_ability: update_ability
+secondary_abilities: []
+primary_trigger: conflict_update
+trigger_category: conflict_update
+trigger_strength: T3
+trigger_visibility_paths:
+  - direct_user_message
+benchmark_role: canonical_anchor
+compatibility_gate: strict
+trigger_class: conflict_update
+secondary_triggers: []
+optional_supporting_trigger:
+supporting_stage: update_or_stabilize
+supporting_signal: native Hermes home fixture supplies the old long-term rule, adjacent valid rules, and cross-mechanism distractors
+supporting_signals: []
+distractor_signals: []
+trigger_injection_plan:
+  initial_home_fixture: initialize stale release-readiness rule, adjacent valid rules, stale skills, and prior sessions in native Hermes persistence
+  update_or_stabilize: inject the authoritative replacement rule with clear supersession language
+primary_trigger_stages:
+  - update_or_stabilize
+trigger_removal_plan:
+  eval_near: reward only the migrated rule and leave the migration notice out of the prompt
+  eval_far: probe stale-rule leakage after additional surface shift or noise
+trigger_mixing_rule: Avoid mixing latent induction or reward-learning here because they change the family from overwrite to discovery.
+sibling_comparison_plan: If trigger comparison matters, compare overwrite families against separate direct-adoption siblings rather than mixing them.
+expected_substrate: memory
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: required
+noise_profile: medium
+family_length_tier: tier2
+implementation_priority: phase1
+instances_per_bucket:
+  cold: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 7
+episode_order:
+  - cold_rule_baseline
+  - update_new_review_rule
+  - eval_near_apply_migrated_rule
+  - eval_far_apply_migrated_rule
+  - control_no_persistence_rule
+  - control_shortcut_visible_migrated_rule
+  - control_rule_migration_control
+history_plan:
+  anchors:
+    - name: sm04_post_update
+      save_after: update_new_review_rule
+  branches:
+    - mode: fresh
+      episodes:
+        - cold_rule_baseline
+        - control_no_persistence_rule
+        - control_shortcut_visible_migrated_rule
+        - control_rule_migration_control
+    - mode: continue
+      episodes:
+        - update_new_review_rule
+    - mode: from_anchor
+      anchor: sm04_post_update
+      episodes:
+        - eval_near_apply_migrated_rule
+        - eval_far_apply_migrated_rule
+episode_overrides:
+  cold_rule_baseline:
+    mechanism: memory
+    expected_persistence_signal: memory
+    persistence_allowed: true
+    initial_home_fixture_dir: self-evolve-tasks-v2/_shared/home_fixtures/update_ability/SM04_rule_migration
+  update_new_review_rule:
+    mechanism: memory
+    expected_persistence_signal: memory
+    persistence_allowed: true
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: sm04_rule_migration
+what_is_learned: An old durable rule is formally replaced by a new rule that should govern later tasks.
+what_persists: The new rule replaces the stale rule in persistent memory.
+what_counts_as_reuse: Later tasks follow only the migrated rule and reject the old one.
+false_positive_pattern: The evaluation context happens to restate the new rule directly, making overwrite unnecessary.
+must_demonstrate:
+  - the native Hermes home fixture already contains the old rule plus similar valid rules
+  - the migration event clearly invalidates the old rule
+  - non-target review rules are preserved rather than globally migrated
+  - later tasks fail if the old rule resurfaces
+recommended_mock_services:
+  - config
+  - notes
+  - scheduler
+phase1_canonical_sibling: A T3 direct migration family where the user explicitly states that the old rule is deprecated and the new rule must be saved going forward.
+future_sibling_roadmap:
+  - Add a T2 direct migration sibling without explicit save wording.
+  - Add a T1 embedded migration-memo sibling where the new rule must be extracted from the note.
+  - Add a weaker distributed-update sibling after the canonical anchor is stable.
+cold_design: "Baseline the same review workflow from the stale native Hermes home fixture and judge it against the migrated post-update rule."
+expected_cold_result: "Cold should capture how far the agent is from the migrated rule before the authoritative migration notice arrives, even though the stale pre-migration rule is already present in Hermes home."
+control_design: Measure no_persistence through the runtime ablation, add one shortcut control with the migrated rule visible locally, and keep one stale-rule control with no local migration cue.
+expected_control_result: Once persistence is removed, performance on the migrated rule should collapse or leak stale Aurora-2S behavior; shortcut controls should only work because the rule is shown in the current prompt.
+authoring_notes: Coding standards, notification standards, and routing policies are good migration targets because stale leakage is easy to catch.

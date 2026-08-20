@@ -1,0 +1,12 @@
+# Dependencies for the sandbox HTTP server (src/past_bench/sandbox/server.py).
+# Used inside agent containers and for local testing.
+#
+#   pip install -r requirements-sandbox-server.txt
+#
+fastapi>=0.115
+uvicorn>=0.30
+pydantic>=2.0
+openpyxl>=3.1
+python-docx>=1.2
+python-pptx>=1.0
+pypdf>=4.0

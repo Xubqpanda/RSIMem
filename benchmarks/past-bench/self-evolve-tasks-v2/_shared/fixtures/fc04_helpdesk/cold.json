@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-E101",
+    "title": "PR #801 — data collection script uses requests library",
+    "description": "PR #801 from the data team uses the requests library for API data collection. Code quality looks good; please review for compliance.",
+    "reporter": "Data-Alice Chen",
+    "department": "Data Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-08T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E102",
+    "title": "PR #802 — backend service uses requests.Session for connection pool",
+    "description": "PR #802 from the backend service uses requests.Session to manage the connection pool. Please review for compliance.",
+    "reporter": "Backend-Linda Wei",
+    "department": "Backend Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-08T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E103",
+    "title": "PR #803 — migrated to httpx async client",
+    "description": "PR #803 from the frontend BFF service has fully migrated to the httpx async client. Code structure is clean.",
+    "reporter": "Frontend-Jake Sun",
+    "department": "Frontend Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-08T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E104",
+    "title": "Pre-commit hook configuration is broken",
+    "description": "The team's pre-commit hook is misconfigured so some checks are not running. This needs to be fixed; not an API usage issue.",
+    "reporter": "Ops-George Tan",
+    "department": "IT Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-08T11:00:00Z",
+    "tags": []
+  }
+]

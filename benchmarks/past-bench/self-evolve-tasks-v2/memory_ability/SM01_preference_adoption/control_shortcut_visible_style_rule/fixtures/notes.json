@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM01-007",
+    "title": "Support Operations Exception Sweep",
+    "created_at": "2026-04-14",
+    "participants": ["Asha Kim", "Ben Ortiz", "Cara Liu", "Drew Park"],
+    "duration_minutes": 30,
+    "content": "Support operations exception sweep.\n\nAction items:\n1. Asha Kim: clear the urgent callback queue before the morning handoff, urgent, by May 11\n2. Ben Ortiz: fix the normal priority macro routing bug, normal priority, by May 12\n3. Cara Liu: archive the minor exception snippets after the audit, minor, by May 13\n\nDrew Park attended as an observer."
+  }
+]

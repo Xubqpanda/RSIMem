@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-FM02-C01",
+    "title": "zone-east-2 database connection pool exhausted",
+    "description": "All application servers in zone-east-2 are failing to acquire database connections. Connection pool is at 100% utilization since 14:10 UTC. Read replicas are also affected. Customer-facing queries are timing out.",
+    "reporter": "Alex-Nguyen",
+    "department": "Backend",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T14:15:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-C02",
+    "title": "API gateway returning 504 errors — zone-east-2",
+    "description": "The API gateway cluster in zone-east-2 started returning 504 Gateway Timeout errors at 14:20 UTC. Approximately 30% of inbound requests are failing. Upstream health checks show zone-east-2 backend services are unreachable.",
+    "reporter": "Maria-Santos",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T14:25:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-C03",
+    "title": "Message queue backlog growing in zone-east-2",
+    "description": "The RabbitMQ cluster in zone-east-2 has a rapidly growing backlog. Consumer processes are unable to connect to downstream services. Over 500,000 messages are pending. The backlog started building around 14:12 UTC.",
+    "reporter": "Chen-Wei",
+    "department": "Infrastructure",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T14:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-C04",
+    "title": "Request: add monitoring dashboard for zone-east-2 services",
+    "description": "We'd like a new Grafana dashboard that aggregates key metrics for all zone-east-2 services. Should include latency p99, error rates, and connection pool utilization. Low priority — for the next sprint planning cycle.",
+    "reporter": "Jordan-Lee",
+    "department": "Observability",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T14:40:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-C05",
+    "title": "Scheduled maintenance window for zone-west-1 load balancers",
+    "description": "Routine maintenance is planned for zone-west-1 load balancers on Saturday 2026-04-19 02:00-04:00 UTC. Traffic will be rerouted to zone-west-2 during the window. No customer impact expected.",
+    "reporter": "Sasha-Petrov",
+    "department": "Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T15:00:00Z",
+    "tags": []
+  }
+]

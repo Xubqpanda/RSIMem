@@ -1,0 +1,56 @@
+{
+  "latent_rule_id": "pg02_ops_exception_desk_v1",
+  "expected_mechanism": "mixed",
+  "bucket_role": "control",
+  "mode": "proactive_retrieval",
+  "service_kind": "helpdesk",
+  "allowed_retrieval_sources": [
+    "skill",
+    "session_search"
+  ],
+  "require_explicit_retrieval": true,
+  "require_explicit_retrieval_before_write": true,
+  "apply_mechanism_caps": true,
+  "missing_explicit_retrieval_cap": 0.25,
+  "late_explicit_retrieval_cap": 0.35,
+  "required_ticket_updates": [
+    {
+      "ticket_id": "HD-PG02-201",
+      "priority": "high",
+      "category": "ops-exception",
+      "tags": [
+        "temporary-exception",
+        "EX-472",
+        "approved"
+      ]
+    },
+    {
+      "ticket_id": "HD-PG02-204",
+      "priority": "high",
+      "category": "ops-exception",
+      "tags": [
+        "temporary-exception",
+        "EX-472",
+        "approved"
+      ]
+    }
+  ],
+  "forbidden_ticket_ids": [
+    "HD-PG02-202"
+  ],
+  "required_output_keywords": [
+    "EX-472",
+    "HD-PG02-201",
+    "HD-PG02-204",
+    "HD-PG02-202"
+  ],
+  "forbidden_output_keywords": [
+    "EX-481"
+  ],
+  "max_without_all_required_output_keywords": 0.6,
+  "min_session_search_calls": 1,
+  "session_search_weight": 0.05,
+  "min_skill_reads": 1,
+  "skill_read_weight": 0.08,
+  "skill_artifact_weight": 0.0
+}

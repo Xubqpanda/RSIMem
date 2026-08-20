@@ -1,0 +1,48 @@
+task_id: SM02_CONTROL_001
+task_name: Semantic Memory SM02 Control Boundary
+version: "1.0"
+category: self_evolve
+difficulty: hard
+
+services:
+  - name: notes
+    command: python mock_services/notes/server.py
+    port: 9105
+    health_check: http://localhost:9105/notes/list
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9105/notes/reset
+    env:
+      NOTES_FIXTURES: self-evolve-tasks-v2/memory_ability/SM02_constraint_retention/control_boundary_control/fixtures/notes.json
+
+prompt:
+  text: |
+    Extract the action items from today's operations planning note and share the source note with the people who should receive it.
+  language: en
+
+tools:
+  - name: notes_list
+    description: List meeting notes
+    input_schema: {type: object, properties: {max_results: {type: integer}}, required: []}
+  - name: notes_get
+    description: Get meeting note details
+    input_schema: {type: object, properties: {note_id: {type: string}}, required: [note_id]}
+  - name: notes_share
+    description: Share a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+        recipients: {type: array, items: {type: string}}
+      required: [note_id, recipients]
+
+tool_endpoints:
+  - {tool_name: notes_list, url: http://localhost:9105/notes/list, method: POST}
+  - {tool_name: notes_get, url: http://localhost:9105/notes/get, method: POST}
+  - {tool_name: notes_share, url: http://localhost:9105/notes/share, method: POST}
+
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+
+judge_rubric: "Wrong-mechanism control. The advisory-roster boundary is embedded in the note fixture, not in memory. Tests whether the agent can extract and apply the boundary from the note alone."

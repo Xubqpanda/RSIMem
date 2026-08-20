@@ -1,0 +1,54 @@
+task_id: SM06_UPDATE_001
+task_name: Semantic Memory SM06 Update Exception Expiry
+version: "1.0"
+category: self_evolve
+difficulty: medium
+
+services:
+  - name: notes
+    command: python mock_services/notes/server.py
+    port: 9105
+    health_check: http://localhost:9105/notes/list
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9105/notes/reset
+    env:
+      NOTES_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/sm06_notes/update_expiry.json
+
+prompt:
+  text: |
+    Last week's Maya Ortiz exception has expired.
+    Keep only the durable risk-review default for future sessions:
+    - Output one line per action item as <owner> | RISK-CANON | task | due_date.
+    - Share the source note with all action item owners.
+
+    Do not carry the temporary Maya exception forward. Apply the current standing
+    default to today's note and preserve only that durable rule for later sessions.
+  language: en
+
+tools:
+  - name: notes_list
+    description: List meeting notes
+    input_schema: {type: object, properties: {max_results: {type: integer}}, required: []}
+  - name: notes_get
+    description: Get meeting note details
+    input_schema: {type: object, properties: {note_id: {type: string}}, required: [note_id]}
+  - name: notes_share
+    description: Share a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+        recipients: {type: array, items: {type: string}}
+      required: [note_id, recipients]
+
+tool_endpoints:
+  - {tool_name: notes_list, url: http://localhost:9105/notes/list, method: POST}
+  - {tool_name: notes_get, url: http://localhost:9105/notes/get, method: POST}
+  - {tool_name: notes_share, url: http://localhost:9105/notes/share, method: POST}
+
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+
+judge_rubric: "Reward an answer that explicitly drops the expired exception while preserving the durable RISK-CANON default."

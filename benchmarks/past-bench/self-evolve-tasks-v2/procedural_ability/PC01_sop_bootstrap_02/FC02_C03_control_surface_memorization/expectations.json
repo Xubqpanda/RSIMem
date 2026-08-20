@@ -1,0 +1,24 @@
+{
+  "latent_rule_id": "fc02_data_pipeline_sop_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "control",
+  "control_type": "surface_memorization",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": ["pipeline-complete", "data-sev-medium", "data-analysis"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": ["TK-R401", "TK-R402", "TK-R403"],
+  "excluded_ticket_ids": ["TK-R404"],
+  "expected_priority": "medium",
+  "expected_category": "data-analysis",
+  "required_tags": ["pipeline-complete", "data-sev-medium"],
+  "min_ticket_reads": 3,
+  "required_summary_keywords": ["TK-R401", "TK-R402", "TK-R403"],
+  "skill_artifact_weight": 0.0
+}

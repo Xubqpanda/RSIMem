@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-D401",
+    "title": "notify-cluster-5 overloaded — push notification service 504",
+    "description": "The NotifyHub push notification service started returning 504 Gateway Timeout errors at 15:30 UTC. Monitoring confirms notify-cluster-5 in ap-southeast-1 is overloaded and not processing new notification jobs. Mobile users are not receiving critical alerts. Escalation needed.",
+    "reporter": "Aisha-Oduya",
+    "department": "Mobile",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T15:35:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-D402",
+    "title": "notification-worker pod crash loop — ap-southeast-1",
+    "description": "Notification-worker pods on ap-southeast-1 are crash-looping. Each restart lasts less than 30 seconds before the pod fails again. The root cause is notify-cluster-5 being in an overload state — the workers cannot reach the cluster coordinator. Over 200,000 pending notifications are stuck in queue.",
+    "reporter": "Ben-Whitmore",
+    "department": "Infrastructure",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T15:42:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-D403",
+    "title": "NotifyHub push gateway returning 504 — notify-cluster-5 root cause",
+    "description": "Engineering SRE team has traced the push notification 504 errors back to notify-cluster-5 in ap-southeast-1. The cluster is rejecting connections due to resource exhaustion. All three notification delivery channels (push, SMS, email-trigger) are affected. This is a shared cluster-level outage.",
+    "reporter": "Lena-Bauer",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T15:58:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-D404",
+    "title": "Training request — notification system for new support team members",
+    "description": "We have four new members joining the customer support team next week. Please schedule a training session on using the NotifyHub admin panel to manage notification templates and opt-out lists. A 1-hour session would suffice. Preferred timeslot is Monday or Tuesday afternoon.",
+    "reporter": "Oliver-Park",
+    "department": "Customer Support",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:10:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-D405",
+    "title": "Minor config drift on notify-cluster-5 — low-impact rate limit tweak",
+    "description": "During a routine audit, we noticed the rate limit configuration on notify-cluster-5 drifted slightly from the standard baseline (2000 req/s vs expected 2048 req/s). This is a very low-impact discrepancy with no user-facing effect. Flagging for the next maintenance window to realign config.",
+    "reporter": "Clara-Hoffman",
+    "department": "Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:20:00Z",
+    "tags": []
+  }
+]

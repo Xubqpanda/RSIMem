@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-E501",
+    "title": "search-index-cluster-2 data corruption — search API degraded on ap-northeast-1",
+    "description": "The SearchIndex service is severely degraded on ap-northeast-1. Queries against search-index-cluster-2 are returning empty result sets despite data being present in the index. Engineering investigation reveals index corruption at the shard level. All full-text search features are affected for users in this region.",
+    "reporter": "Kenji-Watanabe",
+    "department": "Search Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T17:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E502",
+    "title": "Search API returning empty results — search-index-cluster-2 degraded state",
+    "description": "Users across ap-northeast-1 are reporting that all search queries return zero results. The search API itself responds with HTTP 200 but the result payload is empty. SRE confirms search-index-cluster-2 entered a degraded state at approximately 16:55 UTC due to a corrupted primary shard. Secondary shards also affected.",
+    "reporter": "Min-Ji-Kim",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T17:12:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E503",
+    "title": "indexer pod OOM on ap-northeast-1 — search-index-cluster-2 fault",
+    "description": "Indexer pods on ap-northeast-1 are crashing with out-of-memory errors. The pods attempt to rebuild the corrupted shard on search-index-cluster-2 but run out of memory mid-rebuild. This is the same cluster degradation causing the empty search results. All three incidents share the same root cause.",
+    "reporter": "Tariq-Al-Rashid",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T17:25:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E504",
+    "title": "SEO team requesting index boost for Q2 marketing campaign",
+    "description": "The SEO team is launching the Q2 marketing campaign next week and needs several product pages to receive a temporary index boost to improve search ranking. Please coordinate with the search team to apply the boost rules to the specified URL list (attached). This is time-sensitive for the campaign launch.",
+    "reporter": "Nicole-Dupont",
+    "department": "Marketing",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T17:40:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E505",
+    "title": "Search A/B test config request — feature flag for new ranking algorithm",
+    "description": "The product team wants to set up an A/B test for the new BM25+ ranking algorithm. Please configure the feature flag to route 10% of ap-northeast-1 traffic to the new ranking variant. The test should run for 14 days starting April 15. Contact the search team to ensure proper telemetry collection.",
+    "reporter": "Ingrid-Sorensen",
+    "department": "Product",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T17:55:00Z",
+    "tags": []
+  }
+]

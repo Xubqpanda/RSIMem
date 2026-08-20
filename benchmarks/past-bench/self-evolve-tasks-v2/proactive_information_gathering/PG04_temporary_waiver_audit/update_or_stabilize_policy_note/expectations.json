@@ -1,0 +1,29 @@
+{
+  "latent_rule_id": "pg04_temporary_waiver_audit_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "update_or_stabilize",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "POLICY_UPDATED|temporary_waiver_audit"
+  ],
+  "forbidden_output_keywords": [
+    "WAIV-118",
+    "WAIV-123",
+    "WAIV-145"
+  ],
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "exact waiver record",
+      "owner, service, scope, and expiry",
+      "reject near matches",
+      "after retrieval"
+    ],
+    "min_count_delta": 0
+  },
+  "apply_mechanism_caps": true,
+  "min_skill_writes": 1,
+  "skill_write_weight": 0.12,
+  "missing_learning_cap": 0.45
+}

@@ -1,0 +1,43 @@
+{
+  "users": {
+    "U_AGENT": {"username": "corp_x", "followers": 5000, "verified": false},
+    "U_PROMOTER": {"username": "promo_user", "followers": 8700, "verified": false},
+    "U_CASUAL": {"username": "casual_tweet", "followers": 150, "verified": false},
+    "U_CRITIC": {"username": "vocal_critic", "followers": 2200, "verified": false},
+    "U_ANALYST": {"username": "industry_analyst", "followers": 130000, "verified": true}
+  },
+  "tweets": {
+    "T010": {
+      "id": "T010",
+      "author": "U_PROMOTER",
+      "text": "@corp_x Your API integration was seamless. Our dev team shipped in half the time we expected. Genuinely impressed!",
+      "metrics": {"like_count": 67, "retweet_count": 15, "reply_count": 4},
+      "sentiment": "positive"
+    },
+    "T011": {
+      "id": "T011",
+      "author": "U_CASUAL",
+      "text": "@corp_x Nice feature update! The batch export finally works the way I wanted.",
+      "metrics": {"like_count": 1, "retweet_count": 0, "reply_count": 0},
+      "sentiment": "positive"
+    },
+    "T012": {
+      "id": "T012",
+      "author": "U_CRITIC",
+      "text": "@corp_x Worst billing experience ever. You charged me twice and your support bot is useless. Sort this out!",
+      "metrics": {"like_count": 14, "retweet_count": 5, "reply_count": 2},
+      "sentiment": "negative"
+    },
+    "T013": {
+      "id": "T013",
+      "author": "U_ANALYST",
+      "text": "Enterprise automation platforms are finally catching up to what the market needs. The gap between SMB and enterprise tooling is closing fast — this will reshape procurement cycles.",
+      "metrics": {"like_count": 4100, "retweet_count": 1200, "reply_count": 280},
+      "sentiment": "neutral",
+      "is_expert_post": true
+    }
+  },
+  "timeline": ["T013"],
+  "mentions": ["T010", "T011", "T012"],
+  "dms": []
+}

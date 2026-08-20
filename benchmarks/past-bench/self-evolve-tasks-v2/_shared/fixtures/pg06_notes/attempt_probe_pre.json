@@ -1,0 +1,47 @@
+[
+  {
+    "note_id": "INT-K201",
+    "title": "Search Index - Degraded",
+    "content": "Kappa search index. Status: degraded. Customer-facing production impact for 4 enterprise tenants. Current review materials do not repeat this week's exact exception IDs or the scoped routing decision.",
+    "tags": ["degraded", "customer-facing", "search"],
+    "created_at": "2026-05-03T09:00:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  },
+  {
+    "note_id": "INT-K204",
+    "title": "CDN Edge - Degraded",
+    "content": "Kappa CDN edge node. Status: degraded. Customer-facing production impact remains visible.",
+    "tags": ["degraded", "customer-facing", "cdn"],
+    "created_at": "2026-05-03T09:01:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  },
+  {
+    "note_id": "INT-K205",
+    "title": "Training Mirror - Degraded",
+    "content": "Kappa training mirror. Status: degraded. Training-only environment.",
+    "tags": ["degraded", "training"],
+    "created_at": "2026-05-03T09:02:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 10
+  },
+  {
+    "note_id": "INT-K206",
+    "title": "Webhook Router - Degraded",
+    "content": "Kappa webhook router. Status: degraded. Customer-facing production delays for payment callbacks. Older review drafts still mention a prior alias in places, so this note is not enough by itself.",
+    "tags": ["degraded", "customer-facing", "webhook"],
+    "created_at": "2026-05-03T09:03:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  },
+  {
+    "note_id": "INT-K207",
+    "title": "Partner Export - Degraded",
+    "content": "Kappa partner export. Status: degraded. Customer-facing production issue.",
+    "tags": ["degraded", "customer-facing", "export"],
+    "created_at": "2026-05-03T09:04:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  }
+]

@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM03-002",
+    "title": "Phoenix Freeze Date Planning Note",
+    "created_at": "2026-04-11",
+    "participants": ["Elena Gomez", "Ravi Shah", "Nora Klein"],
+    "duration_minutes": 35,
+    "content": "Phoenix freeze date planning note.\n\nAction items:\n1. Elena Gomez: update the QA checklist against the freeze window\n2. Ravi Shah: sync the rollout announcement timing with the freeze date\n\nNora Klein attended as an observer."
+  }
+]

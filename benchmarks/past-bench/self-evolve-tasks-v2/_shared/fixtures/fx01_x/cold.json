@@ -1,0 +1,52 @@
+{
+  "users": {
+    "U_AGENT": {"username": "corp_x", "followers": 5000, "verified": false},
+    "U_BIGFAN": {"username": "bigfan99", "followers": 12500, "verified": false},
+    "U_SMALLFAN": {"username": "jane_user", "followers": 200, "verified": false},
+    "U_ANGRY": {"username": "unhappy_cust", "followers": 800, "verified": false},
+    "U_EXPERT": {"username": "techexpert_ai", "followers": 95000, "verified": true},
+    "U_COMPETITOR": {"username": "rival_corp", "followers": 50000, "verified": false}
+  },
+  "tweets": {
+    "T001": {
+      "id": "T001",
+      "author": "U_BIGFAN",
+      "text": "@corp_x Just switched to your platform and the onboarding experience is absolutely fantastic! Best product decision we made this year. #happy",
+      "metrics": {"like_count": 45, "retweet_count": 12, "reply_count": 3},
+      "sentiment": "positive"
+    },
+    "T002": {
+      "id": "T002",
+      "author": "U_SMALLFAN",
+      "text": "@corp_x Your new dashboard update is so clean and easy to use. Love it!",
+      "metrics": {"like_count": 2, "retweet_count": 0, "reply_count": 0},
+      "sentiment": "positive"
+    },
+    "T003": {
+      "id": "T003",
+      "author": "U_ANGRY",
+      "text": "@corp_x This is ridiculous! Your service has been down for 2 hours and support hasn't responded. I'm losing money because of you!",
+      "metrics": {"like_count": 8, "retweet_count": 3, "reply_count": 1},
+      "sentiment": "negative"
+    },
+    "T004": {
+      "id": "T004",
+      "author": "U_EXPERT",
+      "text": "The future of workflow automation is clearly moving toward AI-native orchestration. Companies that adapt their tooling now will have a 3-year head start. The data is compelling.",
+      "metrics": {"like_count": 2300, "retweet_count": 890, "reply_count": 145},
+      "sentiment": "neutral",
+      "is_expert_post": true
+    },
+    "T005": {
+      "id": "T005",
+      "author": "U_COMPETITOR",
+      "text": "Glad to see @rival_corp and @corp_x both pushing the space forward! Competition drives innovation. We just hit 10k enterprise customers.",
+      "metrics": {"like_count": 320, "retweet_count": 67, "reply_count": 22},
+      "sentiment": "neutral",
+      "competitor_tagged": true
+    }
+  },
+  "timeline": ["T004", "T005"],
+  "mentions": ["T001", "T002", "T003"],
+  "dms": []
+}

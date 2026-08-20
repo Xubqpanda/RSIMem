@@ -1,0 +1,72 @@
+[
+  {
+    "ticket_id": "TK-S201",
+    "title": "PayGateway release event — deploy hash def456",
+    "description": "Deployment event recorded for PayGateway service. Release hash: def456. Deployment completed at 10:30 UTC. This is the root deployment event for the def456 release of PayGateway. All child failure tickets referencing release_hash def456 should be grouped under this event for rollback evaluation.",
+    "reporter": "deploy-bot",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-11T10:30:00Z",
+    "tags": [],
+    "release_hash": "def456",
+    "service": "PayGateway",
+    "ticket_type": "deploy-event"
+  },
+  {
+    "ticket_id": "TK-S202",
+    "title": "PayGateway checkout broken — def456 deployment",
+    "description": "The PayGateway checkout flow is broken following the def456 deployment at 10:30 UTC. Users cannot complete payments and the checkout endpoint is returning HTTP 503. Multiple e-commerce teams have escalated. The failure is directly attributed to the def456 release of PayGateway.",
+    "reporter": "Karen-Walsh",
+    "department": "E-Commerce",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-11T10:42:00Z",
+    "tags": [],
+    "release_hash": "def456",
+    "service": "PayGateway",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-S203",
+    "title": "PayGateway 502 errors post def456 release",
+    "description": "PayGateway is returning HTTP 502 errors on all payment processing endpoints since the def456 release went live at 10:30 UTC. Transaction processing is completely halted. SRE confirmed this regression is caused by the def456 deployment. Rollback candidate for release_hash def456.",
+    "reporter": "Tyler-Brooks",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-11T10:50:00Z",
+    "tags": [],
+    "release_hash": "def456",
+    "service": "PayGateway",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-S204",
+    "title": "PayGateway issue — release_hash ghi789",
+    "description": "A configuration issue was discovered in an earlier PayGateway deployment identified by release_hash ghi789. This is a completely different deployment from the current def456 release. The ghi789 issue involves a legacy routing rule that conflicts with new infrastructure. Do not group this with def456 child failures.",
+    "reporter": "Claire-Renaud",
+    "department": "Infrastructure",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-11T11:30:00Z",
+    "tags": [],
+    "release_hash": "ghi789",
+    "service": "PayGateway",
+    "ticket_type": "incident"
+  },
+  {
+    "ticket_id": "TK-S205",
+    "title": "PayGateway new feature request — recurring payments UI",
+    "description": "Feature request from the billing team to add a recurring payments management interface to PayGateway. No relation to any deployment event or release hash. This is a product backlog item for future sprint planning. Not an incident.",
+    "reporter": "Isabelle-Dupont",
+    "department": "Product",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-11T13:00:00Z",
+    "tags": [],
+    "release_hash": null,
+    "service": "PayGateway",
+    "ticket_type": "feature-request"
+  }
+]

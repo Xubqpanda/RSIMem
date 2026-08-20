@@ -1,0 +1,41 @@
+[
+  {
+    "note_id": "MTG-EP01-CNP1",
+    "title": "Procurement Escalation",
+    "content": "Procurement needs a same-day yes/no on Vendor X for production rollout. They expect us to rely on whatever prior decision we already documented.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-C1",
+    "title": "Arch Review",
+    "content": "Architecture review. Bob proposed moving to event-driven pattern for the ingestion layer.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-C2",
+    "title": "Standup",
+    "content": "Daily standup. No blockers. Carol picked up the dashboard polish.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  }
+]

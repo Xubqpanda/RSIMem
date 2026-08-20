@@ -1,0 +1,15 @@
+{
+  "session_id": "ep03_regional_checklist",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Regional onboarding checklist DOC-425 has APAC-only shipping and badge steps."
+    },
+    {
+      "role": "assistant",
+      "content": "DOC-425 is a regional checklist, not the approved onboarding playbook."
+    }
+  ]
+}

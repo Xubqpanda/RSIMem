@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-R401",
+    "title": "Order conversion rate data contains anomalies",
+    "description": "This month's order conversion statistics show several channels with -5% conversion rate, which is clearly invalid. Data needs to be cleaned and filtered before re-running the numbers.",
+    "reporter": "Data-Bob Zhang",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-18T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R402",
+    "title": "Member spending analysis missing normalization",
+    "description": "Spending amounts differ in scale across membership tiers; normalization is needed before tier-to-tier comparisons can be made.",
+    "reporter": "Research-Carol Liu",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-18T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R403",
+    "title": "New product launch effectiveness aggregation report pending",
+    "description": "Two weeks post-launch, channel data has been cleaned; aggregation and a full effectiveness analysis report still need to be produced.",
+    "reporter": "Data-Alice Chen",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-18T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R404",
+    "title": "Request: expand data warehouse storage",
+    "description": "The data warehouse is nearly at capacity; requesting an expansion. This is an infrastructure ticket, not a data analysis issue.",
+    "reporter": "Ops-George Tan",
+    "department": "IT Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-18T11:00:00Z",
+    "tags": []
+  }
+]

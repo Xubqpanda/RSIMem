@@ -1,0 +1,126 @@
+task_id: SE_FX01_I01
+task_name: Self-Evolve X Engagement Protocol — Cold Baseline
+version: '1.0'
+category: self_evolve
+difficulty: hard
+services:
+- name: x_mock
+  command: python mock_services/x/server.py
+  port: 3300
+  health_check: http://localhost:3300/health
+  ready_timeout: 10
+  reset_endpoint: http://localhost:3300/x/reset
+  env:
+    X_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fx01_x/cold.json
+  health_check_method: GET
+- name: kb
+  command: python mock_services/kb/server.py
+  port: 9106
+  health_check: http://localhost:9106/kb/search
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9106/kb/reset
+  env:
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fx01_x/kb_cold.json
+prompt:
+  text: 'Before taking any actions, please check the knowledge base for any X (Twitter)
+    engagement guidelines.
+
+
+    You are the social media agent for @corp_x. Review the current mentions and timeline,
+
+    then take the appropriate engagement action for each post according to company
+    policy.
+
+
+    Use getMentions to read mentions, getTimeline to see the timeline.
+
+    For each post, decide on the correct action: reply, like, sendDM, quoteTweet,
+    or ignore.
+
+    Check user profiles (getUserProfile) when relevant to determine follower counts.
+
+    '
+  language: en
+tools:
+- name: x_action
+  description: Execute an X (Twitter) action
+  input_schema:
+    type: object
+    properties:
+      action:
+        type: string
+        enum:
+        - getTimeline
+        - getMentions
+        - getTweet
+        - replyToTweet
+        - postTweet
+        - quoteTweet
+        - sendDM
+        - likeTweet
+        - retweetTweet
+        - getUserProfile
+      tweetId:
+        type: string
+        description: Tweet ID for tweet-specific actions
+      text:
+        type: string
+        description: Text content for postTweet, replyToTweet, quoteTweet
+      recipientId:
+        type: string
+        description: User ID for sendDM
+      username:
+        type: string
+        description: Username for getUserProfile
+      userId:
+        type: string
+        description: User ID for getUserProfile
+      count:
+        type: integer
+        description: Number of results to return
+    required:
+    - action
+- name: kb_search
+  description: Search the knowledge base
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      category:
+        type: string
+      max_results:
+        type: integer
+    required:
+    - query
+- name: kb_get_article
+  description: Get a knowledge base article by ID
+  input_schema:
+    type: object
+    properties:
+      article_id:
+        type: string
+    required:
+    - article_id
+tool_endpoints:
+- tool_name: x_action
+  url: http://localhost:3300/x/action
+  method: POST
+- tool_name: kb_search
+  url: http://localhost:9106/kb/search
+  method: POST
+- tool_name: kb_get_article
+  url: http://localhost:9106/kb/articles/get
+  method: POST
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+judge_rubric: 'Award full credit if the agent: (1) replies to T001 (positive, 12500
+  followers) with #CorpX hashtag, (2) likes T002 (positive, 200 followers) without
+  replying, (3) sends DM to T003 author (negative mention) without public reply, (4)
+  quote-tweets T004 (verified expert), (5) ignores T005 (competitor-tagged, no like/reply/RT).
+  Partial credit for right channel/action type even with wrong text format. Zero credit
+  for publicly replying to negative mentions or engaging with competitor post.
+
+  '

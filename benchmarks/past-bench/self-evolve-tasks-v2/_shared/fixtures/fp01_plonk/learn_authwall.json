@@ -1,0 +1,91 @@
+{
+  "users": {
+    "U_AGENT": {"name": "agent", "display_name": "Task Agent"},
+    "U_BACKEND": {"name": "backend_team", "display_name": "Backend Team"},
+    "U_DEVOPS": {"name": "devops_team", "display_name": "DevOps Team"},
+    "U_PM": {"name": "product_manager", "display_name": "Product Manager"},
+    "U_SECURITY": {"name": "security_team", "display_name": "Security Team"},
+    "U_SUPPORT": {"name": "support_team", "display_name": "Support Team"}
+  },
+  "channels": {
+    "plk-general": {
+      "topic": "General discussion",
+      "messages": [
+        {
+          "id": "m001",
+          "user": "U_PM",
+          "text": "The new onboarding flow is live in production. Let's track conversion metrics over the next 48 hours.",
+          "ts": "2026-04-05T08:00:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m002",
+          "user": "U_SUPPORT",
+          "text": "Support queue is backed up this morning — lots of users reporting they cannot log in.",
+          "ts": "2026-04-05T09:05:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m003",
+          "user": "U_PM",
+          "text": "We have a product demo at 2pm. Everything needs to be stable by then.",
+          "ts": "2026-04-05T09:15:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-engineering": {
+      "topic": "Engineering discussions and incident alerts",
+      "messages": [
+        {
+          "id": "m004",
+          "user": "U_BACKEND",
+          "text": "Finished refactoring the token refresh logic. PR #445 merged this morning.",
+          "ts": "2026-04-05T08:30:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m005",
+          "user": "U_SECURITY",
+          "text": "ALERT: AuthWall login failure rate at 94%. JWT validation is returning 401 for all users. AuthWall service appears down. This is a critical incident — users cannot authenticate.",
+          "ts": "2026-04-05T09:10:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m006",
+          "user": "U_BACKEND",
+          "text": "Confirmed: AuthWall token signing service is returning 503. Root cause likely the cert rotation that ran at 09:00 UTC.",
+          "ts": "2026-04-05T09:14:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m007",
+          "user": "U_DEVOPS",
+          "text": "Working on rolling back the cert rotation. ETA 15 minutes.",
+          "ts": "2026-04-05T09:18:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m008",
+          "user": "U_SECURITY",
+          "text": "All SSO providers are failing too — SAML assertions not being accepted by AuthWall. Full authentication outage confirmed.",
+          "ts": "2026-04-05T09:22:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-incidents": {
+      "topic": "Active incident tracking",
+      "messages": []
+    }
+  },
+  "dms": []
+}

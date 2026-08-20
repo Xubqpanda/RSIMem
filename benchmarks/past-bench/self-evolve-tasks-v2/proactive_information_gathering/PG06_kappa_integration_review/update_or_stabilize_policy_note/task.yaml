@@ -1,0 +1,28 @@
+task_id: PG06_UPDATE_001
+task_name: PG06 Kappa Integration Review Policy Update
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Update your own retrieval policy / meta-memory / skill note for future Kappa integration reviews.
+
+    Stable routing fact change:
+    - customer-facing payment or identity Kappa integrations now escalate to security-partners@corp.com instead of infra-risk@corp.com
+    - every other Kappa escalation still uses infra-risk@corp.com
+    - workflow steps are unchanged
+    - weekly exception IDs must still be recovered from session history
+
+    Write a general rule, not a case-specific memory. Do not include any exact weekly exception IDs or note IDs.
+
+    Output: POLICY_UPDATED|kappa_review_workflow
+
+    '
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward a general policy update that patches the scoped routing fact while preserving the existing workflow and weekly-exception retrieval rule.

@@ -1,0 +1,32 @@
+[
+  {
+    "integration_id": "INTG-AP-010",
+    "name": "APAC Tax Ledger",
+    "region": "APAC",
+    "status": "suspended",
+    "auth_type": "oauth2",
+    "exception_approved": false,
+    "notes": "Suspended pending APAC compliance questionnaire.",
+    "last_updated": "2026-04-10"
+  },
+  {
+    "integration_id": "INTG-AP-011",
+    "name": "APAC Audit Mirror",
+    "region": "APAC",
+    "status": "suspended",
+    "auth_type": "api_key",
+    "exception_approved": false,
+    "notes": "Suspended pending audit response.",
+    "last_updated": "2026-04-10"
+  },
+  {
+    "integration_id": "INTG-US-012",
+    "name": "US CRM Sync",
+    "region": "US",
+    "status": "active",
+    "auth_type": "oauth2",
+    "exception_approved": false,
+    "notes": "",
+    "last_updated": "2026-04-10"
+  }
+]

@@ -1,0 +1,55 @@
+[
+  {
+    "note_id": "DOC-721",
+    "title": "Onboarding Playbook",
+    "content": "Current shell placeholder for the settled onboarding playbook. Preserve the existing metadata when applying updates.",
+    "tags": ["approved", "artifact-shell"],
+    "status": "active",
+    "created_at": "2026-04-16T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "DOC-722",
+    "title": "Onboarding Playbook Draft",
+    "content": "Draft shell for a candidate onboarding playbook refresh. Metadata may not match the settled version.",
+    "tags": ["approved", "artifact-shell"],
+    "status": "active",
+    "created_at": "2026-04-16T09:03:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "DOC-723",
+    "title": "Onboarding Playbook",
+    "content": "Regional onboarding shell queued for review. The assigned reviewers differ from the settled version.",
+    "tags": ["candidate", "artifact-shell"],
+    "status": "active",
+    "created_at": "2026-04-16T09:06:00Z",
+    "participants": [
+      "alice@corp.com",
+      "people-ops@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "REQ-8801",
+    "title": "Ops Change Request",
+    "content": "Set the mentor handoff SLA to 24 hours on the settled onboarding playbook. Leave every other step and metadata unchanged.",
+    "tags": ["request"],
+    "status": "active",
+    "created_at": "2026-04-16T09:12:00Z",
+    "participants": [
+      "ops@corp.com"
+    ],
+    "duration_minutes": 10
+  }
+]

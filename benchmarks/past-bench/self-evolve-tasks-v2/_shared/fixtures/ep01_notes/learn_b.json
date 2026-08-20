@@ -1,0 +1,54 @@
+[
+  {
+    "note_id": "MTG-EP01-C1",
+    "title": "Arch Review",
+    "content": "Architecture review. Bob proposed moving to event-driven pattern for the ingestion layer.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-C2",
+    "title": "Standup",
+    "content": "Daily standup. No blockers. Carol picked up the dashboard polish.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-NOISE",
+    "title": "Roadmap Planning",
+    "content": "Q3 roadmap planning. Priority items: launch customer migration dashboard, finish audit evidence automation, and close mobile release blockers before code freeze.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  },
+  {
+    "note_id": "MTG-EP01-NOISE2",
+    "title": "Budget Check-In",
+    "content": "Monthly budget review. Hold flat on travel spend and defer non-critical vendor onboarding.",
+    "tags": [],
+    "created_at": "2026-04-15T09:00:00Z",
+    "participants": [
+      "alice@corp.com",
+      "bob@corp.com",
+      "carol@corp.com"
+    ],
+    "duration_minutes": 45
+  }
+]

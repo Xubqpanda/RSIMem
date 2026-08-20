@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-R201",
+    "title": "User behavior funnel data lacks cleaning step",
+    "description": "The user behavior analysis report contains significant duplicate event records and timestamp anomalies in the raw event log, causing distorted funnel metrics at each stage.",
+    "reporter": "Data-Bob Zhang",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R202",
+    "title": "Multi-channel ad performance missing normalization",
+    "description": "Ad spend volumes vary enormously across channels; without normalization the conversion rate comparisons are biased. Please normalize and produce a comparable report.",
+    "reporter": "Research-Carol Liu",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R203",
+    "title": "New user activation aggregated metrics not updated",
+    "description": "New user activation data is spread across three channels; it needs to be aggregated by campaign dimension and published as a unified activation rate report.",
+    "reporter": "Data-Alice Chen",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R204",
+    "title": "Request: purchase additional BI tool licenses",
+    "description": "Current BI tool licenses are expiring; the team needs to renew or procure a replacement. This is a procurement matter, not a data analysis issue.",
+    "reporter": "Operations-Dan Park",
+    "department": "Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T11:00:00Z",
+    "tags": []
+  }
+]

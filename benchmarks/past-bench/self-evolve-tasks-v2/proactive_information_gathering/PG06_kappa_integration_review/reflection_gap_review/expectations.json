@@ -1,0 +1,19 @@
+{
+  "latent_rule_id": "pg06_kappa_integration_review_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "reflection",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "ERROR_CLASS|",
+    "MISSED_CLUE|",
+    "NEXT_CHECK|"
+  ],
+  "forbidden_output_keywords": [
+    "INT-K204",
+    "INT-K207",
+    "INT-K201",
+    "infra-risk@corp.com",
+    "security-partners@corp.com"
+  ]
+}

@@ -1,0 +1,29 @@
+[
+  {
+    "note_id": "AUDIT-PG04-A",
+    "title": "Ledger export waiver audit",
+    "content": "Request under review: owner=data-platform service=ledger-export scope=staging-eu candidates=LGR-EU-14,LGR-EU-19,LGR-EU-22. A current shell suggests an EU waiver still applies, but an older archive and near-match scopes also exist. The exact reference, approved cases, and expiry are not copied here.",
+    "tags": [
+      "audit-note",
+      "current"
+    ],
+    "created_at": "2026-04-20T12:00:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 10
+  },
+  {
+    "note_id": "AUDIT-PG04-M1",
+    "title": "Waiver audit scratchpad",
+    "content": "Scratchpad only.",
+    "tags": [
+      "misc"
+    ],
+    "created_at": "2026-04-20T12:01:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 5
+  }
+]

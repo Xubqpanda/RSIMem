@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM07-003",
+    "title": "Scoped Security Migration",
+    "created_at": "2026-05-13",
+    "participants": ["Renee Shah", "Evan Lin", "Jonah Fisk", "Marta Hill", "Olivia Cruz"],
+    "duration_minutes": 40,
+    "content": "Scoped security migration.\n\nAction items:\n1. [Security][High] Renee Shah: rotate the privileged credential chain, due 2026-07-09\n2. [Security][Medium] Evan Lin: reconcile the stale alert acknowledgements, due 2026-07-10\n3. [Ops][High] Jonah Fisk: replay the failed deployment batch, due 2026-07-11\n4. [Ops][Low] Marta Hill: archive the completed rollback tickets, due 2026-07-12\n\nOlivia Cruz attended as an observer."
+  }
+]

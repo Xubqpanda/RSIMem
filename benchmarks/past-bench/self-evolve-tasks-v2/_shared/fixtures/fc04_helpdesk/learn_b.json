@@ -1,0 +1,46 @@
+[
+  {
+    "ticket_id": "TK-E301",
+    "title": "PR #1001 — monitoring collector uses requests.Session",
+    "description": "PR #1001 for the monitoring data collection module uses requests.Session for persistent connections. Please evaluate whether migration is required.",
+    "reporter": "Ops-Henry Kim",
+    "department": "IT Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E302",
+    "title": "PR #1002 — search service uses aiohttp",
+    "description": "PR #1002 for the search service uses aiohttp for async HTTP calls; concurrency performance has improved significantly.",
+    "reporter": "Backend-Linda Wei",
+    "department": "Backend Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E303",
+    "title": "PR #1003 — third-party callback handler uses import requests",
+    "description": "PR #1003 for the third-party payment callback service still uses import requests. Please handle.",
+    "reporter": "Payments-Mark Zhou",
+    "department": "Payments Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-E304",
+    "title": "Request: update internal coding standards document",
+    "description": "The team would like to update the internal coding standards documentation to include the latest toolchain guidance. Not a code review ticket.",
+    "reporter": "Architecture-Steve Chen",
+    "department": "Architecture Team",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-14T11:00:00Z",
+    "tags": []
+  }
+]

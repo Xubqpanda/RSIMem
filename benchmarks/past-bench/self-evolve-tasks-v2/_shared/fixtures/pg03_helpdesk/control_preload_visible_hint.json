@@ -1,0 +1,49 @@
+[
+  {
+    "ticket_id": "INC-870",
+    "title": "CacheEdge latency parent incident",
+    "reporter": "monitor",
+    "department": "sre",
+    "priority": "high",
+    "status": "open",
+    "tags": [
+      "cacheedge",
+      "parent-incident",
+      "visible-hint"
+    ],
+    "category": "incident",
+    "reason_code": "active",
+    "description": "Visible hint: there is a maintenance window later today, but exact owner and blocked ticket set are not copied here.",
+    "created_at": "2026-04-20T11:40:00Z"
+  },
+  {
+    "ticket_id": "HD-PG03-103",
+    "title": "CacheEdge latency follow-up shard A",
+    "reporter": "monitor",
+    "department": "sre",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "cacheedge",
+      "follow-up"
+    ],
+    "category": "follow-up",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T11:41:00Z"
+  },
+  {
+    "ticket_id": "HD-PG03-104",
+    "title": "CacheEdge latency follow-up shard B",
+    "reporter": "monitor",
+    "department": "sre",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "cacheedge",
+      "follow-up"
+    ],
+    "category": "follow-up",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T11:42:00Z"
+  }
+]

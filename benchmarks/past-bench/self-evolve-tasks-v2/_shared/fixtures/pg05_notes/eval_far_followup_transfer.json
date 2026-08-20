@@ -1,0 +1,17 @@
+[
+  {
+    "note_id": "FREEZE-PG05-FAR",
+    "title": "Meridian Data Bridge status footer shell",
+    "content": "The status-page footer needs the exact Meridian Data Bridge freeze window from the earlier CAB packet. Do not guess from partial context.",
+    "tags": [
+      "change-freeze",
+      "status-page",
+      "prod-ca"
+    ],
+    "created_at": "2026-05-02T10:00:00Z",
+    "participants": [
+      "status-page@corp.com"
+    ],
+    "duration_minutes": 10
+  }
+]

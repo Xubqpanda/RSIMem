@@ -1,0 +1,20 @@
+[
+  {
+    "article_id": "kb_pipeline_brief",
+    "title": "Data Analysis Process Overview",
+    "category": "Data SOP",
+    "tags": ["data analysis", "pipeline", "brief"],
+    "content": "Data analysis issues typically require multi-step processing: raw data cleaning, normalization, outlier filtering, aggregation, and report generation. For the detailed standard, see the full Data Quality Analysis SOP.",
+    "last_updated": "2026-03-20",
+    "views": 15
+  },
+  {
+    "article_id": "kb_pipeline_noise",
+    "title": "Handling Demo Requests",
+    "category": "Operations",
+    "tags": ["demo", "request"],
+    "content": "Tool demo requests are non-technical; forward directly to the operations coordinator. They do not follow the data analysis pipeline.",
+    "last_updated": "2026-03-15",
+    "views": 8
+  }
+]

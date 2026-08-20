@@ -1,0 +1,51 @@
+{
+  "latent_rule_id": "fp01_plonk_incident_response_sop_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "evaluation",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "nexobi",
+      "felura",
+      "zubefa",
+      "plk-incidents"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": true,
+    "min_skill_reads": 1
+  },
+  "mode": "plonk",
+  "required_methods": [
+    "nexobi",
+    "felura",
+    "zubefa"
+  ],
+  "forbidden_methods": [
+    "mokufa",
+    "volari",
+    "plentu",
+    "ximako",
+    "doravi",
+    "kaviru",
+    "zolanti",
+    "fenaldi",
+    "gremoku",
+    "torvani",
+    "wexidu",
+    "lunista",
+    "prikova",
+    "darvoxi",
+    "nubikov"
+  ],
+  "required_channel": "plk-incidents",
+  "required_message_keywords": [
+    "INCIDENT",
+    "NetGuard"
+  ],
+  "min_skill_count": 1,
+  "skill_artifact_weight": 0.05,
+  "missing_retrieval_cap": 0.25,
+  "apply_mechanism_caps": true
+}

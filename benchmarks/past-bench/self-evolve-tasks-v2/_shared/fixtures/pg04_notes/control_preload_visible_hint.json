@@ -1,0 +1,30 @@
+[
+  {
+    "note_id": "AUDIT-PG04-CP",
+    "title": "Ledger export visible-hint audit",
+    "content": "Visible hint: there was an earlier EU waiver, but the exact approved cases, reference, and expiry are not copied into this note. Request under review: owner=data-platform service=ledger-export scope=staging-eu candidates=LGR-EU-14,LGR-EU-22.",
+    "tags": [
+      "audit-note",
+      "current",
+      "visible-hint"
+    ],
+    "created_at": "2026-04-20T12:40:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 10
+  },
+  {
+    "note_id": "AUDIT-PG04-M5",
+    "title": "EU waiver scratchpad",
+    "content": "Scratchpad only.",
+    "tags": [
+      "misc"
+    ],
+    "created_at": "2026-04-20T12:41:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 5
+  }
+]

@@ -1,0 +1,72 @@
+[
+  {
+    "ticket_id": "TK-T301",
+    "title": "SearchAPI release event — deploy hash jkl012",
+    "description": "Deployment event recorded for SearchAPI service. Release hash: jkl012. Deployment completed at 16:00 UTC. This is the root deployment event for the jkl012 release of SearchAPI. Child tickets referencing release_hash jkl012 should be grouped under this event for triage.",
+    "reporter": "deploy-bot",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:00:00Z",
+    "tags": [],
+    "release_hash": "jkl012",
+    "service": "SearchAPI",
+    "ticket_type": "deploy-event"
+  },
+  {
+    "ticket_id": "TK-T302",
+    "title": "SearchAPI returning stale results after jkl012 deploy",
+    "description": "Since the jkl012 deployment of SearchAPI at 16:00 UTC, search queries are returning stale cached results. The index refresh mechanism appears to have broken. Multiple product teams are reporting degraded search quality. This regression is tied to release_hash jkl012.",
+    "reporter": "Markus-Gruber",
+    "department": "Product",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:15:00Z",
+    "tags": [],
+    "release_hash": "jkl012",
+    "service": "SearchAPI",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-T303",
+    "title": "SearchAPI 503 errors — jkl012 release regression",
+    "description": "SearchAPI is returning HTTP 503 Service Unavailable on all query endpoints since the jkl012 release at 16:00 UTC. Real-time search is completely non-functional. SRE has confirmed the 503s started immediately after the jkl012 deployment completed. Candidate for rollback of release_hash jkl012.",
+    "reporter": "Beatriz-Santos",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:22:00Z",
+    "tags": [],
+    "release_hash": "jkl012",
+    "service": "SearchAPI",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-T304",
+    "title": "SearchAPI indexing issue — different deployment mno345",
+    "description": "An indexing configuration issue discovered in the SearchAPI deployment with release_hash mno345, which was deployed two weeks ago. This is a separate deployment from the current jkl012 release. The mno345 issue involves index mapping changes that conflict with a schema update. Not related to jkl012.",
+    "reporter": "Elsa-Magnusson",
+    "department": "DBA",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T17:00:00Z",
+    "tags": [],
+    "release_hash": "mno345",
+    "service": "SearchAPI",
+    "ticket_type": "incident"
+  },
+  {
+    "ticket_id": "TK-T305",
+    "title": "SearchAPI index rebuild request — maintenance",
+    "description": "Routine search index rebuild request for the SearchAPI service. The full-text index requires a monthly rebuild to maintain performance. No relation to any specific deployment event or release hash. This is scheduled maintenance per the SRE calendar.",
+    "reporter": "Pieter-de-Jong",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T18:00:00Z",
+    "tags": [],
+    "release_hash": null,
+    "service": "SearchAPI",
+    "ticket_type": "maintenance"
+  }
+]

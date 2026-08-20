@@ -1,0 +1,113 @@
+family_id: PC02_sop_patch_02
+title: Error-Correction SOP Patch
+ability_dir: update_ability
+primary_ability: update_ability
+secondary_abilities: []
+primary_trigger: weak_conflict_update
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 7
+episode_order:
+- FC04_I01_errcorr_cold
+- FC04_I02b_errcorr_update_or_stabilize
+- FC04_I03_errcorr_eval_near
+- FC04_I03b_errcorr_eval_far
+- FC04_C01_control_no_persistence
+- FC04_C02_control_shortcut
+- FC04_C03_control_stale_procedure
+history_plan:
+  anchors:
+  - name: pc02_02_post_update
+    save_after: FC04_I02b_errcorr_update_or_stabilize
+  branches:
+  - mode: fresh
+    episodes:
+    - FC04_I01_errcorr_cold
+    - FC04_C01_control_no_persistence
+    - FC04_C02_control_shortcut
+    - FC04_C03_control_stale_procedure
+  - mode: continue
+    episodes:
+    - FC04_I02b_errcorr_update_or_stabilize
+  - mode: from_anchor
+    anchor: pc02_02_post_update
+    episodes:
+    - FC04_I03_errcorr_eval_near
+    - FC04_I03b_errcorr_eval_far
+episode_overrides:
+  FC04_I01_errcorr_cold:
+    mechanism: skill
+    expected_persistence_signal: skill
+    persistence_allowed: true
+    initial_home_fixture_dir: self-evolve-tasks-v2/_shared/home_fixtures/update_ability/PC02_sop_patch_02
+  FC04_I02b_errcorr_update_or_stabilize:
+    mechanism: skill
+    expected_persistence_signal: skill
+    persistence_allowed: true
+control_set:
+- no_persistence
+- shortcut
+- stale_procedure
+status: v2_architecture_aligned
+latent_rule_id: fc04_error_correction_procedure_v1
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  Error-correction procedure patch — the updated diagnostic and correction
+  sequence that supersedes the original, with revised check ordering.
+what_persists: >
+  A durable skill artifact encoding the patched error-correction procedure,
+  overwriting the previously stored original sequence.
+what_counts_as_reuse: >
+  Agent applies the corrected procedure (not the original) to novel error
+  scenarios, demonstrating the correction was absorbed and persisted.
+false_positive_pattern: >
+  Agent applies a mix of old and new check orderings, or reverts to the
+  original sequence under surface variation, indicating incomplete uptake.
+must_demonstrate:
+- Absorb the correction patch and overwrite the stored procedure
+- Apply only the corrected check sequence to novel error scenarios
+- Resist regression to the original procedure under changed surface wording
+
+# §13.0 Trigger Spec
+trigger_category: weak_conflict_update
+trigger_strength: T2
+visibility_surface: correction appears as an operational revision memo; the prompt does not directly command a skill overwrite
+trigger_injection_plan: "initial_home_fixture: seed flawed HTTP client skill with memory/session distractors; update_or_stabilize: expose corrected guide and revision memo without an explicit overwrite command"
+trigger_removal_plan: eval penalizes stale procedure; rewards only corrected path
+trigger_mixing_rule: no failure_reflection; update-driven only, but overwrite must be inferred from the correction notice
+sibling_comparison_plan: reflection-based patch sibling should be separate
+phase1_canonical_sibling: compare against PC02_01 T3 canonical patch
+future_sibling_roadmap: reflection-based correction sibling; T1 embedded changelog sibling
+
+# §10 Cold Design
+cold_design: "Run the same skill-retrieval workflow as eval from the stale native Hermes home fixture and score cold against the corrected HTTP client policy."
+expected_cold_result: "Cold should provide the pre-correction baseline against the same post-correction target that eval uses, with the stale skill already seeded in Hermes home."
+
+# Control Design
+control_design: no_persistence, shortcut, stale_procedure
+expected_control_result: without persistence, agent reverts to stale procedure
+
+# Episodes
+legacy_source: previous PC split, architecture-aligned
+legacy_episodes:
+- FC04_C01_control_no_persistence
+- FC04_C02_control_shortcut
+- FC04_C03_control_stale_procedure
+- FC04_I01_errcorr_cold
+- FC04_I02b_errcorr_update_or_stabilize
+- FC04_I03_errcorr_eval_near
+- FC04_I03b_errcorr_eval_far

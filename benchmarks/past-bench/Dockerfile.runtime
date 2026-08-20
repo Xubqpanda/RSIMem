@@ -1,0 +1,72 @@
+# Generic decoupled runtime image for past-bench.
+# Optimized layer order: heavy deps (cached) → source code (changes often).
+ARG REGISTRY=docker.io
+FROM ${REGISTRY}/python:3.11-slim
+
+WORKDIR /opt/past-bench
+
+ARG OPENCLAW_VERSION=latest
+ARG CODEX_VERSION=latest
+ARG CLAUDE_CODE_VERSION=latest
+
+# ── Layer 1: System packages + Node.js CLIs (rarely changes) ──
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates gnupg build-essential git ripgrep \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
+        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" \
+        > /etc/apt/sources.list.d/nodesource.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends nodejs \
+    && npm install -g "openclaw@${OPENCLAW_VERSION}" "@openai/codex@${CODEX_VERSION}" "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+    && openclaw --version \
+    && codex --version \
+    && claude --version \
+    && apt-get purge -y gnupg \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Layer 2: Python deps — requirements files only (cached unless deps change) ──
+COPY requirements.txt /tmp/requirements.txt
+COPY agents/zeroclaw/python/pyproject.toml /tmp/zeroclaw-pyproject.toml
+COPY agents/hermes-agent/pyproject.toml /tmp/hermes-pyproject.toml
+COPY agents/agent-zero/requirements-docker.txt /tmp/agent-zero-requirements.txt
+
+RUN pip install -r /tmp/requirements.txt \
+        --default-timeout=1000 \
+        --no-cache-dir \
+    && rm /tmp/requirements.txt
+
+# Agent Zero heavy deps (scipy, sentence-transformers, faiss)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gfortran libopenblas-dev \
+    && pip install --no-cache-dir --prefer-binary \
+        --default-timeout=1000 \
+        -r /tmp/agent-zero-requirements.txt \
+    && apt-get purge -y gfortran \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Layer 3: Source code (changes often — fast rebuild from here) ──
+COPY pyproject.toml /opt/past-bench/pyproject.toml
+COPY src/ /opt/past-bench/src/
+COPY configs/ /opt/past-bench/configs/
+COPY agents/zeroclaw/python/ /opt/past-bench/agents/zeroclaw/python/
+COPY agents/hermes-agent/ /opt/past-bench/agents/hermes-agent/
+COPY agents/hermes-plus/ /opt/past-bench/agents/hermes-plus/
+COPY agents/agent-zero/ /opt/past-bench/agents/agent-zero/
+COPY agents/nanobot/ /opt/past-bench/agents/nanobot/
+
+# Install past-bench + bundled agents (editable, fast)
+RUN pip install -e /opt/past-bench --no-cache-dir --default-timeout=1000 \
+    && pip install -e /opt/past-bench/agents/zeroclaw/python --no-cache-dir --default-timeout=1000 \
+    && pip install -e /opt/past-bench/agents/hermes-agent --no-cache-dir --default-timeout=1000 \
+    && pip install -e /opt/past-bench/agents/hermes-plus --no-cache-dir --default-timeout=1000 \
+    && pip install -e /opt/past-bench/agents/nanobot --no-cache-dir --default-timeout=1000
+
+ENV PAST_BENCH_AGENT_REGISTRY=/opt/past-bench/configs/agents.yaml
+ENV PAST_BENCH_RUNTIME_CACHE=/opt/runtime-cache
+
+EXPOSE 8090
+ENTRYPOINT ["python", "-m", "past_bench.runtime.server", "--port", "8090"]

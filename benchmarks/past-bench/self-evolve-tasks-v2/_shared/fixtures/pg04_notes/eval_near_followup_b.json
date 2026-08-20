@@ -1,0 +1,29 @@
+[
+  {
+    "note_id": "AUDIT-PG04-NB",
+    "title": "Metrics drain waiver audit",
+    "content": "Request under review: owner=observability service=metrics-drain scope=qa-eu candidates=MD-08,MD-09,MD-12. Check whether a temporary waiver still applies.",
+    "tags": [
+      "audit-note",
+      "current"
+    ],
+    "created_at": "2026-04-20T12:20:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 10
+  },
+  {
+    "note_id": "AUDIT-PG04-M3",
+    "title": "Metrics scratchpad",
+    "content": "Scratchpad only.",
+    "tags": [
+      "misc"
+    ],
+    "created_at": "2026-04-20T12:21:00Z",
+    "participants": [
+      "risk@corp.com"
+    ],
+    "duration_minutes": 5
+  }
+]

@@ -1,0 +1,71 @@
+{
+  "latent_rule_id": "fx01_x_engagement_protocol_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "mode": "x_engagement",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "1000",
+      "#CorpX",
+      "sendDM",
+      "quoteTweet",
+      "ignore"
+    ],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "engagement_checks": [
+    {
+      "tweet_id": "T010",
+      "expected_action": "replyToTweet",
+      "expected_text_contains": "#CorpX",
+      "weight": 0.25,
+      "note": "Positive mention, 8700 followers (≥1000) → public reply with #CorpX"
+    },
+    {
+      "tweet_id": "T011",
+      "expected_action": "like",
+      "forbidden_actions": [
+        "replyToTweet",
+        "postTweet"
+      ],
+      "weight": 0.25,
+      "note": "Positive mention, 150 followers (<1000) → like only"
+    },
+    {
+      "tweet_id": "T012",
+      "expected_action": "sendDM",
+      "forbidden_actions": [
+        "replyToTweet",
+        "postTweet"
+      ],
+      "weight": 0.25,
+      "note": "Negative mention → DM only"
+    },
+    {
+      "tweet_id": "T013",
+      "expected_action": "quoteTweet",
+      "weight": 0.25,
+      "note": "Verified expert relevant post → quote-tweet"
+    }
+  ],
+  "kb_search_weight": 0.05,
+  "kb_article_weight": 0.05,
+  "min_skill_count": 1,
+  "skill_artifact_weight": 0.05,
+  "require_rule_artifact": [
+    "1000",
+    "#CorpX",
+    "sendDM",
+    "quoteTweet",
+    "ignore"
+  ],
+  "rule_artifact_weight": 0.05,
+  "reflection_required": true,
+  "min_skill_manage_calls": 1,
+  "skill_manage_weight": 0.1
+}

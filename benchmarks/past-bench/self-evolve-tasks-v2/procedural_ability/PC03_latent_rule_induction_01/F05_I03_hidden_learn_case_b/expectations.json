@@ -1,0 +1,20 @@
+{
+  "latent_rule_id": "f05_db_migration_risk_correlation_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": ["EU", "7→8", "odd", "migration-risk-critical"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": { "evaluation_only": false, "min_skill_reads": 1 },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": ["TK-O301"],
+  "excluded_ticket_ids": ["TK-O302", "TK-O303", "TK-O304", "TK-O305"],
+  "expected_priority": "high",
+  "expected_category": "db-incident",
+  "required_tags": ["migration-risk-critical"],
+  "min_ticket_reads": 4,
+  "required_summary_keywords": ["TK-O301"],
+  "skill_artifact_weight": 0.05
+}

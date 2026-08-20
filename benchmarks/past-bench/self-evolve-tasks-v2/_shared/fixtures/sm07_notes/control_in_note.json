@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM07-008",
+    "title": "Scoped Migration In-Note Control",
+    "created_at": "2026-05-18",
+    "participants": ["Olivia Cruz", "Jonah Fisk", "Renee Shah", "Tessa Wu", "Marta Hill"],
+    "duration_minutes": 40,
+    "content": "Scoped migration in-note control.\n\nCurrent scoped routing memo:\n- Security items use Security | <owner> | SEC-GAMMA | task | due_date.\n- Share the source note only with High priority Security owners.\n- Ops items use Ops | <owner> | OPS-DELTA | task | due_date.\n- Share the source note with all Ops owners.\n\nAction items:\n1. [Security][High] Olivia Cruz: rotate the partner escalation token, due 2026-07-29\n2. [Security][Low] Tessa Wu: archive the resolved privileged ticket packet, due 2026-07-30\n3. [Ops][Medium] Jonah Fisk: rebuild the deployment replay queue, due 2026-07-31\n4. [Ops][High] Renee Shah: confirm the rollback escalation checklist, due 2026-08-01\n\nMarta Hill attended as an observer."
+  }
+]

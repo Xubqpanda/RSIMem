@@ -1,0 +1,64 @@
+[
+  {
+    "ticket_id": "INC-870",
+    "title": "CacheEdge latency parent incident",
+    "reporter": "monitor",
+    "department": "sre",
+    "priority": "high",
+    "status": "open",
+    "tags": [
+      "cacheedge",
+      "parent-incident"
+    ],
+    "category": "incident",
+    "reason_code": "active",
+    "description": "Visible shell: there is a maintenance window later today, but the exact owner and blocked follow-up set are not copied here; an older handoff also exists.",
+    "created_at": "2026-04-20T11:00:00Z"
+  },
+  {
+    "ticket_id": "HD-PG03-103",
+    "title": "CacheEdge latency follow-up shard A",
+    "reporter": "monitor",
+    "department": "sre",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "cacheedge",
+      "follow-up"
+    ],
+    "category": "follow-up",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T11:01:00Z"
+  },
+  {
+    "ticket_id": "HD-PG03-104",
+    "title": "CacheEdge latency follow-up shard B",
+    "reporter": "monitor",
+    "department": "sre",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "cacheedge",
+      "follow-up"
+    ],
+    "category": "follow-up",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T11:02:00Z"
+  },
+  {
+    "ticket_id": "HD-PG03-105",
+    "title": "CacheEdge unrelated follow-up shard C",
+    "reporter": "monitor",
+    "department": "sre",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "cacheedge",
+      "follow-up"
+    ],
+    "category": "follow-up",
+    "reason_code": "pending",
+    "description": "Similar follow-up from another CacheEdge handoff. Do not assume this ticket belongs to the current blocked set without checking the exact handoff.",
+    "created_at": "2026-04-20T11:03:00Z"
+  }
+]

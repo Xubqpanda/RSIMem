@@ -1,0 +1,76 @@
+task_id: PG06_EVAL_NEAR_A_001
+task_name: PG06 Kappa Integration Review Eval Near A
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Read the updated Kappa review workflow first, then re-check the Kappa panel after the scoped routing update. Customer-facing payment or identity notes now use the updated alias, but the weekly
+    exception IDs are still not repeated locally. Recover the exact exception IDs and share only the notes that truly need escalation.
+
+    Output each reviewed note as: NOTE_ID|decision|recipient|reason'
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward reading the workflow, retrieving INT-K204 and INT-K207, then sharing only INT-K301 and INT-K305 to security-partners@corp.com.
+services:
+- name: notes
+  command: python mock_services/notes/server.py
+  port: 9205
+  health_check: http://localhost:9205/notes/list
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9205/notes/reset
+  env:
+    NOTES_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/pg06_notes/eval_near_followup_a.json
+    PORT: '9205'
+tools:
+- name: notes_list
+  description: List integration review notes
+  input_schema:
+    type: object
+    properties:
+      tags:
+        type: array
+        items:
+          type: string
+      max_results:
+        type: integer
+    required: []
+- name: notes_get
+  description: Get an integration review note
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+    required:
+    - note_id
+- name: notes_share
+  description: Share an integration review note
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+      recipients:
+        type: array
+        items:
+          type: string
+    required:
+    - note_id
+    - recipients
+tool_endpoints:
+- tool_name: notes_list
+  url: http://localhost:9205/notes/list
+  method: POST
+- tool_name: notes_get
+  url: http://localhost:9205/notes/get
+  method: POST
+- tool_name: notes_share
+  url: http://localhost:9205/notes/share
+  method: POST

@@ -1,0 +1,9 @@
+{
+  "users": {
+    "U_AGENT": {"username": "agent_user", "display_name": "Agent User", "verified": false}
+  },
+  "tweets": {},
+  "timeline": [],
+  "mentions": [],
+  "dms": []
+}

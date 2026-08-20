@@ -1,0 +1,31 @@
+{
+  "latent_rule_id": "pg06_kappa_integration_review_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "update_or_stabilize",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "POLICY_UPDATED|kappa_review_workflow"
+  ],
+  "forbidden_output_keywords": [
+    "INT-K204",
+    "INT-K207",
+    "INT-K299"
+  ],
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "payment or identity",
+      "security-partners@corp.com",
+      "every other",
+      "infra-risk@corp.com",
+      "workflow",
+      "session history"
+    ],
+    "min_count_delta": 0
+  },
+  "apply_mechanism_caps": true,
+  "min_skill_writes": 1,
+  "skill_write_weight": 0.12,
+  "missing_learning_cap": 0.45
+}

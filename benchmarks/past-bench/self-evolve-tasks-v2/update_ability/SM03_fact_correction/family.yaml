@@ -1,0 +1,110 @@
+family_id: SM03_fact_correction
+title: Fact Correction
+ability_dir: update_ability
+primary_ability: update_ability
+secondary_abilities: []
+primary_trigger: conflict_update
+trigger_category: conflict_update
+trigger_strength: T3
+trigger_visibility_paths:
+  - direct_user_message
+benchmark_role: canonical_anchor
+compatibility_gate: strict
+trigger_class: conflict_update
+secondary_triggers: []
+optional_supporting_trigger: explicit_instruction
+supporting_stage: update_or_stabilize
+supporting_signal: native Hermes home fixture supplies stale target state plus cross-mechanism distractors before the measured update
+supporting_signals: []
+distractor_signals: []
+trigger_injection_plan:
+  initial_home_fixture: initialize stale Phoenix fact, similar facts, unrelated facts, stale skills, and prior sessions in native Hermes persistence
+  update_or_stabilize: inject the authoritative correction and make the overwrite relation explicit
+primary_trigger_stages:
+  - update_or_stabilize
+trigger_removal_plan:
+  eval_near: reference the entity naturally but do not expose the corrected value in the prompt
+  eval_far: keep the corrected value absent and penalize any stale-value leakage
+trigger_mixing_rule: Do not combine explicit_correction and conflict_update as co-equal triggers; this family should stay overwrite-centered.
+sibling_comparison_plan: If needed, compare against a separate feedback-based correction sibling rather than mixing user correction into this family.
+expected_substrate: memory
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: required
+noise_profile: medium
+family_length_tier: tier2
+implementation_priority: phase1
+instances_per_bucket:
+  cold: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 7
+episode_order:
+  - cold_fact_baseline
+  - update_corrected_freeze_date
+  - eval_near_use_corrected_fact
+  - eval_far_use_corrected_fact
+  - control_no_persistence_fact
+  - control_shortcut_visible_corrected_fact
+  - control_fact_correction_control
+history_plan:
+  anchors:
+    - name: sm03_post_update
+      save_after: update_corrected_freeze_date
+  branches:
+    - mode: fresh
+      episodes:
+        - cold_fact_baseline
+        - control_no_persistence_fact
+        - control_shortcut_visible_corrected_fact
+        - control_fact_correction_control
+    - mode: continue
+      episodes:
+        - update_corrected_freeze_date
+    - mode: from_anchor
+      anchor: sm03_post_update
+      episodes:
+        - eval_near_use_corrected_fact
+        - eval_far_use_corrected_fact
+episode_overrides:
+  cold_fact_baseline:
+    mechanism: memory
+    expected_persistence_signal: memory
+    persistence_allowed: true
+    initial_home_fixture_dir: self-evolve-tasks-v2/_shared/home_fixtures/update_ability/SM03_fact_correction
+  update_corrected_freeze_date:
+    mechanism: memory
+    expected_persistence_signal: memory
+    persistence_allowed: true
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: sm03_fact_correction
+what_is_learned: A previously stored fact has been superseded by a newer authoritative value.
+what_persists: The corrected fact overwrites the stale fact in memory.
+what_counts_as_reuse: Later tasks use only the new value and never leak the stale value.
+false_positive_pattern: The agent infers the new value from current prompt artifacts without actually replacing stored state.
+must_demonstrate:
+  - the native Hermes home fixture already contains the stale fact plus similar and unrelated distractors
+  - the authoritative correction overwrites the old fact
+  - adjacent Phoenix and non-Phoenix facts are preserved rather than globally overwritten
+  - later tasks penalize stale fact leakage
+recommended_mock_services:
+  - notes
+  - finance
+  - crm
+phase1_canonical_sibling: A T3 direct overwrite family where the user explicitly states that the old fact is obsolete and the new fact must be saved for future sessions.
+future_sibling_roadmap:
+  - Add a T2 direct overwrite sibling without explicit save wording.
+  - Add a T1 embedded update-note sibling where the correction must be extracted from the note.
+  - Add a user-feedback overwrite sibling for trigger-strength comparison.
+cold_design: "Use the same retrieval-demanding workflow as eval while starting from the stale native Hermes home fixture, and judge cold against the corrected post-update target."
+expected_cold_result: "Cold should serve as the pre-update contrast point: the stale seeded home is present from the start, but without the authoritative correction the agent should score poorly against the corrected target."
+control_design: Measure no_persistence through the runtime ablation, add one shortcut control where the corrected fact is visible locally, and keep one stale-leakage control with no local corrected value.
+expected_control_result: Without persistence or overwrite, behavior should revert toward the stale fact, guessing, or failure to prefer the corrected value cleanly; shortcut controls should only succeed because the fact is locally exposed.
+authoring_notes: Favor factual values with clean overwrite scoring, such as quotas, budgets, deadlines, or named contacts.

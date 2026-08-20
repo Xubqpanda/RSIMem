@@ -1,0 +1,66 @@
+family_id: PG04_temporary_waiver_audit
+title: Temporary Waiver Audit
+ability_dir: proactive_information_gathering
+primary_ability: proactive_information_gathering
+secondary_abilities:
+  - episodic_experience
+  - trigger_and_arbitration
+primary_trigger: failure_reflection
+secondary_trigger: []
+expected_substrate: mixed
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier3
+instances_per_bucket:
+  attempt: 1
+  reflection: 1
+  update_or_stabilize: 1
+  eval_near: 2
+  eval_far: 1
+  control: 2
+total_episodes: 8
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: pg04_temporary_waiver_audit_v1
+what_is_learned: Temporary waivers are only reusable when the exact owner/service/scope/expiry tuple matches.
+what_persists: A retrieval skill note that says to search the exact waiver record and reject near matches.
+what_counts_as_reuse: Later waiver audits explicitly retrieve the prior waiver, update the audit note with the exact approved set, and reject scope mismatches.
+false_positive_pattern: The agent applies a temporary waiver to a near match, turning one-off approval into a generalized rule.
+must_demonstrate:
+  - the waiver record is explicitly retrieved before the audit note is updated
+  - owner, service, scope, and expiry are matched exactly
+  - near matches are rejected
+episode_order:
+  - attempt_probe_pre
+  - reflection_gap_review
+  - update_or_stabilize_policy_note
+  - eval_near_followup_a
+  - eval_near_followup_b
+  - eval_far_followup_transfer
+  - control_preload_visible_hint
+  - control_boundary_scope_mismatch
+history_plan:
+  branches:
+    - mode: continue
+      episodes:
+        - attempt_probe_pre
+        - reflection_gap_review
+        - update_or_stabilize_policy_note
+        - eval_near_followup_a
+        - eval_near_followup_b
+        - eval_far_followup_transfer
+        - control_preload_visible_hint
+        - control_boundary_scope_mismatch
+episode_overrides:
+  reflection_gap_review:
+    mechanism: skill
+    expected_persistence_signal: skill
+  update_or_stabilize_policy_note:
+    mechanism: skill
+    expected_persistence_signal: skill

@@ -1,0 +1,29 @@
+{
+  "latent_rule_id": "sm07_scoped_rule_migration",
+  "expected_mechanism": "memory",
+  "bucket_role": "control",
+  "control_kind": "shortcut",
+  "shortcut_exposes_target_rule": true,
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["SEC-GAMMA", "OPS-DELTA", "High priority Security owners"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_memory_injections": 0
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM07-007",
+  "required_recipients": ["Asha Kim", "Ben Ortiz", "Cara Liu"],
+  "forbidden_recipients": ["Drew Park", "Mina Ross"],
+  "required_output_keywords": [
+    "Security | Asha Kim | SEC-GAMMA",
+    "Security | Drew Park | SEC-GAMMA",
+    "Ops | Ben Ortiz | OPS-DELTA",
+    "Ops | Cara Liu | OPS-DELTA"
+  ],
+  "forbidden_output_keywords": ["Ops | Ben Ortiz | SEC-GAMMA", "Ops | Cara Liu | SEC-GAMMA"],
+  "stale_coexistence_penalty": 0.15,
+  "apply_mechanism_caps": true
+}

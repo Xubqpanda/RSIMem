@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "kb_f02_billing_brief",
+    "title": "Billing Incident Handling — Quick Reference",
+    "category": "incident-management",
+    "content": "## Billing Incident Handling\n\nFor billing incident handling procedures, see the Billing Incident SOP.\n\nGeneral guidance:\n- Review all open billing tickets before taking action.\n- Identify tickets that share a common root cause (e.g., same cluster failure).\n- Distinguish billing incidents from routine requests (reports, access, documentation).\n- Do NOT close any ticket — leave resolution to the on-call billing engineer.\n- Output one line per updated ticket: TICKET_ID|priority|category|why\n\nNote: The full SOP with specific escalation thresholds, priority labels, category assignments, and required tags is maintained separately. Consult the latest version of the Billing Incident SOP for exact rules.",
+    "tags": [],
+    "last_updated": "2026-04-01",
+    "views": 0
+  }
+]

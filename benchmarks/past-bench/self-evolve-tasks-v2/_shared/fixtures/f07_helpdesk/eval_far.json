@@ -1,0 +1,72 @@
+[
+  {
+    "ticket_id": "TK-V501",
+    "title": "AuthService production release — hash vwx234",
+    "description": "Production deployment event for AuthService. Release hash: vwx234. Deployment completed at 11:00 UTC. This is the root deployment event for the vwx234 release. All child failure tickets caused by this deployment will reference release hash vwx234 and should be grouped under this event for rollback triage.",
+    "reporter": "deploy-bot",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T11:00:00Z",
+    "tags": [],
+    "release_hash": "vwx234",
+    "service": "AuthService",
+    "ticket_type": "deploy-event"
+  },
+  {
+    "ticket_id": "TK-V502",
+    "title": "AuthService SSO broken — related to vwx234 deployment",
+    "description": "The AuthService SSO integration has stopped working for all enterprise clients. This issue is related to the vwx234 deployment that completed at 11:00 UTC. The SSO provider callback URL is returning 403 Forbidden. Engineering suspects the vwx234 rollout changed the OAuth configuration. This failure is related to the vwx234 deployment of AuthService.",
+    "reporter": "Aleksandra-Nowak",
+    "department": "Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T11:18:00Z",
+    "tags": [],
+    "release_hash": "vwx234",
+    "service": "AuthService",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-V503",
+    "title": "AuthService token refresh failing — vwx234 rollout issue",
+    "description": "Token refresh is failing for all AuthService clients since 11:00 UTC. This appears to be a vwx234 rollout issue — the token refresh endpoint is returning 500 errors. Users are being logged out after their session expires and cannot renew their tokens. The vwx234 rollout issue is affecting all authentication flows that depend on token refresh.",
+    "reporter": "Cédric-Martin",
+    "department": "SRE",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T11:25:00Z",
+    "tags": [],
+    "release_hash": "vwx234",
+    "service": "AuthService",
+    "ticket_type": "child-failure"
+  },
+  {
+    "ticket_id": "TK-V504",
+    "title": "AuthService rollback needed — yz1567 deployment regression",
+    "description": "A rollback is needed for the AuthService deployment identified by release_hash yz1567, which introduced a permissions regression for admin users last week. This is a completely separate deployment from the current vwx234 release. The yz1567 issue involves ACL rule changes that bypass multi-factor authentication for certain admin roles.",
+    "reporter": "Jana-Horáková",
+    "department": "Security",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T12:00:00Z",
+    "tags": [],
+    "release_hash": "yz1567",
+    "service": "AuthService",
+    "ticket_type": "rollback-request"
+  },
+  {
+    "ticket_id": "TK-V505",
+    "title": "AuthService SSL certificate renewal — scheduled maintenance",
+    "description": "The AuthService SSL certificate for the production domain is expiring in 14 days and needs renewal. This is scheduled maintenance with no relation to any deployment event or release hash. The certificate renewal process is handled by the Security team and does not require a service deployment.",
+    "reporter": "Enzo-Romano",
+    "department": "Security",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-13T13:00:00Z",
+    "tags": [],
+    "release_hash": null,
+    "service": "AuthService",
+    "ticket_type": "maintenance"
+  }
+]

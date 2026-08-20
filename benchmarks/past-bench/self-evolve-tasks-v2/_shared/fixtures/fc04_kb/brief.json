@@ -1,0 +1,11 @@
+[
+  {
+    "article_id": "kb_api_review_brief",
+    "title": "API Library Usage Standards Overview",
+    "category": "Engineering SOP",
+    "tags": ["API", "code review", "brief"],
+    "content": "The team has standards for third-party HTTP client libraries; some older libraries have been placed on the deprecated list. See the HTTP Client Migration Guide for details.",
+    "last_updated": "2026-03-15",
+    "views": 18
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "session_id": "pc02_02_v1_flawed_session",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "HTTP Client Migration Guide v1 says requests is approved and urllib is deprecated."
+    },
+    {
+      "role": "assistant",
+      "content": "Saved flawed HTTP client migration procedure as a reusable skill."
+    }
+  ]
+}

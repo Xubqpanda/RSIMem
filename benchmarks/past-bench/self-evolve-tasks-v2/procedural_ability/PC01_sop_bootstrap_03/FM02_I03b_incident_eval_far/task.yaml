@@ -1,0 +1,122 @@
+task_id: V2_FM02_I05
+task_name: FM02 Shared Outage — Eval Far
+version: '1.0'
+category: self_evolve
+difficulty: hard
+requires_fresh_session: true
+services:
+- name: helpdesk
+  command: python mock_services/helpdesk/server.py
+  port: 9107
+  health_check: http://localhost:9107/helpdesk/tickets
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9107/helpdesk/reset
+  env:
+    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm02_v2_helpdesk/eval_far.json
+- name: kb
+  command: python mock_services/kb/server.py
+  port: 9106
+  health_check: http://localhost:9106/kb/search
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9106/kb/reset
+  env:
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm02_v2_kb/brief.json
+prompt:
+  text: 'The KB only has a brief overview. Check your skill library for a saved outage
+    triage procedure. This batch uses different terminology (''region'' instead of
+    ''zone'', ''degraded'' instead of ''failing''). Apply the same triage logic. Do
+    NOT close any ticket.
+
+    Output: TICKET_ID|priority|category|why
+
+    You MUST use helpdesk_list_tickets, helpdesk_get_ticket, and helpdesk_update_ticket
+    tools to process and update tickets.
+
+    '
+  language: en
+tools:
+- name: helpdesk_list_tickets
+  description: List helpdesk tickets
+  input_schema:
+    type: object
+    properties:
+      status:
+        type: string
+    required: []
+- name: helpdesk_get_ticket
+  description: Get ticket details
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+    required:
+    - ticket_id
+- name: helpdesk_update_ticket
+  description: Update a ticket
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+      priority:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+      category:
+        type: string
+      status:
+        type: string
+      internal_note:
+        type: string
+    required:
+    - ticket_id
+- name: kb_search
+  description: Search the knowledge base
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      category:
+        type: string
+      max_results:
+        type: integer
+    required:
+    - query
+- name: kb_get_article
+  description: Get a knowledge base article
+  input_schema:
+    type: object
+    properties:
+      article_id:
+        type: string
+    required:
+    - article_id
+tool_endpoints:
+- tool_name: helpdesk_list_tickets
+  url: http://localhost:9107/helpdesk/tickets
+  method: POST
+- tool_name: helpdesk_get_ticket
+  url: http://localhost:9107/helpdesk/tickets/get
+  method: POST
+- tool_name: helpdesk_update_ticket
+  url: http://localhost:9107/helpdesk/tickets/update
+  method: POST
+- tool_name: kb_search
+  url: http://localhost:9106/kb/search
+  method: POST
+- tool_name: kb_get_article
+  url: http://localhost:9106/kb/articles/get
+  method: POST
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+judge_rubric: Reward retrieving the saved SOP skill and correctly applying the shared
+  outage pattern to the three region-ap-3 tickets (TK-FM02-F01, F02, F03) despite
+  different surface terminology. Penalize including config review or hardware upgrade
+  tickets.

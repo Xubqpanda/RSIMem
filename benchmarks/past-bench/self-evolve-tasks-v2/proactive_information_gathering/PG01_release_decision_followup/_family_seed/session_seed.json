@@ -1,0 +1,559 @@
+{
+  "sessions": [
+    {
+      "id": "pg01-rel-447",
+      "source": "seed",
+      "title": "Falcon Edge connector release review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact prior release decision for Falcon Edge connector."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-447: Falcon Edge connector is not approved for production. A staging-only validation is allowed through 2026-05-31. Cite REF-RLS-447 in follow-ups."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-512",
+      "source": "seed",
+      "title": "Atlas Sync relay release review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact prior release decision for Atlas Sync relay."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-512: Atlas Sync relay is not approved for production. An internal canary is allowed only in us-west-lab through 2026-06-12."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-578",
+      "source": "seed",
+      "title": "Blueport ingest plugin release review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact prior release decision for Blueport ingest plugin."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-578: Blueport ingest plugin is not approved for production. A QA sandbox trial is allowed through 2026-06-20."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-401",
+      "source": "seed",
+      "title": "Falcon Edge connector beta review old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Falcon Edge beta decision."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded record REF-RLS-401: Falcon Edge beta had a staging-only validation through 2026-04-30. Do not reuse this after the later review."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-446",
+      "source": "seed",
+      "title": "Falcon Edge connector current release review shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Falcon Edge connector release review."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Falcon Edge connector is still not approved for production, but this shell does not preserve the settled reference ID or authoritative expiry. Re-check the exact release review before sharing guidance."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-448",
+      "source": "seed",
+      "title": "Falcon Edge connector latest packet review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Falcon Edge connector packet decision."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-448: Falcon Edge connector remains not approved for production. A device-sim validation is allowed only in eu-shadow-lab through 2026-06-02."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-433",
+      "source": "seed",
+      "title": "Falcon Edge connector decision recap shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the Falcon Edge connector decision."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: Falcon Edge connector is still blocked for production and some lab validation was allowed earlier, but the settled release record is not copied here. Do not cite this shell as the exact answer."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-438",
+      "source": "seed",
+      "title": "Falcon Edge connector vendor pilot one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Falcon Edge connector reuse the earlier vendor pilot allowance?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record REF-RLS-438: Falcon Edge connector could run a packaging-only vendor pilot in build-vault through 2026-05-08. This was a narrow one-time allowance and must not replace the settled release decision."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-452",
+      "source": "seed",
+      "title": "Falcon Edge connector release review device-sim",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Falcon Edge connector release review for the device-sim track."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-452: Falcon Edge connector is not approved for production. A device-sim trial is allowed only in ap-sandbox through 2026-06-03."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-455",
+      "source": "seed",
+      "title": "Falcon Edge connector current release shell unresolved",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Falcon Edge connector release shell."
+        },
+        {
+          "role": "assistant",
+          "content": "This current shell says Falcon Edge connector is still not approved for production, but the exact environment and expiry were intentionally omitted pending a check of the prior review. Not authoritative by itself."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-459",
+      "source": "seed",
+      "title": "Falcon Edge connector beta reopen",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Was the Falcon Edge connector beta decision reopened?"
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded reopen note REF-RLS-459: Falcon Edge connector beta briefly referenced staging-only validation through 2026-05-05, but this archive was closed after the later connector review. Do not treat it as the current record."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-466",
+      "source": "seed",
+      "title": "Falcon Edge connector release review us-east-lab",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Falcon Edge connector decision for us-east-lab."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-466: Falcon Edge connector is not approved for production. An internal connector validation is allowed only in us-east-lab through 2026-05-27."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-469",
+      "source": "seed",
+      "title": "Falcon Edge connector latest approval memo incomplete",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Falcon Edge connector approval memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Incomplete memo: Falcon Edge connector remains blocked for production and staging-only language still appears, but the memo omits the settled reference ID and should not be forwarded without checking the exact release review."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-507",
+      "source": "seed",
+      "title": "Atlas Sync relay current release review shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Atlas Sync relay release review."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Atlas Sync relay is still not approved for production, but the exact internal canary environment and expiry were not preserved in this shell. Re-check the settled release decision."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-509",
+      "source": "seed",
+      "title": "Atlas Sync relay open questions",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What open questions remain for Atlas Sync relay?"
+        },
+        {
+          "role": "assistant",
+          "content": "Open questions only: Atlas Sync relay may still be limited to an internal canary, but this thread does not restate the settled reference ID or authoritative expiry. Do not use it as the final answer."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-511",
+      "source": "seed",
+      "title": "Atlas Sync relay review old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Atlas Sync relay decision."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded record REF-RLS-511: Atlas Sync relay was not approved for production and an internal canary in us-west-lab was allowed only through 2026-06-05. Later review replaced this record."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-513",
+      "source": "seed",
+      "title": "Atlas Sync relay latest packet review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Atlas Sync relay packet decision."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-513: Atlas Sync relay is not approved for production. An internal canary is allowed only in us-west-lab-2 through 2026-06-13."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-516",
+      "source": "seed",
+      "title": "Atlas Sync relay docs dry-run one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Atlas Sync relay reuse the earlier docs dry-run allowance?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record REF-RLS-516: Atlas Sync relay could run a docs-preview dry-run in us-west-lab through 2026-05-28. This was a narrow exception and should not be reused as the settled release review."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-521",
+      "source": "seed",
+      "title": "Atlas Sync connector release review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Atlas Sync connector release review."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-521: Atlas Sync connector is not approved for production. A connector-only validation is allowed in us-west-lab through 2026-06-16."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-524",
+      "source": "seed",
+      "title": "Atlas Sync relay approval memo incomplete",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Atlas Sync relay approval memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Incomplete memo: Atlas Sync relay remains production-blocked and an internal canary in a west lab still appears to be the approved environment, but the exact reference and expiry were not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-526",
+      "source": "seed",
+      "title": "Atlas Sync relay current staging note",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Atlas Sync relay staging note."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-526: Atlas Sync relay is not approved for production. A staging replay is allowed only in us-west-stage through 2026-06-09."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-571",
+      "source": "seed",
+      "title": "Blueport ingest plugin release review old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Blueport ingest plugin decision."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded record REF-RLS-571: Blueport ingest plugin was not approved for production and a QA sandbox trial was allowed through 2026-06-10. Later review replaced this record."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-576",
+      "source": "seed",
+      "title": "Blueport ingest plugin current release shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Blueport ingest plugin release shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Blueport ingest plugin is still not approved for production and a QA sandbox allowance still exists, but the exact reference and expiry were intentionally omitted. Not authoritative on its own."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-579",
+      "source": "seed",
+      "title": "Blueport ingest plugin latest packet review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Blueport ingest plugin packet decision."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-579: Blueport ingest plugin is not approved for production. A QA sandbox trial is allowed only in qa-sandbox-east through 2026-06-21."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-582",
+      "source": "seed",
+      "title": "Blueport ingest extension release review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact prior release decision for Blueport ingest extension."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-582: Blueport ingest extension is not approved for production. An extension-only QA sandbox trial is allowed through 2026-06-18."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-584",
+      "source": "seed",
+      "title": "Blueport ingest plugin replay waiver one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Blueport ingest plugin reuse the replay waiver?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record REF-RLS-584: Blueport ingest plugin could run a replay-only check in qa-replay through 2026-06-08. This was a narrow exception and does not replace the settled release review."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-586",
+      "source": "seed",
+      "title": "Blueport ingest plugin current review memo incomplete",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Blueport ingest plugin review memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Incomplete memo: Blueport ingest plugin is still blocked for production and the QA sandbox trial still applies somewhere, but the memo does not preserve the exact settled expiry or reference."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-589",
+      "source": "seed",
+      "title": "Blueport ingest plugin sandbox-east review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Blueport ingest plugin decision for sandbox-east."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-589: Blueport ingest plugin is not approved for production. A QA sandbox trial is allowed only in sandbox-east through 2026-06-14."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-592",
+      "source": "seed",
+      "title": "Blueport ingest plugin beta archive",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Blueport ingest plugin beta archive."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded archive REF-RLS-592: Blueport ingest plugin beta referenced a QA sandbox trial through 2026-05-30. This archive predates the settled plugin review and should not be reused."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-595",
+      "source": "seed",
+      "title": "Blueport ingest gateway release review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the exact prior release decision for Blueport ingest gateway."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-595: Blueport ingest gateway is not approved for production. A gateway QA sandbox check is allowed through 2026-06-19."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-598",
+      "source": "seed",
+      "title": "Falcon Edge connector notes shell partial",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Falcon Edge connector notes shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial shell only: Falcon Edge connector remains not approved for production and staging-only wording is still expected, but the settled review reference is not present here. Check the exact release history first."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-601",
+      "source": "seed",
+      "title": "Atlas Sync relay review qa mirror",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Atlas Sync relay decision for qa mirror."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-601: Atlas Sync relay is not approved for production. A QA mirror validation is allowed only in us-west-qa through 2026-06-15."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-447-shell",
+      "source": "seed",
+      "title": "Falcon Edge connector current governance shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current governance shell for the Falcon integration item."
+        },
+        {
+          "role": "assistant",
+          "content": "Current shell only: the Falcon Edge connector is still not approved for production and staging-only language still applies somewhere, but this shell is not the settled release record and must not be cited as the exact answer."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-448a",
+      "source": "seed",
+      "title": "Falcon Edge connector latest governance review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest governance review for Falcon Edge connector."
+        },
+        {
+          "role": "assistant",
+          "content": "Decision record REF-RLS-448A: Falcon Edge connector is not approved for production. A staging-only validation is allowed only in us-east-lab through 2026-06-01."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-447b",
+      "source": "seed",
+      "title": "Falcon Edge connector settled review recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the settled Falcon Edge connector review."
+        },
+        {
+          "role": "assistant",
+          "content": "Recap only: Falcon Edge connector remains not approved for production and staging-only validation still applies, but this recap omits the authoritative reference ID and exact expiry. Do not forward this as the settled decision."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-447c",
+      "source": "seed",
+      "title": "Falcon Edge connector current release packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current release packet for Falcon Edge connector."
+        },
+        {
+          "role": "assistant",
+          "content": "Release packet REF-RLS-447C: Falcon Edge connector is not approved for production. A staging-only validation is allowed through 2026-05-28 pending connector packaging review."
+        }
+      ]
+    },
+    {
+      "id": "pg01-rel-447d",
+      "source": "seed",
+      "title": "Falcon Edge connector governance note latest",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Falcon Edge connector governance note."
+        },
+        {
+          "role": "assistant",
+          "content": "Governance note only: Falcon Edge connector remains production-blocked, and a staging-only validation still appears to be the active allowance. Verify the exact reference and expiry from the settled release review before sharing guidance."
+        }
+      ]
+    }
+  ]
+}

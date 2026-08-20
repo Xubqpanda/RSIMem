@@ -1,0 +1,66 @@
+family_id: PG06_kappa_integration_review
+title: Kappa Integration Review
+ability_dir: proactive_information_gathering
+primary_ability: proactive_information_gathering
+secondary_abilities:
+  - episodic_experience
+  - trigger_and_arbitration
+primary_trigger: failure_reflection
+secondary_trigger: []
+expected_substrate: mixed
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier3
+instances_per_bucket:
+  attempt: 1
+  reflection: 1
+  update_or_stabilize: 1
+  eval_near: 2
+  eval_far: 1
+  control: 2
+total_episodes: 8
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: pg06_kappa_integration_review_v1
+what_is_learned: Kappa integration review requires mixed retrieval across a durable routing fact, a reusable workflow, and weekly exception IDs that remain session-only.
+what_persists: A workflow note about reading the Kappa review skill first, using durable routing rules carefully, and retrieving weekly exception IDs from session history.
+what_counts_as_reuse: Later probes reuse the workflow, keep one-off exceptions session-bound, and apply the patched alias only to the updated scope while preserving the rest.
+false_positive_pattern: The agent reuses an old alias everywhere, bakes weekly exception IDs into durable policy, or generalizes a one-off shortcut to superficially similar notes.
+must_demonstrate:
+  - skill retrieval is used for the Kappa review workflow
+  - session retrieval is used for weekly exception lookup
+  - scope-specific alias updates preserve unchanged routing and do not generalize one-off shortcuts
+episode_order:
+  - attempt_probe_pre
+  - reflection_gap_review
+  - update_or_stabilize_policy_note
+  - eval_near_followup_a
+  - eval_near_followup_b
+  - eval_far_followup_transfer
+  - control_preload_visible_hint
+  - control_boundary_scope_patch_mismatch
+history_plan:
+  branches:
+    - mode: continue
+      episodes:
+        - attempt_probe_pre
+        - reflection_gap_review
+        - update_or_stabilize_policy_note
+        - eval_near_followup_a
+        - eval_near_followup_b
+        - eval_far_followup_transfer
+        - control_preload_visible_hint
+        - control_boundary_scope_patch_mismatch
+episode_overrides:
+  reflection_gap_review:
+    mechanism: skill
+    expected_persistence_signal: skill
+  update_or_stabilize_policy_note:
+    mechanism: skill
+    expected_persistence_signal: skill

@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-I401",
+    "title": "payment-cluster-4 down — subscription renewal failures",
+    "description": "Subscription renewal processing has been failing since 16:00 UTC. The renewal service cannot reach payment-cluster-4, which is unresponsive. Thousands of monthly subscribers are receiving failed renewal notifications. Revenue impact is growing by the minute. SRE has confirmed the cluster is down.",
+    "reporter": "Thomas-Eriksson",
+    "department": "Subscriptions",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:05:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-I402",
+    "title": "Credit card processing 503 — payment-cluster-4 outage",
+    "description": "Credit card processing is returning 503 errors for all card-present and card-not-present transactions routed through payment-cluster-4. The cluster is in a down state. Both new purchases and recurring charges are affected. This is the second team reporting the same payment-cluster-4 root cause.",
+    "reporter": "Brigitte-Moreau",
+    "department": "Payments Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:18:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-I403",
+    "title": "billing-worker OOM crash — payment-cluster-4 cascade",
+    "description": "Billing worker pods are crashing with OOM errors in a cascade from payment-cluster-4 being down. The workers exhaust memory attempting reconnection retries. Platform team has confirmed this is the same root cause as the subscription renewal failures and credit card processing errors.",
+    "reporter": "Raj-Pillai",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:32:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-I404",
+    "title": "promo-cluster outage — two affected teams reporting errors",
+    "description": "Two teams are reporting issues with the promotional pricing service: the marketing team sees 500 errors when applying promo codes, and the storefront team sees promo-cluster connectivity failures. Only two teams reporting — investigation ongoing. Note: this cluster is different from payment-cluster-4.",
+    "reporter": "Owen-Barrett",
+    "department": "Marketing",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:45:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-I405",
+    "title": "Billing SLA monthly report — April summary request",
+    "description": "Finance leadership is requesting the monthly billing SLA report for April. Please compile uptime figures, payment success rates, average processing latency, and any SLA breach incidents for the month to date. Standard format report needed by end of business Friday.",
+    "reporter": "Simone-Leclerc",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T16:55:00Z",
+    "tags": []
+  }
+]

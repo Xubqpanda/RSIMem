@@ -1,0 +1,19 @@
+{
+  "latent_rule_id": "pg02_ops_exception_desk_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "reflection",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "ERROR_CLASS|",
+    "MISSED_CLUE|",
+    "NEXT_CHECK|"
+  ],
+  "forbidden_output_keywords": [
+    "EX-472",
+    "EX-490",
+    "EX-503",
+    "HD-PG02-201",
+    "2026-05-02"
+  ]
+}

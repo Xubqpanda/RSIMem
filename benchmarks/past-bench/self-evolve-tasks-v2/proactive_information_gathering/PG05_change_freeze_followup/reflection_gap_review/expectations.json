@@ -1,0 +1,20 @@
+{
+  "latent_rule_id": "pg05_change_freeze_followup_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "reflection",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "ERROR_CLASS|",
+    "MISSED_CLUE|",
+    "NEXT_CHECK|"
+  ],
+  "forbidden_output_keywords": [
+    "CAB-FRZ-441",
+    "CAB-FRZ-403",
+    "Atlas Billing",
+    "atlas-replay",
+    "2026-05-03T01:00Z",
+    "2026-05-03T03:00Z"
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "users": {
+    "U_AGENT": {"name": "agent", "display_name": "Task Agent"},
+    "U_DEVOPS": {"name": "devops_team", "display_name": "DevOps Team"},
+    "U_NETOPS": {"name": "netops_team", "display_name": "Network Operations"},
+    "U_PM": {"name": "product_manager", "display_name": "Product Manager"},
+    "U_SRE": {"name": "sre_team", "display_name": "SRE Team"}
+  },
+  "channels": {
+    "plk-general": {
+      "topic": "General discussion",
+      "messages": [
+        {
+          "id": "m001",
+          "user": "U_PM",
+          "text": "The new feature flags system is working great. Rolled out to 20% of users with no issues.",
+          "ts": "2026-04-07T08:00:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m002",
+          "user": "U_DEVOPS",
+          "text": "Reminder: Helm chart updates for all services need to be complete before next release cut.",
+          "ts": "2026-04-07T08:30:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m003",
+          "user": "U_PM",
+          "text": "Sprint review is at 3pm. Please have your demo environments ready.",
+          "ts": "2026-04-07T09:00:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-infra": {
+      "topic": "Infrastructure alerts and status",
+      "messages": [
+        {
+          "id": "m004",
+          "user": "U_SRE",
+          "text": "CDN cache hit rates are nominal at 94%. No issues.",
+          "ts": "2026-04-07T09:00:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m005",
+          "user": "U_NETOPS",
+          "text": "Load balancer health checks all green across us-east-1 and eu-west-1.",
+          "ts": "2026-04-07T09:15:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m006",
+          "user": "U_NETOPS",
+          "text": "ALERT: NetGuard network degradation detected. Packet loss at 18% on core transit links. Latency p99 up to 890ms from normal 45ms. NetGuard routing fabric is degraded.",
+          "ts": "2026-04-07T09:30:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m007",
+          "user": "U_SRE",
+          "text": "Confirming NetGuard incident. BGP route flapping on AS-7421 peering. Multiple downstream services seeing elevated error rates.",
+          "ts": "2026-04-07T09:34:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m008",
+          "user": "U_DEVOPS",
+          "text": "Switched primary traffic to backup transit provider. NetGuard degradation is ongoing — ETA to resolve 45min.",
+          "ts": "2026-04-07T09:40:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-incidents": {
+      "topic": "Active incident tracking",
+      "messages": []
+    }
+  },
+  "dms": []
+}

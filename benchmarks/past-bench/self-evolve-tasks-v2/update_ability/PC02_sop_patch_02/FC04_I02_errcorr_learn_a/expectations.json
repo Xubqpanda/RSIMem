@@ -1,0 +1,49 @@
+{
+  "latent_rule_id": "fc04_error_correction_procedure_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "api-compliant",
+      "deprecated-api"
+    ],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-E201",
+    "TK-E203"
+  ],
+  "excluded_ticket_ids": [
+    "TK-E204"
+  ],
+  "expected_priority": "medium",
+  "expected_category": "code-review",
+  "required_tags": [
+    "api-compliant"
+  ],
+  "min_ticket_reads": 3,
+  "required_summary_keywords": [
+    "TK-E201",
+    "TK-E202",
+    "TK-E203"
+  ],
+  "min_skill_manage_calls": 1,
+  "skill_manage_weight": 0.1,
+  "require_rule_artifact": [
+    "api-compliant",
+    "deprecated-api"
+  ],
+  "rule_artifact_weight": 0.05,
+  "reflection_rules": [
+    "Under the v1 (OLD) guide: the requests library is the approved standard. PRs using requests should be tagged api-compliant.",
+    "Under the v1 (OLD) guide: urllib/urllib3 are deprecated. PRs using them must be tagged deprecated-api + needs-migration.",
+    "Save the HTTP client standard rule as a skill for future sessions."
+  ],
+  "min_skill_count": 1,
+  "skill_artifact_weight": 0.05
+}

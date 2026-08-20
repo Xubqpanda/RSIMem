@@ -1,0 +1,53 @@
+{
+  "latent_rule_id": "fx01_x_engagement_protocol_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "baseline",
+  "mode": "x_engagement",
+  "artifact_contract": {
+    "type": "skill",
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "engagement_checks": [
+    {
+      "tweet_id": "T001",
+      "expected_action": "replyToTweet",
+      "expected_text_contains": "#CorpX",
+      "weight": 0.20,
+      "note": "Positive mention, 12500 followers (≥1000) → public reply with #CorpX"
+    },
+    {
+      "tweet_id": "T002",
+      "expected_action": "like",
+      "forbidden_actions": ["replyToTweet", "postTweet"],
+      "weight": 0.20,
+      "note": "Positive mention, 200 followers (<1000) → like only, no reply"
+    },
+    {
+      "tweet_id": "T003",
+      "expected_action": "sendDM",
+      "forbidden_actions": ["replyToTweet", "postTweet"],
+      "weight": 0.20,
+      "note": "Negative mention → DM only, never public reply"
+    },
+    {
+      "tweet_id": "T004",
+      "expected_action": "quoteTweet",
+      "weight": 0.20,
+      "note": "Verified expert relevant post → quote-tweet"
+    },
+    {
+      "tweet_id": "T005",
+      "expected_action": "ignore",
+      "forbidden_actions": ["replyToTweet", "like", "retweetTweet", "quoteTweet", "sendDM"],
+      "weight": 0.20,
+      "note": "Competitor-tagged post → ignore entirely"
+    }
+  ],
+  "skill_artifact_weight": 0.0,
+  "kb_search_weight": 0.0,
+  "kb_article_weight": 0.0
+}

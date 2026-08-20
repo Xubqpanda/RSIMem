@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM04-005",
+    "title": "Data Pipeline Script Review",
+    "created_at": "2026-04-14",
+    "participants": ["Maya Chen", "Owen Price", "Lucia Park", "Dylan Moss"],
+    "duration_minutes": 45,
+    "content": "Data pipeline script review.\n\nAction items:\n1. Maya Chen: harden the schema validation gate, High priority, by May 2\n2. Owen Price: remove the remaining style drift in batch transforms, Medium priority, by May 3\n3. Lucia Park: update the pipeline review examples in the playbook, Low priority, by May 4\n\nDylan Moss attended as an observer."
+  }
+]

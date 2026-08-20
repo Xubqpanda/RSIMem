@@ -1,0 +1,14 @@
+{
+  "users": {
+    "U1": {"name": "alice", "display_name": "Alice Chen", "role": "admin"},
+    "U2": {"name": "bob", "display_name": "Bob Ramirez", "role": "member"}
+  },
+  "channels": {
+    "plk-general": {
+      "topic": "General chat",
+      "messages": [
+        {"id": "m001", "user": "U1", "text": "Welcome to Plonk!", "ts": "1742100000", "reactions": [], "pinned": false}
+      ]
+    }
+  }
+}

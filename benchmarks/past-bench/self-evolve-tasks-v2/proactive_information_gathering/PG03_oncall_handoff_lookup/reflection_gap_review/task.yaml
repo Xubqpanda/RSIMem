@@ -1,0 +1,38 @@
+task_id: PG03_REFLECTION_001
+task_name: PG03 Oncall Handoff Lookup Reflection
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Prior attempt review.
+
+    Reflection only. Do not reveal any exact handoff IDs, incident IDs, ticket IDs, owners, or windows from the failed case.
+
+
+    Observed failure pattern:
+
+    - error_class: acted before grounding on the latest handoff
+
+    - missed_clue_type: exact owner, maintenance window, and blocked ticket list from the latest prior handoff
+
+    - next_check_priority: search session history for the latest matching handoff before the first ticket update
+
+
+    Output exactly three lines:
+
+    ERROR_CLASS|...
+
+    MISSED_CLUE|...
+
+    NEXT_CHECK|...
+
+    '
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward a concise reflection that identifies the premature-action failure without leaking any exact handoff details.

@@ -1,0 +1,110 @@
+family_id: SM06_temporary_exception_pollution
+title: Temporary Exception Pollution
+ability_dir: update_ability
+primary_ability: update_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+trigger_category: direct_explicit_save_instruction
+trigger_strength: T3
+trigger_visibility_paths:
+  - direct_user_message
+benchmark_role: diagnostic_sibling
+compatibility_gate: diagnostic
+trigger_class: explicit_instruction
+secondary_triggers: []
+optional_supporting_trigger: explicit_instruction
+supporting_stage: update_or_stabilize
+supporting_signal: native Hermes home fixture supplies the stale Maya exception alongside the durable default and cross-mechanism distractors before the explicit expiry update arrives
+supporting_signals: []
+distractor_signals: []
+trigger_injection_plan:
+  initial_home_fixture: initialize durable default, expired target exception, active unrelated exception, stale skill, and prior sessions in native Hermes persistence.
+  update_or_stabilize: explicitly expire the temporary exception and reinforce that only the durable default survives.
+primary_trigger_stages:
+  - update_or_stabilize
+trigger_removal_plan:
+  eval_near: remove all exception wording and test whether the expired exception still pollutes the durable default.
+  eval_far: probe the same expired-exception failure under larger surface shift.
+trigger_mixing_rule: Do not turn this family into a conflict_update overwrite family. The diagnostic target is selective persistence and harmful pollution from a temporary exception, not stable rule replacement.
+sibling_comparison_plan: Compare against SM02_constraint_retention or SM01_preference_adoption only as clean anchors; this family is the negative-transfer sibling that asks whether temporary exceptions contaminate memory.
+expected_substrate: memory
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier3
+implementation_priority: phase1
+instances_per_bucket:
+  cold: 1
+  update_or_stabilize: 1
+  eval_near: 2
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+  - cold_exception_baseline
+  - update_or_stabilize_exception_expiry
+  - eval_near_apply_expired_exception_a
+  - eval_near_apply_expired_exception_b
+  - eval_far_transfer_expired_exception
+  - control_no_persistence_exception
+  - control_shortcut_visible_exception_rule
+  - control_exception_pollution_control
+history_plan:
+  anchors:
+    - name: sm06_post_update
+      save_after: update_or_stabilize_exception_expiry
+  branches:
+    - mode: fresh
+      episodes:
+        - cold_exception_baseline
+        - control_no_persistence_exception
+        - control_shortcut_visible_exception_rule
+        - control_exception_pollution_control
+    - mode: continue
+      episodes:
+        - update_or_stabilize_exception_expiry
+    - mode: from_anchor
+      anchor: sm06_post_update
+      episodes:
+        - eval_near_apply_expired_exception_a
+        - eval_near_apply_expired_exception_b
+        - eval_far_transfer_expired_exception
+episode_overrides:
+  cold_exception_baseline:
+    mechanism: memory
+    expected_persistence_signal: memory
+    persistence_allowed: true
+    initial_home_fixture_dir: self-evolve-tasks-v2/_shared/home_fixtures/update_ability/SM06_temporary_exception_pollution
+  update_or_stabilize_exception_expiry:
+    mechanism: memory
+    expected_persistence_signal: memory
+    persistence_allowed: true
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: sm06_temporary_exception_pollution
+what_is_learned: A durable risk-review default should persist, but a clearly temporary owner-specific exception should expire and never become durable memory.
+what_persists: The durable RISK-CANON routing rule persists; the temporary Maya Ortiz skip should not.
+what_counts_as_reuse: Later tasks still use the durable route token and share with all action item owners, including Maya once the temporary exception has expired.
+false_positive_pattern: The agent remembers both the durable rule and the one-week exception, causing negative transfer after the exception expires.
+must_demonstrate:
+  - the native Hermes home fixture already contains the durable default plus a stale Maya exception that should be removed
+  - the expired temporary exception is removed or suppressed as a lasting rule
+  - unrelated active exceptions and the durable default are not clobbered
+  - eval tasks fail if the expired exception resurfaces
+recommended_mock_services:
+  - notes
+phase1_canonical_sibling: Diagnostic sibling to the semantic-memory anchors, focused on selective persistence failure rather than clean positive transfer.
+future_sibling_roadmap:
+  - Add a multi-exception version where two temporary exceptions expire at different times.
+  - Add a weaker embedded-note variant where the temporary scope must be inferred rather than stated directly.
+  - Add telemetry-only contamination analysis if the controller work needs more precise harmful-persistence attribution.
+cold_design: "Use the same retrieval-demanding workflow as eval from the stale native Hermes home fixture and judge it against the post-expiry target."
+expected_cold_result: "Cold should quantify pre-update miss rate: the stale Maya exception is present from the start, but the task is already judged against the post-expiry RISK-CANON-only target."
+control_design: no_persistence removes the stored default; shortcut exposes the current durable rule locally; wrong_mechanism places the active rule and expired-exception notice inside the current note instead of memory.
+expected_control_result: If the temporary exception pollutes memory, with_persistence can underperform no_persistence on later notes; shortcut and wrong_mechanism remain locally solvable.
+authoring_notes: This family is intentionally asymmetric. The durable default should help, but the bad case is that a temporary exception contaminates later reuse and causes negative transfer.

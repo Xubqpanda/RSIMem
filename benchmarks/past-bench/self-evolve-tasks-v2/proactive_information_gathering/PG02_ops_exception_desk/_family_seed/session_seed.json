@@ -1,0 +1,484 @@
+{
+  "sessions": [
+    {
+      "id": "pg02-ex-472",
+      "source": "seed",
+      "title": "Wave Cedar export exception",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for Wave Cedar export queue."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-472 applies only to partner mirror-west for the Wave Cedar export queue. Approve only HD-PG02-201 and HD-PG02-204 until 2026-05-02. Do not generalize this as default policy."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-490",
+      "source": "seed",
+      "title": "Aurora Sync export exception",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for Aurora Sync export queue."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-490 applies only to partner sunrise-ap for Aurora Sync export. Approve only HD-PG02-311 until 2026-05-04."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-503",
+      "source": "seed",
+      "title": "Ledger Burst export exception",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for Ledger Burst export queue."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-503 applies only to partner cube-eu for Ledger Burst export. Approve only HD-PG02-501 and HD-PG02-503 until 2026-05-09."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-481",
+      "source": "seed",
+      "title": "Wave Cedar export exception expired",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Wave Cedar exception record."
+        },
+        {
+          "role": "assistant",
+          "content": "Expired record EX-481 previously approved HD-PG02-202 for mirror-west only until 2026-04-18. This record is expired and superseded."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-474",
+      "source": "seed",
+      "title": "Wave Cedar export exception current shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Wave Cedar export exception shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Wave Cedar export still has a narrow temporary exception somewhere on the mirror-west side, but the exact exception ID and approved subset were intentionally omitted here. Re-check the exact history before touching tickets."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-475",
+      "source": "seed",
+      "title": "Wave Cedar export exception mirror-east archive",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the older Wave Cedar export exception for mirror-east."
+        },
+        {
+          "role": "assistant",
+          "content": "Expired archive EX-475 applied only to partner mirror-east for the Wave Cedar export queue and ended on 2026-04-12. Do not reuse this archive for current queues."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-476",
+      "source": "seed",
+      "title": "Wave Cedar import exception mirror-west",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for Wave Cedar import queue."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-476 applies only to partner mirror-west for the Wave Cedar import queue. Approve only HD-PG02-221 and HD-PG02-223 until 2026-05-03."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-477",
+      "source": "seed",
+      "title": "Wave Cedar export retry exception mirror-west latest",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Wave Cedar export retry exception."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-477 applies only to partner mirror-west for the Wave Cedar export retry queue. Approve only HD-PG02-205 and HD-PG02-207 until 2026-05-05."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-478",
+      "source": "seed",
+      "title": "Wave Cedar export backlog recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the Wave Cedar export backlog exception."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: Wave Cedar export had a mirror-west temporary exception with a narrow ticket subset, but this recap does not preserve the authoritative exception ID or the full approved list."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-479",
+      "source": "seed",
+      "title": "Wave Cedar export replay one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Wave Cedar export reuse the replay one-off exception?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record EX-479 allowed a replay-only unblock for partner mirror-west on Wave Cedar export replay. Approve only HD-PG02-209 until 2026-04-29. This one-time allowance does not replace the settled queue exception."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-482",
+      "source": "seed",
+      "title": "Wave Cedar export docs lane exception",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for the Wave Cedar export docs lane."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-482 applies only to partner mirror-west for the Wave Cedar export docs lane. Approve only HD-PG02-214 until 2026-05-01."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-483",
+      "source": "seed",
+      "title": "Wave Cedar export default policy note",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the default handling for Wave Cedar export?"
+        },
+        {
+          "role": "assistant",
+          "content": "Default policy note: keep Wave Cedar export tickets blocked pending review unless an exact temporary exception record is found. This note is not itself an exception record."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-484",
+      "source": "seed",
+      "title": "Wave Cedar export exception mirror-south",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for Wave Cedar export on mirror-south."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-484 applies only to partner mirror-south for the Wave Cedar export queue. Approve only HD-PG02-241 and HD-PG02-242 until 2026-05-02."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-485",
+      "source": "seed",
+      "title": "Wave Cedar export hotfix exception old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Wave Cedar export hotfix exception."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded record EX-485 previously approved HD-PG02-203 for partner mirror-west on the Wave Cedar export queue through 2026-04-20. Do not reuse this old hotfix record."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-491",
+      "source": "seed",
+      "title": "Aurora Sync export exception current shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Aurora Sync export exception shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Aurora Sync export still has a narrow temporary exception for one sunrise partner, but the exact exception ID and approved ticket were not copied here. Check exact history first."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-492",
+      "source": "seed",
+      "title": "Aurora Sync export exception sunrise-eu",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for Aurora Sync export on sunrise-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-492 applies only to partner sunrise-eu for Aurora Sync export. Approve only HD-PG02-321 until 2026-05-04."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-493",
+      "source": "seed",
+      "title": "Aurora Sync export retry exception",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for Aurora Sync export retry queue."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-493 applies only to partner sunrise-ap for the Aurora Sync export retry queue. Approve only HD-PG02-314 until 2026-05-05."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-494",
+      "source": "seed",
+      "title": "Aurora Sync export exception expired",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Aurora Sync exception record."
+        },
+        {
+          "role": "assistant",
+          "content": "Expired record EX-494 previously approved HD-PG02-312 for partner sunrise-ap on Aurora Sync export until 2026-04-17. This exception is expired."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-495",
+      "source": "seed",
+      "title": "Aurora Sync export docs preview one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Aurora Sync export reuse the docs preview exception?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record EX-495 allowed a docs-preview unblock for Aurora Sync export on sunrise-ap. Approve only HD-PG02-315 until 2026-04-30. Do not reuse it as the settled exception."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-496",
+      "source": "seed",
+      "title": "Aurora Sync export latest packet review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Aurora Sync export exception packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-496 applies only to partner sunrise-ap for Aurora Sync export shadow traffic. Approve only HD-PG02-316 and HD-PG02-317 until 2026-05-06."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-497",
+      "source": "seed",
+      "title": "Aurora Sync export default policy note",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the default handling for Aurora Sync export?"
+        },
+        {
+          "role": "assistant",
+          "content": "Default policy note: Aurora Sync export tickets stay blocked pending review unless the exact temporary exception record is retrieved. This note is not an exception record."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-504",
+      "source": "seed",
+      "title": "Ledger Burst export exception current shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current Ledger Burst export exception shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: Ledger Burst export still has a temporary exception for one cube partner, but the exact exception ID and approved subset were not preserved here. Check history before updating tickets."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-505",
+      "source": "seed",
+      "title": "Ledger Burst export exception cube-us",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for Ledger Burst export on cube-us."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-505 applies only to partner cube-us for Ledger Burst export. Approve only HD-PG02-511 until 2026-05-09."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-506",
+      "source": "seed",
+      "title": "Ledger Burst import exception cube-eu",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Temporary exception for Ledger Burst import queue."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-506 applies only to partner cube-eu for the Ledger Burst import queue. Approve only HD-PG02-504 until 2026-05-08."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-507",
+      "source": "seed",
+      "title": "Ledger Burst export exception expired",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older Ledger Burst exception record."
+        },
+        {
+          "role": "assistant",
+          "content": "Expired record EX-507 previously approved HD-PG02-502 for partner cube-eu on Ledger Burst export until 2026-04-21. This record is expired."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-508",
+      "source": "seed",
+      "title": "Ledger Burst export schema-diff one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can Ledger Burst export reuse the schema-diff exception?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record EX-508 allowed a schema-diff unblock for partner cube-eu on Ledger Burst export. Approve only HD-PG02-505 until 2026-05-01. Do not generalize this one-off."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-509",
+      "source": "seed",
+      "title": "Ledger Burst export latest packet review",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Ledger Burst export exception packet."
+        },
+        {
+          "role": "assistant",
+          "content": "Exception EX-509 applies only to partner cube-eu for the Ledger Burst export reconciliation queue. Approve only HD-PG02-506 and HD-PG02-507 until 2026-05-10."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-510",
+      "source": "seed",
+      "title": "Ledger Burst export default policy recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the default handling for Ledger Burst export?"
+        },
+        {
+          "role": "assistant",
+          "content": "Default recap only: Ledger Burst export stays blocked unless the exact temporary exception record is found. This recap should not be treated as the exception itself."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-511",
+      "source": "seed",
+      "title": "Wave Cedar export latest review memo incomplete",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest Wave Cedar export review memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Incomplete memo: a temporary Wave Cedar export exception still exists for a mirror-west partner, but the exact exception ID and approved ticket IDs are omitted here. Do not update tickets from this memo alone."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-512",
+      "source": "seed",
+      "title": "Wave Cedar export manual unblock note",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can we use the earlier Wave Cedar export manual unblock note?"
+        },
+        {
+          "role": "assistant",
+          "content": "Manual unblock note only: one Wave Cedar export ticket was manually held for mirror-west during a tooling outage, but this note is not an exception record and should not be used as the current decision."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-513",
+      "source": "seed",
+      "title": "Ledger Burst export approval memo incomplete",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Ledger Burst export approval memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Incomplete memo: Ledger Burst export still has a temporary exception for cube-eu and a narrow approved subset, but the exact exception ID and final ticket list were not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg02-ex-514",
+      "source": "seed",
+      "title": "Aurora Sync export approval memo incomplete",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the Aurora Sync export approval memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Incomplete memo: Aurora Sync export still has a sunrise-ap temporary exception for a narrow subset, but the authoritative exception ID and exact approved ticket ID are omitted."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+family_id: PG03_oncall_handoff_lookup
+title: Oncall Handoff Lookup
+ability_dir: proactive_information_gathering
+primary_ability: proactive_information_gathering
+secondary_abilities:
+  - episodic_experience
+  - trigger_and_arbitration
+primary_trigger: failure_reflection
+secondary_trigger: []
+expected_substrate: session_search
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier3
+instances_per_bucket:
+  attempt: 1
+  reflection: 1
+  update_or_stabilize: 1
+  eval_near: 2
+  eval_far: 1
+  control: 2
+total_episodes: 8
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: pg03_oncall_handoff_lookup_v1
+what_is_learned: Incident handoff tasks require explicit session retrieval of exact owner, window, ticket set, and blocked actions before any update.
+what_persists: A retrieval skill note about searching handoff sessions first and preferring the latest matching handoff.
+what_counts_as_reuse: Later probes update only the blocked child tickets after retrieving the latest handoff record and citing the exact owner/window.
+false_positive_pattern: The agent acts from vague memory, updates the root incident, or reuses a stale handoff with the wrong owner or window.
+must_demonstrate:
+  - retrieval happens before the first ticket update
+  - exact owner, window, and ticket set are recalled
+  - stale handoffs are not reused when a newer one exists
+episode_order:
+  - attempt_probe_pre
+  - reflection_gap_review
+  - update_or_stabilize_policy_note
+  - eval_near_followup_a
+  - eval_near_followup_b
+  - eval_far_followup_transfer
+  - control_preload_visible_hint
+  - control_boundary_latest_record
+history_plan:
+  branches:
+    - mode: continue
+      episodes:
+        - attempt_probe_pre
+        - reflection_gap_review
+        - update_or_stabilize_policy_note
+        - eval_near_followup_a
+        - eval_near_followup_b
+        - eval_far_followup_transfer
+        - control_preload_visible_hint
+        - control_boundary_latest_record
+episode_overrides:
+  reflection_gap_review:
+    mechanism: skill
+    expected_persistence_signal: skill
+  update_or_stabilize_policy_note:
+    mechanism: skill
+    expected_persistence_signal: skill

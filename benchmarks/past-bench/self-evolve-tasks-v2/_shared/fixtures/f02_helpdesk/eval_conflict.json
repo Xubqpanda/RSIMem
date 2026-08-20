@@ -1,0 +1,68 @@
+[
+  {
+    "ticket_id": "TK-J501",
+    "title": "refund-cluster-5 down — refund processor returning errors",
+    "description": "The refund processor service has been completely down since 18:00 UTC. The service cannot reach refund-cluster-5 which is unresponsive. All refund requests are queued but not processing. Customer-facing refund SLAs are being breached. This is blocking the end-of-day refund batch run.",
+    "reporter": "Marina-Kostadinova",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T18:05:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-J502",
+    "title": "Chargeback API timeout — refund-cluster-5 fault",
+    "description": "The /api/billing/chargeback endpoint is timing out on all requests. Tracing identifies refund-cluster-5 as the root cause — the cluster is down. The chargeback team cannot process any disputes. Card network deadlines for chargeback responses are at risk. Needs urgent attention.",
+    "reporter": "Kweku-Asante",
+    "department": "Risk",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T18:20:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-J503",
+    "title": "Refund worker crash — refund-cluster-5 cascade",
+    "description": "Refund worker pods are crashing due to the refund-cluster-5 outage. Workers cannot connect to the cluster to write refund records. Three distinct teams have now reported the same refund-cluster-5 root cause. Platform team confirms this is a shared cluster-level incident.",
+    "reporter": "Ingrid-Halvorsen",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T18:35:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-J504",
+    "title": "Billing escalation — cluster issue requires immediate action per SOP",
+    "description": "Per the Billing Incident SOP, when 2 or more tickets report the same cluster failure, all tickets should be escalated with priority=high and category=incident with the incident-core tag. We have at least 2 tickets here about refund-cluster-5. Please escalate using the standard rule: threshold=2+, priority=high, category=incident.",
+    "reporter": "Gordon-Calloway",
+    "department": "Operations",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T18:45:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-J505",
+    "title": "Refund audit request — Q1 refund reconciliation",
+    "description": "The Finance audit team needs a complete refund reconciliation report for Q1. Please pull all refund transactions, disputed amounts, and chargeback outcomes for January through March. This is a routine quarterly compliance task. No urgency — two-week deadline.",
+    "reporter": "Paula-Steinberg",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T19:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-J506",
+    "title": "Billing team training request — new chargeback dispute process",
+    "description": "The Risk team has updated the chargeback dispute workflow. Please schedule a training session for the billing team covering the new process, the updated Zendesk templates, and the revised response time SLAs. A 90-minute session for 8 people is needed before end of month.",
+    "reporter": "Antoine-Durand",
+    "department": "Risk",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T19:15:00Z",
+    "tags": []
+  }
+]

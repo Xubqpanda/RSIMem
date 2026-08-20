@@ -1,0 +1,78 @@
+family_id: EP02_exception_list_recall
+title: Exception List Recall
+ability_dir: memory_ability
+primary_ability: memory_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+secondary_trigger: []
+expected_substrate: session_search
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  learn: 2
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+- EP02_I01_exception_cold
+- EP02_I02_seed_exception
+- EP02_I03_context_noise
+- EP02_I04_eval_near
+- EP02_I05_eval_far
+- EP02_I07_control_shortcut
+- EP02_I08_control_wrong_mechanism
+- EP02_I06_control_no_persistence
+history_plan:
+  anchors:
+  - name: ep02_post_learn
+    save_after: EP02_I03_context_noise
+  branches:
+  - mode: continue
+    episodes:
+    - EP02_I01_exception_cold
+    - EP02_I02_seed_exception
+    - EP02_I03_context_noise
+  - mode: from_anchor
+    anchor: ep02_post_learn
+    episodes:
+    - EP02_I04_eval_near
+    - EP02_I05_eval_far
+    - EP02_I07_control_shortcut
+    - EP02_I08_control_wrong_mechanism
+  - mode: fresh
+    episodes:
+    - EP02_I06_control_no_persistence
+control_set:
+- no_persistence
+- shortcut
+- wrong_mechanism
+status: authored
+scope_note: "Canonical 8-episode slice keeps a single session-bounded restart subset, then branches eval and controls from the saved post-learn anchor. I08 overlays a decoy durable memory while still scoring session_search as the expected substrate."
+latent_rule_id: ep02_exception_list_recall_v1
+what_is_learned: A session-bounded restart subset for Wave Cedar that must be recalled later from prior-session history without being restated.
+what_persists: Prior session content retrievable via session_search; the restart subset remains episodic rather than becoming a standing policy.
+what_counts_as_reuse: Agent recovers the prior restart subset on a vague follow-up cue and reactivates only the previously cleared connectors while leaving matched distractors suspended.
+false_positive_pattern: Agent infers the subset from local hints in the current batch, or trusts a durable memory/cache artifact instead of grounding the decision in episodic retrieval.
+must_demonstrate:
+- exception set is recoverable via session search
+- exceptions are not elevated into durable memory
+- application to eval uses the correct subset across multiple candidates
+episode_overrides:
+  EP02_I08_control_wrong_mechanism:
+    mechanism: mixed
+    expected_persistence_signal: session_search
+    persistence_allowed: true
+    preseed_artifacts_dir: self-evolve-tasks-v2/_shared/preseed/ep02_wrong_mechanism_memory
+trigger_phrases:
+- session-bounded restart exception
+- Wave Cedar carry-forward subset
+banned_phrases: []
+stale_phrases: []
+calibration_baseline_score: null
+saturation_ceiling: 0.85

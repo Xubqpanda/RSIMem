@@ -1,0 +1,90 @@
+{
+  "users": {
+    "U_AGENT": {"name": "agent", "display_name": "Task Agent"},
+    "U_BACKEND": {"name": "backend_team", "display_name": "Backend Team"},
+    "U_DEVOPS": {"name": "devops_team", "display_name": "DevOps Team"},
+    "U_PM": {"name": "product_manager", "display_name": "Product Manager"},
+    "U_FRONTEND": {"name": "frontend_team", "display_name": "Frontend Team"}
+  },
+  "channels": {
+    "plk-general": {
+      "topic": "General discussion",
+      "messages": [
+        {
+          "id": "m001",
+          "user": "U_PM",
+          "text": "Q2 planning meeting is scheduled for Monday at 10am. Please add your agenda items to the shared doc.",
+          "ts": "2026-04-04T08:00:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m002",
+          "user": "U_FRONTEND",
+          "text": "The new dashboard component library is ready for review. PR #412 is up.",
+          "ts": "2026-04-04T08:45:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m003",
+          "user": "U_DEVOPS",
+          "text": "Reminder: server patching window is Saturday 2–4 AM EST. No deployments during that window.",
+          "ts": "2026-04-04T09:00:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-engineering": {
+      "topic": "Engineering discussions and incident alerts",
+      "messages": [
+        {
+          "id": "m004",
+          "user": "U_FRONTEND",
+          "text": "Just pushed a fix for the stale session tokens in the auth middleware. Deploying to staging now.",
+          "ts": "2026-04-04T09:10:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m005",
+          "user": "U_DEVOPS",
+          "text": "Kubernetes node pool autoscaler is behaving oddly in us-east. Investigating.",
+          "ts": "2026-04-04T09:20:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m006",
+          "user": "U_BACKEND",
+          "text": "ALERT: DataCore DB timeout errors spiking. Connections are timing out after 5s — normally under 200ms. Multiple services are affected. DataCore is down or severely degraded.",
+          "ts": "2026-04-04T09:35:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m007",
+          "user": "U_DEVOPS",
+          "text": "Confirmed — DataCore DB connection pool exhausted. All replicas returning timeout. This looks like a full DataCore incident.",
+          "ts": "2026-04-04T09:38:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m008",
+          "user": "U_FRONTEND",
+          "text": "DataCore incident is causing API gateway 502s on /v2/users and /v2/transactions. Users are getting errors.",
+          "ts": "2026-04-04T09:42:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-incidents": {
+      "topic": "Active incident tracking",
+      "messages": []
+    }
+  },
+  "dms": []
+}

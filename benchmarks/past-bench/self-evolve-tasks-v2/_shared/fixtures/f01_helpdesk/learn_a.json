@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-B201",
+    "title": "payroll-cluster-2 hanging — salary calculation service returning 503",
+    "description": "The PayrollSync salary calculation service has been returning 503 Service Unavailable since 10:02 UTC. Root cause appears to be payroll-cluster-2 which is stuck and not processing requests. Monthly payroll run is at risk if this is not resolved within 4 hours.",
+    "reporter": "Sandra-Kwame",
+    "department": "Finance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T10:08:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-B202",
+    "title": "PayrollSync payroll-worker pod OOM crash — eu-central-1",
+    "description": "Kubernetes alerts firing: payroll-worker pods on eu-central-1 are crashing with OOMKilled status. This is tied to payroll-cluster-2 being overwhelmed. The pod restarts are not recovering — the cluster itself appears to be in a degraded loop. Affects all payroll batch jobs.",
+    "reporter": "Alex-Petrov",
+    "department": "Infrastructure",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T10:15:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-B203",
+    "title": "Salary calculation 503 errors — payroll-cluster-2 root cause confirmed",
+    "description": "Engineering investigation confirms payroll-cluster-2 is the root cause of the ongoing PayrollSync outage. Three separate microservices all fail to connect. Workers on eu-central-1 are OOM crashing. The salary endpoint /api/payroll/calculate has been returning 503 since 10:00 UTC.",
+    "reporter": "Yuki-Tanaka",
+    "department": "Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T10:27:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-B204",
+    "title": "UI styling improvements requested for payroll dashboard",
+    "description": "The payroll dashboard needs some styling updates to match the new company brand guidelines. Specifically the header color, font sizes on the summary cards, and the mobile responsive layout need adjustments. Design assets have been shared in Figma. No urgency, next sprint is fine.",
+    "reporter": "Carlos-Mendez",
+    "department": "Product",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T11:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-B205",
+    "title": "SLA report for Q1 payroll processing — compliance team request",
+    "description": "The compliance team needs the Q1 SLA performance report for the PayrollSync system. Please pull the uptime metrics, processing success rates, and SLA breach incidents from the last quarter and compile them into the standard compliance report format. Deadline is end of week.",
+    "reporter": "Fatima-Al-Hassan",
+    "department": "Compliance",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-12T11:30:00Z",
+    "tags": []
+  }
+]

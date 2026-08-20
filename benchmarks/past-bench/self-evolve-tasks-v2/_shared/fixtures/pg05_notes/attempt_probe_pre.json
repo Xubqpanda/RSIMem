@@ -1,0 +1,30 @@
+[
+  {
+    "note_id": "FREEZE-PG05-A",
+    "title": "Atlas Billing prod-us freeze note shell",
+    "content": "Current Atlas Billing prod-us freeze note. Current materials suggest a CAB freeze and docs-related exception still apply, but older packets and wrong-scope packets also exist. The exact packet, UTC window, and exception projects are not restated here.",
+    "tags": [
+      "change-freeze",
+      "current",
+      "prod-us"
+    ],
+    "created_at": "2026-05-01T09:00:00Z",
+    "participants": [
+      "cab-ops@corp.com"
+    ],
+    "duration_minutes": 10
+  },
+  {
+    "note_id": "FREEZE-PG05-M1",
+    "title": "Freeze scratchpad",
+    "content": "Unrelated freeze scratchpad.",
+    "tags": [
+      "misc"
+    ],
+    "created_at": "2026-05-01T09:05:00Z",
+    "participants": [
+      "cab-ops@corp.com"
+    ],
+    "duration_minutes": 5
+  }
+]

@@ -1,0 +1,106 @@
+family_id: SM05_weak_trigger_preference_adoption
+title: Weak-Trigger Preference Adoption
+ability_dir: memory_ability
+primary_ability: memory_ability
+secondary_abilities: []
+primary_trigger: explicit_instruction
+trigger_category: direct_explicit_instruction
+trigger_strength: T2
+trigger_visibility_paths:
+  - direct_user_message
+  - required_document_or_note_reading
+benchmark_role: diagnostic_sibling
+compatibility_gate: diagnostic
+trigger_class: explicit_instruction
+secondary_triggers: []
+optional_supporting_trigger: embedded_durable_instruction
+supporting_stage: update_or_stabilize
+supporting_signal: the note embeds the standing summary preference instead of restating it directly in the user message
+supporting_signals: []
+distractor_signals: []
+trigger_injection_plan:
+  learn_a: explicit T3 preference seed asks the agent to save the durable TSV column structure for future sessions.
+  learn_b: weaker T2 direct instruction introduces a separate durable priority-normalization rule without explicit save wording.
+  update_or_stabilize: T1 embedded note memo introduces a separate due-date normalization rule and the prompt only tells the agent to adopt any standing team preference found in the note.
+primary_trigger_stages:
+  - learn_a
+  - learn_b
+trigger_removal_plan:
+  eval_near: remove all preference wording and leave only the new note-processing request.
+  eval_far: keep the preference fully implicit under larger surface shift.
+trigger_mixing_rule: Do not mix conflict_update into this family. The diagnostic question is whether independent non-conflicting preference slots delivered through T3, T2, and T1 triggers are acquired and later reused.
+sibling_comparison_plan: Compare against SM01_preference_adoption as the stronger canonical anchor and use this family as the weak-trigger diagnostic sibling.
+expected_substrate: memory
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier3
+implementation_priority: phase1
+instances_per_bucket:
+  cold: 1
+  learn: 2
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 9
+episode_order:
+  - cold_style_baseline
+  - learn_a_explicit_save_preference
+  - learn_b_soft_preference
+  - update_or_stabilize_embedded_preference
+  - eval_near_apply_weak_trigger_style
+  - eval_far_transfer_weak_trigger_style
+  - control_shortcut_visible_style_rule
+  - control_style_preference_control
+  - control_no_persistence_style
+history_plan:
+  anchors:
+    - name: sm05_post_learn
+      save_after: update_or_stabilize_embedded_preference
+  branches:
+    - mode: continue
+      episodes:
+        - cold_style_baseline
+        - learn_a_explicit_save_preference
+        - learn_b_soft_preference
+        - update_or_stabilize_embedded_preference
+    - mode: from_anchor
+      anchor: sm05_post_learn
+      episodes:
+        - eval_near_apply_weak_trigger_style
+        - eval_far_transfer_weak_trigger_style
+    - mode: fresh
+      episodes:
+        - control_shortcut_visible_style_rule
+        - control_style_preference_control
+        - control_no_persistence_style
+control_set:
+  - no_persistence
+  - shortcut
+  - wrong_mechanism
+status: authored
+latent_rule_id: sm05_weak_trigger_preference_adoption
+what_is_learned: "Three durable, non-conflicting formatting preference slots should be acquired from different trigger strengths: T3 teaches TSV structure, T2 teaches priority normalization, and T1 embedded note text teaches date normalization."
+what_persists: The three stable formatting slots and their application policy in memory.
+what_counts_as_reuse: Later tasks simultaneously use TSV structure, normalized priority labels, and normalized dates without restating any of the three rules.
+false_positive_pattern: The evaluation task succeeds only because the current note repeats the formatting rules, or because the T3 TSV slot is learned while the weaker T2/T1 slots are ignored.
+must_demonstrate:
+  - the T3 TSV-structure slot can be stored
+  - the T2 priority-normalization slot can be stored independently of the T3 slot
+  - the T1 embedded due-date slot can be extracted and stored from note content
+  - fresh-session eval applies all three slots without any local clue
+recommended_mock_services:
+  - notes
+phase1_canonical_sibling: SM01_preference_adoption remains the clean T3 anchor; this family is the weak-trigger diagnostic sibling for the same latent preference class.
+future_sibling_roadmap:
+  - Add a pure T1-only version with all slots embedded in notes if the family needs a harsher acquisition probe.
+  - Add an explicit_correction sibling to compare weak instruction versus weak correction triggers.
+  - Add retrieval-timing instrumentation checks before the first external action if attribution needs to be harder.
+cold_design: Use the same note workflow before any formatting preference has been taught and let the agent answer in its default style.
+expected_cold_result: The agent may produce a readable summary, but TSV adherence and normalized labels should be unstable.
+control_design: no_persistence removes durable storage; shortcut exposes all three formatting slots inline; wrong_mechanism embeds all three rules inside the current note instead of memory.
+expected_control_result: Format adherence should drop without persistence, shortcut should be locally solvable, and wrong_mechanism should show that current-document delivery differs from memory reuse.
+authoring_notes: This family intentionally maps T3, T2, and T1 trigger strength to three independent non-conflicting rule slots so eval can attribute which trigger slot failed. It is a diagnostic sibling rather than a clean anchor.

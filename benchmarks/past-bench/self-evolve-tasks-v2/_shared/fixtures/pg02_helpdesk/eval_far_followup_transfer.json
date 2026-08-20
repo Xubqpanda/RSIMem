@@ -1,0 +1,47 @@
+[
+  {
+    "ticket_id": "HD-PG02-501",
+    "title": "Ledger Burst export request cube-eu shard A",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "ledger-burst",
+      "cube-eu"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:30:00Z"
+  },
+  {
+    "ticket_id": "HD-PG02-502",
+    "title": "Ledger Burst export request cube-us shard B",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "ledger-burst",
+      "cube-us"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:31:00Z"
+  },
+  {
+    "ticket_id": "HD-PG02-503",
+    "title": "Ledger Burst export request cube-eu shard C",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "ledger-burst",
+      "cube-eu"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:32:00Z"
+  }
+]

@@ -1,0 +1,74 @@
+task_id: EP03_I02_modify_seed
+task_name: 'EP03 Recall Then Modify — Seed'
+
+services:
+  - name: notes
+    command: python mock_services/notes/server.py
+    port: 9205
+    health_check: http://localhost:9205/notes/list
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9205/notes/reset
+    env:
+      NOTES_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/ep03_notes/update.json
+      PORT: "9205"
+
+tools:
+  - name: notes_list
+    description: List meeting notes
+    input_schema:
+      type: object
+      properties:
+        tags:
+          type: array
+          items: {type: string}
+      required: []
+  - name: notes_get
+    description: Get a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+      required: [note_id]
+  - name: notes_update
+    description: Update a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+        payload: {type: object}
+      required: [note_id, payload]
+  - name: notes_share
+    description: Share a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+        recipients:
+          type: array
+          items: {type: string}
+      required: [note_id, recipients]
+
+tool_endpoints:
+  - {tool_name: notes_list, url: http://localhost:9205/notes/list, method: POST}
+  - {tool_name: notes_get, url: http://localhost:9205/notes/get, method: POST}
+  - {tool_name: notes_update, url: http://localhost:9205/notes/update, method: POST}
+  - {tool_name: notes_share, url: http://localhost:9205/notes/share, method: POST}
+
+prompt:
+  text: |
+    Authoritative update for future onboarding work: the settled onboarding
+    playbook's mentor handoff SLA changes from 48 hours to 24 hours. Recover
+    the prior approved playbook from earlier session history, apply only this
+    mentor-SLA change to the correct current shell, preserve every other step
+    and shell metadata, and save this updated version for later onboarding
+    work.
+    Output: PLAYBOOK|mentor_sla_24h|DOC-711
+  language: en
+
+judge_rubric: "Reward recovering the prior approved playbook through session_search, updating only DOC-711 so mentor assignment changes from 48h to 24h, preserving the rest of the playbook and shell metadata, and treating this updated version as the one to use later."
+
+max_turns: 20
+timeout: 300
+category: self_evolve
+difficulty: medium

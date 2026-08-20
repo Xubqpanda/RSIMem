@@ -1,0 +1,29 @@
+[
+  {
+    "note_id": "INT-K501",
+    "title": "Identity Broker - Degraded",
+    "content": "Kappa identity broker. Status: degraded. Customer-facing production authentication failures.",
+    "tags": ["degraded", "customer-facing", "identity"],
+    "created_at": "2026-05-06T09:00:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  },
+  {
+    "note_id": "INT-K503",
+    "title": "Search Index - Degraded",
+    "content": "Kappa search index. Status: degraded. Customer-facing production latency spike.",
+    "tags": ["degraded", "customer-facing", "search"],
+    "created_at": "2026-05-06T09:01:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  },
+  {
+    "note_id": "INT-K299",
+    "title": "Northstar Attachments - Degraded",
+    "content": "Kappa Northstar attachments. Status: degraded. Customer-facing production issue, but attachment confirmation is missing in this new case.",
+    "tags": ["degraded", "customer-facing", "attachments"],
+    "created_at": "2026-05-06T09:02:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  }
+]

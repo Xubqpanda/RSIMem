@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM05-003",
+    "title": "Backlog Hygiene Follow-up",
+    "created_at": "2026-04-19",
+    "participants": ["Maya Ortiz", "Noah Reed", "Priya Chen", "Dylan Moss"],
+    "duration_minutes": 30,
+    "content": "Backlog hygiene follow-up.\n\nAction items:\n1. Maya Ortiz: close the urgent triage gaps before Monday, urgent, by May 24\n2. Noah Reed: update the normal-priority review roster, standard, by May 25\n3. Priya Chen: archive the minor duplicate escalations, low, by May 26\n\nDylan Moss joined for dependency tracking only."
+  }
+]

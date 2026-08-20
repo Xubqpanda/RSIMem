@@ -1,0 +1,107 @@
+family_id: PC01_sop_bootstrap_02
+title: Pipeline SOP Bootstrap
+ability_dir: procedural_ability
+primary_ability: procedural_ability
+secondary_abilities: []
+primary_trigger: durable_rule_hint
+secondary_trigger: []
+expected_substrate: skill
+autonomy_required: true
+evaluation_requires_reuse: true
+transfer_distance: near_far
+overwrite_mode: not_required
+noise_profile: medium
+family_length_tier: tier2
+instances_per_bucket:
+  cold: 1
+  learn: 1
+  update_or_stabilize: 1
+  eval_near: 1
+  eval_far: 1
+  control: 3
+total_episodes: 8
+episode_order:
+- FC02_I01_pipeline_cold
+- FC02_I02_pipeline_learn_a
+- FC02_I02b_pipeline_update_or_stabilize
+- FC02_I03_pipeline_eval_near
+- FC02_I03b_pipeline_eval_far
+- FC02_C02_control_shortcut
+- FC02_C03_control_surface_memorization
+- FC02_C01_control_no_persistence
+history_plan:
+  anchors:
+  - name: pc01_02_post_learn
+    save_after: FC02_I02b_pipeline_update_or_stabilize
+  branches:
+  - mode: continue
+    episodes:
+    - FC02_I01_pipeline_cold
+    - FC02_I02_pipeline_learn_a
+    - FC02_I02b_pipeline_update_or_stabilize
+  - mode: from_anchor
+    anchor: pc01_02_post_learn
+    episodes:
+    - FC02_I03_pipeline_eval_near
+    - FC02_I03b_pipeline_eval_far
+  - mode: fresh
+    episodes:
+    - FC02_C02_control_shortcut
+    - FC02_C03_control_surface_memorization
+    - FC02_C01_control_no_persistence
+control_set:
+- no_persistence
+- shortcut
+- surface_memorization
+status: v2_architecture_aligned
+latent_rule_id: fc02_data_pipeline_sop_v1
+saturation_ceiling: 0.85
+
+# §4 Semantic Metadata
+what_is_learned: >
+  Data pipeline workflow SOP — the ordered procedure for diagnosing stalled
+  pipelines, checking upstream dependencies, and restarting stages.
+what_persists: >
+  A durable skill artifact encoding the pipeline triage and recovery SOP
+  for reuse across sessions.
+what_counts_as_reuse: >
+  Agent applies the persisted pipeline SOP to new stalled-pipeline scenarios
+  with different stage names and upstream configurations.
+false_positive_pattern: >
+  Agent memorizes specific pipeline names or stage IDs from training cases
+  rather than extracting the general diagnostic procedure.
+must_demonstrate:
+- Extract a reusable pipeline recovery procedure from explicit SOP delivery
+- Apply the procedure to novel pipeline configurations with changed entities
+- Preserve correct diagnostic ordering and dependency-check logic
+
+# §13.0 Trigger Spec
+trigger_category: weak_explicit_future_use
+trigger_strength: T2
+visibility_surface: full pipeline SOP is available, but the prompt only hints that it is a recurring standard and never commands skill creation
+trigger_injection_plan: learn_a exposes the full pipeline SOP with future-use wording; update_or_stabilize uses a surface-varied case with brief-only KB
+trigger_removal_plan: eval removes SOP text; only novel pipeline scenarios remain
+trigger_mixing_rule: no direct save-skill instruction; future-use hint is the only trigger
+sibling_comparison_plan: compare with PC03 induction families for trigger-strength analysis
+phase1_canonical_sibling: compare against PC01_01 T3 explicit anchor
+future_sibling_roadmap: T1 embedded-note version
+
+# §10 Cold Design
+cold_design: same pipeline task before any SOP exposure
+expected_cold_result: partial solve; no stable reusable procedure
+
+# Control Design
+control_design: no_persistence, shortcut, surface_memorization
+expected_control_result: transfer gain shrinks without persisted procedure
+
+# Episodes
+legacy_source: previous PC split, architecture-aligned
+legacy_episodes:
+- FC02_C01_control_no_persistence
+- FC02_C02_control_shortcut
+- FC02_C03_control_surface_memorization
+- FC02_I01_pipeline_cold
+- FC02_I02_pipeline_learn_a
+- FC02_I02b_pipeline_update_or_stabilize
+- FC02_I03_pipeline_eval_near
+- FC02_I03b_pipeline_eval_far

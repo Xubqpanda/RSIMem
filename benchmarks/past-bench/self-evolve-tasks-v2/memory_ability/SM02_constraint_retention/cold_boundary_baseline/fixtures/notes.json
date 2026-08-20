@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM02-001",
+    "title": "Roadmap Planning Sync",
+    "created_at": "2026-04-10",
+    "participants": ["Priya Nair", "Daniel Kim", "Ava Chen", "Chloe Sun"],
+    "duration_minutes": 50,
+    "content": "Roadmap planning sync.\n\nAction items:\n1. Priya Nair: refresh the roadmap matrix before the leadership review\n2. Daniel Kim: close the open dependency risks in the launch sheet\n3. Ava Chen: review the vendor milestone schedule against the demo plan\n\nChloe Sun attended for context only."
+  }
+]

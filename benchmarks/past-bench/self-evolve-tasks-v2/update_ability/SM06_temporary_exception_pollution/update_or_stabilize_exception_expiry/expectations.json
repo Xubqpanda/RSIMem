@@ -1,0 +1,36 @@
+{
+  "latent_rule_id": "sm06_temporary_exception_pollution",
+  "expected_mechanism": "memory",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["RISK-CANON", "action item owners"],
+    "forbidden_rule_keywords": ["this week only", "do not share this batch with Maya Ortiz"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_memory_calls": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM06-003",
+  "required_recipients": ["Maya Ortiz", "Priya Chen"],
+  "forbidden_recipients": ["Cara Liu"],
+  "required_output_keywords": [
+    "Maya Ortiz | RISK-CANON",
+    "Priya Chen | RISK-CANON",
+    "2026-06-15",
+    "2026-06-16"
+  ],
+  "one_off_rule_keywords": [
+    "this week only",
+    "do not share this batch with Maya Ortiz"
+  ],
+  "min_memory_calls": 1,
+  "memory_call_weight": 0.08,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.04,
+  "require_rule_artifact": ["RISK-CANON", "action item owners"],
+  "rule_artifact_weight": 0.04,
+  "apply_mechanism_caps": true
+}

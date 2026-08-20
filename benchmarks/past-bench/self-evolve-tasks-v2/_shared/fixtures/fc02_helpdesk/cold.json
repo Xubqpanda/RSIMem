@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-R101",
+    "title": "User retention analysis contains inaccurate data",
+    "description": "The user retention report from the data platform shows obvious anomalies — retention rates exceed 100% in several time windows, likely a data cleaning issue.",
+    "reporter": "Data-Alice Chen",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T09:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R102",
+    "title": "Sales funnel conversion analysis missing normalization",
+    "description": "This month's sales funnel report did not normalize channel volumes before comparing conversion rates, causing skewed cross-channel comparisons.",
+    "reporter": "Data-Bob Zhang",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T09:30:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R103",
+    "title": "Campaign effectiveness aggregation report not generated",
+    "description": "Last week's promotional campaign data has been collected but no aggregation has been run yet, so the final effectiveness report cannot be produced.",
+    "reporter": "Research-Carol Liu",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T10:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R104",
+    "title": "Request: schedule a data analysis tool demo",
+    "description": "The marketing team would like to schedule a demo of available data analysis tools to better understand their capabilities. Non-urgent, not a technical issue.",
+    "reporter": "Marketing-Emma Wu",
+    "department": "Marketing",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T11:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-R105",
+    "title": "Analytics dashboard loading slowly under high traffic",
+    "description": "The dashboard takes over 10 seconds to load during peak hours, affecting daily operations.",
+    "reporter": "Data-Alice Chen",
+    "department": "Data Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-10T11:30:00Z",
+    "tags": []
+  }
+]

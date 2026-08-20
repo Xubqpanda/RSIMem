@@ -1,0 +1,51 @@
+{
+  "latent_rule_id": "sm05_weak_trigger_preference_adoption",
+  "expected_mechanism": "memory",
+  "bucket_role": "control",
+  "control_kind": "shortcut",
+  "shortcut_exposes_target_rule": true,
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": ["TSV", "High", "Medium", "Low", "YYYY/MM/DD"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_memory_injections": 0
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM05-007",
+  "required_recipients": ["Asha Kim", "Ben Ortiz", "Cara Liu"],
+  "forbidden_recipients": ["Drew Park"],
+  "required_output_keywords": [
+    "Asha Kim",
+    "Ben Ortiz",
+    "Cara Liu",
+    "2026/06/05",
+    "2026/06/06",
+    "2026/06/07",
+    "High",
+    "Medium",
+    "Low"
+  ],
+  "require_tsv_output": true,
+  "slot_checks": {
+    "r1_t3_tsv_structure": {
+      "require_tsv_output": true,
+      "min_tsv_rows": 3
+    },
+    "r2_t2_priority_normalization": {
+      "require_tsv_output": true,
+      "tsv_column_index": 1,
+      "required_tsv_column_values": ["High", "Medium", "Low"],
+      "forbidden_tsv_column_values": ["urgent", "normal priority", "standard", "minor"]
+    },
+    "r3_t1_date_normalization": {
+      "require_tsv_output": true,
+      "tsv_column_index": 3,
+      "required_tsv_column_values": ["2026/06/05", "2026/06/06", "2026/06/07"],
+      "forbidden_tsv_column_values": ["Jun 5", "Jun 6", "Jun 7"]
+    }
+  },
+  "apply_mechanism_caps": true
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "article_id": "kb_pipeline_sop_v1",
+    "title": "Data Quality Analysis SOP v1",
+    "category": "Data SOP",
+    "tags": ["data analysis", "SOP", "pipeline", "quality"],
+    "content": "When a ticket is a data analysis issue (retention, conversion rate, aggregation report, metric anomalies, etc.), you MUST apply the following five-step pipeline:\n1. Data cleaning (pipeline-clean): check raw data completeness; fix missing values and format errors.\n2. Normalization (pipeline-normalize): standardize data from different sources or different scales.\n3. Outlier filtering (pipeline-filter): remove statistical outliers (e.g. retention rate > 100%, negative conversion rates).\n4. Aggregation (pipeline-aggregate): roll up metrics by business dimensions (time period, channel, campaign).\n5. Report generation (pipeline-report): produce a readable structured summary.\nAll data analysis tickets MUST be tagged pipeline-complete and data-sev-medium, category set to data-analysis, priority set to medium. Non-analysis requests (demos, hardware, meeting bookings) do NOT follow this process.",
+    "last_updated": "2026-03-25",
+    "views": 88
+  },
+  {
+    "article_id": "kb_pipeline_hint",
+    "title": "How to identify non-analysis tickets",
+    "category": "Data SOP",
+    "tags": ["data analysis", "classification"],
+    "content": "If a ticket title or description contains words like demo, request, meeting room, booking, hardware, equipment, or slow loading, it is not a data analysis ticket and should not follow the pipeline process.",
+    "last_updated": "2026-03-22",
+    "views": 42
+  }
+]

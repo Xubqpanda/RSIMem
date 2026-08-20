@@ -1,0 +1,26 @@
+[
+  {
+    "ticket_id": "TK-FM03-001",
+    "title": "Export user engagement metrics for Q1 report",
+    "description": "The analytics team needs a raw export of user engagement data (page views, session duration, click events) for the Q1 annual report. Please process and export using pandas.",
+    "reporter": "Nina Wang",
+    "department": "Analytics Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-01",
+    "tags": [],
+    "category": ""
+  },
+  {
+    "ticket_id": "TK-FM03-002",
+    "title": "Download customer demographics dataset",
+    "description": "Marketing team needs a full export of the customer demographics dataset for an upcoming campaign segmentation project. Please provide in CSV format.",
+    "reporter": "Oscar Brown",
+    "department": "Marketing Team",
+    "priority": "medium",
+    "status": "open",
+    "created_at": "2026-04-01",
+    "tags": [],
+    "category": ""
+  }
+]

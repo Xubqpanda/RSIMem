@@ -1,0 +1,51 @@
+{
+  "latent_rule_id": "f02_billing_incident_sop_v2",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "billing-sla-breach",
+      "critical",
+      "incident-billing"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 1
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-G201",
+    "TK-G202",
+    "TK-G203"
+  ],
+  "excluded_ticket_ids": [
+    "TK-G204",
+    "TK-G205"
+  ],
+  "expected_priority": "critical",
+  "expected_category": "incident-billing",
+  "required_tags": [
+    "incident-core",
+    "billing-sla-breach"
+  ],
+  "min_ticket_reads": 4,
+  "required_summary_keywords": [
+    "TK-G201",
+    "TK-G202",
+    "TK-G203"
+  ],
+  "skill_artifact_weight": 0.05,
+  "apply_mechanism_caps": true,
+  "missing_learning_cap": 0.45,
+  "min_skill_updates": 1,
+  "skill_update_weight": 0.1,
+  "require_rule_artifact": [
+    "billing-sla-breach",
+    "critical",
+    "incident-billing"
+  ],
+  "rule_artifact_weight": 0.05
+}

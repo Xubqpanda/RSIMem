@@ -1,0 +1,514 @@
+{
+  "sessions": [
+    {
+      "id": "pg04-waiv-118",
+      "source": "seed",
+      "title": "Ledger export temporary waiver staging-eu",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the temporary waiver for ledger-export staging-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-118 applies only to owner data-platform, service ledger-export, scope staging-eu, expiry 2026-05-10. Approved cases: LGR-EU-14 and LGR-EU-19 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-123",
+      "source": "seed",
+      "title": "CacheEdge overnight-maintenance waiver",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the temporary waiver for CacheEdge overnight maintenance."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-123 applies only to owner infra-ops, service cacheedge, scope overnight-maintenance, expiry 2026-05-03. Approved cases: CE-17 and CE-18 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-131",
+      "source": "seed",
+      "title": "Ledger export temporary waiver staging-us",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the temporary waiver for ledger-export staging-us."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-131 applies only to owner data-platform, service ledger-export, scope staging-us, expiry 2026-05-12. Approved case: LGR-US-07 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-145",
+      "source": "seed",
+      "title": "Metrics drain QA-EU waiver",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the temporary waiver for metrics-drain qa-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-145 applies only to owner observability, service metrics-drain, scope qa-eu, expiry 2026-05-20. Approved cases: MD-08 and MD-09 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-117",
+      "source": "seed",
+      "title": "Ledger export temporary waiver staging-eu old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older waiver for ledger-export staging-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded waiver WAIV-117 applied only to owner data-platform, service ledger-export, scope staging-eu, expiry 2026-04-28. Approved cases: LGR-EU-14 only. Later waiver replaced this record."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-119",
+      "source": "seed",
+      "title": "Ledger export staging-eu current shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current waiver shell for ledger-export staging-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: ledger-export staging-eu still has a temporary waiver for data-platform with a narrow approved case list, but the exact waiver ID and full case set were not copied here. Re-check the exact waiver before auditing."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-120",
+      "source": "seed",
+      "title": "Ledger export temporary waiver staging-eu latest packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the latest packet for ledger-export staging-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-120 applies only to owner data-platform-ops, service ledger-export, scope staging-eu, expiry 2026-05-11. Approved cases: LGR-EU-14 and LGR-EU-22 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-121",
+      "source": "seed",
+      "title": "Ledger export temporary waiver staging-ap archive",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the older waiver for ledger-export staging-ap."
+        },
+        {
+          "role": "assistant",
+          "content": "Expired archive WAIV-121 applied only to owner data-platform, service ledger-export, scope staging-ap, expiry 2026-04-16. Approved case: LGR-AP-03 only. Do not reuse this archive."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-122",
+      "source": "seed",
+      "title": "Ledger export temporary waiver prod-eu",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the temporary waiver for ledger-export prod-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-122 applies only to owner data-platform, service ledger-export, scope prod-eu, expiry 2026-05-09. Approved cases: LGR-EU-31 and LGR-EU-33 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-124",
+      "source": "seed",
+      "title": "Ledger export staging-eu replay one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can ledger-export staging-eu reuse the replay one-off waiver?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record WAIV-124 allowed a replay-only check for owner data-platform, service ledger-export, scope staging-eu, expiry 2026-05-01. Approved case: LGR-EU-18 only. Do not generalize this one-off."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-125",
+      "source": "seed",
+      "title": "Ledger export staging-eu waiver recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the ledger-export staging-eu waiver."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: ledger-export staging-eu has a temporary waiver for data-platform and a narrow approved case list, but this recap omits the authoritative waiver ID and full approved-versus-rejected split."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-126",
+      "source": "seed",
+      "title": "Ledger export temporary waiver staging-us latest packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the latest packet for ledger-export staging-us."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-126 applies only to owner data-platform, service ledger-export, scope staging-us, expiry 2026-05-14. Approved cases: LGR-US-07 and LGR-US-09 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-127",
+      "source": "seed",
+      "title": "Ledger export staging-us current shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current waiver shell for ledger-export staging-us."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: ledger-export staging-us still has a temporary waiver for data-platform, but the exact waiver ID and complete case list were intentionally omitted here. Re-check the exact waiver."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-128",
+      "source": "seed",
+      "title": "Ledger export staging-eu approval memo incomplete",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the ledger-export staging-eu approval memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Incomplete memo: ledger-export staging-eu still has a temporary waiver and a narrow approved case list, but this memo does not preserve the exact waiver ID, expiry, or final rejected cases."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-129",
+      "source": "seed",
+      "title": "Ledger export temporary waiver staging-ca",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the temporary waiver for ledger-export staging-ca."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-129 applies only to owner data-platform, service ledger-export, scope staging-ca, expiry 2026-05-13. Approved cases: LGR-CA-04 and LGR-CA-05 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-130",
+      "source": "seed",
+      "title": "Ledger mirror staging-ap dry-run one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can the staging-ap ledger mirror dry-run reuse the earlier waiver?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record WAIV-130 applied only to owner data-platform, service ledger-mirror, scope staging-ap, expiry 2026-04-30. Approved case: LGR-AP-05 only. This does not apply to ledger-export."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-132",
+      "source": "seed",
+      "title": "CacheEdge overnight-maintenance current shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current CacheEdge overnight-maintenance waiver shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: CacheEdge overnight-maintenance still has a temporary waiver for infra-ops and a narrow approved case list, but the exact waiver ID and final case split are not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-133",
+      "source": "seed",
+      "title": "CacheEdge overnight-maintenance waiver old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older waiver for CacheEdge overnight maintenance."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded waiver WAIV-133 applied only to owner infra-ops, service cacheedge, scope overnight-maintenance, expiry 2026-04-27. Approved cases: CE-15 and CE-16 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-134",
+      "source": "seed",
+      "title": "CacheEdge daytime-maintenance waiver",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the temporary waiver for CacheEdge daytime maintenance."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-134 applies only to owner infra-ops, service cacheedge, scope daytime-maintenance, expiry 2026-05-04. Approved cases: CE-19 and CE-20 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-135",
+      "source": "seed",
+      "title": "CacheEdge overnight-maintenance one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can CacheEdge overnight maintenance reuse the one-off waiver?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record WAIV-135 allowed an overnight CacheEdge dry-run for owner infra-ops, service cacheedge, scope overnight-maintenance, expiry 2026-04-29. Approved case: CE-19 only. Do not generalize this one-off."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-136",
+      "source": "seed",
+      "title": "CacheEdge overnight-maintenance recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the CacheEdge overnight-maintenance waiver."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: CacheEdge overnight-maintenance still has a temporary waiver for infra-ops and two approved cases, but this recap omits the exact waiver ID and authoritative expiry."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-146",
+      "source": "seed",
+      "title": "Metrics drain QA-EU current shell",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current metrics-drain qa-eu waiver shell."
+        },
+        {
+          "role": "assistant",
+          "content": "Current-looking shell only: metrics-drain qa-eu still has a temporary waiver for observability and a narrow approved case list, but the exact waiver ID, expiry, and full case split were not preserved here."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-147",
+      "source": "seed",
+      "title": "Metrics drain QA-US waiver",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the temporary waiver for metrics-drain qa-us."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-147 applies only to owner observability, service metrics-drain, scope qa-us, expiry 2026-05-18. Approved cases: MD-10 and MD-11 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-148",
+      "source": "seed",
+      "title": "Metrics drain QA-EU waiver old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older waiver for metrics-drain qa-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded waiver WAIV-148 applied only to owner observability, service metrics-drain, scope qa-eu, expiry 2026-05-02. Approved case: MD-08 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-149",
+      "source": "seed",
+      "title": "Metrics drain QA-EU latest packet",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the latest packet for metrics-drain qa-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-149 applies only to owner observability-labs, service metrics-drain, scope qa-eu, expiry 2026-05-22. Approved cases: MD-08 and MD-12 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-150",
+      "source": "seed",
+      "title": "Metrics drain QA-EU backfill one-off",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can metrics-drain qa-eu reuse the backfill one-off waiver?"
+        },
+        {
+          "role": "assistant",
+          "content": "One-off record WAIV-150 allowed a backfill-only check for owner observability, service metrics-drain, scope qa-eu, expiry 2026-05-06. Approved case: MD-11 only. Do not generalize this one-off."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-151",
+      "source": "seed",
+      "title": "Metrics drain QA-EU waiver recap",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Recap the metrics-drain qa-eu waiver."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial recap only: metrics-drain qa-eu still has a temporary waiver for observability with two approved cases, but this recap does not preserve the exact waiver ID, expiry, or full rejected set."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-152",
+      "source": "seed",
+      "title": "Metrics drain prod-eu waiver",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Check the temporary waiver for metrics-drain prod-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Waiver WAIV-152 applies only to owner observability, service metrics-drain, scope prod-eu, expiry 2026-05-19. Approved cases: MD-20 and MD-21 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-153",
+      "source": "seed",
+      "title": "Ledger export staging-eu approval memo partial",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the ledger-export staging-eu approval memo partial."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial memo: ledger-export staging-eu remains under a temporary waiver for data-platform with approved EU cases in the teens, but this memo should not be treated as the exact audit source."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-154",
+      "source": "seed",
+      "title": "CacheEdge overnight-maintenance approval memo partial",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the CacheEdge overnight-maintenance approval memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial memo: CacheEdge overnight-maintenance still has a temporary waiver with two approved CE cases, but the exact waiver ID and authoritative expiry are not copied here."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-155",
+      "source": "seed",
+      "title": "Metrics drain QA-EU approval memo partial",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the metrics-drain qa-eu approval memo."
+        },
+        {
+          "role": "assistant",
+          "content": "Partial memo: metrics-drain qa-eu still has a temporary waiver with approved MD cases in the single digits, but this memo omits the exact waiver ID, expiry, and rejected cases."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-156",
+      "source": "seed",
+      "title": "Ledger export temporary waiver staging-us old",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Older waiver for ledger-export staging-us."
+        },
+        {
+          "role": "assistant",
+          "content": "Superseded waiver WAIV-156 applied only to owner data-platform, service ledger-export, scope staging-us, expiry 2026-04-25. Approved case: LGR-US-05 only."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-157",
+      "source": "seed",
+      "title": "CacheEdge overnight-maintenance latest packet draft",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the latest draft packet for CacheEdge overnight maintenance."
+        },
+        {
+          "role": "assistant",
+          "content": "Draft only: CacheEdge overnight-maintenance likely still has a waiver for infra-ops with approved CE cases in the high teens, but the final waiver ID and expiry were not confirmed in this draft."
+        }
+      ]
+    },
+    {
+      "id": "pg04-waiv-158",
+      "source": "seed",
+      "title": "Metrics drain QA-EU current-looking draft",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Need the current-looking draft for metrics-drain qa-eu."
+        },
+        {
+          "role": "assistant",
+          "content": "Draft only: metrics-drain qa-eu still appears to have a waiver for observability with approved MD cases around 08 and 09, but the exact waiver ID and authoritative expiry were not carried into this draft."
+        }
+      ]
+    }
+  ]
+}

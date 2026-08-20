@@ -1,0 +1,51 @@
+{
+  "latent_rule_id": "f01_shared_incident_sop_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "sev1-correlated",
+      "cross-team-verified",
+      "critical",
+      "do not close"
+    ],
+    "min_count_delta": 1
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-B201",
+    "TK-B202",
+    "TK-B203"
+  ],
+  "excluded_ticket_ids": [
+    "TK-B204",
+    "TK-B205"
+  ],
+  "expected_priority": "critical",
+  "expected_category": "cluster-incident",
+  "required_tags": [
+    "sev1-correlated",
+    "cross-team-verified"
+  ],
+  "min_ticket_reads": 4,
+  "required_summary_keywords": [
+    "TK-B201",
+    "TK-B202",
+    "TK-B203"
+  ],
+  "skill_artifact_weight": 0.05,
+  "min_skill_manage_calls": 1,
+  "skill_manage_weight": 0.1,
+  "min_skill_count": 1,
+  "require_rule_artifact": [
+    "shared root cause",
+    "urgent",
+    "do not close"
+  ],
+  "rule_artifact_weight": 0.05
+}

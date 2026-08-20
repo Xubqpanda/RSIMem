@@ -1,0 +1,11 @@
+[
+  {
+    "note_id": "NOTE-SM01-002",
+    "title": "Action Summary Preference Rollout",
+    "created_at": "2026-04-11",
+    "participants": ["Iris Chen", "Victor Hu", "Mina Park", "Lara Gomez"],
+    "duration_minutes": 35,
+    "content": "Action summary preference rollout.\n\nAction items:\n1. Iris Chen: refresh the semantic event catalog, critical, by Apr 22\n2. Victor Hu: backfill null referrer segments, medium priority, by Apr 23\n3. Mina Park: prune obsolete dashboard cards, low priority, by Apr 24\n\nLara Gomez attended to confirm the rollout but does not own an action item.",
+    "duration_minutes": 35
+  }
+]

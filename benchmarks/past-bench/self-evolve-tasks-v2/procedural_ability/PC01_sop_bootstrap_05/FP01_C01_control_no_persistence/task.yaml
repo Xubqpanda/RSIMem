@@ -1,0 +1,110 @@
+task_id: SE_FP01_C01
+task_name: Self-Evolve Plonk Incident SOP — Control No Persistence
+version: '2.0'
+category: self_evolve
+difficulty: hard
+requires_fresh_session: true
+control_type: no_persistence
+services:
+- name: plonk
+  command: python mock_services/plonk/server.py
+  port: 3200
+  health_check: http://localhost:3200/health
+  ready_timeout: 10
+  reset_endpoint: http://localhost:3200/plonk/reset
+  env:
+    PLONK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fp01_plonk/eval_netguard.json
+  health_check_method: GET
+- name: kb
+  command: python mock_services/kb/server.py
+  port: 9106
+  health_check: http://localhost:9106/kb/search
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9106/kb/reset
+  env:
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fp01_kb/incident_brief.json
+prompt:
+  text: 'If you have previously saved a skill for the Plonk incident response procedure, please retrieve and use it first.
+
+
+    Infrastructure incident: The NetGuard network routing fabric is experiencing severe degradation and multiple services are affected.
+
+    Please handle this according to the standard procedure.
+
+    Output a single line: DONE|<pinned message ID>|<incident channel>
+
+    '
+  language: en
+tools:
+- name: plonk_action
+  description: Execute a Plonk API action
+  input_schema:
+    type: object
+    properties:
+      action:
+        type: string
+      xovik:
+        type: string
+      belatu:
+        type: string
+      fenoka:
+        type: string
+      drimpa:
+        type: integer
+      jurela:
+        type: string
+      pikano:
+        type: string
+      dravex:
+        type: string
+      sulima:
+        type: string
+      moriku:
+        type: string
+      tanevi:
+        type: string
+      replyTo:
+        type: string
+    required:
+    - action
+- name: kb_search
+  description: Search the Plonk operations knowledge base
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      category:
+        type: string
+      max_results:
+        type: integer
+    required:
+    - query
+- name: kb_get_article
+  description: Get a knowledge base article by ID
+  input_schema:
+    type: object
+    properties:
+      article_id:
+        type: string
+    required:
+    - article_id
+tool_endpoints:
+- tool_name: plonk_action
+  url: http://localhost:3200/plonk/action
+  method: POST
+- tool_name: kb_search
+  url: http://localhost:9106/kb/search
+  method: POST
+- tool_name: kb_get_article
+  url: http://localhost:9106/kb/articles/get
+  method: POST
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: 'Control (no_persistence): Same as eval_near but persistence disabled.
+  Agent has no access to saved skills or memory. Must solve from scratch with only
+  brief KB index. Measures baseline without any persistence mechanism.
+
+  '

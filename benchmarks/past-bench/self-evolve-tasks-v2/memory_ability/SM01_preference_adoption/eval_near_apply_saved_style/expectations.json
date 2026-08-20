@@ -1,0 +1,58 @@
+{
+  "latent_rule_id": "sm01_preference_adoption",
+  "expected_mechanism": "memory",
+  "bucket_role": "evaluation",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [
+      "TSV",
+      "High/Medium/Low",
+      "YYYY/MM/DD"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": true,
+    "min_memory_injections": 1
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM01-004",
+  "required_recipients": [
+    "Iris Chen",
+    "Victor Hu",
+    "Mina Park"
+  ],
+  "forbidden_recipients": [
+    "Owen Bell"
+  ],
+  "required_output_keywords": [
+    "Iris Chen",
+    "Victor Hu",
+    "Mina Park",
+    "2026/04/28",
+    "2026/04/29",
+    "2026/04/30",
+    "High",
+    "Medium",
+    "Low"
+  ],
+  "forbidden_output_keywords": [
+    "critical",
+    "normal priority",
+    "low priority",
+    "Apr 28",
+    "Apr 29",
+    "Apr 30"
+  ],
+  "require_tsv_output": true,
+  "min_memory_injections": 1,
+  "require_rule_artifact": [
+    "TSV",
+    "High/Medium/Low",
+    "YYYY/MM/DD"
+  ],
+  "rule_artifact_weight": 0.03,
+  "require_memory_artifact": true,
+  "memory_artifact_weight": 0.1,
+  "apply_mechanism_caps": true
+}

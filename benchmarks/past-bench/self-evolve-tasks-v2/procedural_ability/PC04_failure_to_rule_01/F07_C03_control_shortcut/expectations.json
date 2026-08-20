@@ -1,0 +1,44 @@
+{
+  "latent_rule_id": "f07_deployment_rollback_grouping_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "control",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "release_hash",
+      "deploy-child",
+      "do not close",
+      "root-event-pending"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-R102",
+    "TK-R103"
+  ],
+  "excluded_ticket_ids": [
+    "TK-R101",
+    "TK-R104",
+    "TK-R105"
+  ],
+  "expected_priority": "high",
+  "expected_category": "incident",
+  "required_tags": [
+    "deploy-child",
+    "root-event-pending"
+  ],
+  "min_ticket_reads": 4,
+  "required_summary_keywords": [
+    "TK-R102",
+    "TK-R103",
+    "abc123"
+  ],
+  "skill_artifact_weight": 0.0,
+  "control_type": "shortcut",
+  "control_kind": "shortcut"
+}

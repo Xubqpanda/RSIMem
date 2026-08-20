@@ -1,0 +1,75 @@
+task_id: PG02_EVAL_FAR_001
+task_name: PG02 Ops Exception Desk Eval Far
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'A different export queue needs the same kind of disciplined exception handling. Read the desk workflow skill first, then search persisted history and update only the approved subset. Output:
+    EXCEPTION|exception_id|approved_ticket_ids|blocked_ticket_ids'
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward retrieving EX-503 before updating only HD-PG02-501 and HD-PG02-503 while leaving HD-PG02-502 blocked.
+services:
+- name: helpdesk
+  command: python mock_services/helpdesk/server.py
+  port: 9107
+  health_check: http://localhost:9107/helpdesk/tickets
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9107/helpdesk/reset
+  env:
+    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/pg02_helpdesk/eval_far_followup_transfer.json
+    PORT: '9107'
+tools:
+- name: helpdesk_list_tickets
+  description: List helpdesk tickets
+  input_schema:
+    type: object
+    properties:
+      status:
+        type: string
+    required: []
+- name: helpdesk_get_ticket
+  description: Get helpdesk ticket details
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+    required:
+    - ticket_id
+- name: helpdesk_update_ticket
+  description: Update a helpdesk ticket
+  input_schema:
+    type: object
+    properties:
+      ticket_id:
+        type: string
+      priority:
+        type: string
+      tags:
+        type: array
+        items:
+          type: string
+      category:
+        type: string
+      reason_code:
+        type: string
+    required:
+    - ticket_id
+tool_endpoints:
+- tool_name: helpdesk_list_tickets
+  url: http://localhost:9107/helpdesk/tickets
+  method: POST
+- tool_name: helpdesk_get_ticket
+  url: http://localhost:9107/helpdesk/tickets/get
+  method: POST
+- tool_name: helpdesk_update_ticket
+  url: http://localhost:9107/helpdesk/tickets/update
+  method: POST

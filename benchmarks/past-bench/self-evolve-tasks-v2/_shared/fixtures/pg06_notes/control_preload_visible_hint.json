@@ -1,0 +1,20 @@
+[
+  {
+    "note_id": "INT-K601",
+    "title": "Identity Sync - Degraded",
+    "content": "Kappa identity sync. Status: degraded. Customer-facing production outage. A visible legacy note mentions infra-risk@corp.com from a prior week.",
+    "tags": ["degraded", "customer-facing", "identity"],
+    "created_at": "2026-05-07T09:00:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  },
+  {
+    "note_id": "INT-K204",
+    "title": "CDN Edge - Degraded",
+    "content": "Kappa CDN edge node. Status: degraded. Customer-facing production impact remains visible.",
+    "tags": ["degraded", "customer-facing", "cdn"],
+    "created_at": "2026-05-07T09:01:00Z",
+    "participants": ["ops@corp.com"],
+    "duration_minutes": 20
+  }
+]

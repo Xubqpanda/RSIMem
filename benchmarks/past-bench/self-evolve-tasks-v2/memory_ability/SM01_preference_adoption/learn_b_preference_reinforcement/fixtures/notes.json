@@ -1,0 +1,11 @@
+[
+  {
+    "note_id": "NOTE-SM01-003",
+    "title": "Quarterly Metrics Cleanup",
+    "created_at": "2026-04-12",
+    "participants": ["Iris Chen", "Victor Hu", "Mina Park", "Noah Price"],
+    "duration_minutes": 30,
+    "content": "Quarterly metrics cleanup.\n\nAction items:\n1. Iris Chen: remove duplicated attribution labels, urgent, by Apr 25\n2. Victor Hu: repair the campaign mismatch alert, normal priority, by Apr 26\n3. Mina Park: archive stale adoption snapshots, minor, by Apr 27\n\nNoah Price joined for questions but is not an owner.",
+    "duration_minutes": 30
+  }
+]

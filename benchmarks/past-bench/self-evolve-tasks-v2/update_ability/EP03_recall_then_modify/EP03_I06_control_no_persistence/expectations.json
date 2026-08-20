@@ -1,0 +1,59 @@
+{
+  "latent_rule_id": "ep03_recall_then_modify_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "control",
+  "mode": "notes_session_recall",
+  "required_prior_note_id": "DOC-431",
+  "required_updated_note_id": "DOC-741",
+  "required_output_keywords": [
+    "PLAYBOOK"
+  ],
+  "target_modify_field": "content",
+  "preserved_fields": [
+    "title",
+    "participants",
+    "tags"
+  ],
+  "required_shell_metadata": {
+    "title": "Onboarding Playbook",
+    "participants": ["alice@corp.com", "bob@corp.com", "carol@corp.com"],
+    "tags": ["approved", "artifact-shell"]
+  },
+  "shell_match_fields": ["title", "participants", "tags"],
+  "require_updated_note_differs_from_prior": true,
+  "retrieval_snippet_source": "session_search_response_only",
+  "min_session_search_calls": 0,
+  "session_search_weight": 0.0,
+  "required_content_replacements": [
+    {
+      "old": "mentor assigned within 48h",
+      "new": "mentor assigned within 24h"
+    }
+  ],
+  "forbidden_content_regressions": [
+    "HR emails welcome packet",
+    "manager books kickoff call",
+    "IT provisions laptop",
+    "Owner: Carol.",
+    "Status: active."
+  ],
+  "require_retrieved_prior_snippets": [
+    "DOC-431",
+    "mentor assigned within 48h"
+  ],
+  "max_without_grounding": 0.2,
+  "max_without_target_update": 0.25,
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "artifact_contract": {
+    "type": "session_search",
+    "require_rule_keywords": [
+      "onboarding",
+      "playbook"
+    ],
+    "min_count_delta": 0
+  },
+  "skill_artifact_weight": 0.0
+}

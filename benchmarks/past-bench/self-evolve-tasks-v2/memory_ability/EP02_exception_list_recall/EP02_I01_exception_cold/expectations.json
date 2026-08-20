@@ -1,0 +1,25 @@
+{
+  "latent_rule_id": "ep02_exception_list_recall_v1",
+  "expected_mechanism": "session_search",
+  "bucket_role": "baseline",
+  "artifact_contract": {
+    "type": "session_search",
+    "require_rule_keywords": ["INTG-EU-002", "INTG-US-004", "INTG-AP-006", "Wave Cedar carry-forward subset"],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": { "evaluation_only": false, "min_skill_reads": 0 },
+  "mode": "config_recall",
+  "inspected_ids": ["INTG-EU-002", "INTG-US-004", "INTG-AP-006", "INTG-EU-013", "INTG-US-014", "INTG-AP-015"],
+  "inspection_optional": true,
+  "required_update_ids": ["INTG-EU-002", "INTG-US-004", "INTG-AP-006"],
+  "forbidden_update_ids": ["INTG-EU-013", "INTG-US-014", "INTG-AP-015"],
+  "update_requirements": {
+    "INTG-EU-002": {"status": "active", "exception_approved": true},
+    "INTG-US-004": {"status": "active", "exception_approved": true},
+    "INTG-AP-006": {"status": "active", "exception_approved": true}
+  },
+  "required_summary_keywords": ["INTG-EU-002", "INTG-US-004", "INTG-AP-006", "INTG-EU-013", "INTG-US-014", "INTG-AP-015"],
+  "min_session_search_calls": 1,
+  "session_search_weight": 0.1,
+  "skill_artifact_weight": 0.0
+}

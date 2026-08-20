@@ -1,0 +1,119 @@
+task_id: SE_FX01_C01
+task_name: Self-Evolve X Engagement Protocol — Control No Persistence
+version: '1.0'
+category: self_evolve
+difficulty: hard
+requires_fresh_session: true
+control_type: no_persistence
+services:
+- name: x_mock
+  command: python mock_services/x/server.py
+  port: 3300
+  health_check: http://localhost:3300/health
+  ready_timeout: 10
+  reset_endpoint: http://localhost:3300/x/reset
+  env:
+    X_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fx01_x/eval_near.json
+  health_check_method: GET
+- name: kb
+  command: python mock_services/kb/server.py
+  port: 9106
+  health_check: http://localhost:9106/kb/search
+  health_check_method: POST
+  ready_timeout: 10
+  reset_endpoint: http://localhost:9106/kb/reset
+  env:
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fx01_x/kb_brief.json
+prompt:
+  text: 'If you previously saved a skill for the X engagement protocol, retrieve and
+    apply it now.
+
+
+    You are the social media agent for @corp_x. Review the latest mentions and timeline,
+
+    then take the appropriate action for each post.
+
+
+    Use getMentions, getTimeline, and getUserProfile as needed.
+
+    '
+  language: en
+tools:
+- name: x_action
+  description: Execute an X (Twitter) action
+  input_schema:
+    type: object
+    properties:
+      action:
+        type: string
+        enum:
+        - getTimeline
+        - getMentions
+        - getTweet
+        - replyToTweet
+        - postTweet
+        - quoteTweet
+        - sendDM
+        - likeTweet
+        - retweetTweet
+        - getUserProfile
+      tweetId:
+        type: string
+        description: Tweet ID for tweet-specific actions
+      text:
+        type: string
+        description: Text content for postTweet, replyToTweet, quoteTweet
+      recipientId:
+        type: string
+        description: User ID for sendDM
+      username:
+        type: string
+        description: Username for getUserProfile
+      userId:
+        type: string
+        description: User ID for getUserProfile
+      count:
+        type: integer
+        description: Number of results to return
+    required:
+    - action
+- name: kb_search
+  description: Search the knowledge base
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      category:
+        type: string
+      max_results:
+        type: integer
+    required:
+    - query
+- name: kb_get_article
+  description: Get a knowledge base article by ID
+  input_schema:
+    type: object
+    properties:
+      article_id:
+        type: string
+    required:
+    - article_id
+tool_endpoints:
+- tool_name: x_action
+  url: http://localhost:3300/x/action
+  method: POST
+- tool_name: kb_search
+  url: http://localhost:9106/kb/search
+  method: POST
+- tool_name: kb_get_article
+  url: http://localhost:9106/kb/articles/get
+  method: POST
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+judge_rubric: 'Control (no_persistence): Same as eval_near but persistence disabled.
+  Agent has no access to saved skills or memory. Must solve from scratch with only
+  brief KB index. Measures baseline without any persistence mechanism.
+
+  '

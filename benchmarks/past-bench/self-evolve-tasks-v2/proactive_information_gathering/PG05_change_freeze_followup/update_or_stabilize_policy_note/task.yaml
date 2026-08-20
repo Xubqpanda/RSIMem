@@ -1,0 +1,34 @@
+task_id: PG05_UPDATE_001
+task_name: PG05 Change Freeze Followup Policy Update
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Update your own retrieval policy / skill note for future change freeze follow-ups.
+
+    Write a general rule, not a case-specific memory. Do not include any exact packet IDs, project names, exception project names, or UTC timestamps from past cases.
+
+
+    Your updated note should explicitly say all of the following ideas:
+
+    - search session history for the latest matching freeze packet
+
+    - verify the exact UTC start, UTC end, and exception projects
+
+    - do this before updating or sharing the current freeze note
+
+    - reject stale or wrong-scope packets
+
+
+    Output: POLICY_UPDATED|change_freeze_lookup
+
+    '
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward a general retrieval policy update that encodes latest-packet lookup before freeze-note actions without storing case-specific details.

@@ -1,0 +1,150 @@
+{
+  "users": {
+    "U_AGENT": {"name": "agent", "display_name": "Task Agent"},
+    "U_DATAENG": {"name": "data_engineering", "display_name": "Data Engineering"},
+    "U_DEVOPS": {"name": "devops_team", "display_name": "DevOps Team"},
+    "U_PM": {"name": "product_manager", "display_name": "Product Manager"},
+    "U_SRE": {"name": "sre_team", "display_name": "SRE Team"},
+    "U_ANALYTICS": {"name": "analytics_team", "display_name": "Analytics Team"},
+    "U_BACKEND": {"name": "backend_team", "display_name": "Backend Team"}
+  },
+  "channels": {
+    "plk-general": {
+      "topic": "General discussion",
+      "messages": [
+        {
+          "id": "m001",
+          "user": "U_PM",
+          "text": "The new customer dashboard is getting great feedback. Retention up 12% this week.",
+          "ts": "2026-04-08T08:00:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m002",
+          "user": "U_ANALYTICS",
+          "text": "Q1 analytics report is ready for review. See the shared drive link in plk-analytics.",
+          "ts": "2026-04-08T08:20:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m003",
+          "user": "U_PM",
+          "text": "Team lunch tomorrow at noon. Please RSVP by end of day.",
+          "ts": "2026-04-08T08:45:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m004",
+          "user": "U_BACKEND",
+          "text": "API rate limiter update deployed to production. All endpoints now throttled at 1000 req/s.",
+          "ts": "2026-04-08T09:00:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-engineering": {
+      "topic": "Engineering discussions",
+      "messages": [
+        {
+          "id": "m005",
+          "user": "U_DEVOPS",
+          "text": "New Terraform module for EKS node groups merged. All environments updated.",
+          "ts": "2026-04-08T08:30:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m006",
+          "user": "U_BACKEND",
+          "text": "gRPC service mesh upgrade complete. Latency improvements across all service-to-service calls.",
+          "ts": "2026-04-08T09:10:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-data": {
+      "topic": "Data pipeline alerts and status",
+      "messages": [
+        {
+          "id": "m007",
+          "user": "U_ANALYTICS",
+          "text": "Daily ETL jobs completed successfully. All upstream sources processed.",
+          "ts": "2026-04-08T07:00:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m008",
+          "user": "U_DATAENG",
+          "text": "Kafka consumer lag for the events topic is within normal bounds — under 500 messages.",
+          "ts": "2026-04-08T08:00:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m009",
+          "user": "U_DATAENG",
+          "text": "ALERT: StreamFlow pipeline has stalled. The real-time ingestion job has not processed any events for the past 25 minutes. Consumer lag is now at 2.4M messages and growing. StreamFlow is down.",
+          "ts": "2026-04-08T09:30:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m010",
+          "user": "U_SRE",
+          "text": "Confirmed: StreamFlow Flink cluster is in a restart loop. OOM killer hit the task manager pods. StreamFlow pipeline is stalled — dashboards will show stale data.",
+          "ts": "2026-04-08T09:35:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m011",
+          "user": "U_ANALYTICS",
+          "text": "Real-time reports are all showing data from 25 minutes ago. StreamFlow outage is user-visible.",
+          "ts": "2026-04-08T09:40:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-deployments": {
+      "topic": "Deployment tracking",
+      "messages": [
+        {
+          "id": "m012",
+          "user": "U_DEVOPS",
+          "text": "streamflow-v1.8.2 deployed to production at 07:45 UTC. Passed all smoke tests.",
+          "ts": "2026-04-08T07:45:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m013",
+          "user": "U_DEVOPS",
+          "text": "analytics-api v3.2.0 deployed. No issues during rollout.",
+          "ts": "2026-04-08T08:15:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m014",
+          "user": "U_DEVOPS",
+          "text": "backend-core v7.1.1 deployed to production. Monitoring for 30 minutes.",
+          "ts": "2026-04-08T08:45:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-incidents": {
+      "topic": "Active incident tracking",
+      "messages": []
+    }
+  },
+  "dms": []
+}

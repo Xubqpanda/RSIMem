@@ -1,0 +1,38 @@
+task_id: PG02_REFLECTION_001
+task_name: PG02 Ops Exception Desk Reflection
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true
+hermes_home_seed:
+  memory_seed: ../_family_seed/memories
+  skill_seed: ../_family_seed/skills
+  session_seed: ../_family_seed/session_seed.json
+prompt:
+  text: 'Prior attempt review.
+
+    Reflection only. Do not reveal any exact exception IDs, ticket IDs, or expiry dates from the failed case.
+
+
+    Observed failure pattern:
+
+    - error_class: routed to the wrong information source and reused a default policy without checking the exact exception record
+
+    - missed_clue_type: mixed-source clue: workflow skill plus temporary exception session log
+
+    - next_check_priority: open the desk workflow first, then search session history for the exact exception before updating tickets
+
+
+    Output exactly three lines:
+
+    ERROR_CLASS|...
+
+    MISSED_CLUE|...
+
+    NEXT_CHECK|...
+
+    '
+  language: en
+environment:
+  timeout_seconds: 300
+  max_turns: 20
+judge_rubric: Reward a concise reflection that points to the routing mistake and next retrieval priority without leaking any exact exception IDs, ticket IDs, or dates.

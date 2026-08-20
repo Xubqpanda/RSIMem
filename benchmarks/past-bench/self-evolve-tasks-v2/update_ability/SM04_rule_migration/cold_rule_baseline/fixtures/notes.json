@@ -1,0 +1,10 @@
+[
+  {
+    "note_id": "NOTE-SM04-004",
+    "title": "Service Review Follow-up",
+    "created_at": "2026-04-13",
+    "participants": ["Sarah Zhang", "Leo Li", "Kevin Wang", "Maya Patel"],
+    "duration_minutes": 40,
+    "content": "Service review follow-up.\n\nAction items:\n1. Sarah Zhang: tighten the formatter check rollout, High priority, by Apr 28\n2. Leo Li: clean up the remaining style drift in worker modules, Medium priority, by Apr 29\n3. Kevin Wang: update the review examples in the handbook, Low priority, by Apr 30\n\nMaya Patel attended as an observer."
+  }
+]

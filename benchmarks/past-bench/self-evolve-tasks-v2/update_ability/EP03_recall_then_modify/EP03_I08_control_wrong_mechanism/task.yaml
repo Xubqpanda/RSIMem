@@ -1,0 +1,76 @@
+task_id: EP03_I08_control_wrong_mechanism
+task_name: 'EP03 Recall Then Modify — Control Wrong Mechanism'
+
+services:
+  - name: notes
+    command: python mock_services/notes/server.py
+    port: 9205
+    health_check: http://localhost:9205/notes/list
+    health_check_method: POST
+    ready_timeout: 10
+    reset_endpoint: http://localhost:9205/notes/reset
+    env:
+      NOTES_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/ep03_notes/control_wrong_mechanism.json
+      PORT: "9205"
+
+tools:
+  - name: notes_list
+    description: List meeting notes
+    input_schema:
+      type: object
+      properties:
+        tags:
+          type: array
+          items: {type: string}
+      required: []
+  - name: notes_get
+    description: Get a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+      required: [note_id]
+  - name: notes_update
+    description: Update a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+        payload: {type: object}
+      required: [note_id, payload]
+  - name: notes_share
+    description: Share a meeting note
+    input_schema:
+      type: object
+      properties:
+        note_id: {type: string}
+        recipients:
+          type: array
+          items: {type: string}
+      required: [note_id, recipients]
+
+tool_endpoints:
+  - {tool_name: notes_list, url: http://localhost:9205/notes/list, method: POST}
+  - {tool_name: notes_get, url: http://localhost:9205/notes/get, method: POST}
+  - {tool_name: notes_update, url: http://localhost:9205/notes/update, method: POST}
+  - {tool_name: notes_share, url: http://localhost:9205/notes/share, method: POST}
+
+prompt:
+  text: |
+    A convenience cache may already claim to know the onboarding playbook, and
+    today's notes also include a proposed rewrite, but the settled onboarding
+    playbook was already updated earlier in this rollout line and should be
+    recovered from that source rather than from the cache or rewrite note.
+    Apply that settled updated playbook to the correct current shell, including
+    the settled mentor handoff SLA, and leave every other field
+    unchanged.
+    Output: PLAYBOOK
+  language: en
+
+judge_rubric: "Reward using session_search to recover the already-updated settled onboarding playbook, mapping it onto the matching current shell DOC-761, and preserving the approved content while keeping the mentor handoff SLA at 24h. Penalize relying on the durable cache summary or the proposed rewrite note, including edits to DOC-504 or behavior that follows the stale manager-sends-link storyline."
+
+max_turns: 20
+timeout: 300
+category: self_evolve
+difficulty: medium
+requires_fresh_session: true

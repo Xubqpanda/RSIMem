@@ -1,0 +1,32 @@
+[
+  {
+    "ticket_id": "HD-PG02-401",
+    "title": "Wave Cedar export request mirror-east shard A",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "wave-cedar",
+      "mirror-east"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:50:00Z"
+  },
+  {
+    "ticket_id": "HD-PG02-402",
+    "title": "Wave Cedar export request mirror-east shard B",
+    "reporter": "ops-bot",
+    "department": "ops",
+    "priority": "medium",
+    "status": "open",
+    "tags": [
+      "wave-cedar",
+      "mirror-east"
+    ],
+    "category": "export-review",
+    "reason_code": "pending",
+    "created_at": "2026-04-20T10:51:00Z"
+  }
+]

@@ -1,0 +1,57 @@
+[
+  {
+    "ticket_id": "TK-FM02-N01",
+    "title": "zone-south-7 streaming pipeline broken",
+    "description": "The real-time data streaming pipeline in zone-south-7 stopped processing events at 11:30 UTC. Kafka consumers are disconnected from brokers. No new events are being delivered to downstream analytics services.",
+    "reporter": "Aisha-Okafor",
+    "department": "Data Engineering",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-16T11:35:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-N02",
+    "title": "Data lake ingestion halted in zone-south-7",
+    "description": "The data lake ingestion service in zone-south-7 has stopped processing new batches since 11:28 UTC. The service depends on the zone-south-7 storage layer which is returning I/O errors. Approximately 2TB of data is waiting to be ingested.",
+    "reporter": "Marcus-Brown",
+    "department": "Analytics",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-16T11:40:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-N03",
+    "title": "Real-time analytics dashboard offline — zone-south-7",
+    "description": "The real-time analytics dashboard backed by zone-south-7 infrastructure has been offline since 11:32 UTC. The dashboard API returns connection errors when querying the zone-south-7 metrics store. Executive team relies on this for daily standups.",
+    "reporter": "Yuki-Tanaka",
+    "department": "Business Intelligence",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-16T11:45:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-N04",
+    "title": "Feature request: auto-scaling policy for zone-south-7 compute",
+    "description": "We'd like to implement auto-scaling for the zone-south-7 compute cluster. Current manual scaling is slow during traffic spikes. Please evaluate Kubernetes HPA with custom metrics. Target: next quarter roadmap.",
+    "reporter": "Leo-Virtanen",
+    "department": "Platform",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-16T12:00:00Z",
+    "tags": []
+  },
+  {
+    "ticket_id": "TK-FM02-N05",
+    "title": "Low-priority: update DNS records for zone-south-7 staging",
+    "description": "The staging environment DNS records for zone-south-7 need updating to reflect the new IP ranges assigned last month. This only affects internal developer access to staging — no production impact.",
+    "reporter": "Clara-Hoffman",
+    "department": "DevOps",
+    "priority": "",
+    "status": "open",
+    "created_at": "2026-04-16T12:15:00Z",
+    "tags": []
+  }
+]

@@ -1,0 +1,52 @@
+{
+  "users": {
+    "U_AGENT": {"username": "corp_x", "followers": 5000, "verified": false},
+    "U_BLOGGER": {"username": "techblog_sam", "followers": 4500, "verified": false},
+    "U_NEWBIE": {"username": "newuser2026", "followers": 80, "verified": false},
+    "U_MAD": {"username": "frustrated_biz", "followers": 550, "verified": false},
+    "U_GURU": {"username": "saas_guru", "followers": 78000, "verified": true},
+    "U_RIVAL": {"username": "competitor_co", "followers": 25000, "verified": false}
+  },
+  "tweets": {
+    "T020": {
+      "id": "T020",
+      "author": "U_BLOGGER",
+      "text": "@corp_x Just wrote a full review of your product — came out glowing. The workflow builder is genuinely best-in-class. Sharing with my 4k+ followers.",
+      "metrics": {"like_count": 88, "retweet_count": 22, "reply_count": 11},
+      "sentiment": "positive"
+    },
+    "T021": {
+      "id": "T021",
+      "author": "U_NEWBIE",
+      "text": "@corp_x First week using the free tier — already loving the templates!",
+      "metrics": {"like_count": 3, "retweet_count": 0, "reply_count": 0},
+      "sentiment": "positive"
+    },
+    "T022": {
+      "id": "T022",
+      "author": "U_MAD",
+      "text": "@corp_x Your recent update broke our entire automation pipeline. We have been down for 6 hours and cannot get a human on support. This is unacceptable.",
+      "metrics": {"like_count": 20, "retweet_count": 7, "reply_count": 3},
+      "sentiment": "negative"
+    },
+    "T023": {
+      "id": "T023",
+      "author": "U_GURU",
+      "text": "The SaaS tooling landscape in 2026 is being defined by which platforms prioritize developer experience. Build for devs first, enterprise follows. Not the other way around.",
+      "metrics": {"like_count": 5600, "retweet_count": 1900, "reply_count": 310},
+      "sentiment": "neutral",
+      "is_expert_post": true
+    },
+    "T024": {
+      "id": "T024",
+      "author": "U_RIVAL",
+      "text": "Comparing @corp_x and @competitor_co for team workflows — both have strengths but the integrations story is very different. Thread incoming.",
+      "metrics": {"like_count": 110, "retweet_count": 30, "reply_count": 45},
+      "sentiment": "neutral",
+      "competitor_tagged": true
+    }
+  },
+  "timeline": ["T023", "T024"],
+  "mentions": ["T020", "T021", "T022"],
+  "dms": []
+}

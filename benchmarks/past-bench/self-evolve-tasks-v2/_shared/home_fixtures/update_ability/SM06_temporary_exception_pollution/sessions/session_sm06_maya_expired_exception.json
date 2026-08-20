@@ -1,0 +1,15 @@
+{
+  "session_id": "sm06_maya_expired_exception",
+  "model": "fixture-model",
+  "platform": "cli",
+  "messages": [
+    {
+      "role": "user",
+      "content": "For this week only, do not share the risk batch with Maya Ortiz."
+    },
+    {
+      "role": "assistant",
+      "content": "Applied this-week-only Maya Ortiz skip and noted it must expire after the batch."
+    }
+  ]
+}

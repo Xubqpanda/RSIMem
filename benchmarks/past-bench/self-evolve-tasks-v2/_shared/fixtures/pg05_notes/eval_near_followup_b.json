@@ -1,0 +1,17 @@
+[
+  {
+    "note_id": "FREEZE-PG05-NB",
+    "title": "Kappa Gateway prod-ap freeze note shell",
+    "content": "Current Kappa Gateway prod-ap freeze note. The exact window and exception projects were decided earlier by CAB but are not repeated here.",
+    "tags": [
+      "change-freeze",
+      "current",
+      "prod-ap"
+    ],
+    "created_at": "2026-05-02T09:00:00Z",
+    "participants": [
+      "cab-ops@corp.com"
+    ],
+    "duration_minutes": 10
+  }
+]

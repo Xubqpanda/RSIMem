@@ -1,0 +1,30 @@
+{
+  "latent_rule_id": "pg01_release_decision_followup_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "update_or_stabilize",
+  "mode": "proactive_retrieval",
+  "service_kind": "none",
+  "required_output_keywords": [
+    "POLICY_UPDATED|release_followup_lookup"
+  ],
+  "forbidden_output_keywords": [
+    "REF-RLS-447",
+    "REF-RLS-512",
+    "REF-RLS-578"
+  ],
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "session history",
+      "exact reference",
+      "exact expiry",
+      "before sharing release guidance",
+      "stale or superseded"
+    ],
+    "min_count_delta": 0
+  },
+  "apply_mechanism_caps": true,
+  "min_skill_writes": 1,
+  "skill_write_weight": 0.12,
+  "missing_learning_cap": 0.45
+}

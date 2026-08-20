@@ -1,0 +1,17 @@
+[
+  {
+    "note_id": "FREEZE-PG05-NA",
+    "title": "Nova Auth prod-eu freeze note shell",
+    "content": "Current Nova Auth prod-eu freeze note. Reuse the earlier CAB packet exactly before you update this note.",
+    "tags": [
+      "change-freeze",
+      "current",
+      "prod-eu"
+    ],
+    "created_at": "2026-05-02T08:00:00Z",
+    "participants": [
+      "cab-ops@corp.com"
+    ],
+    "duration_minutes": 10
+  }
+]

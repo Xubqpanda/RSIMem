@@ -1,0 +1,90 @@
+{
+  "users": {
+    "U_AGENT": {"name": "agent", "display_name": "Task Agent"},
+    "U_BACKEND": {"name": "backend_team", "display_name": "Backend Team"},
+    "U_DEVOPS": {"name": "devops_team", "display_name": "DevOps Team"},
+    "U_FINANCE": {"name": "finance_team", "display_name": "Finance Team"},
+    "U_SUPPORT": {"name": "support_team", "display_name": "Support Team"}
+  },
+  "channels": {
+    "plk-general": {
+      "topic": "General discussion",
+      "messages": [
+        {
+          "id": "m001",
+          "user": "U_FINANCE",
+          "text": "Monthly reconciliation report is due Friday. Please make sure all transactions are settled.",
+          "ts": "2026-04-06T08:00:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m002",
+          "user": "U_SUPPORT",
+          "text": "We are getting reports from customers that payments are failing at checkout.",
+          "ts": "2026-04-06T10:02:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-payments": {
+      "topic": "Payment system alerts and status",
+      "messages": [
+        {
+          "id": "m003",
+          "user": "U_BACKEND",
+          "text": "Stripe webhook processing is running fine. All events acknowledged within 2s.",
+          "ts": "2026-04-06T09:30:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m004",
+          "user": "U_DEVOPS",
+          "text": "PayHub payment processing service is down. All charge requests returning 503. Started approximately 10:00 UTC.",
+          "ts": "2026-04-06T10:05:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m005",
+          "user": "U_BACKEND",
+          "text": "PayHub DB connection pool is exhausted. The payment processor cannot connect to the transaction store. Critical incident — revenue impacted.",
+          "ts": "2026-04-06T10:08:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m006",
+          "user": "U_DEVOPS",
+          "text": "Investigating PayHub incident. Postgres replication lag is at 45 seconds — possible I/O storm on the primary.",
+          "ts": "2026-04-06T10:12:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m007",
+          "user": "U_FINANCE",
+          "text": "Can someone update the incidents channel? Customers are calling in — we need official status.",
+          "ts": "2026-04-06T10:15:00Z",
+          "reactions": [],
+          "pinned": false
+        },
+        {
+          "id": "m008",
+          "user": "U_BACKEND",
+          "text": "Confirmed: PayHub payment service is down. All card processing halted. ETA for fix: 30 minutes.",
+          "ts": "2026-04-06T10:17:00Z",
+          "reactions": [],
+          "pinned": false
+        }
+      ]
+    },
+    "plk-incidents": {
+      "topic": "Active incident tracking",
+      "messages": []
+    }
+  },
+  "dms": []
+}

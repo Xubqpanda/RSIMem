@@ -1,0 +1,45 @@
+{
+  "latent_rule_id": "sm03_fact_correction",
+  "expected_mechanism": "memory",
+  "bucket_role": "baseline",
+  "artifact_contract": {
+    "type": "memory",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "forbidden_artifact_keywords": [
+    "2026-06-16",
+    "obsolete 2026-06-14"
+  ],
+  "retrieval_contract": {
+    "evaluation_only": false
+  },
+  "mode": "notes_memory",
+  "required_note_id": "NOTE-SM03-004",
+  "required_recipients": [
+    "Elena Gomez",
+    "Ravi Shah"
+  ],
+  "forbidden_recipients": [
+    "Nora Klein"
+  ],
+  "required_output_keywords": [
+    "Elena Gomez",
+    "Ravi Shah",
+    "2026-06-16",
+    "freeze date"
+  ],
+  "slot_checks": {
+    "corrected_freeze_date": {
+      "required_output_keywords": [
+        "2026-06-16"
+      ]
+    }
+  },
+  "forbidden_output_keywords": [
+    "2026-06-12",
+    "2026-06-14"
+  ],
+  "expected_cold_behavior": "low_score_against_post_update_target",
+  "do_not_use_as_evolve_success": true
+}

@@ -1,0 +1,53 @@
+{
+  "latent_rule_id": "fc04_error_correction_procedure_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "learn",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [
+      "deprecated-api",
+      "needs-migration"
+    ],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 1
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": [
+    "TK-E301",
+    "TK-E303"
+  ],
+  "excluded_ticket_ids": [
+    "TK-E304"
+  ],
+  "expected_priority": "medium",
+  "expected_category": "code-review",
+  "required_tags": [
+    "deprecated-api",
+    "needs-migration"
+  ],
+  "min_ticket_reads": 3,
+  "required_summary_keywords": [
+    "TK-E301",
+    "TK-E302",
+    "TK-E303"
+  ],
+  "min_skill_updates": 1,
+  "skill_update_weight": 0.1,
+  "require_rule_artifact": [
+    "deprecated-api",
+    "needs-migration",
+    "requests"
+  ],
+  "rule_artifact_weight": 0.05,
+  "reflection_rules": [
+    "The CORRECTED v2 rule: requests is NOW deprecated. PRs using requests must be tagged deprecated-api + needs-migration.",
+    "httpx and aiohttp are the recommended replacements; PRs using them should be tagged api-compliant.",
+    "The reusable HTTP client procedure should reflect the corrected v2 rule rather than leaving the old v1 rule active."
+  ],
+  "skill_artifact_weight": 0.05,
+  "apply_mechanism_caps": true,
+  "missing_learning_cap": 0.45
+}
