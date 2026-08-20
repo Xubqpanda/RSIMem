@@ -2,9 +2,9 @@
 
 ## Decision
 
-The first MemBridge evaluation uses PAST-Bench only.
+The first RSIMem evaluation of LightRSI uses PAST-Bench only.
 
-LoCoMo and LongMemEval are useful long-horizon conversational QA benchmarks, but they do not exercise the execution effects central to MemBridge: tool calls, retries, state mutation, procedural reuse, failed tasks, and cross-session agent improvement. Strong results on those datasets would primarily support a long-conversation retrieval claim rather than the intended agentic-memory economics claim.
+LoCoMo and LongMemEval are useful long-horizon conversational QA benchmarks, but they do not exercise the execution effects central to LightRSI: tool calls, retries, state mutation, procedural reuse, failed tasks, and cross-session agent improvement. Strong results on those datasets would primarily support a long-conversation retrieval claim rather than the intended memory-mediated recursive self-improvement claim.
 
 RealMem and other memory QA environments are also outside the initial scope. They can be reconsidered as diagnostic evaluations only if a later experiment needs an isolated memory-quality test.
 
@@ -31,7 +31,7 @@ Paper:     arXiv:2608.04003
 Local:     /mnt/20t/xubuqiang/Study/PAST-Bench
 ```
 
-The runtime requires Python 3.11+, Docker, and an LLM API profile. MemBridge should integrate through PAST-Bench's public task/runtime interfaces rather than vendor the benchmark source.
+The runtime requires Python 3.11+, Docker, and an LLM API profile. RSIMem should integrate through PAST-Bench's public task/runtime interfaces rather than vendor the benchmark source.
 
 ## Initial Protocol
 
@@ -43,7 +43,7 @@ Native persistence
 Native persistence + ledger only
 Eviction-aware admission
 Retrieval-feedback invocation
-Full MemBridge
+Full LightRSI
 ```
 
 Hermes is the initial agent because PAST-Bench includes an in-process adapter and explicit persistence controls. Hermes+ and a second agent framework are follow-up generalization tests, not prerequisites for the first implementation.
@@ -63,7 +63,7 @@ Every stage must preserve matched task, model, tool environment, session order, 
 
 ## Scope Boundary
 
-PAST-Bench is the primary benchmark, not part of the MemBridge implementation. MemBridge owns:
+PAST-Bench is the primary benchmark, not part of RSIMem. RSIMem owns:
 
 - context-eviction and retrieval-feedback event contracts;
 - backend and host adapters;
