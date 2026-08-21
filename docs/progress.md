@@ -61,6 +61,15 @@ The new memory runtime is not yet connected to the PAST-Bench execution path. He
 - [x] Support semantic and procedural add, update, delete, query, revision conflict, and safe-path behavior.
 - [x] Verify the adapter implementation with isolated temporary Hermes homes and a real FTS5 schema.
 
+### Lifecycle Control Plane
+
+- [x] Define host-neutral context segments, evaluation requests, cadence events, and joint context/memory signals.
+- [x] Separate evaluation frequency from evaluator implementation through a configurable scheduler.
+- [x] Add an injected JSON LLM evaluator boundary that can later be replaced by a topic-aware local model.
+- [x] Add a conservative deterministic evaluator for behavior-equivalence tests.
+- [x] Reject incomplete evaluator output and attempts to evict active context segments.
+- [x] Keep observer-facing lifecycle evaluation evidence free of raw context content.
+
 ### Verification Baseline
 
 - [x] Pass all RSIMem tests: `17 passed`.
@@ -72,10 +81,12 @@ The new memory runtime is not yet connected to the PAST-Bench execution path. He
 
 ### **Current: Opt-In Memory Runtime Integration**
 
-The immediate objective is to connect the typed memory runtime to experiments without changing the native Hermes baseline.
+The immediate objective is to connect the typed memory runtime and lifecycle control plane to experiments without changing the native Hermes baseline.
 
 - [ ] Define an experiment configuration that selects one backend for each memory kind and defaults to native Hermes behavior.
 - [ ] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
+- [ ] Construct context snapshots at task completion and configured context-pressure boundaries.
+- [ ] Add an opt-in lifecycle evaluator configuration with an injected model client and deterministic baseline.
 - [ ] Identify and document the exact Hermes semantic write, episodic search, skill read, and skill mutation interception points.
 - [ ] Add an opt-in adapter execution path while retaining the direct native path as the control.
 - [ ] Forward runtime lifecycle events into the existing ledger through stable run, episode, session, and artifact identifiers.

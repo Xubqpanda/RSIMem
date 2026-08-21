@@ -59,4 +59,4 @@ Events contain backend names, opaque artifact IDs, character counts, operation t
 
 The adapter API is available for isolated experiments, but the PAST-Bench runner still uses Hermes' native tools directly. This is intentional: the first milestone proves behavioral equivalence at the storage boundary before changing the runtime path.
 
-The next integration milestone is an opt-in experiment configuration that selects adapters while preserving native Hermes as the baseline. Only after matched tests pass should LightRSI lifecycle signals invoke compilers and route their mutations through this runtime.
+The context lifecycle control plane now lives in [`lifecycle_controller.md`](lifecycle_controller.md). It decides when to evaluate a context snapshot and validates a joint context/memory signal, but it does not yet invoke compilers or route mutations. The next integration milestone is an opt-in experiment configuration that selects adapters while preserving native Hermes as the baseline. Only after matched tests pass should lifecycle signals invoke compilers and route their mutations through this runtime.
