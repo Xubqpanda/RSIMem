@@ -54,7 +54,7 @@ confidence: [0, 1]
 reason_codes: content-free machine-readable evidence
 ```
 
-The evaluator must return exactly one signal per input segment. Active segments cannot be evicted. `add` and `update` require an explicit memory kind, while a retained segment cannot be marked for discard. This makes the relationship between eviction and memory writeback explicit before any backend mutation is attempted.
+The evaluator must return exactly one signal per input segment. Active, current-turn, unresolved, and open-tool segments cannot be evicted. `add` requires an explicit memory kind without an existing target. `update` additionally requires a target backend, artifact ID, expected memory revision, update hint or mode, compiler version, and a backend that supports update. A retained segment cannot be marked for discard.
 
 The signal is a prediction, not a proof of future value. Later retrieval, injection, task, tool, retry, and cost events will provide delayed feedback for the adaptive policy. Raw context remains in the evaluator request only; observer-facing lifecycle evidence contains IDs, counts, actions, and reason codes rather than memory text.
 
@@ -62,9 +62,11 @@ The signal is a prediction, not a proof of future value. Later retrieval, inject
 
 The package is available under `rsimem.lifecycle`:
 
-- `contracts.py`: context snapshots, cadence, signals, and evaluator protocols.
+- `contracts.py`: context segments, cadence, exit signals, and evaluator protocols.
+- `snapshot.py`: stable snapshot identity, provenance, turn state, and deterministic safety state.
 - `scheduler.py`: event-to-evaluation cadence decisions.
 - `evaluators.py`: injected JSON LLM adapter and deterministic baseline.
 - `controller.py`: scheduling, validation, and observer notification.
+- `writeback.py`: revisioned plans, target-aware idempotency, persistent receipts, and dry-run coordination.
 
-The next implementation step is an opt-in Hermes integration that constructs a context snapshot at a task-aligned exit boundary and forwards the controller result to a validated compiler/writeback coordinator. Native Hermes behavior remains the control until deterministic equivalence tests pass.
+The next implementation step is calling real Hermes prompt, session-search, and skill surfaces under observer-only instrumentation, followed by restart and failure-bypass checks. The current result is a storage-boundary deterministic equivalence baseline, not execution equivalence.

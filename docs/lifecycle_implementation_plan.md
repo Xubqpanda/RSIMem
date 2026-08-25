@@ -65,7 +65,9 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Define a `ContextSnapshot` that groups segments, active IDs, task/session identity, context revision, and token totals.
 - [x] Define a `WritebackPlan` containing context actions, memory actions, memory kind, provenance, and policy version.
 - [x] Preserve tool call/result closure and reject plans that split a closure.
-- [x] Require active/current segments to remain in context.
+- [x] Require active, current-turn, unresolved, and open-tool segments to remain in context.
+- [x] Require `current_turn_id` to reference a real turn or be `None`.
+- [x] Require update targets, expected memory revisions, compiler versions, and backend capabilities.
 - [x] Add deterministic contract tests for duplicate IDs, stale revisions, incomplete decisions, and unsafe eviction.
 
 ### Stage 2: Hermes Snapshot Collector
@@ -80,16 +82,19 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 
 - [x] Convert validated lifecycle signals into a plan without changing Hermes files.
 - [x] Link every candidate to `session_id`, `task_id`, `evaluation_id`, `segment_id`, and `policy_version`.
-- [x] Enforce idempotency so one context exit cannot create duplicate dry-run mutations.
+- [x] Enforce target-aware idempotency and support persistent receipts across coordinator restarts.
 - [x] Validate that `add` and `update` decisions declare a compatible memory kind.
 - [x] Emit content-free plan and validation evidence.
 
-### Stage 4: Native Equivalence Runtime
+### Stage 4: Storage-Boundary Equivalence Baseline
 
 - [x] Add an opt-in experiment configuration selecting native or RSIMem adapter execution, defaulting to direct native behavior.
 - [x] Run `native`, `native+ledger`, and `native+adapter+ledger` variants on a deterministic storage-boundary fixture.
-- [x] Confirm identical model-visible semantic memory, episodic search results, and procedural resources.
+- [x] Add observer-only evidence to the direct-native storage helper used by `native+ledger`.
+- [x] Confirm identical deterministic semantic rendering, episodic FTS views, and procedural resources at the storage-helper boundary.
+- [ ] Call Hermes' real memory prompt construction, `session_search`, `skills_list`, and `skill_view` paths.
 - [ ] Confirm restart persistence, artifact identity, and failure bypass behavior.
+- [ ] Run matched variants through the PAST-Bench execution path.
 - [x] Keep the direct Hermes path unchanged as the control.
 
 ### Stage 5: Validated Memory Writeback
@@ -101,10 +106,10 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [ ] Add revision checks, idempotency, failure bypass, and rollback tests.
 - [ ] Account for compiler model calls, tokens, latency, storage bytes, and rejected mutations.
 
-### Stage 6: Static LightRSI Evaluation
+### Stage 6: Static RSIMem Evaluation
 
 - [ ] Run the fixed writeback policy on `SM01_preference_adoption` first.
-- [ ] Compare no persistence, native Hermes, and static LightRSI with matched task order, model, seed, and budget.
+- [ ] Compare no persistence, native Hermes, and static RSIMem with matched task order, model, seed, and budget.
 - [ ] Report task score, persistence gap, memory retrieval, injected tokens, model calls, tool calls, retries, controller cost, compiler cost, storage cost, and wall time.
 - [ ] Expand to procedural and update families only after the first family is fully attributable.
 
@@ -153,4 +158,4 @@ Acceptance requires native behavior to remain unchanged, the memory artifact to 
 
 ## Current Boundary
 
-The scheduler, evaluator protocol, JSON LLM evaluator, conservative evaluator, lifecycle controller, snapshot contracts, deterministic Hermes fixture, and dry-run writeback coordinator are implemented in `rsimem.lifecycle`. The storage-boundary fixture now verifies semantic, episodic, and procedural equivalence across direct native, instrumented native, and typed-adapter reads. Snapshot and writeback events can be joined to the existing ledger schema without context content. Restart/failure equivalence, PAST-Bench runtime interception, compiler execution, adaptive policy, and real memory mutation remain the next stages. No PAST-Bench task definition or hidden grading contract should be changed while these stages are implemented.
+The scheduler, evaluator protocol, JSON LLM evaluator, conservative evaluator, lifecycle controller, snapshot contracts, deterministic Hermes fixture, and dry-run writeback coordinator are implemented in `rsimem.lifecycle`. Storage-boundary deterministic equivalence baseline completed. This does not establish Hermes execution equivalence: real prompt construction, `session_search`, `skills_list`, `skill_view`, restart, failure bypass, and matched PAST-Bench execution remain unverified. Snapshot and writeback events can be joined to the existing ledger schema without context content. Compiler execution, adaptive policy, and real memory mutation also remain future stages. No PAST-Bench task definition or hidden grading contract should be changed while these stages are implemented.

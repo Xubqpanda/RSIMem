@@ -77,18 +77,23 @@ The new memory runtime is not yet connected to the PAST-Bench execution path. He
 - [x] Add a deterministic `SM01_preference_adoption` Hermes fixture and semantic preference evaluator.
 - [x] Build content-free `WritebackPlan` validation with stale-revision rejection and idempotency keys.
 - [x] Build a dry-run coordinator that records plan and mutation identifiers without changing Hermes or memory backend state.
+- [x] Protect unresolved segments and require a real current turn or `None`.
+- [x] Require revisioned update targets, backend update capability, compiler versioning, and persistent idempotency receipts.
 
-### Deterministic Native Equivalence
+### Storage-Boundary Deterministic Equivalence Baseline
 
 - [x] Define explicit `native`, `native+ledger`, and `native+adapter+ledger` modes with direct native behavior as the default.
 - [x] Add a factory for constructing the three-route Hermes typed runtime from an isolated home.
-- [x] Verify identical semantic prompt blocks, episodic search results with surrounding context, and procedural skill resources across native and adapter reads.
+- [x] Add observer-only evidence to the direct-native storage helper for the `native+ledger` fixture variant.
+- [x] Verify identical deterministic semantic rendering, episodic FTS views, and procedural skill resources across native and adapter helpers.
 - [x] Preserve native semantic entry order and Hermes episodic surrounding-context behavior in the adapter.
 - [x] Join content-free snapshot, plan, validation, and dry-run events into the existing ledger schema.
 
+Storage-boundary deterministic equivalence baseline completed. Real Hermes execution equivalence has not been established.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `32 passed`.
+- [x] Pass all RSIMem tests: `39 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `380 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
@@ -123,6 +128,8 @@ Acceptance criteria:
 
 - [x] Add `native`, `native+ledger`, and `native+adapter+ledger` storage-boundary variants.
 - [x] Run matched deterministic fixtures before spending model tokens.
+- [ ] Invoke real Hermes memory prompt construction, `session_search`, `skills_list`, and `skill_view` in matched fixtures.
+- [ ] Verify restart persistence and adapter failure bypass.
 - [ ] Run at least three matched `SM01_preference_adoption` seeds with fixed model, prompt, task order, sandbox, and budget.
 - [ ] Compare task score, pass rate, model requests, token buckets, tool calls, stored bytes, injected characters, and wall time.
 - [ ] Establish an explicit tolerance for nondeterministic model variation and require zero unexplained accounting drift.
