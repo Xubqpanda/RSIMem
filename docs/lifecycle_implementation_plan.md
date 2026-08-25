@@ -68,6 +68,8 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Require active, current-turn, unresolved, and open-tool segments to remain in context.
 - [x] Require `current_turn_id` to reference a real turn or be `None`.
 - [x] Require update targets, expected memory revisions, compiler versions, and backend capabilities.
+- [x] Resolve UPDATE hints through an allowlisted backend search before creating an executable plan.
+- [x] Carry structured `ExitEvidence` from the signal into the writeback plan.
 - [x] Add deterministic contract tests for duplicate IDs, stale revisions, incomplete decisions, and unsafe eviction.
 
 ### Stage 2: Hermes Snapshot Collector
@@ -83,8 +85,10 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Convert validated lifecycle signals into a plan without changing Hermes files.
 - [x] Link every candidate to `session_id`, `task_id`, `evaluation_id`, `segment_id`, and `policy_version`.
 - [x] Enforce target-aware idempotency and support persistent receipts across coordinator restarts.
+- [x] Include the complete update hint tuple in the idempotency identity.
 - [x] Validate that `add` and `update` decisions declare a compatible memory kind.
 - [x] Emit content-free plan and validation evidence.
+- [x] Fail closed on malformed idempotency receipts and conflicting ledger event payloads.
 
 ### Stage 4: Storage-Boundary Equivalence Baseline
 

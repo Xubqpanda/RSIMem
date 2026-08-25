@@ -79,6 +79,9 @@ The new memory runtime is not yet connected to the PAST-Bench execution path. He
 - [x] Build a dry-run coordinator that records plan and mutation identifiers without changing Hermes or memory backend state.
 - [x] Protect unresolved segments and require a real current turn or `None`.
 - [x] Require revisioned update targets, backend update capability, compiler versioning, and persistent idempotency receipts.
+- [x] Resolve model UPDATE hints through an allowlisted target resolver before plan creation.
+- [x] Carry structured `ExitEvidence` and the complete update hint tuple into `WritebackPlan`.
+- [x] Fail closed on malformed idempotency receipts and conflicting ledger event payloads.
 
 ### Storage-Boundary Deterministic Equivalence Baseline
 
@@ -93,7 +96,7 @@ Storage-boundary deterministic equivalence baseline completed. Real Hermes execu
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `39 passed`.
+- [x] Pass all RSIMem tests: `44 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `380 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
