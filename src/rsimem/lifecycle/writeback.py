@@ -12,13 +12,16 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
-from typing import Iterable, Mapping, Protocol, runtime_checkable
+from typing import Callable, Iterable, Mapping, Protocol, runtime_checkable
 
 from ..memory.contracts import MemoryKind
 from .contracts import (
+    CompletionStatus,
     ContextAction,
     ContextEvaluation,
     EvaluationSignal,
+    MemoryScope,
+    TemporalValidity,
     WritebackAction,
 )
 from .snapshot import ContextSnapshot, ProvenanceRef
@@ -109,6 +112,99 @@ class RawResourceUsage:
 
 
 @dataclass(frozen=True, slots=True)
+class ExitEvidence:
+    """Resolved analysis carried from context evaluation into compilation."""
+
+    completion_status: CompletionStatus
+    completion_evidence: tuple[str, ...]
+    safe_to_evict: bool
+    unresolved_state: str | None
+    scope: MemoryScope | None
+    temporal_validity: TemporalValidity | None
+    provenance: tuple[str, ...]
+    reusable_facts: tuple[str, ...]
+    reusable_procedures: tuple[str, ...]
+    update_hints: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "completion_status", CompletionStatus(self.completion_status))
+        if self.scope is not None:
+            object.__setattr__(self, "scope", MemoryScope(self.scope))
+        if self.temporal_validity is not None:
+            object.__setattr__(self, "temporal_validity", TemporalValidity(self.temporal_validity))
+        if self.unresolved_state is not None and not self.unresolved_state.strip():
+            raise ValueError("unresolved_state must be non-empty when present")
+        if not self.provenance:
+            raise ValueError("exit evidence requires deterministic provenance")
+        sequences = (
+            self.completion_evidence,
+            self.provenance,
+            self.reusable_facts,
+            self.reusable_procedures,
+            self.update_hints,
+        )
+        if any(not value.strip() for values in sequences for value in values):
+            raise ValueError("exit evidence values must not be empty")
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateTarget:
+    backend: str
+    artifact_id: str
+    expected_revision: str
+    memory_kind: MemoryKind
+
+    def __post_init__(self) -> None:
+        if any(
+            not value.strip()
+            for value in (self.backend, self.artifact_id, self.expected_revision)
+        ):
+            raise ValueError("update target identifiers and revision must not be empty")
+        object.__setattr__(self, "memory_kind", MemoryKind(self.memory_kind))
+
+
+@runtime_checkable
+class UpdateTargetResolver(Protocol):
+    def resolve(
+        self,
+        snapshot: ContextSnapshot,
+        signal: EvaluationSignal,
+    ) -> UpdateTarget | None: ...
+
+
+class AllowlistedUpdateTargetResolver:
+    """Bind an LLM update suggestion to one trusted backend search result."""
+
+    def __init__(
+        self,
+        search: Callable[[ContextSnapshot, EvaluationSignal], Iterable[UpdateTarget]],
+        *,
+        allowed_backends: Mapping[str, frozenset[MemoryKind]],
+    ) -> None:
+        self.search = search
+        self.allowed_backends = {
+            backend: frozenset(MemoryKind(kind) for kind in kinds)
+            for backend, kinds in allowed_backends.items()
+        }
+
+    def resolve(
+        self,
+        snapshot: ContextSnapshot,
+        signal: EvaluationSignal,
+    ) -> UpdateTarget | None:
+        candidates = tuple(
+            candidate
+            for candidate in self.search(snapshot, signal)
+            if candidate.memory_kind == signal.memory_kind
+            and candidate.memory_kind in self.allowed_backends.get(
+                candidate.backend,
+                frozenset(),
+            )
+        )
+        return candidates[0] if len(candidates) == 1 else None
+
+
+@dataclass(frozen=True, slots=True)
 class WritebackPlan:
     """One atomic context and memory decision over stable source IDs."""
 
@@ -123,13 +219,19 @@ class WritebackPlan:
     provenance: ProvenanceRef
     idempotency_key: str
     summary: str
+    exit_evidence: ExitEvidence
     target_backend: str | None = None
     target_artifact_id: str | None = None
     expected_memory_revision: str | None = None
-    update_hint: str | None = None
     update_mode: str | None = None
     compiler_version: str = "uncompiled-v0"
     reason_codes: tuple[str, ...] = ()
+
+    @property
+    def update_hints(self) -> tuple[str, ...]:
+        """Expose the complete compiler hint tuple without duplicating storage."""
+
+        return self.exit_evidence.update_hints
 
     def __post_init__(self) -> None:
         required = (
@@ -161,19 +263,15 @@ class WritebackPlan:
             self.target_backend,
             self.target_artifact_id,
             self.expected_memory_revision,
-            self.update_hint,
             self.update_mode,
         )
         if any(value is not None and not value.strip() for value in optional_values):
             raise ValueError("optional writeback target fields must be non-empty")
-        if self.update_hint is not None and not _REASON_CODE.fullmatch(self.update_hint):
-            raise ValueError("writeback update_hint must be machine-readable")
         if self.update_mode is not None and not _REASON_CODE.fullmatch(self.update_mode):
             raise ValueError("writeback update_mode must be machine-readable")
         has_existing_target = any((
             self.target_artifact_id,
             self.expected_memory_revision,
-            self.update_hint,
             self.update_mode,
         ))
         if self.memory_action == PlanMemoryAction.ADD and any((
@@ -188,7 +286,7 @@ class WritebackPlan:
                 self.expected_memory_revision,
             )):
                 raise ValueError("update plans require backend, artifact, and revision")
-            if not self.update_hint and not self.update_mode:
+            if not self.exit_evidence.update_hints and not self.update_mode:
                 raise ValueError("update plans require update_hint or update_mode")
         if self.memory_action == PlanMemoryAction.DISCARD and any(optional_values):
             raise ValueError("discard plans must not carry a memory target")
@@ -196,6 +294,9 @@ class WritebackPlan:
             raise ValueError("plan provenance must identify its source segments")
         if self.provenance.evaluation_id != self.evaluation_id:
             raise ValueError("plan provenance must identify its evaluation")
+        if self.context_action == PlanContextAction.EVICT:
+            if not self.exit_evidence.safe_to_evict:
+                raise ValueError("eviction plans require resolved safe_to_evict=true")
         if any(not _REASON_CODE.fullmatch(code) for code in self.reason_codes):
             raise ValueError("writeback reason codes must be machine-readable")
 
@@ -289,15 +390,22 @@ class JsonIdempotencyReceiptStore:
         value = json.loads(self.path.read_text(encoding="utf-8"))
         if not isinstance(value, dict):
             raise ValueError("idempotency receipt file must contain an object")
-        return {
-            key: IdempotencyReceipt(
+        receipts: dict[str, IdempotencyReceipt] = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or not key.strip():
+                raise ValueError("idempotency receipt keys must be non-empty strings")
+            if not isinstance(item, dict):
+                raise ValueError(f"malformed idempotency receipt: {key}")
+            if set(item) != {"plan_id", "mutation_id"}:
+                raise ValueError(f"malformed idempotency receipt: {key}")
+            if not all(isinstance(item[field], str) for field in item):
+                raise ValueError(f"malformed idempotency receipt: {key}")
+            receipts[key] = IdempotencyReceipt(
                 idempotency_key=key,
                 plan_id=str(item["plan_id"]),
                 mutation_id=str(item["mutation_id"]),
             )
-            for key, item in value.items()
-            if isinstance(key, str) and isinstance(item, dict)
-        }
+        return receipts
 
     def get(self, idempotency_key: str) -> IdempotencyReceipt | None:
         with self._lock(fcntl.LOCK_SH):
@@ -438,12 +546,6 @@ class WritebackPlanValidator:
         ):
             reasons.append("protected_segment_eviction")
         if any(
-            signal.safe_to_evict is False
-            and signal.context_action == ContextAction.EVICT
-            for signal in evaluation.signals
-        ):
-            reasons.append("unsafe_exit_signal")
-        if any(
             signal.context_action == ContextAction.EVICT
             and signal.writeback_action == WritebackAction.DEFER
             for signal in evaluation.signals
@@ -539,10 +641,12 @@ class WritebackCoordinator:
         self,
         *,
         validator: WritebackPlanValidator | None = None,
+        target_resolver: UpdateTargetResolver | None = None,
         receipt_store: IdempotencyReceiptStore | None = None,
         observers: Iterable[WritebackObserver] = (),
     ) -> None:
         self.validator = validator or WritebackPlanValidator()
+        self.target_resolver = target_resolver
         self.receipt_store = receipt_store or InMemoryIdempotencyReceiptStore()
         self.observers = tuple(observers)
         self._dry_run_mutations: dict[str, DryRunMutation] = {}
@@ -622,13 +726,48 @@ class WritebackCoordinator:
 
         plans: list[WritebackPlan] = []
         for source_ids in groups:
-            signal = by_id[source_ids[0]]
+            signals = tuple(by_id[source_id] for source_id in source_ids)
+            signal = signals[0]
             if (
                 signal.context_action == ContextAction.RETAIN
                 and signal.writeback_action == WritebackAction.DEFER
             ):
                 continue
-            plan = self._build_plan(snapshot, evaluation, source_ids, signal)
+            target: UpdateTarget | None = None
+            if signal.writeback_action == WritebackAction.UPDATE:
+                targets = tuple(
+                    self.target_resolver.resolve(snapshot, item)
+                    for item in signals
+                ) if self.target_resolver is not None else ()
+                if not targets or any(item is None for item in targets):
+                    self._record(self._event(
+                        WritebackEventKind.PLAN_REJECTED,
+                        snapshot,
+                        evaluation.evaluation_id,
+                        status=PlanValidationStatus.INVALID.value,
+                        reason_codes=("update_target_unresolved",),
+                        resources=resources,
+                    ))
+                    continue
+                resolved_targets = {item for item in targets if item is not None}
+                if len(resolved_targets) != 1:
+                    self._record(self._event(
+                        WritebackEventKind.PLAN_REJECTED,
+                        snapshot,
+                        evaluation.evaluation_id,
+                        status=PlanValidationStatus.INVALID.value,
+                        reason_codes=("split_tool_update_target",),
+                        resources=resources,
+                    ))
+                    continue
+                target = resolved_targets.pop()
+            plan = self._build_plan(
+                snapshot,
+                evaluation,
+                source_ids,
+                signals,
+                target=target,
+            )
             plan_validation = self.validator.validate_plan(plan, snapshot)
             if not plan_validation.valid:
                 self._record(self._event(
@@ -658,8 +797,15 @@ class WritebackCoordinator:
         snapshot: ContextSnapshot,
         evaluation: ContextEvaluation,
         source_ids: tuple[str, ...],
-        signal: EvaluationSignal,
+        signals: tuple[EvaluationSignal, ...],
+        *,
+        target: UpdateTarget | None,
     ) -> WritebackPlan:
+        signal = signals[0]
+
+        def combined(values: Iterable[tuple[str, ...]]) -> tuple[str, ...]:
+            return tuple(dict.fromkeys(value for group in values for value in group))
+
         context_action = (
             PlanContextAction.EVICT
             if signal.context_action == ContextAction.EVICT
@@ -667,7 +813,51 @@ class WritebackCoordinator:
         )
         memory_action = PlanMemoryAction(signal.writeback_action.value)
         memory_kind = signal.memory_kind if memory_action != PlanMemoryAction.DISCARD else None
-        update_hint = signal.update_hints[0] if signal.update_hints else None
+        protected = snapshot.protected_segment_ids
+        safe_to_evict = not bool(set(source_ids).intersection(protected))
+        source_segments = {
+            segment.segment_id: segment for segment in snapshot.segments
+        }
+        resolved_unresolved_state = (
+            "host_unresolved"
+            if any(not source_segments[source_id].completed for source_id in source_ids)
+            else None
+        )
+        completion_statuses = {item.completion_status for item in signals}
+        scopes = {item.scope for item in signals}
+        temporal_validities = {item.temporal_validity for item in signals}
+        exit_evidence = ExitEvidence(
+            completion_status=(
+                completion_statuses.pop()
+                if len(completion_statuses) == 1
+                else CompletionStatus.UNKNOWN
+            ),
+            completion_evidence=combined(
+                item.completion_evidence for item in signals
+            ),
+            safe_to_evict=safe_to_evict,
+            unresolved_state=resolved_unresolved_state,
+            scope=scopes.pop() if len(scopes) == 1 else None,
+            temporal_validity=(
+                temporal_validities.pop()
+                if len(temporal_validities) == 1
+                else None
+            ),
+            provenance=(
+                snapshot.run_id,
+                snapshot.episode_id,
+                snapshot.session_id,
+                snapshot.task_id,
+                snapshot.snapshot_id,
+                evaluation.evaluation_id,
+                *source_ids,
+            ),
+            reusable_facts=combined(item.reusable_facts for item in signals),
+            reusable_procedures=combined(
+                item.reusable_procedures for item in signals
+            ),
+            update_hints=combined(item.update_hints for item in signals),
+        )
         key_payload = {
             "source_segment_ids": source_ids,
             "policy_version": evaluation.policy_version,
@@ -675,10 +865,10 @@ class WritebackCoordinator:
             "memory_action": memory_action.value,
             "memory_kind": memory_kind.value if memory_kind else None,
             "base_revision": snapshot.context_revision,
-            "target_backend": signal.target_backend,
-            "target_artifact_id": signal.target_artifact_id,
-            "expected_memory_revision": signal.expected_memory_revision,
-            "update_hint": update_hint,
+            "target_backend": target.backend if target else None,
+            "target_artifact_id": target.artifact_id if target else None,
+            "expected_memory_revision": target.expected_revision if target else None,
+            "update_hints": exit_evidence.update_hints,
             "update_mode": signal.update_mode,
             "compiler_version": signal.compiler_version,
         }
@@ -709,13 +899,13 @@ class WritebackCoordinator:
             provenance=provenance,
             idempotency_key=idempotency_key,
             summary=summary,
-            target_backend=signal.target_backend,
-            target_artifact_id=signal.target_artifact_id,
-            expected_memory_revision=signal.expected_memory_revision,
-            update_hint=update_hint,
+            exit_evidence=exit_evidence,
+            target_backend=target.backend if target else None,
+            target_artifact_id=target.artifact_id if target else None,
+            expected_memory_revision=target.expected_revision if target else None,
             update_mode=signal.update_mode,
             compiler_version=signal.compiler_version,
-            reason_codes=signal.reason_codes,
+            reason_codes=combined(item.reason_codes for item in signals),
         )
 
     def dry_run(

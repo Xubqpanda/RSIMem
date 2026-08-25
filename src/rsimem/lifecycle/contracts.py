@@ -197,14 +197,15 @@ class EvaluationSignal:
         )):
             raise ValueError("add signals must not carry an existing memory target")
         if self.writeback_action == WritebackAction.UPDATE:
-            if not all((
+            if not self.update_mode and not self.update_hints:
+                raise ValueError("update signals require update_mode or update_hints")
+            target_values = (
                 self.target_backend,
                 self.target_artifact_id,
                 self.expected_memory_revision,
-            )):
-                raise ValueError("update signals require backend, artifact, and revision")
-            if not self.update_mode and not self.update_hints:
-                raise ValueError("update signals require update_mode or update_hints")
+            )
+            if any(target_values) and not all(target_values):
+                raise ValueError("prebound update targets must be complete")
         if self.writeback_action in {
             WritebackAction.DEFER,
             WritebackAction.DISCARD,
