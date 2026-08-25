@@ -54,7 +54,7 @@ confidence: [0, 1]
 reason_codes: content-free machine-readable evidence
 ```
 
-The evaluator must return exactly one signal per input segment. Active, current-turn, unresolved, and open-tool segments cannot be evicted. `add` requires an explicit memory kind without an existing target. `update` additionally requires a target backend, artifact ID, expected memory revision, update hint or mode, compiler version, and a backend that supports update. A retained segment cannot be marked for discard.
+The evaluator must return exactly one signal per input segment. Active, current-turn, unresolved, and open-tool segments cannot be evicted. `add` requires an explicit memory kind without an existing target. For `update`, the evaluator supplies only update hints/mode; a trusted target resolver must search an allowlisted backend, bind one artifact and expected revision, and the coordinator rejects ambiguous or unsupported candidates. Compiler version is supplied by the host runtime, not trusted from model output. A retained segment cannot be marked for discard.
 
 The signal is a prediction, not a proof of future value. Later retrieval, injection, task, tool, retry, and cost events will provide delayed feedback for the adaptive policy. Raw context remains in the evaluator request only; observer-facing lifecycle evidence contains IDs, counts, actions, and reason codes rather than memory text.
 
