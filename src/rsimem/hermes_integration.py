@@ -9,8 +9,10 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
+from .ledger import MemoryLedgerObserver
 from .memory import (
     MemoryEvent,
+    MemoryEventKind,
     MemoryKind,
     MemoryObserver,
     MemoryQuery,
@@ -100,6 +102,8 @@ class _SemanticView:
     user_block: str
     memory_entry_count: int
     user_entry_count: int
+    memory_content_chars: int
+    user_content_chars: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +150,9 @@ class HermesVariantResult:
     checks: tuple[HermesSurfaceCheck, ...]
     ledger_enabled: bool
     memory_event_count: int
+    memory_event_kinds: tuple[MemoryEventKind, ...]
+    ledger_event_count: int
+    ledger_event_kinds: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,6 +194,8 @@ def _native_semantic(home: Path) -> _SemanticView:
         _render_semantic_block("user", user_entries),
         len(memory_entries),
         len(user_entries),
+        len(_ENTRY_DELIMITER.join(memory_entries)),
+        len(_ENTRY_DELIMITER.join(user_entries)),
     )
 
 
@@ -272,20 +281,128 @@ def _native_procedural(home: Path) -> tuple[_ProceduralSkillView, ...]:
     return tuple(views)
 
 
-def _capture_native(home: Path, probe: HermesEquivalenceProbe) -> _HermesSurfaceView:
-    return _HermesSurfaceView(
+def _record_native_surface(
+    view: _HermesSurfaceView,
+    probe: HermesEquivalenceProbe,
+    observer: MemoryObserver,
+) -> None:
+    semantic = view.semantic
+    for namespace, count, content_chars in (
+        ("memory", semantic.memory_entry_count, semantic.memory_content_chars),
+        ("user", semantic.user_entry_count, semantic.user_content_chars),
+    ):
+        artifact_ids = tuple(
+            f"native-semantic:{namespace}:{index}" for index in range(count)
+        )
+        observer.record(MemoryEvent(
+            MemoryEventKind.QUERY,
+            MemoryKind.SEMANTIC,
+            "hermes-native-semantic",
+            query_chars=0,
+            attributes={"limit": 100, "namespace": namespace},
+        ))
+        observer.record(MemoryEvent(
+            MemoryEventKind.RETRIEVED,
+            MemoryKind.SEMANTIC,
+            "hermes-native-semantic",
+            artifact_ids=artifact_ids,
+            content_chars=content_chars,
+            attributes={"count": count},
+        ))
+        if artifact_ids:
+            observer.record(MemoryEvent(
+                MemoryEventKind.INJECTED,
+                MemoryKind.SEMANTIC,
+                "hermes-native-semantic",
+                artifact_ids=artifact_ids,
+                content_chars=content_chars,
+                attributes={"count": count, "surface": "system_prompt"},
+            ))
+
+    episodic_ids = tuple(
+        f"native-episodic:{index}" for index in range(len(view.episodic))
+    )
+    episodic_chars = sum(len(item.content) for item in view.episodic)
+    observer.record(MemoryEvent(
+        MemoryEventKind.QUERY,
+        MemoryKind.EPISODIC,
+        "hermes-native-episodic",
+        query_chars=len(probe.episodic_query),
+        attributes={"limit": probe.episodic_limit, "namespace": "default"},
+    ))
+    observer.record(MemoryEvent(
+        MemoryEventKind.RETRIEVED,
+        MemoryKind.EPISODIC,
+        "hermes-native-episodic",
+        artifact_ids=episodic_ids,
+        content_chars=episodic_chars,
+        attributes={"count": len(episodic_ids)},
+    ))
+    if episodic_ids:
+        observer.record(MemoryEvent(
+            MemoryEventKind.INJECTED,
+            MemoryKind.EPISODIC,
+            "hermes-native-episodic",
+            artifact_ids=episodic_ids,
+            content_chars=episodic_chars,
+            attributes={"count": len(episodic_ids), "surface": "session_search"},
+        ))
+
+    procedural_ids = tuple(
+        f"native-procedural:{index}" for index in range(len(view.procedural))
+    )
+    procedural_chars = sum(len(item.content) for item in view.procedural)
+    observer.record(MemoryEvent(
+        MemoryEventKind.QUERY,
+        MemoryKind.PROCEDURAL,
+        "hermes-native-procedural",
+        query_chars=0,
+        attributes={"limit": 100, "namespace": "default"},
+    ))
+    observer.record(MemoryEvent(
+        MemoryEventKind.RETRIEVED,
+        MemoryKind.PROCEDURAL,
+        "hermes-native-procedural",
+        artifact_ids=procedural_ids,
+        content_chars=procedural_chars,
+        attributes={"count": len(procedural_ids)},
+    ))
+    if procedural_ids:
+        observer.record(MemoryEvent(
+            MemoryEventKind.INJECTED,
+            MemoryKind.PROCEDURAL,
+            "hermes-native-procedural",
+            artifact_ids=procedural_ids,
+            content_chars=procedural_chars,
+            attributes={"count": len(procedural_ids), "surface": "skill_view"},
+        ))
+
+
+def _capture_native(
+    home: Path,
+    probe: HermesEquivalenceProbe,
+    *,
+    observer: MemoryObserver | None = None,
+) -> _HermesSurfaceView:
+    view = _HermesSurfaceView(
         semantic=_native_semantic(home),
         episodic=_native_episodic(home, probe),
         procedural=_native_procedural(home),
     )
+    if observer is not None:
+        _record_native_surface(view, probe, observer)
+    return view
 
 
 class _MemoryEventCollector:
-    def __init__(self) -> None:
+    def __init__(self, ledger: MemoryLedgerObserver | None = None) -> None:
         self.events: list[MemoryEvent] = []
+        self.ledger = ledger
 
     def record(self, event: MemoryEvent) -> None:
         self.events.append(event)
+        if self.ledger is not None:
+            self.ledger.record(event)
 
 
 def _capture_adapter(
@@ -310,6 +427,12 @@ def _capture_adapter(
             ),
             len(semantic_hits["memory"]),
             len(semantic_hits["user"]),
+            len(_ENTRY_DELIMITER.join(
+                hit.artifact.content for hit in semantic_hits["memory"]
+            )),
+            len(_ENTRY_DELIMITER.join(
+                hit.artifact.content for hit in semantic_hits["user"]
+            )),
         )
 
         episodic_hits = runtime.query(MemoryQuery(
@@ -411,12 +534,27 @@ def run_hermes_equivalence_variants(
     variants = []
     for mode in HermesExecutionMode:
         config = HermesExperimentConfig(mode)
-        collector = _MemoryEventCollector()
-        candidate = (
-            _capture_adapter(home, probe, collector)
-            if mode == HermesExecutionMode.ADAPTER_LEDGER
-            else _capture_native(home, probe)
+        ledger = (
+            MemoryLedgerObserver(
+                run_id="storage-boundary-fixture",
+                variant=mode.value,
+                trace_id="storage-boundary-trace",
+                episode_id="storage-boundary-episode",
+                session_id="storage-boundary-session",
+                task_id="storage-boundary-task",
+                family_id="storage-boundary",
+                stage="fixture",
+            )
+            if config.ledger_enabled
+            else None
         )
+        collector = _MemoryEventCollector(ledger)
+        if mode == HermesExecutionMode.ADAPTER_LEDGER:
+            candidate = _capture_adapter(home, probe, collector)
+        elif mode == HermesExecutionMode.NATIVE_LEDGER:
+            candidate = _capture_native(home, probe, observer=collector)
+        else:
+            candidate = _capture_native(home, probe)
         checks = _surface_checks(baseline, candidate)
         variants.append(HermesVariantResult(
             mode=mode,
@@ -424,5 +562,12 @@ def run_hermes_equivalence_variants(
             checks=checks,
             ledger_enabled=config.ledger_enabled,
             memory_event_count=len(collector.events),
+            memory_event_kinds=tuple(event.kind for event in collector.events),
+            ledger_event_count=len(ledger.events) if ledger is not None else 0,
+            ledger_event_kinds=(
+                tuple(event["kind"] for event in ledger.events)
+                if ledger is not None
+                else ()
+            ),
         ))
     return HermesEquivalenceReport(tuple(variants))
