@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
@@ -15,7 +15,7 @@ from rsimem.hermes_integration import (
     run_hermes_equivalence_variants,
 )
 from rsimem.ledger import LifecycleLedgerObserver
-from rsimem.lifecycle import run_sm01_preference_fixture
+from rsimem.lifecycle import RawResourceUsage, run_sm01_preference_fixture
 from rsimem.memory import MemoryKind
 
 
@@ -119,12 +119,22 @@ def test_native_ledger_and_adapter_views_are_equivalent(tmp_path: Path) -> None:
     assert [variant.mode for variant in report.variants] == list(HermesExecutionMode)
     assert all(variant.equivalent_to_native for variant in report.variants)
     assert [variant.ledger_enabled for variant in report.variants] == [False, True, True]
+    native = report.variants[0]
+    native_ledger = report.variants[1]
     adapter = next(
         item for item in report.variants
         if item.mode == HermesExecutionMode.ADAPTER_LEDGER
     )
     assert {check.memory_kind for check in adapter.checks} == set(MemoryKind)
     assert adapter.memory_event_count == 12
+    assert native.memory_event_count == 0
+    assert native_ledger.memory_event_count == 12
+    assert native.ledger_event_count == 0
+    assert native_ledger.ledger_event_count == 12
+    assert adapter.ledger_event_count == 12
+    assert native_ledger.ledger_event_kinds == adapter.ledger_event_kinds
+    assert native_ledger.memory_event_kinds == adapter.memory_event_kinds
+    assert native_ledger.checks == native.checks
     semantic = next(
         check for check in adapter.checks if check.memory_kind == MemoryKind.SEMANTIC
     )
@@ -162,6 +172,48 @@ def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) ->
     assert all(event["sessionId"] == fixture.snapshot.session_id for event in first.events)
     assert all(event["snapshotId"] == fixture.snapshot.snapshot_id for event in first.events)
     assert first.events[-1]["data"]["mutationId"] == fixture.receipts[0].mutation_id
+    event_count = len(first.events)
+    first.record(fixture.events[-1])
+    assert len(first.events) == event_count
+
+    plan_only = LifecycleLedgerObserver(
+        variant="native+adapter+ledger",
+        trace_id="trace-sm01-fixture",
+        family_id="SM01",
+        stage="learn",
+    )
+    plan_only.record(fixture.events[-1])
+    assert plan_only.events[0]["eventId"] == first.events[-1]["eventId"]
+
+    usage_observer = LifecycleLedgerObserver(
+        variant="native+adapter+ledger",
+        trace_id="trace-sm01-fixture",
+        family_id="SM01",
+        stage="learn",
+    )
+    usage_observer.record(replace(
+        fixture.events[0],
+        resources=RawResourceUsage(
+            input_tokens=100,
+            output_tokens=20,
+            cache_read_tokens=30,
+            cache_write_tokens=4,
+            reasoning_tokens=7,
+            model_requests=2,
+            retry_count=1,
+        ),
+    ))
+    assert usage_observer.events[0]["data"]["resources"] == {
+        "inputTokens": 100,
+        "outputTokens": 20,
+        "cacheReadTokens": 30,
+        "cacheWriteTokens": 4,
+        "reasoningTokens": 7,
+        "modelRequests": 2,
+        "retryCount": 1,
+        "durationMs": None,
+        "storageBytes": 0,
+    }
 
     output = tmp_path / "lifecycle.jsonl"
     first.write(output)
