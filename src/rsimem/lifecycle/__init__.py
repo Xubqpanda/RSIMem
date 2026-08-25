@@ -2,6 +2,7 @@
 
 from .contracts import (
     ContextAction,
+    CompletionStatus,
     ContextEvaluation,
     ContextEvaluationRequest,
     ContextEvaluator,
@@ -11,7 +12,9 @@ from .contracts import (
     EvaluationObserver,
     EvaluationSignal,
     EvaluationTrigger,
+    MemoryScope,
     SchedulerState,
+    TemporalValidity,
     WritebackAction,
 )
 from .controller import LifecycleController
@@ -37,6 +40,10 @@ from .writeback import (
     DryRunMutation,
     DryRunReceipt,
     DryRunStatus,
+    IdempotencyReceipt,
+    IdempotencyReceiptStore,
+    InMemoryIdempotencyReceiptStore,
+    JsonIdempotencyReceiptStore,
     PlanContextAction,
     PlanMemoryAction,
     PlanValidationResult,
@@ -52,6 +59,7 @@ from .writeback import (
 
 __all__ = [
     "ContextAction",
+    "CompletionStatus",
     "ContextEvaluation",
     "ContextEvaluationRequest",
     "ContextEvaluator",
@@ -62,6 +70,10 @@ __all__ = [
     "DryRunMutation",
     "DryRunReceipt",
     "DryRunStatus",
+    "IdempotencyReceipt",
+    "IdempotencyReceiptStore",
+    "InMemoryIdempotencyReceiptStore",
+    "JsonIdempotencyReceiptStore",
     "EvaluationCadence",
     "EvaluationEvent",
     "EvaluationObserver",
@@ -72,6 +84,7 @@ __all__ = [
     "HermesMessage",
     "HermesSnapshotCollector",
     "LifecycleController",
+    "MemoryScope",
     "PlanContextAction",
     "PlanMemoryAction",
     "PlanValidationResult",
@@ -83,6 +96,7 @@ __all__ = [
     "Sm01FixtureResult",
     "SnapshotSegment",
     "TaskLifecycleState",
+    "TemporalValidity",
     "ToolClosure",
     "WritebackAction",
     "WritebackCoordinator",

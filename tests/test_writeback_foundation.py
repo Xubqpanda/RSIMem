@@ -12,11 +12,14 @@ from rsimem.lifecycle import (
     EvaluationTrigger,
     HermesMessage,
     HermesSnapshotCollector,
+    JsonIdempotencyReceiptStore,
     PlanValidationStatus,
+    RawResourceUsage,
     SegmentKind,
     TaskLifecycleState,
     WritebackAction,
     WritebackCoordinator,
+    WritebackPlanValidator,
     run_sm01_preference_fixture,
     snapshot_to_evaluation_request,
 )
@@ -75,7 +78,7 @@ def test_tool_call_and_result_are_one_writeback_unit() -> None:
             ),
         ),
         run_id="run", episode_id="episode", session_id="session", task_id="task",
-        current_turn_id="completion-turn", task_state=TaskLifecycleState.COMPLETED,
+        current_turn_id=None, task_state=TaskLifecycleState.COMPLETED,
         lifecycle_state="task_completed", source_ref="fixture:tool",
     )
     request = snapshot_to_evaluation_request(snapshot, evaluation_id="evaluation")
@@ -147,3 +150,164 @@ def test_incomplete_evaluation_creates_no_plan() -> None:
     incomplete = replace(result.evaluation, signals=result.evaluation.signals[:1])
     coordinator = WritebackCoordinator()
     assert coordinator.create_plans(result.snapshot, incomplete) == ()
+
+
+def _update_evaluation(
+    target_artifact_id: str,
+    *,
+    expected_revision: str = "memory-revision-7",
+    compiler_version: str = "deterministic-compiler-v2",
+) -> tuple[object, ContextEvaluation]:
+    fixture = run_sm01_preference_fixture()
+    preference = fixture.evaluation.signals[0]
+    update = replace(
+        preference,
+        writeback_action=WritebackAction.UPDATE,
+        target_backend="hermes-native-semantic",
+        target_artifact_id=target_artifact_id,
+        expected_memory_revision=expected_revision,
+        update_hints=("replace_preference",),
+        update_mode="replace",
+        compiler_version=compiler_version,
+    )
+    return fixture, replace(
+        fixture.evaluation,
+        evaluation_id="evaluation-update",
+        signals=(update, *fixture.evaluation.signals[1:]),
+    )
+
+
+def test_update_plan_requires_target_revision_and_backend_capability() -> None:
+    fixture, evaluation = _update_evaluation("artifact-a")
+    validator = WritebackPlanValidator(updatable_backends={
+        "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
+    })
+    plan = WritebackCoordinator(validator=validator).create_plans(
+        fixture.snapshot,
+        evaluation,
+    )[0]
+    assert plan.target_backend == "hermes-native-semantic"
+    assert plan.target_artifact_id == "artifact-a"
+    assert plan.expected_memory_revision == "memory-revision-7"
+    assert plan.update_mode == "replace"
+    assert plan.compiler_version == "deterministic-compiler-v2"
+
+    rejected_events = []
+
+    class Observer:
+        def record(self, event):
+            rejected_events.append(event)
+
+    assert WritebackCoordinator(observers=(Observer(),)).create_plans(
+        fixture.snapshot,
+        evaluation,
+    ) == ()
+    assert rejected_events[-1].reason_codes == ("backend_update_not_supported",)
+
+
+def test_update_idempotency_distinguishes_target_artifacts() -> None:
+    fixture, first_evaluation = _update_evaluation("artifact-a")
+    _, second_evaluation = _update_evaluation("artifact-b")
+    validator = WritebackPlanValidator(updatable_backends={
+        "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
+    })
+    coordinator = WritebackCoordinator(validator=validator)
+    first = coordinator.create_plans(fixture.snapshot, first_evaluation)[0]
+    second = coordinator.create_plans(fixture.snapshot, second_evaluation)[0]
+    assert first.idempotency_key != second.idempotency_key
+
+    _, revision_evaluation = _update_evaluation(
+        "artifact-a",
+        expected_revision="memory-revision-8",
+    )
+    revision_plan = coordinator.create_plans(fixture.snapshot, revision_evaluation)[0]
+    assert first.idempotency_key != revision_plan.idempotency_key
+
+    _, compiler_evaluation = _update_evaluation(
+        "artifact-a",
+        compiler_version="deterministic-compiler-v3",
+    )
+    compiler_plan = coordinator.create_plans(fixture.snapshot, compiler_evaluation)[0]
+    assert first.idempotency_key != compiler_plan.idempotency_key
+
+
+def test_add_and_discard_reject_existing_memory_targets() -> None:
+    fixture = run_sm01_preference_fixture()
+    add = fixture.evaluation.signals[0]
+    with pytest.raises(ValueError, match="add signals"):
+        replace(add, target_artifact_id="existing")
+
+    with pytest.raises(ValueError, match="defer/discard"):
+        replace(
+            add,
+            writeback_action=WritebackAction.DISCARD,
+            memory_kind=None,
+            target_backend="hermes-native-semantic",
+        )
+
+    with pytest.raises(ValueError, match="update signals require"):
+        replace(add, writeback_action=WritebackAction.UPDATE)
+
+    plan = fixture.plans[0]
+    with pytest.raises(ValueError, match="add plans"):
+        replace(plan, target_backend="hermes-native-semantic")
+    with pytest.raises(ValueError, match="discard plans"):
+        replace(
+            plan,
+            memory_action="discard",
+            memory_kind=None,
+            target_artifact_id="existing",
+        )
+    with pytest.raises(ValueError, match="update plans require"):
+        replace(plan, memory_action="update")
+
+
+def test_persistent_idempotency_receipt_survives_coordinator_restart(
+    tmp_path,
+) -> None:
+    fixture, evaluation = _update_evaluation("artifact-a")
+    receipt_path = tmp_path / "idempotency-receipts.json"
+
+    def coordinator() -> WritebackCoordinator:
+        return WritebackCoordinator(
+            validator=WritebackPlanValidator(updatable_backends={
+                "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
+            }),
+            receipt_store=JsonIdempotencyReceiptStore(receipt_path),
+        )
+
+    first_coordinator = coordinator()
+    plan = first_coordinator.create_plans(fixture.snapshot, evaluation)[0]
+    first = first_coordinator.dry_run(plan, fixture.snapshot)
+    second = coordinator().dry_run(plan, fixture.snapshot)
+
+    assert first.status.value == "accepted"
+    assert second.status.value == "duplicate"
+    assert first.mutation_id == second.mutation_id
+    serialized = receipt_path.read_text(encoding="utf-8")
+    assert "Use TSV" not in serialized
+
+
+def test_lifecycle_usage_preserves_all_raw_request_buckets() -> None:
+    usage = RawResourceUsage(
+        input_tokens=100,
+        output_tokens=20,
+        cache_read_tokens=30,
+        cache_write_tokens=4,
+        reasoning_tokens=7,
+        model_requests=2,
+        retry_count=1,
+        duration_ms=250,
+        storage_bytes=64,
+    )
+    assert usage.to_dict() == {
+        "input_tokens": 100,
+        "output_tokens": 20,
+        "cache_read_tokens": 30,
+        "cache_write_tokens": 4,
+        "reasoning_tokens": 7,
+        "model_requests": 2,
+        "retry_count": 1,
+        "duration_ms": 250,
+        "storage_bytes": 64,
+    }

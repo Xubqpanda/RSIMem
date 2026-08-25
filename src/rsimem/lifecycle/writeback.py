@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
+import os
 import re
+import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from typing import Iterable, Protocol, runtime_checkable
+from pathlib import Path
+from typing import Iterable, Mapping, Protocol, runtime_checkable
 
 from ..memory.contracts import MemoryKind
 from .contracts import (
@@ -66,7 +71,11 @@ class RawResourceUsage:
 
     input_tokens: int | None = None
     output_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    reasoning_tokens: int | None = None
     model_requests: int = 0
+    retry_count: int = 0
     duration_ms: int | None = None
     storage_bytes: int = 0
 
@@ -74,7 +83,11 @@ class RawResourceUsage:
         values = (
             self.input_tokens,
             self.output_tokens,
+            self.cache_read_tokens,
+            self.cache_write_tokens,
+            self.reasoning_tokens,
             self.model_requests,
+            self.retry_count,
             self.duration_ms,
             self.storage_bytes,
         )
@@ -85,7 +98,11 @@ class RawResourceUsage:
         return {
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
+            "cache_read_tokens": self.cache_read_tokens,
+            "cache_write_tokens": self.cache_write_tokens,
+            "reasoning_tokens": self.reasoning_tokens,
             "model_requests": self.model_requests,
+            "retry_count": self.retry_count,
             "duration_ms": self.duration_ms,
             "storage_bytes": self.storage_bytes,
         }
@@ -106,6 +123,12 @@ class WritebackPlan:
     provenance: ProvenanceRef
     idempotency_key: str
     summary: str
+    target_backend: str | None = None
+    target_artifact_id: str | None = None
+    expected_memory_revision: str | None = None
+    update_hint: str | None = None
+    update_mode: str | None = None
+    compiler_version: str = "uncompiled-v0"
     reason_codes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
@@ -130,8 +153,45 @@ class WritebackPlan:
         if self.memory_action in {PlanMemoryAction.ADD, PlanMemoryAction.UPDATE}:
             if self.memory_kind is None:
                 raise ValueError("add/update plans require memory_kind")
+            if not self.compiler_version.strip():
+                raise ValueError("add/update plans require compiler_version")
         elif self.memory_kind is not None:
             raise ValueError("discard plans must not declare memory_kind")
+        optional_values = (
+            self.target_backend,
+            self.target_artifact_id,
+            self.expected_memory_revision,
+            self.update_hint,
+            self.update_mode,
+        )
+        if any(value is not None and not value.strip() for value in optional_values):
+            raise ValueError("optional writeback target fields must be non-empty")
+        if self.update_hint is not None and not _REASON_CODE.fullmatch(self.update_hint):
+            raise ValueError("writeback update_hint must be machine-readable")
+        if self.update_mode is not None and not _REASON_CODE.fullmatch(self.update_mode):
+            raise ValueError("writeback update_mode must be machine-readable")
+        has_existing_target = any((
+            self.target_artifact_id,
+            self.expected_memory_revision,
+            self.update_hint,
+            self.update_mode,
+        ))
+        if self.memory_action == PlanMemoryAction.ADD and any((
+            self.target_backend,
+            has_existing_target,
+        )):
+            raise ValueError("add plans must not carry an existing memory target")
+        if self.memory_action == PlanMemoryAction.UPDATE:
+            if not all((
+                self.target_backend,
+                self.target_artifact_id,
+                self.expected_memory_revision,
+            )):
+                raise ValueError("update plans require backend, artifact, and revision")
+            if not self.update_hint and not self.update_mode:
+                raise ValueError("update plans require update_hint or update_mode")
+        if self.memory_action == PlanMemoryAction.DISCARD and any(optional_values):
+            raise ValueError("discard plans must not carry a memory target")
         if self.provenance.segment_ids != self.source_segment_ids:
             raise ValueError("plan provenance must identify its source segments")
         if self.provenance.evaluation_id != self.evaluation_id:
@@ -158,6 +218,9 @@ class DryRunMutation:
     memory_kind: MemoryKind | None
     source_segment_ids: tuple[str, ...]
     provenance: ProvenanceRef
+    target_backend: str | None = None
+    target_artifact_id: str | None = None
+    expected_memory_revision: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,6 +229,113 @@ class DryRunReceipt:
     status: DryRunStatus
     validation: PlanValidationResult
     mutation_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class IdempotencyReceipt:
+    idempotency_key: str
+    plan_id: str
+    mutation_id: str
+
+    def __post_init__(self) -> None:
+        if any(
+            not value.strip()
+            for value in (self.idempotency_key, self.plan_id, self.mutation_id)
+        ):
+            raise ValueError("idempotency receipt identifiers must not be empty")
+
+
+@runtime_checkable
+class IdempotencyReceiptStore(Protocol):
+    def get(self, idempotency_key: str) -> IdempotencyReceipt | None: ...
+
+    def put(self, receipt: IdempotencyReceipt) -> None: ...
+
+
+class InMemoryIdempotencyReceiptStore:
+    def __init__(self) -> None:
+        self._receipts: dict[str, IdempotencyReceipt] = {}
+
+    def get(self, idempotency_key: str) -> IdempotencyReceipt | None:
+        return self._receipts.get(idempotency_key)
+
+    def put(self, receipt: IdempotencyReceipt) -> None:
+        existing = self._receipts.get(receipt.idempotency_key)
+        if existing is not None and existing != receipt:
+            raise ValueError("idempotency key already has a different receipt")
+        self._receipts[receipt.idempotency_key] = receipt
+
+
+class JsonIdempotencyReceiptStore:
+    """Small persistent receipt store for replay-safe coordinator execution."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path.expanduser().resolve()
+
+    @contextmanager
+    def _lock(self, operation: int):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        with lock_path.open("w", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), operation)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def _read(self) -> dict[str, IdempotencyReceipt]:
+        if not self.path.exists():
+            return {}
+        value = json.loads(self.path.read_text(encoding="utf-8"))
+        if not isinstance(value, dict):
+            raise ValueError("idempotency receipt file must contain an object")
+        return {
+            key: IdempotencyReceipt(
+                idempotency_key=key,
+                plan_id=str(item["plan_id"]),
+                mutation_id=str(item["mutation_id"]),
+            )
+            for key, item in value.items()
+            if isinstance(key, str) and isinstance(item, dict)
+        }
+
+    def get(self, idempotency_key: str) -> IdempotencyReceipt | None:
+        with self._lock(fcntl.LOCK_SH):
+            return self._read().get(idempotency_key)
+
+    def put(self, receipt: IdempotencyReceipt) -> None:
+        with self._lock(fcntl.LOCK_EX):
+            receipts = self._read()
+            existing = receipts.get(receipt.idempotency_key)
+            if existing is not None:
+                if existing != receipt:
+                    raise ValueError("idempotency key already has a different receipt")
+                return
+            receipts[receipt.idempotency_key] = receipt
+            payload = {
+                key: {
+                    "plan_id": value.plan_id,
+                    "mutation_id": value.mutation_id,
+                }
+                for key, value in sorted(receipts.items())
+            }
+            fd, temp_name = tempfile.mkstemp(
+                prefix=f".{self.path.name}.",
+                dir=self.path.parent,
+            )
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    json.dump(payload, handle, ensure_ascii=True, sort_keys=True)
+                    handle.write("\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temp_name, self.path)
+            except BaseException:
+                try:
+                    os.unlink(temp_name)
+                except OSError:
+                    pass
+                raise
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +354,9 @@ class WritebackEvent:
     context_action: PlanContextAction | None
     memory_action: PlanMemoryAction | None
     memory_kind: MemoryKind | None
+    target_backend: str | None
+    target_artifact_id: str | None
+    compiler_version: str | None
     source_segment_count: int
     status: str
     reason_codes: tuple[str, ...] = ()
@@ -203,6 +376,9 @@ class WritebackEvent:
             "context_action": self.context_action.value if self.context_action else None,
             "memory_action": self.memory_action.value if self.memory_action else None,
             "memory_kind": self.memory_kind.value if self.memory_kind else None,
+            "target_backend": self.target_backend,
+            "target_artifact_id": self.target_artifact_id,
+            "compiler_version": self.compiler_version,
             "source_segment_count": self.source_segment_count,
             "status": self.status,
             "reason_codes": list(self.reason_codes),
@@ -217,6 +393,16 @@ class WritebackObserver(Protocol):
 
 class WritebackPlanValidator:
     """Deterministic safety checks shared by plan creation and execution."""
+
+    def __init__(
+        self,
+        *,
+        updatable_backends: Mapping[str, frozenset[MemoryKind]] | None = None,
+    ) -> None:
+        self.updatable_backends = {
+            backend: frozenset(MemoryKind(kind) for kind in kinds)
+            for backend, kinds in (updatable_backends or {}).items()
+        }
 
     @staticmethod
     def validate_evaluation(
@@ -234,6 +420,16 @@ class WritebackPlanValidator:
             reasons.append("incomplete_evaluation")
         if any(not _REASON_CODE.fullmatch(code) for signal in evaluation.signals for code in signal.reason_codes):
             reasons.append("invalid_reason_code")
+        if any(
+            not _REASON_CODE.fullmatch(hint)
+            for signal in evaluation.signals
+            for hint in signal.update_hints
+        ) or any(
+            signal.update_mode is not None
+            and not _REASON_CODE.fullmatch(signal.update_mode)
+            for signal in evaluation.signals
+        ):
+            reasons.append("invalid_update_hint")
 
         protected = snapshot.protected_segment_ids
         if any(
@@ -241,6 +437,12 @@ class WritebackPlanValidator:
             for signal in evaluation.signals
         ):
             reasons.append("protected_segment_eviction")
+        if any(
+            signal.safe_to_evict is False
+            and signal.context_action == ContextAction.EVICT
+            for signal in evaluation.signals
+        ):
+            reasons.append("unsafe_exit_signal")
         if any(
             signal.context_action == ContextAction.EVICT
             and signal.writeback_action == WritebackAction.DEFER
@@ -256,7 +458,17 @@ class WritebackPlanValidator:
             if any(signal is None for signal in signals):
                 continue
             actions = {
-                (signal.context_action, signal.writeback_action, signal.memory_kind)
+                (
+                    signal.context_action,
+                    signal.writeback_action,
+                    signal.memory_kind,
+                    signal.target_backend,
+                    signal.target_artifact_id,
+                    signal.expected_memory_revision,
+                    signal.update_mode,
+                    signal.update_hints,
+                    signal.compiler_version,
+                )
                 for signal in signals
                 if signal is not None
             }
@@ -270,8 +482,8 @@ class WritebackPlanValidator:
             )
         return PlanValidationResult(PlanValidationStatus.VALID)
 
-    @staticmethod
     def validate_plan(
+        self,
         plan: WritebackPlan,
         current_snapshot: ContextSnapshot,
     ) -> PlanValidationResult:
@@ -297,6 +509,13 @@ class WritebackPlanValidator:
         snapshot_ids = {segment.segment_id for segment in current_snapshot.segments}
         if not source_ids.issubset(snapshot_ids):
             return PlanValidationResult(PlanValidationStatus.INVALID, ("unknown_source_segment",))
+        if plan.memory_action == PlanMemoryAction.UPDATE:
+            supported_kinds = self.updatable_backends.get(plan.target_backend or "", frozenset())
+            if plan.memory_kind not in supported_kinds:
+                return PlanValidationResult(
+                    PlanValidationStatus.INVALID,
+                    ("backend_update_not_supported",),
+                )
         if plan.context_action == PlanContextAction.EVICT:
             if source_ids.intersection(current_snapshot.protected_segment_ids):
                 return PlanValidationResult(
@@ -320,15 +539,17 @@ class WritebackCoordinator:
         self,
         *,
         validator: WritebackPlanValidator | None = None,
+        receipt_store: IdempotencyReceiptStore | None = None,
         observers: Iterable[WritebackObserver] = (),
     ) -> None:
         self.validator = validator or WritebackPlanValidator()
+        self.receipt_store = receipt_store or InMemoryIdempotencyReceiptStore()
         self.observers = tuple(observers)
-        self._mutations_by_key: dict[str, DryRunMutation] = {}
+        self._dry_run_mutations: dict[str, DryRunMutation] = {}
 
     @property
     def dry_run_mutations(self) -> tuple[DryRunMutation, ...]:
-        return tuple(self._mutations_by_key.values())
+        return tuple(self._dry_run_mutations.values())
 
     def _record(self, event: WritebackEvent) -> None:
         for observer in self.observers:
@@ -359,6 +580,9 @@ class WritebackCoordinator:
             context_action=plan.context_action if plan else None,
             memory_action=plan.memory_action if plan else None,
             memory_kind=plan.memory_kind if plan else None,
+            target_backend=plan.target_backend if plan else None,
+            target_artifact_id=plan.target_artifact_id if plan else None,
+            compiler_version=plan.compiler_version if plan else None,
             source_segment_count=len(plan.source_segment_ids) if plan else 0,
             status=status,
             reason_codes=reason_codes,
@@ -443,6 +667,7 @@ class WritebackCoordinator:
         )
         memory_action = PlanMemoryAction(signal.writeback_action.value)
         memory_kind = signal.memory_kind if memory_action != PlanMemoryAction.DISCARD else None
+        update_hint = signal.update_hints[0] if signal.update_hints else None
         key_payload = {
             "source_segment_ids": source_ids,
             "policy_version": evaluation.policy_version,
@@ -450,6 +675,12 @@ class WritebackCoordinator:
             "memory_action": memory_action.value,
             "memory_kind": memory_kind.value if memory_kind else None,
             "base_revision": snapshot.context_revision,
+            "target_backend": signal.target_backend,
+            "target_artifact_id": signal.target_artifact_id,
+            "expected_memory_revision": signal.expected_memory_revision,
+            "update_hint": update_hint,
+            "update_mode": signal.update_mode,
+            "compiler_version": signal.compiler_version,
         }
         idempotency_key = _stable_hash("idem", key_payload, length=40)
         plan_id = _stable_hash(
@@ -478,6 +709,12 @@ class WritebackCoordinator:
             provenance=provenance,
             idempotency_key=idempotency_key,
             summary=summary,
+            target_backend=signal.target_backend,
+            target_artifact_id=signal.target_artifact_id,
+            expected_memory_revision=signal.expected_memory_revision,
+            update_hint=update_hint,
+            update_mode=signal.update_mode,
+            compiler_version=signal.compiler_version,
             reason_codes=signal.reason_codes,
         )
 
@@ -500,7 +737,7 @@ class WritebackCoordinator:
         if not validation.valid:
             return DryRunReceipt(plan.plan_id, DryRunStatus.REJECTED, validation)
 
-        existing = self._mutations_by_key.get(plan.idempotency_key)
+        existing = self.receipt_store.get(plan.idempotency_key)
         if existing is not None:
             self._record(self._event(
                 WritebackEventKind.DRY_RUN_DUPLICATE,
@@ -526,8 +763,16 @@ class WritebackCoordinator:
             memory_kind=plan.memory_kind,
             source_segment_ids=plan.source_segment_ids,
             provenance=replace(plan.provenance, mutation_id=mutation_id),
+            target_backend=plan.target_backend,
+            target_artifact_id=plan.target_artifact_id,
+            expected_memory_revision=plan.expected_memory_revision,
         )
-        self._mutations_by_key[plan.idempotency_key] = mutation
+        self.receipt_store.put(IdempotencyReceipt(
+            idempotency_key=plan.idempotency_key,
+            plan_id=plan.plan_id,
+            mutation_id=mutation_id,
+        ))
+        self._dry_run_mutations[plan.idempotency_key] = mutation
         self._record(self._event(
             WritebackEventKind.DRY_RUN_MUTATION,
             current_snapshot,

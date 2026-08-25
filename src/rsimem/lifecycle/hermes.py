@@ -10,12 +10,15 @@ from typing import Any, Mapping, Sequence
 
 from ..memory.contracts import MemoryKind
 from .contracts import (
+    CompletionStatus,
     ContextAction,
     ContextEvaluation,
     ContextEvaluationRequest,
     ContextSegment,
     EvaluationSignal,
     EvaluationTrigger,
+    MemoryScope,
+    TemporalValidity,
     WritebackAction,
 )
 from .snapshot import (
@@ -74,7 +77,7 @@ class HermesSnapshotCollector:
         episode_id: str,
         session_id: str,
         task_id: str,
-        current_turn_id: str,
+        current_turn_id: str | None,
         task_state: TaskLifecycleState,
         lifecycle_state: str,
         source_ref: str,
@@ -289,6 +292,35 @@ class DeterministicPreferenceEvaluator:
                 ),
                 utility_estimate=1.0 if segment.segment_id == self.preference_segment_id else 0.0,
                 confidence=1.0,
+                completion_status=(
+                    CompletionStatus.COMPLETED
+                    if segment.completed
+                    else CompletionStatus.IN_PROGRESS
+                ),
+                completion_evidence=(
+                    ("host_segment_completed",)
+                    if segment.completed
+                    else ("host_segment_unresolved",)
+                ),
+                safe_to_evict=(
+                    segment.completed
+                    and segment.segment_id not in request.active_segment_ids
+                ),
+                unresolved_state=None if segment.completed else "host_unresolved",
+                scope=(
+                    MemoryScope.USER
+                    if segment.segment_id == self.preference_segment_id
+                    else MemoryScope.TASK
+                ),
+                temporal_validity=(
+                    TemporalValidity.DURABLE
+                    if segment.segment_id == self.preference_segment_id
+                    else TemporalValidity.CURRENT
+                ),
+                provenance=(
+                    str(request.metadata.get("snapshot_id") or "snapshot_unknown"),
+                    segment.segment_id,
+                ),
                 reason_codes=(
                     ("preference_candidate",)
                     if segment.segment_id == self.preference_segment_id
