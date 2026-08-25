@@ -4,8 +4,15 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 from rsimem.audit import audit_run
-from rsimem.ledger import build_events, write_ledger
+from rsimem.ledger import LifecycleLedgerObserver, build_events, write_ledger
+from rsimem.lifecycle import (
+    HermesMessage,
+    HermesSnapshotCollector,
+    TaskLifecycleState,
+)
 
 
 MEMORY = "Use TSV with owner, priority, task, and due_date."
@@ -228,3 +235,51 @@ def test_audit_reconciles_request_usage_and_ledger(tmp_path: Path) -> None:
     assert report["uniquePhysicalUsage"]["cacheReadTokens"] == 20
     assert report["ledgerUniqueBillingCalls"] == 1
     assert report["privacy"]["memoryTextLeaks"] == 0
+
+
+def test_write_ledger_joins_validated_lifecycle_events(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    snapshot = HermesSnapshotCollector().collect(
+        (
+            HermesMessage(
+                "message-1",
+                "user",
+                MEMORY,
+                "turn-1",
+                10,
+                completed=True,
+            ),
+        ),
+        run_id=comparison.parent.name,
+        episode_id="episode-1",
+        session_id="session-1",
+        task_id="task-1",
+        current_turn_id="turn-2",
+        task_state=TaskLifecycleState.COMPLETED,
+        lifecycle_state="task_completed",
+        source_ref="fixture:ledger-join",
+    )
+    observer = LifecycleLedgerObserver(
+        variant="native+adapter+ledger",
+        trace_id="trace-1",
+        family_id="family-1",
+        stage="learn",
+    )
+    observer.record_snapshot(snapshot)
+
+    output = comparison.parent / "ledger.jsonl"
+    events = write_ledger(
+        comparison,
+        output,
+        lifecycle_events=observer.events,
+    )
+    joined = events[-1]
+    assert joined["kind"] == "context_snapshot"
+    assert joined["episodeId"] == "episode-1"
+    assert joined["sessionId"] == "session-1"
+    assert joined["data"]["segmentCount"] == 1
+    assert MEMORY not in output.read_text(encoding="utf-8")
+
+    invalid = dict(joined, runId="another-run", eventId="evt_other")
+    with pytest.raises(ValueError, match="runId"):
+        build_events(comparison, lifecycle_events=(invalid,))

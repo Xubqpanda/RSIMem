@@ -8,6 +8,9 @@ import json
 from pathlib import Path
 from typing import Any, Iterable
 
+from .lifecycle.snapshot import ContextSnapshot
+from .lifecycle.writeback import WritebackEvent
+
 SCHEMA_VERSION = 1
 
 
@@ -30,6 +33,134 @@ class _RecordIdRegistry:
             record_id = f"mem_{_json_hash({'runId': self._run_id, 'ordinal': len(self._ids)})}"
             self._ids[normalized] = record_id
         return record_id
+
+
+class LifecycleLedgerObserver:
+    """Join content-free snapshot and writeback evidence to the ledger schema."""
+
+    def __init__(
+        self,
+        *,
+        variant: str,
+        trace_id: str,
+        family_id: str | None = None,
+        stage: str | None = None,
+    ) -> None:
+        if not variant.strip() or not trace_id.strip():
+            raise ValueError("lifecycle ledger variant and trace_id must not be empty")
+        self.variant = variant
+        self.trace_id = trace_id
+        self.family_id = family_id
+        self.stage = stage
+        self._events: list[dict[str, Any]] = []
+
+    @property
+    def events(self) -> tuple[dict[str, Any], ...]:
+        return tuple(self._events)
+
+    def _append(
+        self,
+        *,
+        kind: str,
+        run_id: str,
+        episode_id: str,
+        session_id: str,
+        task_id: str,
+        snapshot_id: str,
+        data: dict[str, Any],
+    ) -> None:
+        ordinal = len(self._events)
+        identity = {
+            "runId": run_id,
+            "variant": self.variant,
+            "traceId": self.trace_id,
+            "snapshotId": snapshot_id,
+            "kind": kind,
+            "ordinal": ordinal,
+        }
+        self._events.append({
+            "schemaVersion": SCHEMA_VERSION,
+            "eventId": f"evt_{_json_hash(identity)}",
+            "runId": run_id,
+            "variant": self.variant,
+            "traceId": self.trace_id,
+            "episodeId": episode_id,
+            "sessionId": session_id,
+            "taskId": task_id,
+            "familyId": self.family_id,
+            "stage": self.stage,
+            "snapshotId": snapshot_id,
+            "kind": kind,
+            "source": {"type": "rsimem_lifecycle_contract"},
+            "data": data,
+        })
+
+    def record_snapshot(self, snapshot: ContextSnapshot) -> None:
+        self._append(
+            kind="context_snapshot",
+            run_id=snapshot.run_id,
+            episode_id=snapshot.episode_id,
+            session_id=snapshot.session_id,
+            task_id=snapshot.task_id,
+            snapshot_id=snapshot.snapshot_id,
+            data={
+                "segmentCount": len(snapshot.segments),
+                "activeSegmentCount": len(snapshot.active_segment_ids),
+                "protectedSegmentCount": len(snapshot.protected_segment_ids),
+                "toolClosureCount": len(snapshot.tool_closures),
+                "openToolClosureCount": sum(
+                    1 for closure in snapshot.tool_closures if not closure.closed
+                ),
+                "totalTokens": snapshot.total_token_count,
+                "taskState": snapshot.task_state.value,
+                "lifecycleState": snapshot.lifecycle_state,
+            },
+        )
+
+    def record(self, event: WritebackEvent) -> None:
+        """Implement WritebackObserver without retaining plan or source content."""
+
+        resources = event.resources
+        self._append(
+            kind=event.kind.value,
+            run_id=event.run_id,
+            episode_id=event.episode_id,
+            session_id=event.session_id,
+            task_id=event.task_id,
+            snapshot_id=event.snapshot_id,
+            data={
+                "evaluationId": event.evaluation_id,
+                "planId": event.plan_id,
+                "mutationId": event.mutation_id,
+                "contextAction": (
+                    event.context_action.value if event.context_action is not None else None
+                ),
+                "memoryAction": (
+                    event.memory_action.value if event.memory_action is not None else None
+                ),
+                "memoryKind": event.memory_kind.value if event.memory_kind is not None else None,
+                "sourceSegmentCount": event.source_segment_count,
+                "status": event.status,
+                "reasonCodes": list(event.reason_codes),
+                "resources": {
+                    "inputTokens": resources.input_tokens,
+                    "outputTokens": resources.output_tokens,
+                    "modelRequests": resources.model_requests,
+                    "durationMs": resources.duration_ms,
+                    "storageBytes": resources.storage_bytes,
+                },
+            },
+        )
+
+    def write(self, output_path: Path) -> None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(
+            "".join(
+                json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n"
+                for event in self._events
+            ),
+            encoding="utf-8",
+        )
 
 
 def _relative(path: Path, root: Path) -> str:
@@ -262,6 +393,7 @@ def build_events(
     comparison_path: Path,
     *,
     judge_enabled: bool | None = None,
+    lifecycle_events: Iterable[dict[str, Any]] = (),
 ) -> list[dict[str, Any]]:
     """Build deterministic ledger events from one sequence comparison."""
     comparison_path = comparison_path.resolve()
@@ -393,6 +525,20 @@ def build_events(
                     "stateDbBytes": _directory_bytes(artifact_dir / "state.db"),
                 },
             ))
+    existing_ids = {event["eventId"] for event in events}
+    for event in lifecycle_events:
+        value = dict(event)
+        if value.get("schemaVersion") != SCHEMA_VERSION:
+            raise ValueError("lifecycle event schema version does not match the ledger")
+        if value.get("runId") != run_id:
+            raise ValueError("lifecycle event runId does not match the comparison run")
+        event_id = value.get("eventId")
+        if not isinstance(event_id, str) or not event_id:
+            raise ValueError("lifecycle event requires eventId")
+        if event_id in existing_ids:
+            raise ValueError(f"duplicate ledger eventId: {event_id}")
+        existing_ids.add(event_id)
+        events.append(value)
     return events
 
 
@@ -401,8 +547,13 @@ def write_ledger(
     output_path: Path,
     *,
     judge_enabled: bool | None = None,
+    lifecycle_events: Iterable[dict[str, Any]] = (),
 ) -> list[dict[str, Any]]:
-    events = build_events(comparison_path, judge_enabled=judge_enabled)
+    events = build_events(
+        comparison_path,
+        judge_enabled=judge_enabled,
+        lifecycle_events=lifecycle_events,
+    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     content = "".join(json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n" for event in events)
     output_path.write_text(content, encoding="utf-8")
