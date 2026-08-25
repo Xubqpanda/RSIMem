@@ -54,7 +54,7 @@ class LifecycleLedgerObserver:
         self.family_id = family_id
         self.stage = stage
         self._events: list[dict[str, Any]] = []
-        self._event_ids: set[str] = set()
+        self._events_by_id: dict[str, str] = {}
 
     @property
     def events(self) -> tuple[dict[str, Any], ...]:
@@ -84,10 +84,7 @@ class LifecycleLedgerObserver:
             "reasonCodes": data.get("reasonCodes"),
         }
         event_id = f"evt_{_json_hash(identity)}"
-        if event_id in self._event_ids:
-            return
-        self._event_ids.add(event_id)
-        self._events.append({
+        event = {
             "schemaVersion": SCHEMA_VERSION,
             "eventId": event_id,
             "runId": run_id,
@@ -102,7 +99,15 @@ class LifecycleLedgerObserver:
             "kind": kind,
             "source": {"type": "rsimem_lifecycle_contract"},
             "data": data,
-        })
+        }
+        canonical = json.dumps(event, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        existing = self._events_by_id.get(event_id)
+        if existing is not None:
+            if existing != canonical:
+                raise ValueError(f"conflicting lifecycle ledger event: {event_id}")
+            return
+        self._events_by_id[event_id] = canonical
+        self._events.append(event)
 
     def record_snapshot(self, snapshot: ContextSnapshot) -> None:
         self._append(
@@ -634,7 +639,15 @@ def build_events(
                     "stateDbBytes": _directory_bytes(artifact_dir / "state.db"),
                 },
             ))
-    existing_ids = {event["eventId"] for event in events}
+    events_by_id = {
+        event["eventId"]: json.dumps(
+            event,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        for event in events
+    }
     for event in lifecycle_events:
         value = dict(event)
         if value.get("schemaVersion") != SCHEMA_VERSION:
@@ -659,9 +672,18 @@ def build_events(
         event_id = value.get("eventId")
         if not isinstance(event_id, str) or not event_id:
             raise ValueError("lifecycle event requires eventId")
-        if event_id in existing_ids:
-            raise ValueError(f"duplicate ledger eventId: {event_id}")
-        existing_ids.add(event_id)
+        canonical = json.dumps(
+            value,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        existing = events_by_id.get(event_id)
+        if existing is not None:
+            if existing != canonical:
+                raise ValueError(f"conflicting ledger eventId: {event_id}")
+            continue
+        events_by_id[event_id] = canonical
         events.append(value)
     return events
 

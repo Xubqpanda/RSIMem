@@ -292,3 +292,37 @@ def test_write_ledger_joins_validated_lifecycle_events(tmp_path: Path) -> None:
         invalid = dict(joined, **{field: value}, eventId=f"evt_other_{index}")
         with pytest.raises(ValueError, match=field):
             build_events(comparison, lifecycle_events=(invalid,))
+
+
+def test_identical_lifecycle_event_is_idempotent_but_payload_conflict_fails(
+    tmp_path: Path,
+) -> None:
+    comparison = _fixture(tmp_path)
+    snapshot = HermesSnapshotCollector().collect(
+        (
+            HermesMessage("message-1", "user", MEMORY, "turn-1", 10, completed=True),
+        ),
+        run_id=comparison.parent.name,
+        episode_id="episode-1",
+        session_id="session-1",
+        task_id="task-1",
+        current_turn_id=None,
+        task_state=TaskLifecycleState.COMPLETED,
+        lifecycle_state="task_completed",
+        source_ref="fixture:ledger-conflict",
+    )
+    observer = LifecycleLedgerObserver(
+        variant="with_persistence",
+        trace_id="trace-1",
+        family_id="family-1",
+        stage="learn",
+    )
+    observer.record_snapshot(snapshot)
+    same = observer.events[0]
+    assert len(build_events(comparison, lifecycle_events=(same, same))) == 8
+
+    conflicting = json.loads(json.dumps(same))
+    conflicting["data"]["totalTokens"] = 999
+    conflicting["eventId"] = same["eventId"]
+    with pytest.raises(ValueError, match="conflicting ledger eventId"):
+        build_events(comparison, lifecycle_events=(same, conflicting))
