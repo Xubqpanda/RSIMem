@@ -1,8 +1,8 @@
 # RSIMem Progress
 
-Last updated: 2026-08-21
+Last updated: 2026-08-25
 
-This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md).
+This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md).
 
 ## Status Legend
 
@@ -70,9 +70,25 @@ The new memory runtime is not yet connected to the PAST-Bench execution path. He
 - [x] Reject incomplete evaluator output and attempts to evict active context segments.
 - [x] Keep observer-facing lifecycle evaluation evidence free of raw context content.
 
+### Snapshot And Dry-Run Foundation
+
+- [x] Define immutable context snapshots with stable segment IDs, revisions, active/current protection, token totals, and provenance.
+- [x] Preserve Hermes tool call/result closures as atomic planning units.
+- [x] Add a deterministic `SM01_preference_adoption` Hermes fixture and semantic preference evaluator.
+- [x] Build content-free `WritebackPlan` validation with stale-revision rejection and idempotency keys.
+- [x] Build a dry-run coordinator that records plan and mutation identifiers without changing Hermes or memory backend state.
+
+### Deterministic Native Equivalence
+
+- [x] Define explicit `native`, `native+ledger`, and `native+adapter+ledger` modes with direct native behavior as the default.
+- [x] Add a factory for constructing the three-route Hermes typed runtime from an isolated home.
+- [x] Verify identical semantic prompt blocks, episodic search results with surrounding context, and procedural skill resources across native and adapter reads.
+- [x] Preserve native semantic entry order and Hermes episodic surrounding-context behavior in the adapter.
+- [x] Join content-free snapshot, plan, validation, and dry-run events into the existing ledger schema.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `17 passed`.
+- [x] Pass all RSIMem tests: `32 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `380 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
@@ -81,10 +97,10 @@ The new memory runtime is not yet connected to the PAST-Bench execution path. He
 
 ### **Current: Opt-In Memory Runtime Integration**
 
-The immediate objective is to connect the typed memory runtime and lifecycle control plane to experiments without changing the native Hermes baseline.
+The immediate objective is to connect the typed memory runtime and lifecycle control plane to experiments without changing the native Hermes baseline. Follow [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md) for the staged contracts, snapshot collector, dry-run plan, writeback, and acceptance order.
 
-- [ ] Define an experiment configuration that selects one backend for each memory kind and defaults to native Hermes behavior.
-- [ ] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
+- [x] Define an experiment configuration that selects one backend for each memory kind and defaults to native Hermes behavior.
+- [x] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
 - [ ] Construct context snapshots at task completion and configured context-pressure boundaries.
 - [ ] Add an opt-in lifecycle evaluator configuration with an injected model client and deterministic baseline.
 - [ ] Identify and document the exact Hermes semantic write, episodic search, skill read, and skill mutation interception points.
@@ -105,8 +121,8 @@ Acceptance criteria:
 
 ### Native Behavior Equivalence Experiment
 
-- [ ] Add `native`, `native+ledger`, and `native+adapter+ledger` experiment variants.
-- [ ] Run matched deterministic fixtures before spending model tokens.
+- [x] Add `native`, `native+ledger`, and `native+adapter+ledger` storage-boundary variants.
+- [x] Run matched deterministic fixtures before spending model tokens.
 - [ ] Run at least three matched `SM01_preference_adoption` seeds with fixed model, prompt, task order, sandbox, and budget.
 - [ ] Compare task score, pass rate, model requests, token buckets, tool calls, stored bytes, injected characters, and wall time.
 - [ ] Establish an explicit tolerance for nondeterministic model variation and require zero unexplained accounting drift.
@@ -161,13 +177,11 @@ Acceptance criteria:
 
 ## Immediate Execution Order
 
-1. Add opt-in configuration and runtime construction without changing the benchmark path.
-2. Build deterministic native-versus-adapter equivalence fixtures.
-3. Connect one memory surface at a time: semantic, episodic, then procedural.
-4. Join adapter lifecycle events to the ledger and extend the audit.
-5. Run matched native behavior equivalence experiments.
-6. Implement deterministic compiler baselines.
-7. Begin the static LightRSI writeback policy only after equivalence is established.
+1. Connect the explicit modes and lifecycle collector to the opt-in PAST-Bench/Hermes execution path.
+2. Join typed memory query, retrieval, injection, and mutation events to the existing ledger.
+3. Verify restart persistence and explicit adapter failure behavior.
+4. Implement validated compiler and backend mutation baselines.
+5. Begin the static RSIMem writeback policy only after runtime equivalence is established.
 
 ## Update Policy
 
