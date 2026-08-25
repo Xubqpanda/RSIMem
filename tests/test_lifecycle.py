@@ -94,6 +94,13 @@ def test_json_llm_evaluator_requires_complete_typed_output() -> None:
                 "utility_estimate": 0.7,
                 "confidence": 0.9,
                 "reason_codes": ["completed", "future_reuse"],
+                "completion_status": "completed",
+                "completion_evidence": ["task_boundary"],
+                "scope": "user",
+                "temporal_validity": "durable",
+                "reusable_facts": ["candidate preference"],
+                "reusable_procedures": [],
+                "update_hints": [],
             },
             {
                 "segment_id": "current",
@@ -110,6 +117,10 @@ def test_json_llm_evaluator_requires_complete_typed_output() -> None:
     evaluation = evaluator.evaluate(_request())
     assert evaluation.signals[0].writeback_action == WritebackAction.ADD
     assert evaluation.signals[0].memory_kind.value == "episodic"
+    assert evaluation.signals[0].completion_status.value == "completed"
+    assert evaluation.signals[0].scope.value == "user"
+    assert evaluation.signals[0].safe_to_evict is None
+    assert evaluation.signals[0].provenance == ()
     assert '"content": "Completed deployment output."' in evaluator.build_prompt(_request())
 
 

@@ -36,6 +36,28 @@ class WritebackAction(StrEnum):
     UPDATE = "update"
 
 
+class CompletionStatus(StrEnum):
+    UNKNOWN = "unknown"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    BLOCKED = "blocked"
+
+
+class MemoryScope(StrEnum):
+    TURN = "turn"
+    TASK = "task"
+    SESSION = "session"
+    USER = "user"
+    GLOBAL = "global"
+
+
+class TemporalValidity(StrEnum):
+    TRANSIENT = "transient"
+    CURRENT = "current"
+    DURABLE = "durable"
+    EXPIRED = "expired"
+
+
 def _frozen_metadata(value: Mapping[str, Any] | None) -> Mapping[str, Any]:
     return MappingProxyType(dict(value or {}))
 
@@ -105,6 +127,21 @@ class EvaluationSignal:
     confidence: float
     memory_kind: MemoryKind | None = None
     reason_codes: tuple[str, ...] = ()
+    completion_status: CompletionStatus = CompletionStatus.UNKNOWN
+    completion_evidence: tuple[str, ...] = ()
+    safe_to_evict: bool | None = None
+    unresolved_state: str | None = None
+    scope: MemoryScope | None = None
+    temporal_validity: TemporalValidity | None = None
+    provenance: tuple[str, ...] = ()
+    reusable_facts: tuple[str, ...] = ()
+    reusable_procedures: tuple[str, ...] = ()
+    update_hints: tuple[str, ...] = ()
+    target_backend: str | None = None
+    target_artifact_id: str | None = None
+    expected_memory_revision: str | None = None
+    update_mode: str | None = None
+    compiler_version: str = "uncompiled-v0"
 
     def __post_init__(self) -> None:
         if not self.segment_id.strip():
@@ -115,13 +152,64 @@ class EvaluationSignal:
             raise ValueError("confidence must be between 0 and 1")
         object.__setattr__(self, "context_action", ContextAction(self.context_action))
         object.__setattr__(self, "writeback_action", WritebackAction(self.writeback_action))
+        object.__setattr__(self, "completion_status", CompletionStatus(self.completion_status))
         if self.memory_kind is not None:
             object.__setattr__(self, "memory_kind", MemoryKind(self.memory_kind))
+        if self.scope is not None:
+            object.__setattr__(self, "scope", MemoryScope(self.scope))
+        if self.temporal_validity is not None:
+            object.__setattr__(self, "temporal_validity", TemporalValidity(self.temporal_validity))
         if self.writeback_action in {WritebackAction.ADD, WritebackAction.UPDATE}:
             if self.memory_kind is None:
                 raise ValueError("memory_kind is required for add/update")
+            if not self.compiler_version.strip():
+                raise ValueError("compiler_version is required for add/update")
         if self.context_action == ContextAction.RETAIN and self.writeback_action == WritebackAction.DISCARD:
             raise ValueError("retained context cannot be marked for discard")
+        optional_values = {
+            "unresolved_state": self.unresolved_state,
+            "target_backend": self.target_backend,
+            "target_artifact_id": self.target_artifact_id,
+            "expected_memory_revision": self.expected_memory_revision,
+            "update_mode": self.update_mode,
+        }
+        if any(value is not None and not value.strip() for value in optional_values.values()):
+            raise ValueError("optional signal string fields must be non-empty when present")
+        sequence_values = (
+            self.completion_evidence,
+            self.provenance,
+            self.reusable_facts,
+            self.reusable_procedures,
+            self.update_hints,
+        )
+        if any(not value.strip() for values in sequence_values for value in values):
+            raise ValueError("signal evidence and hint values must not be empty")
+
+        has_existing_target = any((
+            self.target_artifact_id,
+            self.expected_memory_revision,
+            self.update_mode,
+            self.update_hints,
+        ))
+        if self.writeback_action == WritebackAction.ADD and any((
+            self.target_backend,
+            has_existing_target,
+        )):
+            raise ValueError("add signals must not carry an existing memory target")
+        if self.writeback_action == WritebackAction.UPDATE:
+            if not all((
+                self.target_backend,
+                self.target_artifact_id,
+                self.expected_memory_revision,
+            )):
+                raise ValueError("update signals require backend, artifact, and revision")
+            if not self.update_mode and not self.update_hints:
+                raise ValueError("update signals require update_mode or update_hints")
+        if self.writeback_action in {
+            WritebackAction.DEFER,
+            WritebackAction.DISCARD,
+        } and any((self.target_backend, has_existing_target)):
+            raise ValueError("defer/discard signals must not carry a memory target")
 
 
 @dataclass(frozen=True, slots=True)

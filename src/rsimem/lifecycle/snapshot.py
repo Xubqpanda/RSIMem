@@ -127,7 +127,7 @@ class ContextSnapshot:
     context_revision: str
     segments: tuple[SnapshotSegment, ...]
     active_segment_ids: tuple[str, ...]
-    current_turn_id: str
+    current_turn_id: str | None
     task_state: TaskLifecycleState
     lifecycle_state: str
     tool_closures: tuple[ToolClosure, ...]
@@ -142,7 +142,6 @@ class ContextSnapshot:
             self.task_id,
             self.snapshot_id,
             self.context_revision,
-            self.current_turn_id,
             self.lifecycle_state,
         )
         if any(not value.strip() for value in required):
@@ -159,6 +158,11 @@ class ContextSnapshot:
             raise ValueError("active segment IDs must be unique")
         if not set(self.active_segment_ids).issubset(id_set):
             raise ValueError("active segments must be present in the snapshot")
+        if self.current_turn_id is not None:
+            if not self.current_turn_id.strip():
+                raise ValueError("current_turn_id must be None or a non-empty turn ID")
+            if self.current_turn_id not in {segment.turn_id for segment in self.segments}:
+                raise ValueError("current_turn_id must identify a turn in the snapshot")
         expected_tokens = sum(segment.token_count for segment in self.segments)
         if self.total_token_count != expected_tokens:
             raise ValueError("snapshot total_token_count must equal the segment total")
@@ -205,9 +209,13 @@ class ContextSnapshot:
         current = {
             segment.segment_id
             for segment in self.segments
-            if segment.turn_id == self.current_turn_id
+            if self.current_turn_id is not None
+            and segment.turn_id == self.current_turn_id
+        }
+        unresolved = {
+            segment.segment_id for segment in self.segments if not segment.completed
         }
         open_tools = {
             closure.call_segment_id for closure in self.tool_closures if not closure.closed
         }
-        return frozenset(self.active_segment_ids) | current | open_tools
+        return frozenset(self.active_segment_ids) | current | unresolved | open_tools

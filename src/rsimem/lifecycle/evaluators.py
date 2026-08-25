@@ -9,10 +9,13 @@ from typing import Any
 from ..memory.contracts import MemoryKind
 from .contracts import (
     ContextAction,
+    CompletionStatus,
     ContextEvaluation,
     ContextEvaluationRequest,
     ContextEvaluator,
     EvaluationSignal,
+    MemoryScope,
+    TemporalValidity,
     WritebackAction,
 )
 
@@ -67,6 +70,17 @@ class JsonLlmContextEvaluator:
                     else None
                 ),
                 reason_codes=tuple(item.get("reason_codes", ())),
+                completion_status=item.get("completion_status", CompletionStatus.UNKNOWN),
+                completion_evidence=tuple(item.get("completion_evidence", ())),
+                scope=(MemoryScope(item["scope"]) if item.get("scope") else None),
+                temporal_validity=(
+                    TemporalValidity(item["temporal_validity"])
+                    if item.get("temporal_validity")
+                    else None
+                ),
+                reusable_facts=tuple(item.get("reusable_facts", ())),
+                reusable_procedures=tuple(item.get("reusable_procedures", ())),
+                update_hints=tuple(item.get("update_hints", ())),
             ))
         if seen != expected:
             missing = ", ".join(sorted(expected - seen))
@@ -102,6 +116,13 @@ class JsonLlmContextEvaluator:
                     "utility_estimate": "number in [0,1]",
                     "confidence": "number in [0,1]",
                     "reason_codes": ["short_machine_readable_code"],
+                    "completion_status": "unknown|in_progress|completed|blocked",
+                    "completion_evidence": ["short evidence"],
+                    "scope": "turn|task|session|user|global|null",
+                    "temporal_validity": "transient|current|durable|expired|null",
+                    "reusable_facts": ["candidate fact"],
+                    "reusable_procedures": ["candidate procedure"],
+                    "update_hints": ["candidate update hint"],
                 }
             ],
             "policy_version": "string",
@@ -138,6 +159,22 @@ class ConservativeContextEvaluator:
                     writeback_action=WritebackAction.DEFER,
                     utility_estimate=0.0,
                     confidence=1.0,
+                    completion_status=(
+                        CompletionStatus.COMPLETED
+                        if segment.completed
+                        else CompletionStatus.IN_PROGRESS
+                    ),
+                    completion_evidence=(
+                        ("host_segment_completed",)
+                        if segment.completed
+                        else ("host_segment_unresolved",)
+                    ),
+                    safe_to_evict=False,
+                    unresolved_state=None if segment.completed else "host_unresolved",
+                    provenance=(
+                        str(request.metadata.get("snapshot_id") or "snapshot_unknown"),
+                        segment.segment_id,
+                    ),
                     reason_codes=("baseline_no_action",),
                 )
                 for segment in request.segments
