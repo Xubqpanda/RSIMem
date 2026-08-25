@@ -254,13 +254,13 @@ def test_write_ledger_joins_validated_lifecycle_events(tmp_path: Path) -> None:
         episode_id="episode-1",
         session_id="session-1",
         task_id="task-1",
-        current_turn_id="turn-2",
+        current_turn_id=None,
         task_state=TaskLifecycleState.COMPLETED,
         lifecycle_state="task_completed",
         source_ref="fixture:ledger-join",
     )
     observer = LifecycleLedgerObserver(
-        variant="native+adapter+ledger",
+        variant="with_persistence",
         trace_id="trace-1",
         family_id="family-1",
         stage="learn",
@@ -280,6 +280,15 @@ def test_write_ledger_joins_validated_lifecycle_events(tmp_path: Path) -> None:
     assert joined["data"]["segmentCount"] == 1
     assert MEMORY not in output.read_text(encoding="utf-8")
 
-    invalid = dict(joined, runId="another-run", eventId="evt_other")
-    with pytest.raises(ValueError, match="runId"):
-        build_events(comparison, lifecycle_events=(invalid,))
+    mismatches = {
+        "runId": "another-run",
+        "variant": "another-variant",
+        "traceId": "another-trace",
+        "taskId": "another-task",
+        "familyId": "another-family",
+        "stage": "eval_near",
+    }
+    for index, (field, value) in enumerate(mismatches.items()):
+        invalid = dict(joined, **{field: value}, eventId=f"evt_other_{index}")
+        with pytest.raises(ValueError, match=field):
+            build_events(comparison, lifecycle_events=(invalid,))

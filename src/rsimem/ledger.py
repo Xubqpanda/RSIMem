@@ -10,6 +10,7 @@ from typing import Any, Iterable
 
 from .lifecycle.snapshot import ContextSnapshot
 from .lifecycle.writeback import WritebackEvent
+from .memory.contracts import MemoryEvent
 
 SCHEMA_VERSION = 1
 
@@ -53,6 +54,7 @@ class LifecycleLedgerObserver:
         self.family_id = family_id
         self.stage = stage
         self._events: list[dict[str, Any]] = []
+        self._event_ids: set[str] = set()
 
     @property
     def events(self) -> tuple[dict[str, Any], ...]:
@@ -69,18 +71,25 @@ class LifecycleLedgerObserver:
         snapshot_id: str,
         data: dict[str, Any],
     ) -> None:
-        ordinal = len(self._events)
         identity = {
             "runId": run_id,
             "variant": self.variant,
             "traceId": self.trace_id,
             "snapshotId": snapshot_id,
             "kind": kind,
-            "ordinal": ordinal,
+            "evaluationId": data.get("evaluationId"),
+            "planId": data.get("planId"),
+            "mutationId": data.get("mutationId"),
+            "status": data.get("status"),
+            "reasonCodes": data.get("reasonCodes"),
         }
+        event_id = f"evt_{_json_hash(identity)}"
+        if event_id in self._event_ids:
+            return
+        self._event_ids.add(event_id)
         self._events.append({
             "schemaVersion": SCHEMA_VERSION,
-            "eventId": f"evt_{_json_hash(identity)}",
+            "eventId": event_id,
             "runId": run_id,
             "variant": self.variant,
             "traceId": self.trace_id,
@@ -139,13 +148,20 @@ class LifecycleLedgerObserver:
                     event.memory_action.value if event.memory_action is not None else None
                 ),
                 "memoryKind": event.memory_kind.value if event.memory_kind is not None else None,
+                "targetBackend": event.target_backend,
+                "targetArtifactId": event.target_artifact_id,
+                "compilerVersion": event.compiler_version,
                 "sourceSegmentCount": event.source_segment_count,
                 "status": event.status,
                 "reasonCodes": list(event.reason_codes),
                 "resources": {
                     "inputTokens": resources.input_tokens,
                     "outputTokens": resources.output_tokens,
+                    "cacheReadTokens": resources.cache_read_tokens,
+                    "cacheWriteTokens": resources.cache_write_tokens,
+                    "reasoningTokens": resources.reasoning_tokens,
                     "modelRequests": resources.model_requests,
+                    "retryCount": resources.retry_count,
                     "durationMs": resources.duration_ms,
                     "storageBytes": resources.storage_bytes,
                 },
@@ -161,6 +177,87 @@ class LifecycleLedgerObserver:
             ),
             encoding="utf-8",
         )
+
+
+class MemoryLedgerObserver:
+    """Convert content-free memory runtime events to the experiment ledger schema."""
+
+    def __init__(
+        self,
+        *,
+        run_id: str,
+        variant: str,
+        trace_id: str,
+        episode_id: str,
+        session_id: str,
+        task_id: str,
+        family_id: str | None = None,
+        stage: str | None = None,
+        snapshot_id: str | None = None,
+    ) -> None:
+        required = (run_id, variant, trace_id, episode_id, session_id, task_id)
+        if any(not value.strip() for value in required):
+            raise ValueError("memory ledger identity fields must not be empty")
+        self.run_id = run_id
+        self.variant = variant
+        self.trace_id = trace_id
+        self.episode_id = episode_id
+        self.session_id = session_id
+        self.task_id = task_id
+        self.family_id = family_id
+        self.stage = stage
+        self.snapshot_id = snapshot_id
+        self._events: list[dict[str, Any]] = []
+        self._occurrences: dict[str, int] = {}
+
+    @property
+    def events(self) -> tuple[dict[str, Any], ...]:
+        return tuple(self._events)
+
+    def record(self, event: MemoryEvent) -> None:
+        attributes = dict(event.attributes)
+        logical_identity = {
+            "runId": self.run_id,
+            "variant": self.variant,
+            "traceId": self.trace_id,
+            "snapshotId": self.snapshot_id,
+            "kind": event.kind.value,
+            "memoryKind": event.memory_kind.value,
+            "backend": event.backend,
+            "artifactIds": event.artifact_ids,
+            "queryChars": event.query_chars,
+            "contentChars": event.content_chars,
+            "reasonCode": event.reason_code,
+            "attributes": attributes,
+        }
+        logical_key = _json_hash(logical_identity)
+        occurrence = self._occurrences.get(logical_key, 0)
+        self._occurrences[logical_key] = occurrence + 1
+        event_id = f"evt_{_json_hash({**logical_identity, 'occurrence': occurrence})}"
+        self._events.append({
+            "schemaVersion": SCHEMA_VERSION,
+            "eventId": event_id,
+            "runId": self.run_id,
+            "variant": self.variant,
+            "traceId": self.trace_id,
+            "episodeId": self.episode_id,
+            "sessionId": self.session_id,
+            "taskId": self.task_id,
+            "familyId": self.family_id,
+            "stage": self.stage,
+            "snapshotId": self.snapshot_id,
+            "kind": event.kind.value,
+            "source": {"type": "rsimem_memory_runtime"},
+            "data": {
+                "memoryKind": event.memory_kind.value,
+                "backend": event.backend,
+                "artifactIds": list(event.artifact_ids),
+                "queryChars": event.query_chars,
+                "contentChars": event.content_chars,
+                "reasonCode": event.reason_code,
+                "attributes": attributes,
+            },
+        })
 
 
 def _relative(path: Path, root: Path) -> str:
@@ -402,6 +499,18 @@ def build_events(
     run_id = root.name
     record_ids = _RecordIdRegistry(run_id)
     trace_occurrences: dict[str, int] = {}
+    episode_identities: dict[str, dict[str, dict[str, Any]]] = {}
+    for variant, payload in comparison.items():
+        if not isinstance(payload, dict) or not isinstance(payload.get("episodes"), list):
+            continue
+        by_trace: dict[str, dict[str, Any]] = {}
+        for episode in payload["episodes"]:
+            if not isinstance(episode, dict):
+                continue
+            trace_id = str(episode.get("trace_id") or "")
+            if trace_id:
+                by_trace[trace_id] = episode
+        episode_identities[variant] = by_trace
     for variant in ("with_persistence", "without_persistence"):
         for episode in comparison.get(variant, {}).get("episodes", []):
             trace_id = str(episode.get("trace_id") or "")
@@ -532,6 +641,21 @@ def build_events(
             raise ValueError("lifecycle event schema version does not match the ledger")
         if value.get("runId") != run_id:
             raise ValueError("lifecycle event runId does not match the comparison run")
+        variant = value.get("variant")
+        if not isinstance(variant, str) or variant not in episode_identities:
+            raise ValueError("lifecycle event variant does not match the comparison")
+        trace_id = value.get("traceId")
+        episode = episode_identities[variant].get(str(trace_id))
+        if episode is None:
+            raise ValueError("lifecycle event traceId does not match the comparison variant")
+        expected_identity = {
+            "taskId": episode.get("task_id"),
+            "familyId": episode.get("family_id"),
+            "stage": episode.get("stage"),
+        }
+        for field, expected in expected_identity.items():
+            if value.get(field) != expected:
+                raise ValueError(f"lifecycle event {field} does not match its episode")
         event_id = value.get("eventId")
         if not isinstance(event_id, str) or not event_id:
             raise ValueError("lifecycle event requires eventId")
