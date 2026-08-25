@@ -29,9 +29,18 @@ class JsonLlmContextEvaluator:
     a future writeback coordinator can act on the result.
     """
 
-    def __init__(self, complete: Callable[[str], str], *, name: str = "llm-context-evaluator") -> None:
+    def __init__(
+        self,
+        complete: Callable[[str], str],
+        *,
+        name: str = "llm-context-evaluator",
+        compiler_version: str = "uncompiled-v0",
+    ) -> None:
+        if not compiler_version.strip():
+            raise ValueError("compiler_version must not be empty")
         self._complete = complete
         self._name = name
+        self._compiler_version = compiler_version
 
     @property
     def name(self) -> str:
@@ -81,6 +90,8 @@ class JsonLlmContextEvaluator:
                 reusable_facts=tuple(item.get("reusable_facts", ())),
                 reusable_procedures=tuple(item.get("reusable_procedures", ())),
                 update_hints=tuple(item.get("update_hints", ())),
+                update_mode=item.get("update_mode"),
+                compiler_version=self._compiler_version,
             ))
         if seen != expected:
             missing = ", ".join(sorted(expected - seen))
@@ -123,6 +134,7 @@ class JsonLlmContextEvaluator:
                     "reusable_facts": ["candidate fact"],
                     "reusable_procedures": ["candidate procedure"],
                     "update_hints": ["candidate update hint"],
+                    "update_mode": "machine_readable_mode|null",
                 }
             ],
             "policy_version": "string",

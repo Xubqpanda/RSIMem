@@ -239,7 +239,7 @@ def snapshot_to_evaluation_request(
         trigger=trigger,
         turn_index=turn_index,
         context_revision=snapshot.context_revision,
-        active_segment_ids=tuple(snapshot.protected_segment_ids),
+        active_segment_ids=tuple(sorted(snapshot.protected_segment_ids)),
         context_tokens=snapshot.total_token_count,
         segments=tuple(
             ContextSegment(

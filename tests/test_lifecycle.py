@@ -15,8 +15,15 @@ from rsimem.lifecycle import (
     EvaluationTrigger,
     JsonLlmContextEvaluator,
     LifecycleController,
+    AllowlistedUpdateTargetResolver,
+    UpdateTarget,
+    WritebackCoordinator,
+    WritebackPlanValidator,
     WritebackAction,
+    run_sm01_preference_fixture,
+    snapshot_to_evaluation_request,
 )
+from rsimem.memory import MemoryKind
 
 
 def _request(trigger: EvaluationTrigger = EvaluationTrigger.TASK_COMPLETED) -> ContextEvaluationRequest:
@@ -128,3 +135,95 @@ def test_json_llm_evaluator_rejects_missing_segment() -> None:
     evaluator = JsonLlmContextEvaluator(lambda _: '{"signals": []}')
     with pytest.raises(ValueError, match="omitted segment IDs"):
         evaluator.evaluate(_request())
+
+
+def test_llm_update_requires_trusted_target_resolution() -> None:
+    fixture = run_sm01_preference_fixture()
+    request = snapshot_to_evaluation_request(
+        fixture.snapshot,
+        evaluation_id="llm-update",
+    )
+    preference_id = fixture.snapshot.segments[0].segment_id
+    payload = {
+        "policy_version": "llm-update-v1",
+        "signals": [
+            {
+                "segment_id": segment.segment_id,
+                "context_action": "evict" if segment.segment_id == preference_id else "retain",
+                "writeback_action": "update" if segment.segment_id == preference_id else "defer",
+                "memory_kind": "semantic" if segment.segment_id == preference_id else None,
+                "utility_estimate": 0.9,
+                "confidence": 0.8,
+                "completion_status": "completed",
+                "completion_evidence": ["model_predicted_complete"],
+                "scope": "user",
+                "temporal_validity": "durable",
+                "reusable_facts": ["candidate preference"],
+                "reusable_procedures": ["candidate formatting procedure"],
+                "update_hints": (
+                    ["replace_preference", "preserve_columns"]
+                    if segment.segment_id == preference_id
+                    else []
+                ),
+                "update_mode": (
+                    "replace" if segment.segment_id == preference_id else None
+                ),
+                "compiler_version": (
+                    "compiler-v4"
+                    if segment.segment_id == preference_id
+                    else "uncompiled-v0"
+                ),
+                "safe_to_evict": False,
+                "target_backend": "untrusted-backend",
+                "target_artifact_id": "untrusted-artifact",
+                "expected_memory_revision": "untrusted-revision",
+                "reason_codes": ["preference_update"],
+            }
+            for segment in request.segments
+        ],
+    }
+    evaluation = JsonLlmContextEvaluator(
+        lambda _: json.dumps(payload),
+        compiler_version="compiler-v4",
+    ).evaluate(request)
+    signal = evaluation.signals[0]
+    assert signal.target_backend is None
+    assert signal.target_artifact_id is None
+    assert signal.expected_memory_revision is None
+    assert signal.safe_to_evict is None
+    assert signal.compiler_version == "compiler-v4"
+
+    resolver = AllowlistedUpdateTargetResolver(
+        lambda snapshot, candidate: (
+            UpdateTarget(
+                backend="hermes-native-semantic",
+                artifact_id="trusted-artifact",
+                expected_revision="trusted-revision-3",
+                memory_kind=MemoryKind.SEMANTIC,
+            ),
+        ),
+        allowed_backends={
+            "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
+        },
+    )
+    coordinator = WritebackCoordinator(
+        target_resolver=resolver,
+        validator=WritebackPlanValidator(updatable_backends={
+            "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
+        }),
+    )
+    plan = coordinator.create_plans(fixture.snapshot, evaluation)[0]
+    assert plan.target_backend == "hermes-native-semantic"
+    assert plan.target_artifact_id == "trusted-artifact"
+    assert plan.expected_memory_revision == "trusted-revision-3"
+    assert plan.exit_evidence.safe_to_evict is True
+    assert plan.exit_evidence.completion_status.value == "completed"
+    assert plan.exit_evidence.completion_evidence == ("model_predicted_complete",)
+    assert plan.exit_evidence.reusable_facts == ("candidate preference",)
+    assert plan.exit_evidence.reusable_procedures == (
+        "candidate formatting procedure",
+    )
+    assert plan.exit_evidence.update_hints == (
+        "replace_preference",
+        "preserve_columns",
+    )

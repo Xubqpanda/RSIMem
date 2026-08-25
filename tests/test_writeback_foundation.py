@@ -5,6 +5,7 @@ from dataclasses import replace
 import pytest
 
 from rsimem.lifecycle import (
+    AllowlistedUpdateTargetResolver,
     ContextAction,
     ContextEvaluation,
     DeterministicPreferenceEvaluator,
@@ -17,6 +18,7 @@ from rsimem.lifecycle import (
     RawResourceUsage,
     SegmentKind,
     TaskLifecycleState,
+    UpdateTarget,
     WritebackAction,
     WritebackCoordinator,
     WritebackPlanValidator,
@@ -153,20 +155,19 @@ def test_incomplete_evaluation_creates_no_plan() -> None:
 
 
 def _update_evaluation(
-    target_artifact_id: str,
     *,
-    expected_revision: str = "memory-revision-7",
     compiler_version: str = "deterministic-compiler-v2",
+    update_hints: tuple[str, ...] = ("replace_preference",),
 ) -> tuple[object, ContextEvaluation]:
     fixture = run_sm01_preference_fixture()
     preference = fixture.evaluation.signals[0]
     update = replace(
         preference,
         writeback_action=WritebackAction.UPDATE,
-        target_backend="hermes-native-semantic",
-        target_artifact_id=target_artifact_id,
-        expected_memory_revision=expected_revision,
-        update_hints=("replace_preference",),
+        target_backend=None,
+        target_artifact_id=None,
+        expected_memory_revision=None,
+        update_hints=update_hints,
         update_mode="replace",
         compiler_version=compiler_version,
     )
@@ -177,12 +178,32 @@ def _update_evaluation(
     )
 
 
+def _target_resolver(
+    artifact_id: str,
+    *,
+    expected_revision: str = "memory-revision-7",
+    backend: str = "hermes-native-semantic",
+) -> AllowlistedUpdateTargetResolver:
+    return AllowlistedUpdateTargetResolver(
+        lambda snapshot, signal: (
+            UpdateTarget(
+                backend=backend,
+                artifact_id=artifact_id,
+                expected_revision=expected_revision,
+                memory_kind=MemoryKind.SEMANTIC,
+            ),
+        ),
+        allowed_backends={backend: frozenset({MemoryKind.SEMANTIC})},
+    )
 def test_update_plan_requires_target_revision_and_backend_capability() -> None:
-    fixture, evaluation = _update_evaluation("artifact-a")
+    fixture, evaluation = _update_evaluation()
     validator = WritebackPlanValidator(updatable_backends={
         "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
     })
-    plan = WritebackCoordinator(validator=validator).create_plans(
+    plan = WritebackCoordinator(
+        validator=validator,
+        target_resolver=_target_resolver("artifact-a"),
+    ).create_plans(
         fixture.snapshot,
         evaluation,
     )[0]
@@ -191,6 +212,11 @@ def test_update_plan_requires_target_revision_and_backend_capability() -> None:
     assert plan.expected_memory_revision == "memory-revision-7"
     assert plan.update_mode == "replace"
     assert plan.compiler_version == "deterministic-compiler-v2"
+    assert plan.exit_evidence.safe_to_evict is True
+    assert plan.exit_evidence.update_hints == ("replace_preference",)
+    assert plan.exit_evidence.scope == evaluation.signals[0].scope
+    assert plan.exit_evidence.temporal_validity == evaluation.signals[0].temporal_validity
+    assert plan.exit_evidence.provenance[-1] == plan.source_segment_ids[0]
 
     rejected_events = []
 
@@ -198,7 +224,10 @@ def test_update_plan_requires_target_revision_and_backend_capability() -> None:
         def record(self, event):
             rejected_events.append(event)
 
-    assert WritebackCoordinator(observers=(Observer(),)).create_plans(
+    assert WritebackCoordinator(
+        target_resolver=_target_resolver("artifact-a"),
+        observers=(Observer(),),
+    ).create_plans(
         fixture.snapshot,
         evaluation,
     ) == ()
@@ -206,29 +235,43 @@ def test_update_plan_requires_target_revision_and_backend_capability() -> None:
 
 
 def test_update_idempotency_distinguishes_target_artifacts() -> None:
-    fixture, first_evaluation = _update_evaluation("artifact-a")
-    _, second_evaluation = _update_evaluation("artifact-b")
+    fixture, evaluation = _update_evaluation()
     validator = WritebackPlanValidator(updatable_backends={
         "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
     })
-    coordinator = WritebackCoordinator(validator=validator)
-    first = coordinator.create_plans(fixture.snapshot, first_evaluation)[0]
-    second = coordinator.create_plans(fixture.snapshot, second_evaluation)[0]
+    def plan(
+        artifact_id: str,
+        *,
+        expected_revision: str = "memory-revision-7",
+        current_evaluation: ContextEvaluation = evaluation,
+    ):
+        return WritebackCoordinator(
+            validator=validator,
+            target_resolver=_target_resolver(
+                artifact_id,
+                expected_revision=expected_revision,
+            ),
+        ).create_plans(fixture.snapshot, current_evaluation)[0]
+
+    first = plan("artifact-a")
+    second = plan("artifact-b")
     assert first.idempotency_key != second.idempotency_key
 
-    _, revision_evaluation = _update_evaluation(
-        "artifact-a",
-        expected_revision="memory-revision-8",
-    )
-    revision_plan = coordinator.create_plans(fixture.snapshot, revision_evaluation)[0]
+    revision_plan = plan("artifact-a", expected_revision="memory-revision-8")
     assert first.idempotency_key != revision_plan.idempotency_key
 
     _, compiler_evaluation = _update_evaluation(
-        "artifact-a",
         compiler_version="deterministic-compiler-v3",
     )
-    compiler_plan = coordinator.create_plans(fixture.snapshot, compiler_evaluation)[0]
+    compiler_plan = plan("artifact-a", current_evaluation=compiler_evaluation)
     assert first.idempotency_key != compiler_plan.idempotency_key
+
+    _, hints_a = _update_evaluation(update_hints=("same_first", "second_a"))
+    _, hints_b = _update_evaluation(update_hints=("same_first", "second_b"))
+    assert plan("artifact-a", current_evaluation=hints_a).idempotency_key != plan(
+        "artifact-a",
+        current_evaluation=hints_b,
+    ).idempotency_key
 
 
 def test_add_and_discard_reject_existing_memory_targets() -> None:
@@ -265,7 +308,7 @@ def test_add_and_discard_reject_existing_memory_targets() -> None:
 def test_persistent_idempotency_receipt_survives_coordinator_restart(
     tmp_path,
 ) -> None:
-    fixture, evaluation = _update_evaluation("artifact-a")
+    fixture, evaluation = _update_evaluation()
     receipt_path = tmp_path / "idempotency-receipts.json"
 
     def coordinator() -> WritebackCoordinator:
@@ -273,6 +316,7 @@ def test_persistent_idempotency_receipt_survives_coordinator_restart(
             validator=WritebackPlanValidator(updatable_backends={
                 "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
             }),
+            target_resolver=_target_resolver("artifact-a"),
             receipt_store=JsonIdempotencyReceiptStore(receipt_path),
         )
 
@@ -286,6 +330,22 @@ def test_persistent_idempotency_receipt_survives_coordinator_restart(
     assert first.mutation_id == second.mutation_id
     serialized = receipt_path.read_text(encoding="utf-8")
     assert "Use TSV" not in serialized
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '{"idem_bad": "not-an-object"}',
+        '{"idem_bad": {"plan_id": "plan-only"}}',
+        '{"idem_bad": {"plan_id": 7, "mutation_id": "mutation"}}',
+    ],
+)
+def test_malformed_idempotency_receipt_fails_closed(tmp_path, payload: str) -> None:
+    receipt_path = tmp_path / "idempotency-receipts.json"
+    receipt_path.write_text(payload, encoding="utf-8")
+    store = JsonIdempotencyReceiptStore(receipt_path)
+    with pytest.raises(ValueError, match="malformed idempotency receipt"):
+        store.get("idem_bad")
 
 
 def test_lifecycle_usage_preserves_all_raw_request_buckets() -> None:
