@@ -160,7 +160,8 @@ class HermesSemanticBackend:
             if terms and score == 0:
                 continue
             candidates.append((score, self._artifact(namespace, index, content)))
-        candidates.sort(key=lambda item: (-item[0], item[1].artifact_id))
+        if terms:
+            candidates.sort(key=lambda item: (-item[0], item[1].artifact_id))
         return tuple(
             MemoryHit(artifact, rank=index, score=float(score), backend=self.descriptor.name)
             for index, (score, artifact) in enumerate(candidates[:query.limit], start=1)
@@ -324,6 +325,17 @@ class HermesEpisodicBackend:
             artifact = self._artifact(row)
             metadata = dict(artifact.metadata)
             metadata["snippet"] = row["snippet"]
+            with self._connect() as connection:
+                context_rows = connection.execute(
+                    """SELECT role, content FROM messages
+                       WHERE session_id = ? AND id >= ? - 1 AND id <= ? + 1
+                       ORDER BY id""",
+                    (row["session_id"], row["id"], row["id"]),
+                ).fetchall()
+            metadata["context"] = tuple(
+                (str(item["role"]), str(item["content"] or "")[:200])
+                for item in context_rows
+            )
             artifact = MemoryArtifact(
                 artifact_id=artifact.artifact_id,
                 kind=artifact.kind,
@@ -443,7 +455,13 @@ class HermesProceduralBackend:
             if terms and score == 0:
                 continue
             candidates.append((score, artifact))
-        candidates.sort(key=lambda item: (-item[0], item[1].artifact_id))
+        if terms:
+            candidates.sort(key=lambda item: (-item[0], item[1].artifact_id))
+        else:
+            candidates.sort(key=lambda item: (
+                "" if item[1].namespace == "default" else item[1].namespace,
+                item[1].title or "",
+            ))
         return tuple(
             MemoryHit(artifact, rank=index, score=float(score), backend=self.descriptor.name)
             for index, (score, artifact) in enumerate(candidates[:query.limit], start=1)
