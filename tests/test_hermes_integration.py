@@ -175,6 +175,11 @@ def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) ->
     event_count = len(first.events)
     first.record(fixture.events[-1])
     assert len(first.events) == event_count
+    with pytest.raises(ValueError, match="conflicting lifecycle ledger event"):
+        first.record(replace(
+            fixture.events[-1],
+            resources=RawResourceUsage(input_tokens=1, model_requests=1),
+        ))
 
     plan_only = LifecycleLedgerObserver(
         variant="native+adapter+ledger",
