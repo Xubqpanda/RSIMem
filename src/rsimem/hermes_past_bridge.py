@@ -67,10 +67,18 @@ class _PromptMemoryStore:
 
 
 class _SessionDb:
-    def __init__(self, bridge: "HermesPastBenchBridge", native_db: object) -> None:
+    def __init__(
+        self,
+        bridge: "HermesPastBenchBridge",
+        native_db: object,
+        current_session_id: str | None,
+    ) -> None:
         self._bridge = bridge
         self._native = native_db
-        self._hits_by_session: dict[str, tuple[Any, ...]] = {}
+        self._current_session_id = current_session_id
+        self._hits_by_session: dict[str, dict[str, Any]] = {}
+        self._sessions: dict[str, dict[str, Any]] = {}
+        self._conversations: dict[str, tuple[dict[str, Any], ...]] = {}
         self._injected_sessions: set[str] = set()
 
     def __getattr__(self, name: str) -> Any:
@@ -80,6 +88,7 @@ class _SessionDb:
         self,
         *,
         query: str,
+        source_filter: list[str] | None = None,
         role_filter: list[str] | None = None,
         exclude_sources: list[str] | None = None,
         limit: int = 50,
@@ -87,6 +96,7 @@ class _SessionDb:
     ) -> list[dict[str, Any]]:
         native_call = lambda: self._native.search_messages(
             query=query,
+            source_filter=source_filter,
             role_filter=role_filter,
             exclude_sources=exclude_sources,
             limit=limit,
@@ -98,24 +108,23 @@ class _SessionDb:
             return results
 
         def adapter_read() -> list[dict[str, Any]]:
-            if offset:
-                return []
             hits = self._bridge.runtime.query(MemoryQuery(
                 MemoryKind.EPISODIC,
                 query,
                 limit=limit,
+                filters={
+                    "source_filter": source_filter,
+                    "role_filter": role_filter,
+                    "exclude_sources": exclude_sources,
+                    "offset": offset,
+                },
             ))
             results = []
             for hit in hits:
                 metadata = hit.artifact.metadata
                 role = str(metadata.get("role") or "")
                 source = str(metadata.get("source") or "")
-                if role_filter and role not in role_filter:
-                    continue
-                if exclude_sources and source in exclude_sources:
-                    continue
-                self._hits_by_session.setdefault(hit.artifact.namespace, tuple())
-                self._hits_by_session[hit.artifact.namespace] += (hit,)
+                self._cache_projection(hit)
                 results.append({
                     "id": metadata.get("message_id"),
                     "session_id": hit.artifact.namespace,
@@ -135,13 +144,63 @@ class _SessionDb:
 
         return self._bridge.adapter_call("session_search", adapter_read, native_call)
 
+    def _cache_projection(self, hit: Any) -> None:
+        lineage = hit.artifact.metadata.get("session_lineage")
+        if not isinstance(lineage, (list, tuple)) or not lineage:
+            raise ValueError("episodic hit requires a session_lineage projection")
+        projected_ids = []
+        for item in lineage:
+            if not isinstance(item, (list, tuple)) or len(item) != 3:
+                raise ValueError("invalid episodic session_lineage entry")
+            session_id, session, conversation = item
+            session_id = str(session_id or "")
+            if (
+                not session_id
+                or not isinstance(session, dict)
+                or not isinstance(conversation, (list, tuple))
+                or any(not isinstance(message, dict) for message in conversation)
+            ):
+                raise ValueError("invalid episodic session projection")
+            session_value = dict(session)
+            conversation_value = tuple(dict(message) for message in conversation)
+            if session_id in self._sessions and self._sessions[session_id] != session_value:
+                raise ValueError("conflicting episodic session projection")
+            if (
+                session_id in self._conversations
+                and self._conversations[session_id] != conversation_value
+            ):
+                raise ValueError("conflicting episodic conversation projection")
+            self._sessions[session_id] = session_value
+            self._conversations[session_id] = conversation_value
+            projected_ids.append(session_id)
+        if hit.artifact.namespace != projected_ids[0]:
+            raise ValueError("episodic hit namespace must start its session lineage")
+        for session_id in projected_ids:
+            self._hits_by_session.setdefault(session_id, {})[
+                hit.artifact.artifact_id
+            ] = hit
+
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
+        if not self._bridge.uses_adapter:
+            return self._native.get_session(session_id)
+        session = self._sessions.get(session_id)
+        if session is not None:
+            return dict(session)
+        if session_id == self._current_session_id:
+            return self._native.get_session(session_id)
+        raise KeyError(f"session is absent from episodic projection: {session_id}")
+
     def get_messages_as_conversation(self, session_id: str) -> list[dict[str, Any]]:
-        messages = self._native.get_messages_as_conversation(session_id)
-        hits = self._hits_by_session.get(session_id, ())
+        if not self._bridge.uses_adapter:
+            return self._native.get_messages_as_conversation(session_id)
+        messages = self._conversations.get(session_id)
+        if messages is None:
+            raise KeyError(f"conversation is absent from episodic projection: {session_id}")
+        hits = tuple(self._hits_by_session.get(session_id, {}).values())
         if hits and session_id not in self._injected_sessions:
             self._bridge.runtime.mark_injected(hits, surface="session_search")
             self._injected_sessions.add(session_id)
-        return messages
+        return [dict(message) for message in messages]
 
 
 class HermesPastBenchBridge:
@@ -196,7 +255,11 @@ class HermesPastBenchBridge:
             agent._memory_store = _PromptMemoryStore(self, memory_store)
         session_db = getattr(agent, "_session_db", None)
         if session_db is not None:
-            agent._session_db = _SessionDb(self, session_db)
+            agent._session_db = _SessionDb(
+                self,
+                session_db,
+                str(getattr(agent, "session_id", "") or "") or None,
+            )
         self._wrap_skill_handlers()
 
     def adapter_call(
