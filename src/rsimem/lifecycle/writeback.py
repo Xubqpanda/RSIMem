@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Mapping, Protocol, runtime_checkable
 
 from ..memory.contracts import MemoryKind
+from ..memory.runtime import MemoryBackendRegistry
 from .contracts import (
     CompletionStatus,
     ContextAction,
@@ -146,7 +147,6 @@ class ExitEvidence:
         if any(not value.strip() for values in sequences for value in values):
             raise ValueError("exit evidence values must not be empty")
 
-
 @dataclass(frozen=True, slots=True)
 class UpdateTarget:
     backend: str
@@ -173,14 +173,16 @@ class UpdateTargetResolver(Protocol):
 
 
 class AllowlistedUpdateTargetResolver:
-    """Bind an LLM update suggestion to one trusted backend search result."""
+    """Bind an update suggestion to an artifact owned by the selected backend."""
 
     def __init__(
         self,
-        search: Callable[[ContextSnapshot, EvaluationSignal], Iterable[UpdateTarget]],
+        registry: MemoryBackendRegistry,
+        search: Callable[[ContextSnapshot, EvaluationSignal], Iterable[str]],
         *,
         allowed_backends: Mapping[str, frozenset[MemoryKind]],
     ) -> None:
+        self.registry = registry
         self.search = search
         self.allowed_backends = {
             backend: frozenset(MemoryKind(kind) for kind in kinds)
@@ -192,16 +194,41 @@ class AllowlistedUpdateTargetResolver:
         snapshot: ContextSnapshot,
         signal: EvaluationSignal,
     ) -> UpdateTarget | None:
-        candidates = tuple(
-            candidate
-            for candidate in self.search(snapshot, signal)
-            if candidate.memory_kind == signal.memory_kind
-            and candidate.memory_kind in self.allowed_backends.get(
-                candidate.backend,
-                frozenset(),
-            )
-        )
-        return candidates[0] if len(candidates) == 1 else None
+        if signal.memory_kind is None:
+            return None
+        try:
+            backend = self.registry.resolve(signal.memory_kind)
+        except KeyError:
+            return None
+        descriptor = backend.descriptor
+        capability = descriptor.capability_for(signal.memory_kind)
+        if capability is None or not capability.updatable:
+            return None
+        if signal.memory_kind not in self.allowed_backends.get(
+            descriptor.name,
+            frozenset(),
+        ):
+            return None
+
+        artifact_ids = tuple(dict.fromkeys(self.search(snapshot, signal)))
+        resolved = []
+        for artifact_id in artifact_ids:
+            if not isinstance(artifact_id, str) or not artifact_id.strip():
+                continue
+            artifact = backend.get(artifact_id)
+            if artifact is None:
+                continue
+            if artifact.artifact_id != artifact_id or artifact.kind != signal.memory_kind:
+                continue
+            if artifact.revision is None or not artifact.revision.strip():
+                continue
+            resolved.append(UpdateTarget(
+                backend=descriptor.name,
+                artifact_id=artifact.artifact_id,
+                expected_revision=artifact.revision,
+                memory_kind=artifact.kind,
+            ))
+        return resolved[0] if len(resolved) == 1 else None
 
 
 @dataclass(frozen=True, slots=True)

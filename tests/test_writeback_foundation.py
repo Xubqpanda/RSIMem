@@ -18,14 +18,62 @@ from rsimem.lifecycle import (
     RawResourceUsage,
     SegmentKind,
     TaskLifecycleState,
-    UpdateTarget,
     WritebackAction,
     WritebackCoordinator,
     WritebackPlanValidator,
     run_sm01_preference_fixture,
     snapshot_to_evaluation_request,
 )
-from rsimem.memory import MemoryKind
+from rsimem.memory import (
+    MemoryAccessMode,
+    MemoryArtifact,
+    MemoryBackendDescriptor,
+    MemoryBackendRegistry,
+    MemoryKind,
+    MemoryKindCapability,
+    MemoryMutationResult,
+)
+
+
+class _UpdateBackend:
+    def __init__(
+        self,
+        name: str,
+        artifacts: tuple[MemoryArtifact, ...],
+        *,
+        updatable: bool = True,
+    ) -> None:
+        self.name = name
+        self.artifacts = {artifact.artifact_id: artifact for artifact in artifacts}
+        self.updatable = updatable
+
+    @property
+    def descriptor(self) -> MemoryBackendDescriptor:
+        return MemoryBackendDescriptor(
+            self.name,
+            (MemoryKindCapability(
+                MemoryKind.SEMANTIC,
+                MemoryAccessMode.SEARCH,
+                updatable=self.updatable,
+            ),),
+        )
+
+    def get(self, artifact_id: str) -> MemoryArtifact | None:
+        return self.artifacts.get(artifact_id)
+
+    def query(self, query):
+        return ()
+
+    def mutate(self, mutation) -> MemoryMutationResult:
+        return MemoryMutationResult(
+            True,
+            self.name,
+            mutation.action,
+            artifact_id=mutation.resolved_artifact_id,
+        )
+
+    def close(self) -> None:
+        return None
 
 
 def test_sm01_replay_has_stable_identity_and_content_free_events() -> None:
@@ -183,18 +231,34 @@ def _target_resolver(
     *,
     expected_revision: str = "memory-revision-7",
     backend: str = "hermes-native-semantic",
+    candidates: tuple[str, ...] | None = None,
+    artifacts: tuple[MemoryArtifact, ...] | None = None,
+    updatable: bool = True,
+    allowed_backends: dict[str, frozenset[MemoryKind]] | None = None,
 ) -> AllowlistedUpdateTargetResolver:
+    stored_artifacts = artifacts or (MemoryArtifact(
+        artifact_id=artifact_id,
+        kind=MemoryKind.SEMANTIC,
+        content="Stored preference.",
+        revision=expected_revision,
+    ),)
+    registry = MemoryBackendRegistry()
+    registry.register(_UpdateBackend(
+        backend,
+        stored_artifacts,
+        updatable=updatable,
+    ))
     return AllowlistedUpdateTargetResolver(
-        lambda snapshot, signal: (
-            UpdateTarget(
-                backend=backend,
-                artifact_id=artifact_id,
-                expected_revision=expected_revision,
-                memory_kind=MemoryKind.SEMANTIC,
-            ),
+        registry,
+        lambda snapshot, signal: candidates or (artifact_id,),
+        allowed_backends=(
+            {backend: frozenset({MemoryKind.SEMANTIC})}
+            if allowed_backends is None
+            else allowed_backends
         ),
-        allowed_backends={backend: frozenset({MemoryKind.SEMANTIC})},
     )
+
+
 def test_update_plan_requires_target_revision_and_backend_capability() -> None:
     fixture, evaluation = _update_evaluation()
     validator = WritebackPlanValidator(updatable_backends={
@@ -232,6 +296,73 @@ def test_update_plan_requires_target_revision_and_backend_capability() -> None:
         evaluation,
     ) == ()
     assert rejected_events[-1].reason_codes == ("backend_update_not_supported",)
+
+
+@pytest.mark.parametrize(
+    ("resolver", "reason"),
+    [
+        (
+            _target_resolver(
+                "artifact-a",
+                candidates=("made-up-artifact",),
+            ),
+            "fabricated artifact",
+        ),
+        (
+            _target_resolver(
+                "artifact-a",
+                artifacts=(MemoryArtifact(
+                    "artifact-a",
+                    MemoryKind.SEMANTIC,
+                    "Stored preference.",
+                ),),
+            ),
+            "revisionless artifact",
+        ),
+        (
+            _target_resolver("artifact-a", updatable=False),
+            "read-only backend",
+        ),
+        (
+            _target_resolver("artifact-a", allowed_backends={}),
+            "backend outside allowlist",
+        ),
+        (
+            _target_resolver(
+                "artifact-a",
+                candidates=("artifact-a", "artifact-b"),
+                artifacts=(
+                    MemoryArtifact(
+                        "artifact-a",
+                        MemoryKind.SEMANTIC,
+                        "Stored preference A.",
+                        revision="revision-a",
+                    ),
+                    MemoryArtifact(
+                        "artifact-b",
+                        MemoryKind.SEMANTIC,
+                        "Stored preference B.",
+                        revision="revision-b",
+                    ),
+                ),
+            ),
+            "ambiguous artifacts",
+        ),
+    ],
+)
+def test_update_target_resolver_rejects_untrusted_candidates(
+    resolver: AllowlistedUpdateTargetResolver,
+    reason: str,
+) -> None:
+    fixture, evaluation = _update_evaluation()
+    coordinator = WritebackCoordinator(
+        validator=WritebackPlanValidator(updatable_backends={
+            "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
+        }),
+        target_resolver=resolver,
+    )
+
+    assert coordinator.create_plans(fixture.snapshot, evaluation) == (), reason
 
 
 def test_update_idempotency_distinguishes_target_artifacts() -> None:

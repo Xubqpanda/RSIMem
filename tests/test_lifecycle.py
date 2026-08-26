@@ -16,14 +16,51 @@ from rsimem.lifecycle import (
     JsonLlmContextEvaluator,
     LifecycleController,
     AllowlistedUpdateTargetResolver,
-    UpdateTarget,
     WritebackCoordinator,
     WritebackPlanValidator,
     WritebackAction,
     run_sm01_preference_fixture,
     snapshot_to_evaluation_request,
 )
-from rsimem.memory import MemoryKind
+from rsimem.memory import (
+    MemoryAccessMode,
+    MemoryArtifact,
+    MemoryBackendDescriptor,
+    MemoryBackendRegistry,
+    MemoryKind,
+    MemoryKindCapability,
+)
+
+
+class _TrustedSemanticBackend:
+    artifact = MemoryArtifact(
+        "trusted-artifact",
+        MemoryKind.SEMANTIC,
+        "Stored preference.",
+        revision="trusted-revision-3",
+    )
+
+    @property
+    def descriptor(self) -> MemoryBackendDescriptor:
+        return MemoryBackendDescriptor(
+            "hermes-native-semantic",
+            (MemoryKindCapability(
+                MemoryKind.SEMANTIC,
+                MemoryAccessMode.SEARCH,
+            ),),
+        )
+
+    def get(self, artifact_id: str) -> MemoryArtifact | None:
+        return self.artifact if artifact_id == self.artifact.artifact_id else None
+
+    def query(self, query):
+        return ()
+
+    def mutate(self, mutation):
+        raise AssertionError("resolver tests must not mutate memory")
+
+    def close(self) -> None:
+        return None
 
 
 def _request(trigger: EvaluationTrigger = EvaluationTrigger.TASK_COMPLETED) -> ContextEvaluationRequest:
@@ -193,15 +230,11 @@ def test_llm_update_requires_trusted_target_resolution() -> None:
     assert signal.safe_to_evict is None
     assert signal.compiler_version == "compiler-v4"
 
+    registry = MemoryBackendRegistry()
+    registry.register(_TrustedSemanticBackend())
     resolver = AllowlistedUpdateTargetResolver(
-        lambda snapshot, candidate: (
-            UpdateTarget(
-                backend="hermes-native-semantic",
-                artifact_id="trusted-artifact",
-                expected_revision="trusted-revision-3",
-                memory_kind=MemoryKind.SEMANTIC,
-            ),
-        ),
+        registry,
+        lambda snapshot, candidate: ("trusted-artifact",),
         allowed_backends={
             "hermes-native-semantic": frozenset({MemoryKind.SEMANTIC}),
         },
