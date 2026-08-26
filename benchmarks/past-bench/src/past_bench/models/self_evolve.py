@@ -455,6 +455,7 @@ class HermesPersistenceConfig(BaseModel):
         "fail_closed",
         "bypass_native",
     ] = "fail_closed"
+    rsimem_verify_native_projection: bool = False
 
 
 class SelfEvolveTaskRef(BaseModel):
