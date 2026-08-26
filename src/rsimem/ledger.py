@@ -45,6 +45,7 @@ _MEMORY_RUNTIME_DATA_FIELDS = {
 _MEMORY_RUNTIME_ATTRIBUTE_FIELDS = {
     "action",
     "count",
+    "equivalent",
     "failure_type",
     "limit",
     "namespace",
@@ -89,6 +90,14 @@ def _validate_memory_runtime_event(value: dict[str, Any], source_path: Path) -> 
         _MEMORY_RUNTIME_ATTRIBUTE_FIELDS
     ):
         raise ValueError(f"invalid RSIMem runtime event attributes in {source_path}")
+    if "equivalent" in attributes and not isinstance(attributes["equivalent"], bool):
+        raise ValueError(f"invalid RSIMem projection result in {source_path}")
+    if value.get("kind") == "projection_check" and (
+        not isinstance(attributes.get("surface"), str)
+        or not attributes["surface"]
+        or not isinstance(attributes.get("equivalent"), bool)
+    ):
+        raise ValueError(f"incomplete RSIMem projection check in {source_path}")
     if data.get("executionMode") not in _RSIMEM_EXECUTION_MODES:
         raise ValueError(f"invalid RSIMem execution mode in {source_path}")
 

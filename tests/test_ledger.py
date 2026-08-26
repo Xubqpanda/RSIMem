@@ -191,6 +191,43 @@ def test_auto_loads_content_free_episode_runtime_evidence(tmp_path: Path) -> Non
     assert MEMORY not in json.dumps(events)
 
 
+def test_auto_loads_strict_projection_check_evidence(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    observer = MemoryLedgerObserver(
+        run_id=comparison.parent.name,
+        variant="with_persistence",
+        trace_id="trace-1",
+        episode_id="learn",
+        session_id="session-1",
+        task_id="task-1",
+        family_id="family-1",
+        stage="learn",
+        execution_mode="native+adapter+ledger",
+    )
+    observer.record(MemoryEvent(
+        MemoryEventKind.PROJECTION_CHECK,
+        MemoryKind.SEMANTIC,
+        "hermes-native-semantic",
+        content_chars=12,
+        attributes={"surface": "system_prompt", "equivalent": True},
+    ))
+    event = json.loads(json.dumps(observer.events[0]))
+    _runtime_evidence_path(comparison).write_text(
+        json.dumps(event) + "\n",
+        encoding="utf-8",
+    )
+
+    assert load_episode_lifecycle_events(comparison) == (event,)
+
+    event["data"]["attributes"]["equivalent"] = "false"
+    _runtime_evidence_path(comparison).write_text(
+        json.dumps(event) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="projection result"):
+        load_episode_lifecycle_events(comparison)
+
+
 def test_run_anchored_relative_paths_are_cwd_independent(tmp_path: Path) -> None:
     comparison = _fixture(tmp_path)
     runtime_event = _write_runtime_evidence(comparison)
