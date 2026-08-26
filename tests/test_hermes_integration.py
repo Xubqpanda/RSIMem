@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -125,16 +126,22 @@ def test_native_ledger_and_adapter_views_are_equivalent(tmp_path: Path) -> None:
     assert "requested task table" not in serialized
 
 
-def test_real_hermes_system_prompt_is_equivalent_across_variants(
+def test_real_hermes_execution_surfaces_are_equivalent_across_variants(
     tmp_path: Path,
 ) -> None:
-    from tools import memory_tool
+    from tools import memory_tool, skills_tool
 
     home = _hermes_home(tmp_path)
     original_memory_dir = memory_tool.MEMORY_DIR
+    original_skills_dir = skills_tool.SKILLS_DIR
+    original_hermes_home = os.environ.get("HERMES_HOME")
     report = run_hermes_execution_equivalence_variants(
         home,
-        HermesEquivalenceProbe(episodic_query="task table"),
+        HermesEquivalenceProbe(
+            episodic_query="task table",
+            procedural_skill_name="task-table",
+            procedural_resource_path="references/columns.md",
+        ),
     )
 
     assert report.equivalent is True
@@ -149,14 +156,18 @@ def test_real_hermes_system_prompt_is_equivalent_across_variants(
         for variant in report.variants
         for check in variant.checks
     )
-    assert [variant.memory_event_count for variant in report.variants] == [0, 9, 9]
-    assert [variant.ledger_event_count for variant in report.variants] == [0, 9, 9]
+    assert [variant.memory_event_count for variant in report.variants] == [0, 15, 15]
+    assert [variant.ledger_event_count for variant in report.variants] == [0, 15, 15]
     assert report.variants[1].memory_event_kinds == report.variants[2].memory_event_kinds
     serialized = json.dumps(asdict(report), default=str)
     assert PRIVATE_PREFERENCE not in serialized
     assert "concise status updates" not in serialized
     assert "requested task table" not in serialized
+    assert "Use the requested columns" not in serialized
+    assert "owner, priority, task, due_date" not in serialized
     assert memory_tool.MEMORY_DIR == original_memory_dir
+    assert skills_tool.SKILLS_DIR == original_skills_dir
+    assert os.environ.get("HERMES_HOME") == original_hermes_home
 
 
 def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) -> None:

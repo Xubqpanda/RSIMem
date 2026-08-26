@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import os
 import sqlite3
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
@@ -92,12 +94,24 @@ def build_configured_hermes_runtime(
 class HermesEquivalenceProbe:
     episodic_query: str
     episodic_limit: int = 5
+    procedural_skill_name: str | None = None
+    procedural_resource_path: str | None = None
 
     def __post_init__(self) -> None:
         if not self.episodic_query.strip():
             raise ValueError("equivalence probe requires an episodic query")
         if self.episodic_limit < 1:
             raise ValueError("episodic_limit must be positive")
+        if (
+            self.procedural_skill_name is not None
+            and not self.procedural_skill_name.strip()
+        ):
+            raise ValueError("procedural_skill_name must be non-empty when present")
+        if (
+            self.procedural_resource_path is not None
+            and not self.procedural_resource_path.strip()
+        ):
+            raise ValueError("procedural_resource_path must be non-empty when present")
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +185,8 @@ class HermesEquivalenceReport:
 class HermesExecutionSurface(StrEnum):
     SYSTEM_PROMPT = "system_prompt"
     SESSION_SEARCH = "session_search"
+    SKILLS_LIST = "skills_list"
+    SKILL_VIEW = "skill_view"
 
 
 @dataclass(frozen=True, slots=True)
@@ -811,6 +827,209 @@ def _capture_adapter_session_search(
         runtime.close()
 
 
+@contextmanager
+def _bound_hermes_skills_dir(skills_dir: Path):
+    """Bind Hermes' import-time skill globals to an isolated directory."""
+
+    from tools import skills_tool
+
+    with _HERMES_NATIVE_BINDING_LOCK:
+        previous_home = skills_tool.HERMES_HOME
+        previous_skills = skills_tool.SKILLS_DIR
+        previous_env = os.environ.get("HERMES_HOME")
+        skills_tool.HERMES_HOME = skills_dir.parent
+        skills_tool.SKILLS_DIR = skills_dir
+        os.environ["HERMES_HOME"] = str(skills_dir.parent)
+        try:
+            yield
+        finally:
+            skills_tool.HERMES_HOME = previous_home
+            skills_tool.SKILLS_DIR = previous_skills
+            if previous_env is None:
+                os.environ.pop("HERMES_HOME", None)
+            else:
+                os.environ["HERMES_HOME"] = previous_env
+
+
+def _dispatch_real_skills(probe: HermesEquivalenceProbe) -> dict[HermesExecutionSurface, str]:
+    if probe.procedural_skill_name is None:
+        raise ValueError("execution equivalence requires procedural_skill_name")
+    from tools import skills_tool  # noqa: F401 - registers the real tools
+    from tools.registry import registry
+
+    skills_list_result = registry.dispatch("skills_list", {})
+    skill_view_result = registry.dispatch(
+        "skill_view",
+        {"name": probe.procedural_skill_name},
+    )
+    if probe.procedural_resource_path is not None:
+        resource_result = registry.dispatch(
+            "skill_view",
+            {
+                "name": probe.procedural_skill_name,
+                "file_path": probe.procedural_resource_path,
+            },
+        )
+        skill_view_result = f"{skill_view_result}\n{resource_result}"
+    return {
+        HermesExecutionSurface.SKILLS_LIST: skills_list_result,
+        HermesExecutionSurface.SKILL_VIEW: skill_view_result,
+    }
+
+
+def _record_native_skills(
+    home: Path,
+    probe: HermesEquivalenceProbe,
+    observer: MemoryObserver,
+) -> None:
+    skills = _native_procedural(home)
+    all_ids = tuple(
+        f"native-procedural:{index}" for index in range(len(skills))
+    )
+    observer.record(MemoryEvent(
+        MemoryEventKind.QUERY,
+        MemoryKind.PROCEDURAL,
+        "hermes-native-procedural",
+        query_chars=0,
+        attributes={"limit": 100, "namespace": "default"},
+    ))
+    observer.record(MemoryEvent(
+        MemoryEventKind.RETRIEVED,
+        MemoryKind.PROCEDURAL,
+        "hermes-native-procedural",
+        artifact_ids=all_ids,
+        content_chars=sum(len(skill.content) for skill in skills),
+        attributes={"count": len(skills)},
+    ))
+    if skills:
+        observer.record(MemoryEvent(
+            MemoryEventKind.INJECTED,
+            MemoryKind.PROCEDURAL,
+            "hermes-native-procedural",
+            artifact_ids=all_ids,
+            content_chars=sum(len(skill.content) for skill in skills),
+            attributes={"count": len(skills), "surface": "skills_list"},
+        ))
+
+    selected = tuple(
+        (index, skill)
+        for index, skill in enumerate(skills)
+        if skill.name == probe.procedural_skill_name
+    )
+    observer.record(MemoryEvent(
+        MemoryEventKind.QUERY,
+        MemoryKind.PROCEDURAL,
+        "hermes-native-procedural",
+        query_chars=len(probe.procedural_skill_name or ""),
+        attributes={"limit": 5, "namespace": "default"},
+    ))
+    observer.record(MemoryEvent(
+        MemoryEventKind.RETRIEVED,
+        MemoryKind.PROCEDURAL,
+        "hermes-native-procedural",
+        artifact_ids=tuple(f"native-procedural:{index}" for index, _ in selected),
+        content_chars=sum(len(skill.content) for _, skill in selected),
+        attributes={"count": len(selected)},
+    ))
+    if selected:
+        observer.record(MemoryEvent(
+            MemoryEventKind.INJECTED,
+            MemoryKind.PROCEDURAL,
+            "hermes-native-procedural",
+            artifact_ids=tuple(
+                f"native-procedural:{index}" for index, _ in selected
+            ),
+            content_chars=sum(len(skill.content) for _, skill in selected),
+            attributes={"count": len(selected), "surface": "skill_view"},
+        ))
+
+
+def _capture_native_skills(
+    home: Path,
+    probe: HermesEquivalenceProbe,
+    *,
+    observer: MemoryObserver | None = None,
+) -> dict[HermesExecutionSurface, str]:
+    with _bound_hermes_skills_dir(home / "skills"):
+        result = _dispatch_real_skills(probe)
+    if observer is not None:
+        _record_native_skills(home, probe, observer)
+    return result
+
+
+def _materialize_procedural_hits(skills_dir: Path, hits: Iterable[Any]) -> None:
+    for hit in hits:
+        relative = PurePosixPath(str(
+            hit.artifact.metadata.get("relative_path") or hit.artifact.title or ""
+        ))
+        if relative.is_absolute() or not relative.parts or ".." in relative.parts:
+            raise ValueError("procedural artifact has an unsafe relative path")
+        skill_dir = skills_dir.joinpath(*relative.parts)
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(
+            hit.artifact.content,
+            encoding="utf-8",
+        )
+        for resource in hit.artifact.resources:
+            resource_path = skill_dir.joinpath(*PurePosixPath(resource.path).parts)
+            resource_path.parent.mkdir(parents=True, exist_ok=True)
+            resource_path.write_bytes(resource.content)
+
+
+def _capture_adapter_skills(
+    home: Path,
+    probe: HermesEquivalenceProbe,
+    collector: _MemoryEventCollector,
+) -> dict[HermesExecutionSurface, str]:
+    if probe.procedural_skill_name is None:
+        raise ValueError("execution equivalence requires procedural_skill_name")
+    runtime = build_configured_hermes_runtime(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        observers=(collector,),
+    )
+    try:
+        list_hits = runtime.query(MemoryQuery(
+            MemoryKind.PROCEDURAL,
+            "",
+            limit=100,
+        ))
+        with TemporaryDirectory(prefix="rsimem-hermes-skills-") as directory:
+            skills_dir = Path(directory) / "skills"
+            _materialize_procedural_hits(skills_dir, list_hits)
+            with _bound_hermes_skills_dir(skills_dir):
+                from tools import skills_tool  # noqa: F401 - registers real tools
+                from tools.registry import registry
+
+                skills_list_result = registry.dispatch("skills_list", {})
+                runtime.mark_injected(list_hits, surface="skills_list")
+                view_hits = runtime.query(MemoryQuery(
+                    MemoryKind.PROCEDURAL,
+                    probe.procedural_skill_name,
+                    limit=5,
+                ))
+                skill_view_result = registry.dispatch(
+                    "skill_view",
+                    {"name": probe.procedural_skill_name},
+                )
+                if probe.procedural_resource_path is not None:
+                    resource_result = registry.dispatch(
+                        "skill_view",
+                        {
+                            "name": probe.procedural_skill_name,
+                            "file_path": probe.procedural_resource_path,
+                        },
+                    )
+                    skill_view_result = f"{skill_view_result}\n{resource_result}"
+                runtime.mark_injected(view_hits, surface="skill_view")
+        return {
+            HermesExecutionSurface.SKILLS_LIST: skills_list_result,
+            HermesExecutionSurface.SKILL_VIEW: skill_view_result,
+        }
+    finally:
+        runtime.close()
+
+
 def _capture_adapter(
     home: Path,
     probe: HermesEquivalenceProbe,
@@ -989,6 +1208,7 @@ def run_hermes_execution_equivalence_variants(
     baseline = {
         HermesExecutionSurface.SYSTEM_PROMPT: _capture_native_system_prompt(home),
         HermesExecutionSurface.SESSION_SEARCH: _capture_native_session_search(home, probe),
+        **_capture_native_skills(home, probe),
     }
     variants = []
     for mode in HermesExecutionMode:
@@ -1016,6 +1236,7 @@ def run_hermes_execution_equivalence_variants(
                 HermesExecutionSurface.SESSION_SEARCH: _capture_adapter_session_search(
                     home, probe, collector
                 ),
+                **_capture_adapter_skills(home, probe, collector),
             }
         elif mode == HermesExecutionMode.NATIVE_LEDGER:
             candidate = {
@@ -1025,6 +1246,7 @@ def run_hermes_execution_equivalence_variants(
                 HermesExecutionSurface.SESSION_SEARCH: _capture_native_session_search(
                     home, probe, observer=collector
                 ),
+                **_capture_native_skills(home, probe, observer=collector),
             }
         else:
             candidate = {
@@ -1032,6 +1254,7 @@ def run_hermes_execution_equivalence_variants(
                 HermesExecutionSurface.SESSION_SEARCH: _capture_native_session_search(
                     home, probe
                 ),
+                **_capture_native_skills(home, probe),
             }
         checks = tuple(
             HermesExecutionSurfaceCheck(
