@@ -13,7 +13,7 @@ from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from types import MappingProxyType
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
 from .ledger import MemoryLedgerObserver
 from .memory import (
@@ -42,15 +42,38 @@ class HermesExecutionMode(StrEnum):
     ADAPTER_LEDGER = "native+adapter+ledger"
 
 
+class HermesAdapterFailurePolicy(StrEnum):
+    FAIL_CLOSED = "fail_closed"
+    BYPASS_NATIVE = "bypass_native"
+
+
+class HermesExecutionRoute(StrEnum):
+    NATIVE = "native"
+    ADAPTER = "adapter"
+    NATIVE_BYPASS = "native_bypass"
+
+
+class HermesAdapterExecutionError(RuntimeError):
+    """Adapter execution failed under the explicit fail-closed policy."""
+
+
 @dataclass(frozen=True, slots=True)
 class HermesExperimentConfig:
     """Explicit experiment path. Direct native behavior is the default."""
 
     mode: HermesExecutionMode = HermesExecutionMode.NATIVE
     routes: Mapping[MemoryKind, str] = field(default_factory=lambda: dict(_NATIVE_ROUTES))
+    adapter_failure_policy: HermesAdapterFailurePolicy = (
+        HermesAdapterFailurePolicy.FAIL_CLOSED
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", HermesExecutionMode(self.mode))
+        object.__setattr__(
+            self,
+            "adapter_failure_policy",
+            HermesAdapterFailurePolicy(self.adapter_failure_policy),
+        )
         routes = {MemoryKind(kind): backend for kind, backend in self.routes.items()}
         if set(routes) != set(MemoryKind):
             raise ValueError("Hermes experiment config requires one route per memory kind")
@@ -195,6 +218,8 @@ class HermesExecutionSurfaceCheck:
     equivalent: bool
     native_content_chars: int
     candidate_content_chars: int
+    route: HermesExecutionRoute
+    adapter_failure: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1030,6 +1055,23 @@ def _capture_adapter_skills(
         runtime.close()
 
 
+def _execute_adapter_call(
+    config: HermesExperimentConfig,
+    operation: str,
+    adapter_call: Callable[[], Any],
+    native_call: Callable[[], Any],
+) -> tuple[Any, HermesExecutionRoute, str | None]:
+    try:
+        return adapter_call(), HermesExecutionRoute.ADAPTER, None
+    except Exception as exc:
+        failure_type = type(exc).__name__
+        if config.adapter_failure_policy == HermesAdapterFailurePolicy.BYPASS_NATIVE:
+            return native_call(), HermesExecutionRoute.NATIVE_BYPASS, failure_type
+        raise HermesAdapterExecutionError(
+            f"Hermes adapter operation failed closed: {operation} ({failure_type})"
+        ) from exc
+
+
 def _capture_adapter(
     home: Path,
     probe: HermesEquivalenceProbe,
@@ -1201,6 +1243,10 @@ def run_hermes_equivalence_variants(
 def run_hermes_execution_equivalence_variants(
     hermes_home: Path,
     probe: HermesEquivalenceProbe,
+    *,
+    adapter_failure_policy: HermesAdapterFailurePolicy = (
+        HermesAdapterFailurePolicy.FAIL_CLOSED
+    ),
 ) -> HermesExecutionEquivalenceReport:
     """Compare final model-visible output from real Hermes execution surfaces."""
 
@@ -1212,7 +1258,10 @@ def run_hermes_execution_equivalence_variants(
     }
     variants = []
     for mode in HermesExecutionMode:
-        config = HermesExperimentConfig(mode)
+        config = HermesExperimentConfig(
+            mode,
+            adapter_failure_policy=adapter_failure_policy,
+        )
         ledger = (
             MemoryLedgerObserver(
                 run_id="execution-surface-fixture",
@@ -1228,16 +1277,49 @@ def run_hermes_execution_equivalence_variants(
             else None
         )
         collector = _MemoryEventCollector(ledger)
+        routes = {
+            surface: HermesExecutionRoute.NATIVE for surface in HermesExecutionSurface
+        }
+        failures: dict[HermesExecutionSurface, str | None] = {
+            surface: None for surface in HermesExecutionSurface
+        }
         if mode == HermesExecutionMode.ADAPTER_LEDGER:
-            candidate = {
-                HermesExecutionSurface.SYSTEM_PROMPT: _capture_adapter_system_prompt(
-                    home, collector
+            candidate = {}
+            prompt, route, failure = _execute_adapter_call(
+                config,
+                HermesExecutionSurface.SYSTEM_PROMPT.value,
+                lambda: _capture_adapter_system_prompt(home, collector),
+                lambda: _capture_native_system_prompt(home, observer=collector),
+            )
+            candidate[HermesExecutionSurface.SYSTEM_PROMPT] = prompt
+            routes[HermesExecutionSurface.SYSTEM_PROMPT] = route
+            failures[HermesExecutionSurface.SYSTEM_PROMPT] = failure
+
+            session_search, route, failure = _execute_adapter_call(
+                config,
+                HermesExecutionSurface.SESSION_SEARCH.value,
+                lambda: _capture_adapter_session_search(home, probe, collector),
+                lambda: _capture_native_session_search(
+                    home, probe, observer=collector
                 ),
-                HermesExecutionSurface.SESSION_SEARCH: _capture_adapter_session_search(
-                    home, probe, collector
-                ),
-                **_capture_adapter_skills(home, probe, collector),
-            }
+            )
+            candidate[HermesExecutionSurface.SESSION_SEARCH] = session_search
+            routes[HermesExecutionSurface.SESSION_SEARCH] = route
+            failures[HermesExecutionSurface.SESSION_SEARCH] = failure
+
+            skills, route, failure = _execute_adapter_call(
+                config,
+                "skills_list+skill_view",
+                lambda: _capture_adapter_skills(home, probe, collector),
+                lambda: _capture_native_skills(home, probe, observer=collector),
+            )
+            candidate.update(skills)
+            for surface in (
+                HermesExecutionSurface.SKILLS_LIST,
+                HermesExecutionSurface.SKILL_VIEW,
+            ):
+                routes[surface] = route
+                failures[surface] = failure
         elif mode == HermesExecutionMode.NATIVE_LEDGER:
             candidate = {
                 HermesExecutionSurface.SYSTEM_PROMPT: _capture_native_system_prompt(
@@ -1262,6 +1344,8 @@ def run_hermes_execution_equivalence_variants(
                 equivalent=baseline[surface] == candidate[surface],
                 native_content_chars=len(baseline[surface]),
                 candidate_content_chars=len(candidate[surface]),
+                route=routes[surface],
+                adapter_failure=failures[surface],
             )
             for surface in HermesExecutionSurface
         )
