@@ -30,6 +30,20 @@ After a successful paired run, the launcher derives `ledger.jsonl` from PAST-Ben
 
 The launcher then runs `rsimem-audit` and writes `audit.json`. The audit fails the run when request events do not reconcile with `TraceEnd`, billing identities cannot be deduplicated, usage is incomplete, or the ledger contains memory text, absolute source paths, or credential-shaped values. Existing runs can be checked independently with `rsimem-audit outputs/smoke/<run>`.
 
+The opt-in matched launcher runs the same SM01 family under `native`,
+`native+ledger`, and `native+adapter+ledger`, preserving the paired persistence
+control and raw resource evidence for every run:
+
+```bash
+export GPT_LUNA_API_KEY=...
+./scripts/run_luna_rsimem_matched.sh
+```
+
+It defaults to one independent replicate. Set `RSIMEM_REPLICATES=3` only when
+the corresponding model cost is intended. The current runtime does not expose
+a provider seed, which is recorded explicitly in `batch_manifest.json`; these
+runs must not be described as deterministic seeded executions.
+
 ## Verification
 
 Run the RSIMem checks from the repository root:
