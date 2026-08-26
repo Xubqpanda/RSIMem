@@ -9,6 +9,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from .ledger import resolve_comparison_evidence_path
+
 
 _SECRET_PATTERNS = {
     "openai_style": re.compile(r"sk-[A-Za-z0-9_-]{20,}"),
@@ -34,13 +36,6 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
         if isinstance(value, dict):
             events.append(value)
     return events
-
-
-def _trace_path(raw_path: Any, run_dir: Path) -> Path:
-    path = Path(str(raw_path))
-    if path.is_absolute():
-        return path
-    return run_dir / path
 
 
 def _call_sum(calls: list[dict[str, Any]], field: str) -> int | None:
@@ -71,7 +66,10 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         for episode in episodes:
             trace_id = str(episode.get("trace_id") or "")
             if trace_id:
-                trace_paths.setdefault(trace_id, _trace_path(episode.get("trace"), run_dir))
+                trace_paths.setdefault(
+                    trace_id,
+                    resolve_comparison_evidence_path(episode.get("trace"), run_dir),
+                )
             memory_entries.extend(
                 entry for entry in episode.get("artifacts", {}).get("memory_entries", [])
                 if isinstance(entry, str) and entry

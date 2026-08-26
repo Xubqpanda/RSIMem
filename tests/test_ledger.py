@@ -191,6 +191,32 @@ def test_auto_loads_content_free_episode_runtime_evidence(tmp_path: Path) -> Non
     assert MEMORY not in json.dumps(events)
 
 
+def test_run_anchored_relative_paths_are_cwd_independent(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    runtime_event = _write_runtime_evidence(comparison)
+    data = json.loads(comparison.read_text(encoding="utf-8"))
+    run = comparison.parent
+    episode = data["with_persistence"]["episodes"][0]
+    trace = Path(episode["trace"])
+    session = Path(episode["internal_tools"]["session_file"])
+    prefix = Path("..") / ".." / "outputs" / run.name
+    episode["trace"] = str(prefix / trace.relative_to(run))
+    episode["internal_tools"]["session_file"] = str(
+        prefix / session.relative_to(run)
+    )
+    comparison.write_text(json.dumps(data), encoding="utf-8")
+
+    events = build_events(comparison)
+    report_path = run / "ledger.jsonl"
+    write_ledger(comparison, report_path)
+    report = audit_run(run)
+
+    assert runtime_event in events
+    assert any(event["kind"] == "model_call_usage" for event in events)
+    assert any(event["kind"] == "memory_injection" for event in events)
+    assert report["ok"] is True
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     (
