@@ -23,7 +23,7 @@ Lifecycle policy
 Writeback coordinator
     |
     v
-Memory compiler
+Semantic ingestor
     |
     v
 Memory runtime and selected backend
@@ -37,10 +37,10 @@ Each layer has one responsibility:
 - **Host adapter** reads native messages, task boundaries, tool state, active-turn state, and token accounting from Hermes or a future host.
 - **Context snapshot collector** converts native messages into stable `ContextSegment` values with session, task, revision, completion, and tool-closure metadata.
 - **Evaluation scheduler** decides when evaluation is allowed. It does not know whether the evaluator is an LLM or a local model.
-- **Context evaluator** estimates completion, future reuse, freshness, unresolved state, and a suggested memory form from a snapshot.
-- **Lifecycle policy** converts the assessment and lifecycle cost model into a joint context and memory decision.
+- **Context evaluator** estimates completion, future reuse, freshness, and unresolved state from a snapshot.
+- **Lifecycle policy** supplies evidence to a fixed Hermes memory route; phase two does not learn route selection or invocation timing.
 - **Writeback coordinator** turns an accepted decision into a validated, provenance-linked writeback plan.
-- **Memory compiler** distills an experience into semantic, episodic, or procedural mutations.
+- **Semantic ingestor** locally reimplements Mem0 flat extraction and internal operation selection over the fixed Hermes semantic route.
 - **Memory runtime and backend** validate and apply mutations while preserving each backend's native storage and retrieval behavior.
 - **Feedback collector** joins retrieval, injection, task, tool, retry, and cost evidence for later policy updates.
 
@@ -106,28 +106,31 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [ ] Run at least three order-rotated live-model replicates on the completed semantic, episodic, and procedural projection path.
 - [x] Keep the direct Hermes path unchanged as the control.
 
-### Stage 5: Validated Memory Writeback
+### Stage 5: Validated Semantic Memory Writeback
 
-- [ ] Invoke the compiler only after the lifecycle decision accepts a candidate.
-- [ ] Route semantic facts and preferences to semantic memory, situated task records to episodic memory, and reusable workflows to procedural memory.
-- [ ] Validate compiler output before backend mutation.
+- [ ] Invoke the semantic ingestor only at the frozen Hermes semantic boundary.
+- [ ] Keep all Hermes routing fixed and do not predict memory form; episodic/procedural policy implementation remains disabled.
+- [ ] Expose ingest/add externally and treat framework-internal ADD/UPDATE/DELETE/NONE as observable outcomes.
+- [ ] Validate every internal operation before backend mutation.
 - [ ] Persist memory before evicting the source context.
 - [ ] Add revision checks, idempotency, failure bypass, and rollback tests.
 - [ ] Add pending/committed receipt states and crash recovery around real backend mutations; dry-run reservation alone is not an exactly-once guarantee.
-- [ ] Account for compiler model calls, tokens, latency, storage bytes, and rejected mutations.
+- [ ] Account for ingestor model calls, tokens, latency, storage bytes, and rejected mutations.
+- [ ] Record content-free atomic operations for extraction, related-memory retrieval, internal decision, target resolution, validation, mutation, verification, future retrieval, injection, use, and outcome.
 
 ### Stage 6: Static RSIMem Evaluation
 
 - [ ] Run the fixed writeback policy on `SM01_preference_adoption` first.
 - [ ] Compare no persistence, native Hermes, and static RSIMem with matched task order, model, budget, and provider randomness controls when available.
-- [ ] Report task score, persistence gap, memory retrieval, injected tokens, model calls, tool calls, retries, controller cost, compiler cost, storage cost, and wall time.
-- [ ] Expand to procedural and update families only after the first family is fully attributable.
+- [ ] Report task score, persistence gap, memory retrieval, injected tokens, model calls, tool calls, retries, controller cost, ingestor cost, storage cost, and wall time.
+- [ ] Expand to semantic-relevant update families only after the first family is fully attributable.
 
 ### Stage 7: Adaptive Policy
 
 - [ ] Collect delayed evidence for retrieval, injection, actual use, task outcome, tool behavior, retries, supersession, non-use, and lifecycle cost.
 - [ ] Estimate realized future utility without using hidden grader labels in the policy path.
-- [ ] Version the joint context-exit and memory-form policy.
+- [ ] Version semantic extraction/update/consolidation and retrieval policies while keeping route and cadence fixed.
+- [ ] Use attributed failure subgraphs to update the responsible operation policy instead of broadcasting every task failure to all prior memory operations.
 - [ ] Validate proposed policy versions on held-out episodes before activation.
 - [ ] Support rejection, rollback, and reproducible replay.
 
@@ -139,14 +142,14 @@ The writeback path must follow this order:
 snapshot
   -> evaluate
   -> validate
-  -> compile
+  -> ingest
   -> validate mutation
   -> persist memory
   -> confirm persistence
   -> evict context
 ```
 
-An evaluator or compiler failure must never cause the source context to be evicted. A backend mutation failure must leave the native context available for bypass or retry. Raw memory content may be present in evaluator and compiler inputs, but observer-facing ledger events must contain only IDs, actions, counts, sizes, and reason codes.
+An evaluator or ingestor failure must never cause the source context to be evicted. A backend mutation failure must leave the native context available for bypass or retry. Raw memory content may be present in evaluator and ingestor inputs, but observer-facing ledger events must contain only IDs, actions, counts, sizes, and reason codes.
 
 ## First End-To-End Acceptance Case
 

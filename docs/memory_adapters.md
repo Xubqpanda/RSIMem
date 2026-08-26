@@ -39,15 +39,17 @@ The adapters do not yet invoke Hermes' prompt-injection scanner or skill securit
 
 ## Backend And Compiler Roles
 
-A `MemoryBackend` stores, retrieves, updates, and deletes already-typed memory artifacts. Mem0, Graphiti, Letta, LangMem, and Hermes integrations belong behind this interface when they provide storage or retrieval.
+A `MemoryBackend` stores, retrieves, updates, and deletes already-typed memory artifacts. Hermes is the only backend in the current paper path. Mem0, LangMem, and similar projects may denote complete systems that combine construction policy with storage; in RSIMem, the Mem0 flat construction algorithm is separated from backend ownership and locally reimplemented as a semantic policy over Hermes storage.
 
 A `MemoryCompiler` converts a completed `MemoryExperience` into zero or more typed `MemoryMutation` values. Text2Skill and SkillCreator belong primarily at this layer because their main responsibility is transforming experience into procedural knowledge. A compiler may target any backend selected for the resulting memory kind.
 
+For the current PAST-Bench paper path, Hermes' native semantic, episodic, and procedural routes remain fixed, but only the semantic route receives a new policy implementation. The phase-two external contract is ingest/add rather than a model-selected mutation: the semantic policy may internally produce ADD, UPDATE, DELETE, or NONE, and RSIMem validates, applies, and accounts for that internal outcome. The first semantic policy locally reimplements Mem0's flat-memory construction algorithm from pinned MemBase source; MemBase itself is not imported at runtime. Episodic and procedural policy implementations remain deferred until their method-selection gates pass.
+
 This distinction supports controlled comparisons:
 
-- Hold the compiler fixed and replace the storage or retrieval backend.
-- Hold the backend fixed and compare memory distillation methods.
-- Let LightRSI choose whether compilation is worthwhile before paying its model and storage cost.
+- Hold the semantic policy fixed and replace the storage or retrieval backend in a future study.
+- Hold the backend fixed and compare semantic construction/update methods in the current study.
+- Hold routing and invocation fixed while comparing route-specific construction/update and retrieval policies under the same lifecycle-cost objective.
 
 ## Runtime Routing And Evidence
 
