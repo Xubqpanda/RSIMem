@@ -11,8 +11,10 @@ from rsimem.experiment_manifest import (
     load_manifest,
     next_attempt_name,
     record_attempt,
+    resolved_environment_profile,
     resolved_family_budget,
     resolved_model_profile,
+    resolved_run_profile,
     validate_manifest,
 )
 
@@ -27,6 +29,7 @@ def _manifest_kwargs() -> dict[str, object]:
             "profile": "hermes-luna/default_model",
             "modelId": "gpt-test",
             "providerBaseUrl": "https://provider.invalid/v1",
+            "temperature": 0.0,
         },
         "judge": {"enabled": False, "profile": "disabled", "modelId": None},
         "budget": {
@@ -43,6 +46,14 @@ def _manifest_kwargs() -> dict[str, object]:
         "persistence_isolation": {
             "strategy": "per_attempt_trace_directory",
             "compareNoPersistence": True,
+        },
+        "environment": {
+            "pythonVersion": "3.11.0",
+            "distributions": {
+                "rsimem": "0.1.0",
+                "past-bench": "1.0.0",
+                "hermes-agent": "0.4.0",
+            },
         },
         "rsimem_commit": "rsimem-head",
         "rsimem_working_tree_dirty": False,
@@ -224,7 +235,7 @@ def test_completed_slot_is_skipped_and_schedule_is_enforced(tmp_path: Path) -> N
         )
 
 
-def test_effective_model_and_family_budget_are_loaded_from_sources(tmp_path: Path) -> None:
+def test_effective_profiles_and_family_budget_are_loaded_from_sources(tmp_path: Path) -> None:
     registry = tmp_path / "agents.yaml"
     registry.write_text(
         "agents:\n"
@@ -243,10 +254,26 @@ def test_effective_model_and_family_budget_are_loaded_from_sources(tmp_path: Pat
         encoding="utf-8",
     )
 
-    assert resolved_model_profile(registry, "hermes-luna") == {
+    run_config = tmp_path / "run.yaml"
+    run_config.write_text(
+        "judge:\n  enabled: false\nruntime:\n  mode: local\n  temperature: 0.25\n",
+        encoding="utf-8",
+    )
+    run_profile = resolved_run_profile(run_config)
+    assert run_profile == {
+        "runtime": "local",
+        "temperature": 0.25,
+        "judge": {"enabled": False, "profile": "disabled", "modelId": None},
+    }
+    assert resolved_model_profile(
+        registry,
+        "hermes-luna",
+        temperature=run_profile["temperature"],
+    ) == {
         "profile": "hermes-luna/default_model",
         "modelId": "actual-model",
         "providerBaseUrl": "https://provider.invalid/v1",
+        "temperature": 0.25,
     }
     budget = resolved_family_budget(family_root)
     assert budget["tasks"] == [{
@@ -256,3 +283,12 @@ def test_effective_model_and_family_budget_are_loaded_from_sources(tmp_path: Pat
         "timeoutSeconds": 45,
     }]
     assert "SECRET_KEY" not in json.dumps(budget)
+
+
+def test_environment_profile_records_versions_without_install_paths() -> None:
+    profile = resolved_environment_profile()
+    assert profile["pythonVersion"].startswith("3.11.")
+    assert {"rsimem", "past-bench", "hermes-agent"} <= set(profile["distributions"])
+    serialized = json.dumps(profile)
+    assert "/mnt/" not in serialized
+    assert "site-packages" not in serialized

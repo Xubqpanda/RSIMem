@@ -63,30 +63,39 @@ import sys
 from pathlib import Path
 from rsimem.experiment_manifest import (
     initialize_batch_manifest,
+    resolved_environment_profile,
     resolved_family_budget,
     resolved_model_profile,
+    resolved_run_profile,
 )
 
+run_profile = resolved_run_profile(Path(sys.argv[4]))
 initialize_batch_manifest(
     Path(sys.argv[1]),
     replicates=int(sys.argv[2]),
     task_family=sys.argv[3],
     agent="hermes-luna",
-    runtime="local",
-    model=resolved_model_profile(Path(sys.argv[4]), "hermes-luna"),
-    judge={"enabled": False, "profile": "disabled", "modelId": None},
-    budget=resolved_family_budget(Path(sys.argv[5])),
+    runtime=run_profile["runtime"],
+    model=resolved_model_profile(
+        Path(sys.argv[5]),
+        "hermes-luna",
+        temperature=run_profile["temperature"],
+    ),
+    judge=run_profile["judge"],
+    budget=resolved_family_budget(Path(sys.argv[6])),
+    environment=resolved_environment_profile(),
     persistence_isolation={
         "strategy": "per_attempt_trace_directory",
         "compareNoPersistence": True,
     },
-    rsimem_commit=sys.argv[6],
-    rsimem_working_tree_dirty=sys.argv[7] == "true",
-    past_bench_commit=sys.argv[8],
-    past_bench_tree=sys.argv[9],
-    past_bench_dirty=sys.argv[10] == "true",
+    rsimem_commit=sys.argv[7],
+    rsimem_working_tree_dirty=sys.argv[8] == "true",
+    past_bench_commit=sys.argv[9],
+    past_bench_tree=sys.argv[10],
+    past_bench_dirty=sys.argv[11] == "true",
 )
 ' "${manifest_path}" "${REPLICATES}" "${TASK_FAMILY}" \
+  "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" \
   "${RSIMEM_ROOT}/configs/agents.yaml" \
   "${PAST_BENCH_ROOT}/self-evolve-tasks-v2/${TASK_FAMILY}" \
   "${rsimem_commit}" "${rsimem_working_tree_dirty}" \

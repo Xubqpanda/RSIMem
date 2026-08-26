@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
+from importlib.metadata import distributions
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,7 @@ _REQUIRED_CONFIGURATION = {
     "model",
     "judge",
     "budget",
+    "environment",
     "executionModes",
     "persistenceIsolation",
     "adapterFailurePolicy",
@@ -72,7 +75,12 @@ def _load_yaml(path: Path) -> dict[str, Any]:
     return value
 
 
-def resolved_model_profile(registry_path: Path, agent: str) -> dict[str, Any]:
+def resolved_model_profile(
+    registry_path: Path,
+    agent: str,
+    *,
+    temperature: float,
+) -> dict[str, Any]:
     """Read the effective non-secret model settings from the agent registry."""
     registry = _load_yaml(registry_path)
     agents = registry.get("agents")
@@ -90,6 +98,57 @@ def resolved_model_profile(registry_path: Path, agent: str) -> dict[str, Any]:
         "profile": f"{agent}/default_model",
         "modelId": model_id,
         "providerBaseUrl": base_url,
+        "temperature": temperature,
+    }
+
+
+def resolved_run_profile(config_path: Path) -> dict[str, Any]:
+    """Read effective runtime and judge settings from the PAST run config."""
+    config = _load_yaml(config_path)
+    runtime_config = config.get("runtime")
+    judge_config = config.get("judge")
+    runtime = runtime_config.get("mode") if isinstance(runtime_config, dict) else None
+    temperature = runtime_config.get("temperature") if isinstance(runtime_config, dict) else None
+    judge_enabled = judge_config.get("enabled") if isinstance(judge_config, dict) else None
+    if not isinstance(runtime, str) or not runtime:
+        raise ValueError("effective runtime mode is missing")
+    if not isinstance(temperature, (int, float)) or isinstance(temperature, bool):
+        raise ValueError("effective model temperature is missing")
+    if not isinstance(judge_enabled, bool):
+        raise ValueError("effective judge state is missing")
+    judge_model = judge_config.get("model_id") if judge_enabled else None
+    if judge_enabled and (not isinstance(judge_model, str) or not judge_model):
+        raise ValueError("enabled judge model is missing")
+    return {
+        "runtime": runtime,
+        "temperature": float(temperature),
+        "judge": {
+            "enabled": judge_enabled,
+            "profile": "config/judge" if judge_enabled else "disabled",
+            "modelId": judge_model,
+        },
+    }
+
+
+def resolved_environment_profile() -> dict[str, Any]:
+    """Capture exact package versions without editable paths or machine details."""
+    installed: dict[str, str] = {}
+    for distribution in distributions():
+        name = distribution.metadata.get("Name")
+        if not isinstance(name, str) or not name:
+            continue
+        normalized = name.lower().replace("_", "-")
+        package_version = distribution.version
+        previous = installed.get(normalized)
+        if previous is not None and previous != package_version:
+            raise ValueError("environment contains conflicting distribution versions")
+        installed[normalized] = package_version
+    for required in ("rsimem", "past-bench", "hermes-agent"):
+        if required not in installed:
+            raise ValueError("experiment environment is missing a required distribution")
+    return {
+        "pythonVersion": ".".join(str(value) for value in sys.version_info[:3]),
+        "distributions": dict(sorted(installed.items())),
     }
 
 
@@ -219,8 +278,14 @@ def validate_manifest(value: Any) -> dict[str, Any]:
         if not isinstance(configuration.get(field), str) or not configuration[field]:
             raise ValueError(f"manifest {field} is invalid")
     model = _validate_non_empty_object(configuration.get("model"), "model")
-    _require_exact_fields(model, {"profile", "modelId", "providerBaseUrl"}, "model")
+    _require_exact_fields(
+        model,
+        {"profile", "modelId", "providerBaseUrl", "temperature"},
+        "model",
+    )
     _require_non_empty_strings(model, ("profile", "modelId", "providerBaseUrl"), "model")
+    if not isinstance(model.get("temperature"), (int, float)) or isinstance(model["temperature"], bool):
+        raise ValueError("manifest model temperature is invalid")
     judge = _validate_non_empty_object(configuration.get("judge"), "judge")
     _require_exact_fields(judge, {"enabled", "profile", "modelId"}, "judge")
     if not isinstance(judge.get("enabled"), bool) or not isinstance(judge.get("profile"), str):
@@ -259,6 +324,22 @@ def validate_manifest(value: Any) -> dict[str, Any]:
             or task["timeoutSeconds"] < 1
         ):
             raise ValueError("manifest task limits are invalid")
+    environment = _validate_non_empty_object(configuration.get("environment"), "environment")
+    _require_exact_fields(environment, {"pythonVersion", "distributions"}, "environment")
+    _require_non_empty_strings(environment, ("pythonVersion",), "environment")
+    installed = environment.get("distributions")
+    if not isinstance(installed, dict) or not installed:
+        raise ValueError("manifest environment distributions are missing")
+    if any(
+        not isinstance(name, str)
+        or not name
+        or not isinstance(package_version, str)
+        or not package_version
+        for name, package_version in installed.items()
+    ):
+        raise ValueError("manifest environment distribution is invalid")
+    if any(required not in installed for required in ("rsimem", "past-bench", "hermes-agent")):
+        raise ValueError("manifest environment is missing a required distribution")
     isolation = _validate_non_empty_object(
         configuration.get("persistenceIsolation"),
         "persistence isolation",
@@ -327,6 +408,7 @@ def initialize_batch_manifest(
     model: dict[str, Any],
     judge: dict[str, Any],
     budget: dict[str, Any],
+    environment: dict[str, Any],
     persistence_isolation: dict[str, Any],
     rsimem_commit: str,
     rsimem_working_tree_dirty: bool,
@@ -345,6 +427,7 @@ def initialize_batch_manifest(
         "model": model,
         "judge": judge,
         "budget": budget,
+        "environment": environment,
         "executionModes": list(EXECUTION_MODES),
         "persistenceIsolation": persistence_isolation,
         "adapterFailurePolicy": "fail_closed",
