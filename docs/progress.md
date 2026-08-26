@@ -133,7 +133,7 @@ establish a nondeterminism tolerance.
 ### Verification Baseline
 
 - [x] Pass all RSIMem tests: `76 passed`.
-- [x] Pass the vendored PAST-Bench regression suite: `383 passed, 2 skipped`.
+- [x] Pass the vendored PAST-Bench regression suite: `384 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
@@ -152,6 +152,8 @@ The immediate objective is to validate the opt-in typed memory read path under m
 - [x] Forward runtime lifecycle events into the existing ledger through stable run, episode, session, and artifact identifiers.
 - [ ] Add host-neutral validation hooks before allowing compiler-generated content to mutate Hermes files.
 - [x] Define explicit fail-closed and native-bypass behavior for deterministic execution surfaces and the PAST-Bench runner.
+- [x] Add an explicit SM01 live-run launcher that fixes the three execution modes, paired persistence control, failure policy, raw ledger/audit output, and replicate count.
+- [x] Record that the current model runtime does not expose a controllable provider seed instead of labeling independent replicates as seeded runs.
 
 Acceptance criteria:
 
@@ -169,7 +171,7 @@ Acceptance criteria:
 - [x] Run matched deterministic fixtures before spending model tokens.
 - [x] Invoke real Hermes memory prompt construction, `session_search`, `skills_list`, and `skill_view` in matched deterministic fixtures.
 - [x] Verify deterministic restart persistence and explicit adapter failure bypass.
-- [ ] Run at least three matched `SM01_preference_adoption` seeds with fixed model, prompt, task order, sandbox, and budget.
+- [ ] Run at least three matched independent `SM01_preference_adoption` replicates with fixed model, prompt, task order, sandbox, and budget.
 - [ ] Compare task score, pass rate, model requests, token buckets, tool calls, stored bytes, injected characters, and wall time.
 - [ ] Establish an explicit tolerance for nondeterministic model variation and require zero unexplained accounting drift.
 - [ ] Treat adapter instrumentation as behaviorally neutral only after the matched comparison passes.
@@ -223,9 +225,9 @@ Acceptance criteria:
 
 ## Immediate Execution Order
 
-1. Add an explicit SM01 live-run configuration for each matched execution mode.
-2. Run matched seeds and compare quality, usage, tool, storage, injection, and timing evidence.
-3. Define and enforce the acceptable live-model nondeterminism boundary.
+1. Run matched independent replicates and compare quality, usage, tool, storage, injection, and timing evidence.
+2. Define and enforce the acceptable live-model nondeterminism boundary.
+3. Add provider-seed control only if the selected runtime exposes and verifies it.
 4. Implement validated compiler and backend mutation baselines.
 5. Begin the static RSIMem writeback policy only after runtime equivalence is established.
 
