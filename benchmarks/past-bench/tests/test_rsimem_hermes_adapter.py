@@ -86,6 +86,7 @@ def _request(home: Path, artifacts: Path, mode: str) -> StartSessionRequest:
             "episode_id": "episode-matched",
             "family_id": "SM01",
             "stage": "eval_near",
+            "experiment_variant": "with_persistence",
         }),
     )
 

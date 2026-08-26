@@ -54,6 +54,7 @@ def _rsimem_adapter_request(tmp_path: Path, rsimem: dict) -> StartSessionRequest
             "episode_id": "episode-rsimem",
             "family_id": "SM01",
             "stage": "learn",
+            "experiment_variant": "with_persistence",
         }),
     )
 
@@ -193,6 +194,7 @@ def test_hermes_adapter_activates_and_closes_opt_in_rsimem_bridge(
     )
     assert captured["kwargs"]["run_id"] == "run-rsimem"
     assert captured["kwargs"]["family_id"] == "SM01"
+    assert captured["kwargs"]["experiment_variant"] == "with_persistence"
     assert captured["agent"] is agent
     assert captured["closed"] is True
 

@@ -291,6 +291,7 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
         episode_id="episode-bridge",
         session_id="session-bridge",
         task_id="task-bridge",
+        experiment_variant="with_persistence",
     )
     agent = SimpleNamespace(_memory_store=store, _session_db=db)
     bridge.attach(agent)
@@ -351,6 +352,7 @@ def test_past_bench_bridge_failure_policy_controls_native_bypass(
             episode_id="episode",
             session_id="session",
             task_id="task",
+            experiment_variant="with_persistence",
         )
 
     fail_closed = bridge(HermesAdapterFailurePolicy.FAIL_CLOSED)

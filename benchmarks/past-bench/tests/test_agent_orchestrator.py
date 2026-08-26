@@ -11,6 +11,7 @@ def test_runtime_metadata_preserves_join_identity_and_authoritative_trace() -> N
         "episode_id": "episode-03",
         "family_id": "SM01",
         "stage": "eval_near",
+        "experiment_variant": "with_persistence",
     })
 
     assert metadata == {
@@ -19,6 +20,7 @@ def test_runtime_metadata_preserves_join_identity_and_authoritative_trace() -> N
         "episode_id": "episode-03",
         "family_id": "SM01",
         "stage": "eval_near",
+        "experiment_variant": "with_persistence",
     }
 
 
