@@ -31,6 +31,33 @@ from past_bench.runtime.registry import AgentSpec
 _MISSING_TOOL = object()
 
 
+def _rsimem_adapter_request(tmp_path: Path, rsimem: dict) -> StartSessionRequest:
+    return StartSessionRequest(
+        session_id="session-rsimem",
+        agent_name="hermes",
+        task_id="T_rsimem",
+        task_name="RSIMem bridge",
+        max_turns=4,
+        timeout_seconds=60,
+        initial_messages=[],
+        model=RuntimeModelConfig(
+            model_id="fixture-model",
+            extra_body={"hermes": {
+                "home_dir": str(tmp_path / "home"),
+                "capture_artifacts_dir": str(tmp_path / "artifacts"),
+                "rsimem": rsimem,
+            }},
+        ),
+        runtime_config=RuntimeConfigPayload(metadata={
+            "run_id": "run-rsimem",
+            "trace_id": "trace-rsimem",
+            "episode_id": "episode-rsimem",
+            "family_id": "SM01",
+            "stage": "learn",
+        }),
+    )
+
+
 def test_self_evolve_sequence_resolves_relative_task_dirs(tmp_path: Path):
     manifest = tmp_path / "sequence.yaml"
     task_dir = tmp_path / "tasks" / "T_demo"
@@ -120,6 +147,100 @@ def test_sequence_validates_rsimem_execution_config(tmp_path: Path):
     manifest.write_text(yaml.safe_dump(invalid), encoding="utf-8")
     with pytest.raises(ValueError, match="rsimem_mode"):
         SelfEvolveSequenceDefinition.from_yaml(manifest)
+
+
+def test_hermes_adapter_activates_and_closes_opt_in_rsimem_bridge(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import rsimem.hermes_past_bridge as bridge_module
+
+    captured = {}
+
+    class Bridge:
+        def __init__(self, home, config, **kwargs):
+            captured.update(home=home, config=config, kwargs=kwargs)
+            self.closed = False
+
+        def attach(self, agent):
+            captured["agent"] = agent
+
+        def close(self):
+            self.closed = True
+            captured["closed"] = True
+
+    monkeypatch.setattr(bridge_module, "HermesPastBenchBridge", Bridge)
+    request = _rsimem_adapter_request(tmp_path, {
+        "mode": "native+adapter+ledger",
+        "adapter_failure_policy": "bypass_native",
+        "evidence_path": str(tmp_path / "artifacts" / "events.jsonl"),
+    })
+    adapter = HermesAdapter(AgentSpec(name="hermes", adapter="hermes"), request)
+    agent = object()
+
+    adapter._activate_rsimem_bridge(
+        agent,
+        request.model.extra_body["hermes"],
+        tmp_path / "home",
+    )
+    adapter.close("test")
+
+    assert captured["home"] == tmp_path / "home"
+    assert captured["config"].mode.value == "native+adapter+ledger"
+    assert captured["config"].adapter_failure_policy.value == "bypass_native"
+    assert captured["kwargs"]["evidence_path"] == (
+        tmp_path / "artifacts" / "events.jsonl"
+    )
+    assert captured["kwargs"]["run_id"] == "run-rsimem"
+    assert captured["kwargs"]["family_id"] == "SM01"
+    assert captured["agent"] is agent
+    assert captured["closed"] is True
+
+
+def test_hermes_adapter_keeps_native_default_and_rejects_evidence_escape(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import rsimem.hermes_past_bridge as bridge_module
+
+    monkeypatch.setattr(
+        bridge_module,
+        "HermesPastBenchBridge",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("native mode must not construct the bridge")
+        ),
+    )
+    native_request = _rsimem_adapter_request(tmp_path, {"mode": "native"})
+    native = HermesAdapter(
+        AgentSpec(name="hermes", adapter="hermes"),
+        native_request,
+    )
+    try:
+        native._activate_rsimem_bridge(
+            object(),
+            native_request.model.extra_body["hermes"],
+            tmp_path / "home",
+        )
+    finally:
+        native.close("test")
+
+    escaped_request = _rsimem_adapter_request(tmp_path, {
+        "mode": "native+ledger",
+        "evidence_path": str(tmp_path / "outside.jsonl"),
+    })
+    escaped = HermesAdapter(
+        AgentSpec(name="hermes", adapter="hermes"),
+        escaped_request,
+    )
+    try:
+        with pytest.raises(ValueError, match="evidence_path"):
+            escaped._activate_rsimem_bridge(
+                object(),
+                escaped_request.model.extra_body["hermes"],
+                tmp_path / "home",
+            )
+    finally:
+        escaped.close("test")
 
 
 def test_resolve_episode_tool_config_isolates_expected_mechanism():

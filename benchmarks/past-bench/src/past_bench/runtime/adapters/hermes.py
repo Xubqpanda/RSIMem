@@ -77,6 +77,7 @@ class HermesAdapter(RuntimeAdapter):
         super().__init__(spec, request)
         self._completed_response: StepResponse | None = None
         self._session_db: Any | None = None
+        self._rsimem_bridge: Any | None = None
         self._past_bench_tool_backups: dict[str, Any] = {}
         self._sandbox_workspace = SandboxWorkspaceMirror(request)
         self._sandbox_workspace.prepare()
@@ -170,6 +171,7 @@ class HermesAdapter(RuntimeAdapter):
             session_db=session_db,
             model_usage_callback=collected_model_calls.append,
         )
+        self._activate_rsimem_bridge(agent, hermes_cfg, hermes_home)
 
         prompt = _build_hermes_prompt(self.request)
 
@@ -259,14 +261,77 @@ class HermesAdapter(RuntimeAdapter):
         return sum(values)
 
     def close(self, reason: str = "") -> None:
-        self._restore_past_bench_tools()
-        if self._session_db is not None:
-            try:
-                self._session_db.close()
-            except Exception:
-                pass
-        self._session_db = None
-        self._sandbox_workspace.close()
+        try:
+            if self._rsimem_bridge is not None:
+                self._rsimem_bridge.close()
+        finally:
+            self._rsimem_bridge = None
+            self._restore_past_bench_tools()
+            if self._session_db is not None:
+                try:
+                    self._session_db.close()
+                except Exception:
+                    pass
+            self._session_db = None
+            self._sandbox_workspace.close()
+
+    def _activate_rsimem_bridge(
+        self,
+        agent: Any,
+        hermes_cfg: dict[str, Any],
+        hermes_home: Path | None,
+    ) -> None:
+        rsimem_cfg = hermes_cfg.get("rsimem") or {}
+        mode = str(rsimem_cfg.get("mode") or "native")
+        if mode == "native":
+            return
+        if hermes_home is None:
+            raise ValueError("RSIMem Hermes execution requires an isolated home_dir")
+
+        capture_value = str(hermes_cfg.get("capture_artifacts_dir") or "").strip()
+        if not capture_value:
+            raise ValueError("RSIMem Hermes execution requires capture_artifacts_dir")
+        capture_dir = Path(capture_value).expanduser().resolve()
+        evidence_value = str(rsimem_cfg.get("evidence_path") or "").strip()
+        evidence_path = (
+            Path(evidence_value).expanduser().resolve()
+            if evidence_value
+            else capture_dir / "rsimem_memory_events.jsonl"
+        )
+        if not evidence_path.is_relative_to(capture_dir):
+            raise ValueError("RSIMem evidence_path must stay inside capture_artifacts_dir")
+
+        from rsimem.hermes_integration import (
+            HermesAdapterFailurePolicy,
+            HermesExecutionMode,
+            HermesExperimentConfig,
+        )
+        from rsimem.hermes_past_bridge import HermesPastBenchBridge
+
+        metadata = self.request.runtime_config.metadata
+        bridge = HermesPastBenchBridge(
+            hermes_home,
+            HermesExperimentConfig(
+                HermesExecutionMode(mode),
+                adapter_failure_policy=HermesAdapterFailurePolicy(
+                    str(rsimem_cfg.get("adapter_failure_policy") or "fail_closed")
+                ),
+            ),
+            evidence_path=evidence_path,
+            run_id=str(metadata.get("run_id") or self.request.session_id),
+            trace_id=str(metadata.get("trace_id") or self.request.session_id),
+            episode_id=str(metadata.get("episode_id") or self.request.session_id),
+            session_id=self.request.session_id,
+            task_id=self.request.task_id,
+            family_id=(str(metadata["family_id"]) if metadata.get("family_id") else None),
+            stage=(str(metadata["stage"]) if metadata.get("stage") else None),
+        )
+        try:
+            bridge.attach(agent)
+        except BaseException:
+            bridge.close()
+            raise
+        self._rsimem_bridge = bridge
 
     @staticmethod
     def _activate_hermes_home(hermes_home: Path) -> None:
