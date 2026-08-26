@@ -258,24 +258,53 @@ class HermesEpisodicBackend:
         return connection
 
     @staticmethod
+    def _session_metadata_projection(connection: sqlite3.Connection) -> str:
+        columns = {
+            str(row["name"])
+            for row in connection.execute("PRAGMA table_info(sessions)").fetchall()
+        }
+        return ", ".join((
+            (
+                "s.started_at AS session_started"
+                if "started_at" in columns
+                else "NULL AS session_started"
+            ),
+            (
+                "s.title AS session_title"
+                if "title" in columns
+                else "NULL AS session_title"
+            ),
+            (
+                "s.parent_session_id AS parent_session_id"
+                if "parent_session_id" in columns
+                else "NULL AS parent_session_id"
+            ),
+        ))
+
+    @staticmethod
     def _artifact(row: sqlite3.Row) -> MemoryArtifact:
         message_id = str(row["id"])
         session_id = str(row["session_id"])
         content = str(row["content"] or "").strip()
+        row_keys = set(row.keys())
+        metadata = {
+            "message_id": int(row["id"]),
+            "session_id": session_id,
+            "role": row["role"],
+            "timestamp": row["timestamp"],
+            "source": row["source"],
+            "model": row["model"],
+        }
+        for key in ("session_started", "session_title", "parent_session_id"):
+            if key in row_keys:
+                metadata[key] = row[key]
         return MemoryArtifact(
             artifact_id=f"hermes-episodic:message:{message_id}",
             kind=MemoryKind.EPISODIC,
             namespace=session_id,
             title=str(row["tool_name"] or row["role"] or "session message"),
             content=content or "(empty message)",
-            metadata={
-                "message_id": int(row["id"]),
-                "session_id": session_id,
-                "role": row["role"],
-                "timestamp": row["timestamp"],
-                "source": row["source"],
-                "model": row["model"],
-            },
+            metadata=metadata,
         )
 
     def get(self, artifact_id: str) -> MemoryArtifact | None:
@@ -289,11 +318,13 @@ class HermesEpisodicBackend:
         if not self.state_db.exists():
             return None
         with self._connect() as connection:
+            session_metadata = self._session_metadata_projection(connection)
             row = connection.execute(
-                """SELECT m.id, m.session_id, m.role, m.content, m.timestamp,
-                          m.tool_name, s.source, s.model
+                f"""SELECT m.id, m.session_id, m.role, m.content, m.timestamp,
+                          m.tool_name, s.source, s.model,
+                          {session_metadata}
                    FROM messages m JOIN sessions s ON s.id = m.session_id
-                   WHERE m.id = ?""",
+                   WHERE m.id = ?""",  # nosec B608 - projection is hardcoded above
                 (message_id,),
             ).fetchone()
         return self._artifact(row) if row is not None else None
@@ -304,19 +335,21 @@ class HermesEpisodicBackend:
         terms = query.text.strip()
         if not terms:
             return ()
-        sql = """SELECT m.id, m.session_id, m.role, m.content, m.timestamp,
-                         m.tool_name, s.source, s.model,
-                         snippet(messages_fts, 0, '>>>', '<<<', '...', 40) AS snippet,
-                         bm25(messages_fts) AS rank_score
-                  FROM messages_fts
-                  JOIN messages m ON m.id = messages_fts.rowid
-                  JOIN sessions s ON s.id = m.session_id
-                  WHERE messages_fts MATCH ?
-                    AND (? = 'default' OR m.session_id = ?)
-                  ORDER BY rank_score
-                  LIMIT ?"""
         try:
             with self._connect() as connection:
+                session_metadata = self._session_metadata_projection(connection)
+                sql = f"""SELECT m.id, m.session_id, m.role, m.content, m.timestamp,
+                                  m.tool_name, s.source, s.model,
+                                  {session_metadata},
+                                  snippet(messages_fts, 0, '>>>', '<<<', '...', 40) AS snippet,
+                                  bm25(messages_fts) AS rank_score
+                           FROM messages_fts
+                           JOIN messages m ON m.id = messages_fts.rowid
+                           JOIN sessions s ON s.id = m.session_id
+                           WHERE messages_fts MATCH ?
+                             AND (? = 'default' OR m.session_id = ?)
+                           ORDER BY rank_score
+                           LIMIT ?"""  # nosec B608 - projection is hardcoded above
                 rows = connection.execute(sql, (terms, query.namespace, query.namespace, query.limit)).fetchall()
         except sqlite3.OperationalError:
             return ()
@@ -327,13 +360,17 @@ class HermesEpisodicBackend:
             metadata["snippet"] = row["snippet"]
             with self._connect() as connection:
                 context_rows = connection.execute(
-                    """SELECT role, content FROM messages
+                    """SELECT id, role, content FROM messages
                        WHERE session_id = ? AND id >= ? - 1 AND id <= ? + 1
                        ORDER BY id""",
                     (row["session_id"], row["id"], row["id"]),
                 ).fetchall()
             metadata["context"] = tuple(
                 (str(item["role"]), str(item["content"] or "")[:200])
+                for item in context_rows
+            )
+            metadata["context_messages"] = tuple(
+                (int(item["id"]), str(item["role"]), str(item["content"] or "")[:200])
                 for item in context_rows
             )
             artifact = MemoryArtifact(
