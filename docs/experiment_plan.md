@@ -16,7 +16,9 @@ The first smoke family is `memory_ability/SM01_preference_adoption`.
 
 Hermes native memory is the first backend because PAST-Bench already provides its runtime and persistence controls.
 
-The smoke run uses one seed, while reported experiments use at least three independent seeds.
+The current paper scope fixes Hermes native memory as the only backend and PAST-Bench as the only benchmark. MemBase's runtime and evaluation pipeline and the external backends integrated through it are out of scope, although pinned memory-layer source may be used as an attributed algorithm reference for local reimplementation.
+
+The initial infrastructure smoke uses one run. The current provider does not expose a verifiable seed, so reported experiments use at least three independently sampled, explicitly unseeded replicates and rotate execution order.
 
 PAST-Bench expectations, answer keys, and grading rubrics remain evaluation-only and never enter LightRSI's policy updates.
 
@@ -27,8 +29,8 @@ PAST-Bench expectations, answer keys, and grading rubrics remain evaluation-only
 | No persistence | Measure performance without cross-session memory. |
 | Native backend | Establish the original memory backend baseline. |
 | Native backend + ledger | Verify that instrumentation is behaviorally neutral. |
-| Static LightRSI | Test context-exit coordination and memory admission without recursive updates. |
-| Adaptive LightRSI | Test the full delayed-feedback policy update loop. |
+| Static LightRSI | Test a fixed semantic construction/update/retrieval policy without recursive updates. |
+| Adaptive LightRSI | Test operation-attributed delayed-feedback updates to the same fixed semantic policy. |
 
 The first implementation stops at these five variants.
 
@@ -43,6 +45,20 @@ Raw resource accounting records model input and output tokens, cache usage, mode
 Derived metrics include total cost, cost per successful episode, future utility per lifecycle cost, and the cost--quality frontier.
 
 Raw resource quantities are retained separately from provider prices so that monetary results can be recomputed.
+
+## Phase 1C Read-Path Analysis Protocol
+
+This protocol is frozen before the full-projection live matched results are observed. One analysis unit is a successful `(replicate, execution mode)` run over the complete ordered SM01 family and its paired no-persistence control. At least three successful units are required per mode. Provider-failed attempts remain in the manifest and failure summary but do not enter clean-run quality or resource aggregates.
+
+The integrity gate is exact rather than statistical: every successful run must pass `rsimem-audit`; physical request reconciliation, model-visible adapter input divergence, unexplained task/order/budget/state differences, silent bypass, and missing runtime evidence must each equal zero. Any non-zero value blocks Phase 1C regardless of quality scores.
+
+For the small unseeded sample, the report presents every raw replicate value plus the median and full range by mode. It does not use a significance test, confidence interval, post-hoc tolerance, or an equivalence claim based on failure to reject a null hypothesis. Paired mode differences are shown within each rotated replicate for:
+
+- with-persistence and without-persistence task score, pass rate, and persistence gap;
+- model request count, input/output/cache-read/cache-write/reasoning tokens, retries, and model duration;
+- tool calls, stored bytes, retrieved records, injected characters, ledger event count, and wall time.
+
+Episode-level attribution follows fixed evidence rules. A changed task manifest, episode order, budget, initial state digest, or model-visible input digest is configuration or adapter divergence. A provider transport/status failure is provider failure. When those invariants match and model-visible inputs are identical, differences in model outputs, tool choices, tokens, or timing are reported as unseeded model/provider variation, not adapter causation. Ambiguous evidence remains unexplained and fails the stage gate.
 
 ## Rollout
 
@@ -64,17 +80,17 @@ The stage passes when all required events are present and instrumentation does n
 
 ### Stage 2: Add Static LightRSI
 
-At task-aligned context exits, use one fixed policy to choose discard, add, or update before invoking the native writer.
+At the fixed Hermes semantic task/session boundary, expose one external ingestion operation and let the locally reimplemented Mem0-style policy decide ADD, UPDATE, DELETE, or NONE internally.
 
-Keep backend-native storage and retrieval unchanged.
+Keep routing, invocation frequency, backend-native storage, and model-visible retrieval surfaces unchanged. The first semantic implementation locally reimplements the flat-memory construction path and prompts from Mem0 as vendored in MemBase, without importing MemBase's datasets, runners, or evaluation code.
 
-The stage passes when every candidate can be linked to its memory operation and later retrieval through stable experiment identifiers.
+The stage passes when every semantic ingestion can be linked through an atomic operation graph from source and extraction to internal operation, mutation, later retrieval, use, and outcome.
 
 ### Stage 3: Close the Recursive Loop
 
 Aggregate deployment-observable feedback from later retrieval, injection, tool execution, retries, completion, and lifecycle cost.
 
-Use this feedback to propose versioned updates to the context-exit and memory-writing policies.
+Use operation-attributed feedback to propose versioned updates to semantic extraction, conflict-resolution, consolidation, and retrieval policies while keeping route selection and invocation boundaries fixed.
 
 Validate, accept, or roll back each proposal without using hidden benchmark grading information.
 
@@ -82,19 +98,19 @@ The stage passes when policy versions are reproducible and adaptive LightRSI can
 
 ### Stage 4: Expand Task Coverage
 
-Run all five memory-ability families first.
+Run semantic-relevant memory-ability families first.
 
-Then add update-ability families, followed by procedural-reuse and proactive-information-gathering families.
+Then add semantic-relevant update-ability families. Episodic and procedural families remain out of the active implementation sequence until their method-selection gates pass.
 
-Only after these stages are stable should the full 26-family evaluation begin.
+Only after these stages are stable should the need for broader PAST-Bench coverage be decided from the supported claim; full 26-family coverage is not an automatic requirement.
 
-### Stage 5: Expand Memory Backends
+### Stage 5: Deferred Typed-Memory Expansion
 
-Add Mem0 first, then LangMem, using MemBase's layer implementations behind an interactive PAST-Bench adapter.
+After the semantic claim is established, separately decide whether an episodic method and a trajectory-to-skill method are mature enough for matched PAST-Bench evaluation. Their implementation is not required to complete the semantic-first paper path.
 
-Add MemOS later because its current MemBase layer does not support a unified in-place update operation.
+Do not add MemBase, Mem0, LangMem, or Graphiti as runtime external backends, and do not add another host or benchmark. The locally reimplemented Mem0 flat construction policy is a controlled algorithm baseline over Hermes storage, not a Mem0 backend integration.
 
-For every backend $B$, the primary comparison remains native $B$ versus $B$ with LightRSI under matched settings.
+The primary comparison remains no persistence, native Hermes, static LightRSI over Hermes, and adaptive LightRSI over Hermes under matched settings.
 
 ## Repository Boundaries
 
@@ -103,5 +119,3 @@ RSIMem contains benchmark sources under `benchmarks/`, benchmark integration, me
 RSIMem may modify benchmark runtime and telemetry code needed for reproducible experiments, but it does not change task semantics, hidden evaluation contracts, answer keys, or grading criteria.
 
 Reusable production components belong in the LightRSI framework repository, while RSIMem pins their exact commit for reproducibility.
-
-The local MemBase worktree currently contains uncommitted changes, so RSIMem must pin a clean commit or a dedicated branch before using it in reported experiments.
