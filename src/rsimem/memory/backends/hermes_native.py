@@ -292,6 +292,7 @@ class HermesEpisodicBackend:
             "session_id": session_id,
             "role": row["role"],
             "timestamp": row["timestamp"],
+            "tool_name": row["tool_name"],
             "source": row["source"],
             "model": row["model"],
         }

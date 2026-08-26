@@ -19,7 +19,10 @@ from rsimem.hermes_integration import (
     build_configured_hermes_runtime,
     run_hermes_execution_equivalence_variants,
     run_hermes_equivalence_variants,
+    _bound_hermes_memory_dir,
+    _bound_hermes_skills_dir,
 )
+from rsimem.hermes_past_bridge import HermesPastBenchBridge
 from rsimem.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import RawResourceUsage, run_sm01_preference_fixture
 from rsimem.memory import MemoryKind, MemoryQuery
@@ -262,6 +265,129 @@ def test_adapter_failure_policy_is_explicit_and_content_free(
     assert checks[HermesExecutionSurface.SESSION_SEARCH].adapter_failure == "RuntimeError"
     assert checks[HermesExecutionSurface.SYSTEM_PROMPT].route == HermesExecutionRoute.ADAPTER
     assert "private adapter failure detail" not in json.dumps(asdict(report), default=str)
+
+
+def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from hermes_state import SessionDB
+    from tools.registry import registry
+
+    home = _hermes_home(tmp_path)
+    evidence_path = tmp_path / "artifacts" / "rsimem_memory_events.jsonl"
+    db = SessionDB(home / "state.db")
+    with _bound_hermes_memory_dir(home) as memory_tool:
+        store = memory_tool.MemoryStore()
+        store.load_from_disk()
+    native_memory = store.format_for_system_prompt("memory")
+    native_search = db.search_messages(query="task table", limit=50, offset=0)
+
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=evidence_path,
+        run_id="run-bridge",
+        trace_id="trace-bridge",
+        episode_id="episode-bridge",
+        session_id="session-bridge",
+        task_id="task-bridge",
+    )
+    agent = SimpleNamespace(_memory_store=store, _session_db=db)
+    bridge.attach(agent)
+    wrapped_skill_handler = registry._tools["skill_view"].handler
+    try:
+        assert agent._memory_store.format_for_system_prompt("memory") == native_memory
+        assert agent._session_db.search_messages(
+            query="task table",
+            limit=50,
+            offset=0,
+        ) == native_search
+        assert agent._session_db.get_messages_as_conversation("session-1") == (
+            db.get_messages_as_conversation("session-1")
+        )
+        with _bound_hermes_skills_dir(home / "skills"):
+            skills = registry.dispatch("skills_list", {})
+            skill = registry.dispatch("skill_view", {"name": "task-table"})
+        assert json.loads(skills)["count"] == 1
+        assert json.loads(skill)["name"] == "task-table"
+    finally:
+        bridge.close()
+        db.close()
+
+    assert registry._tools["skill_view"].handler is not wrapped_skill_handler
+    serialized = evidence_path.read_text(encoding="utf-8")
+    assert '"kind": "query"' in serialized
+    assert '"kind": "injected"' in serialized
+    assert PRIVATE_PREFERENCE not in serialized
+    assert "requested task table" not in serialized
+    assert "Use the requested columns" not in serialized
+
+
+def test_past_bench_bridge_failure_policy_controls_native_bypass(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    class Store:
+        def format_for_system_prompt(self, target: str) -> str:
+            return "native prompt"
+
+        def _render_block(self, target: str, entries: list[str]) -> str:
+            return "adapter prompt"
+
+    home = _hermes_home(tmp_path)
+
+    def bridge(policy: HermesAdapterFailurePolicy) -> HermesPastBenchBridge:
+        return HermesPastBenchBridge(
+            home,
+            HermesExperimentConfig(
+                HermesExecutionMode.ADAPTER_LEDGER,
+                adapter_failure_policy=policy,
+            ),
+            evidence_path=tmp_path / policy.value / "events.jsonl",
+            run_id=f"run-{policy.value}",
+            trace_id=f"trace-{policy.value}",
+            episode_id="episode",
+            session_id="session",
+            task_id="task",
+        )
+
+    fail_closed = bridge(HermesAdapterFailurePolicy.FAIL_CLOSED)
+    monkeypatch.setattr(
+        fail_closed.runtime,
+        "query",
+        lambda query: (_ for _ in ()).throw(RuntimeError("private failure")),
+    )
+    closed_agent = SimpleNamespace(_memory_store=Store(), _session_db=None)
+    fail_closed.attach(closed_agent)
+    try:
+        with pytest.raises(HermesAdapterExecutionError, match="system_prompt"):
+            closed_agent._memory_store.format_for_system_prompt("memory")
+    finally:
+        fail_closed.close()
+
+    bypass = bridge(HermesAdapterFailurePolicy.BYPASS_NATIVE)
+    monkeypatch.setattr(
+        bypass.runtime,
+        "query",
+        lambda query: (_ for _ in ()).throw(RuntimeError("private failure")),
+    )
+    bypass_agent = SimpleNamespace(_memory_store=Store(), _session_db=None)
+    bypass.attach(bypass_agent)
+    try:
+        assert bypass_agent._memory_store.format_for_system_prompt("memory") == (
+            "native prompt"
+        )
+    finally:
+        bypass.close()
+
+    serialized = (tmp_path / "bypass_native" / "events.jsonl").read_text(
+        encoding="utf-8"
+    )
+    assert "adapter_failure_native_bypass" in serialized
+    assert "RuntimeError" in serialized
+    assert "private failure" not in serialized
 
 
 def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) -> None:
