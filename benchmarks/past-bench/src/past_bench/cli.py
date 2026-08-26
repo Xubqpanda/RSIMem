@@ -2107,6 +2107,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
             task: TaskDefinition,
             persistence_enabled: bool,
             persistence_allowed: bool,
+            experiment_variant: str,
         ) -> dict:
             episode_slug = _safe_label(label or task.task_id)
             episode_dir = variant_dir / f"{index:02d}_{episode_slug}"
@@ -2205,6 +2206,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         "episode_id": episode_dir.name,
                         "family_id": sequence.name,
                         "stage": bucket,
+                        "experiment_variant": experiment_variant,
                     },
                 )
 
@@ -2287,6 +2289,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         task=task,
                         persistence_enabled=persistence_enabled,
                         persistence_allowed=False,
+                        experiment_variant=variant_label,
                     )
                     global_index += 1
                     baseline_runs.append(result)
@@ -2337,6 +2340,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     task=selected_task,
                     persistence_enabled=persistence_enabled,
                     persistence_allowed=persistence_enabled,
+                    experiment_variant=variant_label,
                 )
                 global_index += 1
                 episode_results.append(attempt)
@@ -2363,6 +2367,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         task=reflection_task,
                         persistence_enabled=persistence_enabled,
                         persistence_allowed=persistence_enabled,
+                        experiment_variant=variant_label,
                     )
                     global_index += 1
                     episode_results.append(reflection)
@@ -2396,6 +2401,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     task=selected_task,
                     persistence_enabled=persistence_enabled,
                     persistence_allowed=persistence_enabled,
+                    experiment_variant=variant_label,
                 )
                 global_index += 1
                 episode_results.append(result)
@@ -2421,6 +2427,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     task=transfer_task,
                     persistence_enabled=persistence_enabled,
                     persistence_allowed=persistence_enabled,
+                    experiment_variant=variant_label,
                 )
                 global_index += 1
                 episode_results.append(result)
@@ -2582,6 +2589,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         "episode_id": _sc_episode_dir.name,
                         "family_id": _sc_episode.family_id,
                         "stage": _sc_episode.stage,
+                        "experiment_variant": "with_persistence",
                     },
                 )
 
@@ -2784,6 +2792,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                             "episode_id": episode_dir.name,
                             "family_id": episode.family_id,
                             "stage": episode.stage,
+                            "experiment_variant": variant_label,
                         },
                     )
 
@@ -2962,6 +2971,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         "episode_id": reflection_dir.name,
                         "family_id": episode.family_id,
                         "stage": "reflection",
+                        "experiment_variant": variant_label,
                     },
                 )
                 reflection_artifacts = persistence_backend.snapshot_after(reflection_artifacts_dir)

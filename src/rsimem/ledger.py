@@ -199,6 +199,7 @@ class MemoryLedgerObserver:
         family_id: str | None = None,
         stage: str | None = None,
         snapshot_id: str | None = None,
+        execution_mode: str | None = None,
     ) -> None:
         required = (run_id, variant, trace_id, episode_id, session_id, task_id)
         if any(not value.strip() for value in required):
@@ -212,6 +213,7 @@ class MemoryLedgerObserver:
         self.family_id = family_id
         self.stage = stage
         self.snapshot_id = snapshot_id
+        self.execution_mode = execution_mode
         self._events: list[dict[str, Any]] = []
         self._occurrences: dict[str, int] = {}
 
@@ -226,6 +228,7 @@ class MemoryLedgerObserver:
             "variant": self.variant,
             "traceId": self.trace_id,
             "snapshotId": self.snapshot_id,
+            "executionMode": self.execution_mode,
             "kind": event.kind.value,
             "memoryKind": event.memory_kind.value,
             "backend": event.backend,
@@ -254,6 +257,7 @@ class MemoryLedgerObserver:
             "kind": event.kind.value,
             "source": {"type": "rsimem_memory_runtime"},
             "data": {
+                "executionMode": self.execution_mode,
                 "memoryKind": event.memory_kind.value,
                 "backend": event.backend,
                 "artifactIds": list(event.artifact_ids),

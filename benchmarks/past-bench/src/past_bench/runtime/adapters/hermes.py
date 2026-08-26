@@ -309,6 +309,11 @@ class HermesAdapter(RuntimeAdapter):
         from rsimem.hermes_past_bridge import HermesPastBenchBridge
 
         metadata = self.request.runtime_config.metadata
+        experiment_variant = str(metadata.get("experiment_variant") or "").strip()
+        if not experiment_variant:
+            raise ValueError(
+                "RSIMem Hermes execution requires experiment_variant metadata"
+            )
         bridge = HermesPastBenchBridge(
             hermes_home,
             HermesExperimentConfig(
@@ -323,6 +328,7 @@ class HermesAdapter(RuntimeAdapter):
             episode_id=str(metadata.get("episode_id") or self.request.session_id),
             session_id=self.request.session_id,
             task_id=self.request.task_id,
+            experiment_variant=experiment_variant,
             family_id=(str(metadata["family_id"]) if metadata.get("family_id") else None),
             stage=(str(metadata["stage"]) if metadata.get("stage") else None),
         )

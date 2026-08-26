@@ -155,6 +155,7 @@ class HermesPastBenchBridge:
         episode_id: str,
         session_id: str,
         task_id: str,
+        experiment_variant: str,
         family_id: str | None = None,
         stage: str | None = None,
     ) -> None:
@@ -164,13 +165,14 @@ class HermesPastBenchBridge:
         self.evidence_path = evidence_path.expanduser().resolve()
         self.ledger = MemoryLedgerObserver(
             run_id=run_id,
-            variant=config.mode.value,
+            variant=experiment_variant,
             trace_id=trace_id,
             episode_id=episode_id,
             session_id=session_id,
             task_id=task_id,
             family_id=family_id,
             stage=stage,
+            execution_mode=config.mode.value,
         )
         self.runtime = build_configured_hermes_runtime(
             hermes_home,
