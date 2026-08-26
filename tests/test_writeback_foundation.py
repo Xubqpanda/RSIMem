@@ -405,6 +405,85 @@ def test_update_idempotency_distinguishes_target_artifacts() -> None:
     ).idempotency_key
 
 
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"reusable_facts": ("changed preference",)},
+        {"reusable_procedures": ("changed procedure",)},
+        {"completion_status": "blocked"},
+        {"completion_evidence": ("different completion evidence",)},
+        {"scope": "global"},
+        {"temporal_validity": "current"},
+    ],
+)
+def test_idempotency_covers_compiler_relevant_exit_evidence(
+    changes: dict[str, object],
+) -> None:
+    fixture = run_sm01_preference_fixture()
+    baseline = fixture.plans[0]
+    changed_signal = replace(fixture.evaluation.signals[0], **changes)
+    changed_evaluation = replace(
+        fixture.evaluation,
+        signals=(changed_signal, *fixture.evaluation.signals[1:]),
+    )
+    changed = WritebackCoordinator().create_plans(
+        fixture.snapshot,
+        changed_evaluation,
+    )[0]
+
+    assert baseline.idempotency_key != changed.idempotency_key
+
+
+def test_idempotency_is_stable_across_equivalent_reevaluation() -> None:
+    fixture = run_sm01_preference_fixture()
+    reevaluation = replace(fixture.evaluation, evaluation_id="evaluation-retry")
+    retry_plan = WritebackCoordinator().create_plans(
+        fixture.snapshot,
+        reevaluation,
+    )[0]
+
+    assert retry_plan.exit_evidence.provenance != fixture.plans[0].exit_evidence.provenance
+    assert retry_plan.idempotency_key == fixture.plans[0].idempotency_key
+
+
+def test_idempotency_covers_resolved_unresolved_state() -> None:
+    fixture = run_sm01_preference_fixture()
+    retained_add = replace(
+        fixture.evaluation.signals[0],
+        context_action=ContextAction.RETAIN,
+    )
+    evaluation = replace(
+        fixture.evaluation,
+        signals=(retained_add, *fixture.evaluation.signals[1:]),
+    )
+    completed_plan = WritebackCoordinator().create_plans(
+        fixture.snapshot,
+        evaluation,
+    )[0]
+    unresolved_snapshot = replace(
+        fixture.snapshot,
+        segments=(
+            replace(fixture.snapshot.segments[0], completed=False),
+            *fixture.snapshot.segments[1:],
+        ),
+    )
+    unresolved_plan = WritebackCoordinator().create_plans(
+        unresolved_snapshot,
+        evaluation,
+    )[0]
+
+    assert completed_plan.exit_evidence.unresolved_state is None
+    assert unresolved_plan.exit_evidence.unresolved_state == "host_unresolved"
+    assert completed_plan.idempotency_key != unresolved_plan.idempotency_key
+
+
+def test_exit_evidence_requires_a_real_boolean_safety_decision() -> None:
+    evidence = run_sm01_preference_fixture().plans[0].exit_evidence
+
+    with pytest.raises(TypeError, match="safe_to_evict must be bool"):
+        replace(evidence, safe_to_evict="false")
+
+
 def test_add_and_discard_reject_existing_memory_targets() -> None:
     fixture = run_sm01_preference_fixture()
     add = fixture.evaluation.signals[0]

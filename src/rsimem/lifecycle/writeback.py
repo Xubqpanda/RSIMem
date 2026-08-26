@@ -128,6 +128,8 @@ class ExitEvidence:
     update_hints: tuple[str, ...]
 
     def __post_init__(self) -> None:
+        if type(self.safe_to_evict) is not bool:
+            raise TypeError("safe_to_evict must be bool")
         object.__setattr__(self, "completion_status", CompletionStatus(self.completion_status))
         if self.scope is not None:
             object.__setattr__(self, "scope", MemoryScope(self.scope))
@@ -146,6 +148,24 @@ class ExitEvidence:
         )
         if any(not value.strip() for values in sequences for value in values):
             raise ValueError("exit evidence values must not be empty")
+
+    def compiler_input_payload(self) -> dict[str, object]:
+        """Canonical evidence that can change compiler-produced memory content."""
+
+        return {
+            "completion_status": self.completion_status.value,
+            "completion_evidence": self.completion_evidence,
+            "unresolved_state": self.unresolved_state,
+            "scope": self.scope.value if self.scope is not None else None,
+            "temporal_validity": (
+                self.temporal_validity.value
+                if self.temporal_validity is not None
+                else None
+            ),
+            "reusable_facts": self.reusable_facts,
+            "reusable_procedures": self.reusable_procedures,
+            "update_hints": self.update_hints,
+        }
 
 @dataclass(frozen=True, slots=True)
 class UpdateTarget:
@@ -895,7 +915,7 @@ class WritebackCoordinator:
             "target_backend": target.backend if target else None,
             "target_artifact_id": target.artifact_id if target else None,
             "expected_memory_revision": target.expected_revision if target else None,
-            "update_hints": exit_evidence.update_hints,
+            "compiler_input": exit_evidence.compiler_input_payload(),
             "update_mode": signal.update_mode,
             "compiler_version": signal.compiler_version,
         }
