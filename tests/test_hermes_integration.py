@@ -471,6 +471,102 @@ def test_past_bench_bridge_skill_reads_come_from_adapter_projection(
     assert "task-table" not in json.dumps((listed, viewed, resource))
 
 
+def test_past_bench_bridge_historical_sessions_come_from_adapter_projection(
+    tmp_path: Path,
+) -> None:
+    from types import SimpleNamespace
+
+    class NativeDb:
+        def search_messages(self, **kwargs):
+            raise AssertionError("native search must not run")
+
+        def get_session(self, session_id):
+            raise AssertionError("native historical session must not run")
+
+        def get_messages_as_conversation(self, session_id):
+            raise AssertionError("native historical conversation must not run")
+
+    home = _hermes_home(tmp_path)
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-episodic",
+        trace_id="trace-episodic",
+        episode_id="episode-episodic",
+        session_id="session-episodic",
+        task_id="task-episodic",
+        experiment_variant="with_persistence",
+    )
+    original_query = bridge.runtime.query
+    conversation = (
+        {"role": "user", "content": "Adapter-owned history."},
+        {"role": "assistant", "content": "Recovered without native state."},
+    )
+    artifact = MemoryArtifact(
+        artifact_id="adapter-episode-42",
+        kind=MemoryKind.EPISODIC,
+        namespace="adapter-session",
+        title="historical message",
+        content="Adapter-owned history.",
+        metadata={
+            "message_id": 42,
+            "role": "user",
+            "source": "remote-backend",
+            "snippet": ">>>Adapter-owned<<< history.",
+            "timestamp": 1.0,
+            "tool_name": None,
+            "model": "fixture-model",
+            "session_started": 1.0,
+            "context": (("user", "Adapter-owned history."),),
+            "session_lineage": ((
+                "adapter-session",
+                {
+                    "id": "adapter-session",
+                    "source": "remote-backend",
+                    "model": "fixture-model",
+                    "parent_session_id": None,
+                },
+                conversation,
+            ),),
+        },
+    )
+    hit = MemoryHit(artifact, rank=1, score=1.0, backend="adapter-episodic")
+
+    def query(value: MemoryQuery):
+        if value.kind == MemoryKind.EPISODIC:
+            assert value.filters["offset"] == 0
+            assert value.filters["role_filter"] == ["user"]
+            return (hit,)
+        return original_query(value)
+
+    bridge.runtime.query = query
+    agent = SimpleNamespace(
+        _memory_store=None,
+        _session_db=NativeDb(),
+        session_id="current-session",
+    )
+    bridge.attach(agent)
+    try:
+        results = agent._session_db.search_messages(
+            query="adapter history",
+            role_filter=["user"],
+            limit=5,
+            offset=0,
+        )
+        projected_session = agent._session_db.get_session("adapter-session")
+        projected_conversation = agent._session_db.get_messages_as_conversation(
+            "adapter-session"
+        )
+    finally:
+        bridge.close()
+
+    assert results[0]["id"] == 42
+    assert results[0]["source"] == "remote-backend"
+    assert projected_session["model"] == "fixture-model"
+    assert projected_conversation == list(conversation)
+
+
 def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) -> None:
     fixture = run_sm01_preference_fixture()
 

@@ -9,6 +9,7 @@ explicit in experiments.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -330,15 +331,98 @@ class HermesEpisodicBackend:
             ).fetchone()
         return self._artifact(row) if row is not None else None
 
+    @staticmethod
+    def _conversation(connection: sqlite3.Connection, session_id: str) -> tuple[dict[str, Any], ...]:
+        rows = connection.execute(
+            "SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp, id",
+            (session_id,),
+        ).fetchall()
+        messages: list[dict[str, Any]] = []
+        for row in rows:
+            keys = set(row.keys())
+            message: dict[str, Any] = {
+                "role": row["role"],
+                "content": row["content"],
+            }
+            for field in ("tool_call_id", "tool_name", "reasoning"):
+                if field in keys and row[field]:
+                    message[field] = row[field]
+            for field in ("tool_calls", "reasoning_details", "codex_reasoning_items"):
+                if field not in keys or not row[field]:
+                    continue
+                try:
+                    message[field] = json.loads(row[field])
+                except (json.JSONDecodeError, TypeError):
+                    message[field] = row[field]
+            messages.append(message)
+        return tuple(messages)
+
+    @classmethod
+    def _session_lineage(
+        cls,
+        connection: sqlite3.Connection,
+        session_id: str,
+    ) -> tuple[tuple[str, dict[str, Any], tuple[dict[str, Any], ...]], ...]:
+        lineage = []
+        visited: set[str] = set()
+        current = session_id
+        while current and current not in visited:
+            visited.add(current)
+            row = connection.execute(
+                "SELECT * FROM sessions WHERE id = ?",
+                (current,),
+            ).fetchone()
+            if row is None:
+                break
+            session = dict(row)
+            lineage.append((current, session, cls._conversation(connection, current)))
+            current = str(session.get("parent_session_id") or "")
+        return tuple(lineage)
+
+    @staticmethod
+    def _filter_values(filters: Any, name: str) -> tuple[str, ...] | None:
+        value = filters.get(name)
+        if value is None:
+            return None
+        if isinstance(value, str) or not isinstance(value, (list, tuple)):
+            raise ValueError(f"episodic query filter {name} must be a list")
+        return tuple(str(item) for item in value)
+
     def query(self, query: MemoryQuery) -> tuple[MemoryHit, ...]:
         if not self.state_db.exists():
             return ()
         terms = query.text.strip()
         if not terms:
             return ()
+        source_filter = self._filter_values(query.filters, "source_filter")
+        exclude_sources = self._filter_values(query.filters, "exclude_sources")
+        role_filter = self._filter_values(query.filters, "role_filter")
+        offset = query.filters.get("offset", 0)
+        if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
+            raise ValueError("episodic query offset must be a non-negative integer")
         try:
             with self._connect() as connection:
                 session_metadata = self._session_metadata_projection(connection)
+                where_clauses = ["messages_fts MATCH ?"]
+                parameters: list[Any] = [terms]
+                for column, values in (
+                    ("s.source", source_filter),
+                    ("m.role", role_filter),
+                ):
+                    if values is not None:
+                        if not values:
+                            return ()
+                        placeholders = ",".join("?" for _ in values)
+                        where_clauses.append(f"{column} IN ({placeholders})")
+                        parameters.extend(values)
+                if exclude_sources:
+                    placeholders = ",".join("?" for _ in exclude_sources)
+                    where_clauses.append(f"s.source NOT IN ({placeholders})")
+                    parameters.extend(exclude_sources)
+                if query.namespace != "default":
+                    where_clauses.append("m.session_id = ?")
+                    parameters.append(query.namespace)
+                parameters.extend((query.limit, offset))
                 sql = f"""SELECT m.id, m.session_id, m.role, m.content, m.timestamp,
                                   m.tool_name, s.source, s.model,
                                   {session_metadata},
@@ -347,25 +431,30 @@ class HermesEpisodicBackend:
                            FROM messages_fts
                            JOIN messages m ON m.id = messages_fts.rowid
                            JOIN sessions s ON s.id = m.session_id
-                           WHERE messages_fts MATCH ?
-                             AND (? = 'default' OR m.session_id = ?)
+                           WHERE {' AND '.join(where_clauses)}
                            ORDER BY rank_score
-                           LIMIT ?"""  # nosec B608 - projection is hardcoded above
-                rows = connection.execute(sql, (terms, query.namespace, query.namespace, query.limit)).fetchall()
+                           LIMIT ? OFFSET ?"""  # nosec B608 - columns are hardcoded above
+                rows = connection.execute(sql, parameters).fetchall()
+                enriched_rows = []
+                for row in rows:
+                    context_rows = connection.execute(
+                        """SELECT id, role, content FROM messages
+                           WHERE session_id = ? AND id >= ? - 1 AND id <= ? + 1
+                           ORDER BY id""",
+                        (row["session_id"], row["id"], row["id"]),
+                    ).fetchall()
+                    enriched_rows.append((
+                        row,
+                        context_rows,
+                        self._session_lineage(connection, str(row["session_id"])),
+                    ))
         except sqlite3.OperationalError:
             return ()
         hits: list[MemoryHit] = []
-        for rank, row in enumerate(rows, start=1):
+        for rank, (row, context_rows, lineage) in enumerate(enriched_rows, start=1):
             artifact = self._artifact(row)
             metadata = dict(artifact.metadata)
             metadata["snippet"] = row["snippet"]
-            with self._connect() as connection:
-                context_rows = connection.execute(
-                    """SELECT id, role, content FROM messages
-                       WHERE session_id = ? AND id >= ? - 1 AND id <= ? + 1
-                       ORDER BY id""",
-                    (row["session_id"], row["id"], row["id"]),
-                ).fetchall()
             metadata["context"] = tuple(
                 (str(item["role"]), str(item["content"] or "")[:200])
                 for item in context_rows
@@ -374,6 +463,7 @@ class HermesEpisodicBackend:
                 (int(item["id"]), str(item["role"]), str(item["content"] or "")[:200])
                 for item in context_rows
             )
+            metadata["session_lineage"] = lineage
             artifact = MemoryArtifact(
                 artifact_id=artifact.artifact_id,
                 kind=artifact.kind,

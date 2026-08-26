@@ -142,6 +142,31 @@ def test_episodic_backend_searches_fts_and_is_read_only(tmp_path: Path) -> None:
     assert stored.content == hits[0].artifact.content
     assert backend.query(MemoryQuery(MemoryKind.EPISODIC, '"unterminated')) == ()
 
+    unpaged = backend.query(MemoryQuery(
+        MemoryKind.EPISODIC,
+        "Deploy OR Deployment",
+        limit=2,
+    ))
+    paged = backend.query(MemoryQuery(
+        MemoryKind.EPISODIC,
+        "Deploy OR Deployment",
+        limit=1,
+        filters={"offset": 1},
+    ))
+    assert len(paged) == 1
+    assert paged[0].artifact.artifact_id == unpaged[1].artifact.artifact_id
+    assert len(paged[0].artifact.metadata["session_lineage"][0][2]) == 2
+    assert backend.query(MemoryQuery(
+        MemoryKind.EPISODIC,
+        "Deploy OR Deployment",
+        filters={"role_filter": ["assistant"]},
+    ))[0].artifact.metadata["role"] == "assistant"
+    assert backend.query(MemoryQuery(
+        MemoryKind.EPISODIC,
+        "Deploy OR Deployment",
+        filters={"exclude_sources": ["cli"]},
+    )) == ()
+
     rejected = backend.mutate(MemoryMutation(
         MemoryMutationAction.DELETE,
         MemoryKind.EPISODIC,
