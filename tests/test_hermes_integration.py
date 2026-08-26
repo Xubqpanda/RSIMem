@@ -9,9 +9,12 @@ from pathlib import Path
 import pytest
 
 from rsimem.hermes_integration import (
+    HermesAdapterExecutionError,
+    HermesAdapterFailurePolicy,
     HermesEquivalenceProbe,
     HermesExecutionSurface,
     HermesExecutionMode,
+    HermesExecutionRoute,
     HermesExperimentConfig,
     build_configured_hermes_runtime,
     run_hermes_execution_equivalence_variants,
@@ -19,7 +22,7 @@ from rsimem.hermes_integration import (
 )
 from rsimem.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import RawResourceUsage, run_sm01_preference_fixture
-from rsimem.memory import MemoryKind
+from rsimem.memory import MemoryKind, MemoryQuery
 
 
 PRIVATE_PREFERENCE = "Use TSV with owner, priority, task, and due_date."
@@ -76,6 +79,7 @@ def test_config_defaults_to_direct_native_and_requires_three_routes(tmp_path: Pa
     assert config.mode == HermesExecutionMode.NATIVE
     assert config.uses_adapter is False
     assert config.ledger_enabled is False
+    assert config.adapter_failure_policy == HermesAdapterFailurePolicy.FAIL_CLOSED
     assert set(config.routes) == set(MemoryKind)
 
     with pytest.raises(ValueError, match="one route per memory kind"):
@@ -168,6 +172,96 @@ def test_real_hermes_execution_surfaces_are_equivalent_across_variants(
     assert memory_tool.MEMORY_DIR == original_memory_dir
     assert skills_tool.SKILLS_DIR == original_skills_dir
     assert os.environ.get("HERMES_HOME") == original_hermes_home
+
+
+def test_execution_surfaces_and_artifact_ids_survive_runtime_restart(
+    tmp_path: Path,
+) -> None:
+    home = _hermes_home(tmp_path)
+    probe = HermesEquivalenceProbe(
+        episodic_query="task table",
+        procedural_skill_name="task-table",
+        procedural_resource_path="references/columns.md",
+    )
+
+    first_report = run_hermes_execution_equivalence_variants(home, probe)
+    second_report = run_hermes_execution_equivalence_variants(home, probe)
+
+    def artifact_ids() -> dict[str, tuple[str, ...]]:
+        runtime = build_configured_hermes_runtime(
+            home,
+            HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        )
+        try:
+            return {
+                "memory": tuple(hit.artifact.artifact_id for hit in runtime.query(
+                    MemoryQuery(MemoryKind.SEMANTIC, "", namespace="memory", limit=100)
+                )),
+                "user": tuple(hit.artifact.artifact_id for hit in runtime.query(
+                    MemoryQuery(MemoryKind.SEMANTIC, "", namespace="user", limit=100)
+                )),
+                "episodic": tuple(hit.artifact.artifact_id for hit in runtime.query(
+                    MemoryQuery(MemoryKind.EPISODIC, probe.episodic_query, limit=5)
+                )),
+                "procedural": tuple(hit.artifact.artifact_id for hit in runtime.query(
+                    MemoryQuery(MemoryKind.PROCEDURAL, "", limit=100)
+                )),
+            }
+        finally:
+            runtime.close()
+
+    first_ids = artifact_ids()
+    second_ids = artifact_ids()
+    assert first_report == second_report
+    assert first_ids == second_ids
+
+
+def test_adapter_failure_policy_is_explicit_and_content_free(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import rsimem.hermes_integration as integration
+
+    home = _hermes_home(tmp_path)
+    probe = HermesEquivalenceProbe(
+        episodic_query="task table",
+        procedural_skill_name="task-table",
+        procedural_resource_path="references/columns.md",
+    )
+
+    def fail_session_search(*args, **kwargs):
+        raise RuntimeError("private adapter failure detail")
+
+    monkeypatch.setattr(
+        integration,
+        "_capture_adapter_session_search",
+        fail_session_search,
+    )
+    with pytest.raises(
+        HermesAdapterExecutionError,
+        match=r"session_search \(RuntimeError\)",
+    ):
+        run_hermes_execution_equivalence_variants(home, probe)
+
+    report = run_hermes_execution_equivalence_variants(
+        home,
+        probe,
+        adapter_failure_policy=HermesAdapterFailurePolicy.BYPASS_NATIVE,
+    )
+    adapter = next(
+        variant
+        for variant in report.variants
+        if variant.mode == HermesExecutionMode.ADAPTER_LEDGER
+    )
+    checks = {check.surface: check for check in adapter.checks}
+
+    assert report.equivalent is True
+    assert checks[HermesExecutionSurface.SESSION_SEARCH].route == (
+        HermesExecutionRoute.NATIVE_BYPASS
+    )
+    assert checks[HermesExecutionSurface.SESSION_SEARCH].adapter_failure == "RuntimeError"
+    assert checks[HermesExecutionSurface.SYSTEM_PROMPT].route == HermesExecutionRoute.ADAPTER
+    assert "private adapter failure detail" not in json.dumps(asdict(report), default=str)
 
 
 def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) -> None:
