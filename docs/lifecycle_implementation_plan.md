@@ -99,8 +99,8 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Run `native`, `native+ledger`, and `native+adapter+ledger` variants on a deterministic storage-boundary fixture.
 - [x] Add observer-only evidence to the direct-native storage helper used by `native+ledger`.
 - [x] Confirm identical deterministic semantic rendering, episodic FTS views, and procedural resources at the storage-helper boundary.
-- [ ] Call Hermes' real memory prompt construction, `session_search`, `skills_list`, and `skill_view` paths.
-- [ ] Confirm restart persistence, artifact identity, and failure bypass behavior.
+- [x] Call Hermes' real memory prompt construction, `session_search`, `skills_list`, and `skill_view` paths in a deterministic execution-surface fixture.
+- [x] Confirm deterministic restart persistence, artifact identity, and explicit fail-closed or native-bypass behavior.
 - [ ] Run matched variants through the PAST-Bench execution path.
 - [x] Keep the direct Hermes path unchanged as the control.
 
@@ -166,4 +166,4 @@ Acceptance requires native behavior to remain unchanged, the memory artifact to 
 
 ## Current Boundary
 
-The scheduler, evaluator protocol, JSON LLM evaluator, conservative evaluator, lifecycle controller, snapshot contracts, deterministic Hermes fixture, and dry-run writeback coordinator are implemented in `rsimem.lifecycle`. Storage-boundary deterministic equivalence baseline completed. This does not establish Hermes execution equivalence: real prompt construction, `session_search`, `skills_list`, `skill_view`, restart, failure bypass, and matched PAST-Bench execution remain unverified. Snapshot and writeback events can be joined to the existing ledger schema without context content. Compiler execution, adaptive policy, and real memory mutation also remain future stages. No PAST-Bench task definition or hidden grading contract should be changed while these stages are implemented.
+The scheduler, evaluator protocol, JSON LLM evaluator, conservative evaluator, lifecycle controller, snapshot contracts, deterministic Hermes fixture, and dry-run writeback coordinator are implemented in `rsimem.lifecycle`. Storage-boundary and deterministic Hermes execution-surface equivalence baselines are complete. The execution fixture calls the real prompt builder and memory-read tool handlers, verifies restart identity, and makes adapter failures explicit. It replaces external session summarization with a deterministic function and does not run the PAST-Bench agent loop, so matched execution equivalence remains unverified. Snapshot and writeback events can be joined to the existing ledger schema without context content. Compiler execution, adaptive policy, and real memory mutation also remain future stages. No PAST-Bench task definition or hidden grading contract should be changed while these stages are implemented.

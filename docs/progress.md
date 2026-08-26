@@ -100,9 +100,24 @@ recovery before any exactly-once claim is justified.
 
 Storage-boundary deterministic equivalence baseline completed. Real Hermes execution equivalence has not been established.
 
+### Deterministic Hermes Execution-Surface Baseline
+
+- [x] Invoke Hermes' real `AIAgent._build_system_prompt` with native and adapter-backed frozen semantic memory snapshots.
+- [x] Dispatch the real `session_search` tool against native `SessionDB` and an adapter-backed DB contract with a deterministic summarizer.
+- [x] Dispatch the real `skills_list` and `skill_view` tools, including a linked resource, against native and adapter-projected skill directories.
+- [x] Verify identical model-visible output for all four surfaces across `native`, `native+ledger`, and `native+adapter+ledger`.
+- [x] Verify content-free query, retrieval, and injection evidence for instrumented variants.
+- [x] Rebuild runtimes and verify stable execution reports and artifact IDs.
+- [x] Define explicit `fail_closed` and observable `bypass_native` adapter failure policies.
+
+Deterministic Hermes execution-surface equivalence baseline completed. The
+fixture replaces external session summarization with a deterministic function
+and does not run the PAST-Bench agent loop, so matched Hermes execution
+equivalence has not yet been established.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `60 passed`.
+- [x] Pass all RSIMem tests: `63 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `380 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
@@ -117,19 +132,19 @@ The immediate objective is to connect the typed memory runtime and lifecycle con
 - [x] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
 - [ ] Construct context snapshots at task completion and configured context-pressure boundaries.
 - [ ] Add an opt-in lifecycle evaluator configuration with an injected model client and deterministic baseline.
-- [ ] Identify and document the exact Hermes semantic write, episodic search, skill read, and skill mutation interception points.
+- [x] Identify and exercise the Hermes semantic prompt, episodic search, and skill read interception points in an isolated execution fixture; mutation interception remains gated on compiler validation.
 - [ ] Add an opt-in adapter execution path while retaining the direct native path as the control.
 - [ ] Forward runtime lifecycle events into the existing ledger through stable run, episode, session, and artifact identifiers.
 - [ ] Add host-neutral validation hooks before allowing compiler-generated content to mutate Hermes files.
-- [ ] Ensure adapter failures bypass or fail explicitly according to experiment configuration and never silently corrupt native state.
+- [x] Define explicit fail-closed and native-bypass behavior for deterministic execution surfaces; PAST-Bench runner wiring remains pending.
 
 Acceptance criteria:
 
 - [ ] The direct-native and adapter-native variants receive identical task inputs and use identical Hermes storage semantics.
-- [ ] A deterministic fixture produces equivalent model-visible semantic memory, episodic search results, and procedural resources in both variants.
+- [x] A deterministic fixture produces equivalent model-visible semantic memory, episodic search results, and procedural resources in both variants.
 - [ ] Every adapter query, injection, and mutation appears once in lifecycle evidence without memory text leakage.
-- [ ] Restarting between episodes preserves the selected backend state and artifact identity behavior.
-- [ ] The full RSIMem and PAST-Bench regression suites continue to pass.
+- [x] Restarting the deterministic fixture preserves the selected backend state and artifact identity behavior.
+- [x] The full RSIMem and PAST-Bench regression suites continue to pass.
 
 ## Following Milestones
 
@@ -137,8 +152,8 @@ Acceptance criteria:
 
 - [x] Add `native`, `native+ledger`, and `native+adapter+ledger` storage-boundary variants.
 - [x] Run matched deterministic fixtures before spending model tokens.
-- [ ] Invoke real Hermes memory prompt construction, `session_search`, `skills_list`, and `skill_view` in matched fixtures.
-- [ ] Verify restart persistence and adapter failure bypass.
+- [x] Invoke real Hermes memory prompt construction, `session_search`, `skills_list`, and `skill_view` in matched deterministic fixtures.
+- [x] Verify deterministic restart persistence and explicit adapter failure bypass.
 - [ ] Run at least three matched `SM01_preference_adoption` seeds with fixed model, prompt, task order, sandbox, and budget.
 - [ ] Compare task score, pass rate, model requests, token buckets, tool calls, stored bytes, injected characters, and wall time.
 - [ ] Establish an explicit tolerance for nondeterministic model variation and require zero unexplained accounting drift.

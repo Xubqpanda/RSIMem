@@ -76,4 +76,4 @@ plan concurrently. It does not yet provide exactly-once real memory mutation;
 that path needs pending/committed receipt states and crash recovery around the
 backend operation.
 
-The next implementation step is calling real Hermes prompt, session-search, and skill surfaces under observer-only instrumentation, followed by restart and failure-bypass checks. The current result is a storage-boundary deterministic equivalence baseline, not execution equivalence.
+The real Hermes prompt builder, `session_search`, `skills_list`, and `skill_view` surfaces now pass deterministic native/adapter equivalence checks with observer-only instrumentation, restart-stable identities, and explicit failure policy. The next implementation step is opt-in PAST-Bench runner wiring and matched agent-loop execution. The current result is an execution-surface baseline, not matched PAST-Bench execution equivalence.
