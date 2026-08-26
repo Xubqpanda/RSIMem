@@ -14,7 +14,7 @@ This document tracks implementation progress, the current experimental boundary,
 
 RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for every exposed model request, derive a privacy-safe lifecycle ledger, audit run completeness, and represent Hermes semantic, episodic, and procedural memory through typed backend contracts.
 
-The new memory runtime is not yet connected to the PAST-Bench execution path. Hermes native tools remain the behavioral baseline, and no LightRSI admission, distillation, retrieval, or adaptive policy is active yet.
+The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem compiler, real writeback mutation, static policy, or adaptive policy is active yet.
 
 ## Completed Work
 
@@ -112,37 +112,52 @@ Storage-boundary deterministic equivalence baseline completed. Real Hermes execu
 
 Deterministic Hermes execution-surface equivalence baseline completed. The
 fixture replaces external session summarization with a deterministic function
-and does not run the PAST-Bench agent loop, so matched Hermes execution
+and does not make model API calls, so matched live-model Hermes execution
 equivalence has not yet been established.
+
+### Deterministic PAST-Bench Agent-Loop Baseline
+
+- [x] Carry explicit `native`, `native+ledger`, and `native+adapter+ledger` modes through the PAST-Bench sequence and runtime configuration.
+- [x] Attach the bridge after Hermes agent construction and restore every wrapped surface before runtime cleanup.
+- [x] Execute `HermesAdapter.step`, `_run_agent`, semantic prompt reads, session search, and skill reads in one deterministic fixture.
+- [x] Verify identical final model-visible fixture output across all three execution modes.
+- [x] Keep direct native free of RSIMem evidence and emit content-free evidence for both ledger modes.
+- [x] Separate comparison variant identity from RSIMem execution mode.
+- [x] Discover episode-local RSIMem JSONL evidence from comparison-owned trace paths and join it through strict run, variant, trace, task, family, and stage validation.
+- [x] Reject malformed JSONL, misplaced evidence, unknown runtime fields, and conflicting event IDs.
+
+This proves deterministic PAST-Bench adapter-loop equivalence without an
+external model call. It does not prove live-model behavioral equivalence or
+establish a nondeterminism tolerance.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `63 passed`.
-- [x] Pass the vendored PAST-Bench regression suite: `380 passed, 2 skipped`.
+- [x] Pass all RSIMem tests: `76 passed`.
+- [x] Pass the vendored PAST-Bench regression suite: `383 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Opt-In Memory Runtime Integration**
+### **Current: Live Matched Runtime Validation**
 
-The immediate objective is to connect the typed memory runtime and lifecycle control plane to experiments without changing the native Hermes baseline. Follow [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md) for the staged contracts, snapshot collector, dry-run plan, writeback, and acceptance order.
+The immediate objective is to validate the opt-in typed memory read path under matched live-model SM01 runs without changing the native Hermes baseline. Follow [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md) for the later snapshot, compiler, writeback, and acceptance order.
 
 - [x] Define an experiment configuration that selects one backend for each memory kind and defaults to native Hermes behavior.
 - [x] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
 - [ ] Construct context snapshots at task completion and configured context-pressure boundaries.
 - [ ] Add an opt-in lifecycle evaluator configuration with an injected model client and deterministic baseline.
 - [x] Identify and exercise the Hermes semantic prompt, episodic search, and skill read interception points in an isolated execution fixture; mutation interception remains gated on compiler validation.
-- [ ] Add an opt-in adapter execution path while retaining the direct native path as the control.
-- [ ] Forward runtime lifecycle events into the existing ledger through stable run, episode, session, and artifact identifiers.
+- [x] Add an opt-in adapter execution path while retaining the direct native path as the control.
+- [x] Forward runtime lifecycle events into the existing ledger through stable run, episode, session, and artifact identifiers.
 - [ ] Add host-neutral validation hooks before allowing compiler-generated content to mutate Hermes files.
-- [x] Define explicit fail-closed and native-bypass behavior for deterministic execution surfaces; PAST-Bench runner wiring remains pending.
+- [x] Define explicit fail-closed and native-bypass behavior for deterministic execution surfaces and the PAST-Bench runner.
 
 Acceptance criteria:
 
-- [ ] The direct-native and adapter-native variants receive identical task inputs and use identical Hermes storage semantics.
+- [x] The deterministic direct-native and adapter-native fixture variants receive identical task inputs and use identical Hermes storage semantics.
 - [x] A deterministic fixture produces equivalent model-visible semantic memory, episodic search results, and procedural resources in both variants.
-- [ ] Every adapter query, injection, and mutation appears once in lifecycle evidence without memory text leakage.
+- [x] Every deterministic fixture query and injection appears once in lifecycle evidence without memory text leakage; mutation evidence remains gated on real writeback.
 - [x] Restarting the deterministic fixture preserves the selected backend state and artifact identity behavior.
 - [x] The full RSIMem and PAST-Bench regression suites continue to pass.
 
@@ -208,9 +223,9 @@ Acceptance criteria:
 
 ## Immediate Execution Order
 
-1. Connect the explicit modes and lifecycle collector to the opt-in PAST-Bench/Hermes execution path.
-2. Join typed memory query, retrieval, injection, and mutation events to the existing ledger.
-3. Verify restart persistence and explicit adapter failure behavior.
+1. Add an explicit SM01 live-run configuration for each matched execution mode.
+2. Run matched seeds and compare quality, usage, tool, storage, injection, and timing evidence.
+3. Define and enforce the acceptable live-model nondeterminism boundary.
 4. Implement validated compiler and backend mutation baselines.
 5. Begin the static RSIMem writeback policy only after runtime equivalence is established.
 
