@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
+import threading
 
 import pytest
 
@@ -11,6 +13,7 @@ from rsimem.lifecycle import (
     DeterministicPreferenceEvaluator,
     EvaluationSignal,
     EvaluationTrigger,
+    IdempotencyReceipt,
     HermesMessage,
     HermesSnapshotCollector,
     JsonIdempotencyReceiptStore,
@@ -556,6 +559,24 @@ def test_malformed_idempotency_receipt_fails_closed(tmp_path, payload: str) -> N
     store = JsonIdempotencyReceiptStore(receipt_path)
     with pytest.raises(ValueError, match="malformed idempotency receipt"):
         store.get("idem_bad")
+
+
+def test_json_receipt_reservation_is_atomic_under_concurrency(tmp_path) -> None:
+    receipt_path = tmp_path / "idempotency-receipts.json"
+    receipt = IdempotencyReceipt("idem-concurrent", "plan-a", "mutation-a")
+    workers = 8
+    barrier = threading.Barrier(workers)
+
+    def reserve() -> tuple[IdempotencyReceipt, bool]:
+        store = JsonIdempotencyReceiptStore(receipt_path)
+        barrier.wait()
+        return store.reserve_if_absent(receipt)
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        results = tuple(executor.map(lambda _: reserve(), range(workers)))
+
+    assert sum(created for _, created in results) == 1
+    assert {stored for stored, _ in results} == {receipt}
 
 
 def test_lifecycle_usage_preserves_all_raw_request_buckets() -> None:
