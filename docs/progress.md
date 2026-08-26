@@ -125,6 +125,9 @@ equivalence has not yet been established.
 - [x] Separate comparison variant identity from RSIMem execution mode.
 - [x] Discover episode-local RSIMem JSONL evidence from comparison-owned trace paths and join it through strict run, variant, trace, task, family, and stage validation.
 - [x] Reject malformed JSONL, misplaced evidence, unknown runtime fields, and conflicting event IDs.
+- [x] Persist runtime evidence incrementally with flush and fsync instead of waiting for bridge shutdown.
+- [x] Project procedural backend hits into an isolated Hermes skills root before native-format rendering and security checks.
+- [x] Project episodic pagination, filters, session lineage, metadata, and full conversation expansion through the backend.
 
 This proves deterministic PAST-Bench adapter-loop equivalence without an
 external model call. It does not prove live-model behavioral equivalence or
@@ -132,7 +135,7 @@ establish a nondeterminism tolerance.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `76 passed`.
+- [x] Pass all RSIMem tests: `81 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `384 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
@@ -171,6 +174,7 @@ Acceptance criteria:
 - [x] Run matched deterministic fixtures before spending model tokens.
 - [x] Invoke real Hermes memory prompt construction, `session_search`, `skills_list`, and `skill_view` in matched deterministic fixtures.
 - [x] Verify deterministic restart persistence and explicit adapter failure bypass.
+- [x] Complete and audit one live unseeded infrastructure replicate on the earlier hybrid adapter path; record the provider-failed attempt separately.
 - [ ] Run at least three matched independent `SM01_preference_adoption` replicates with fixed model, prompt, task order, sandbox, and budget.
 - [ ] Compare task score, pass rate, model requests, token buckets, tool calls, stored bytes, injected characters, and wall time.
 - [ ] Establish an explicit tolerance for nondeterministic model variation and require zero unexplained accounting drift.
