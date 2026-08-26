@@ -8,6 +8,7 @@ PAST_BENCH_ROOT="${PAST_BENCH_ROOT:-${RSIMEM_ROOT}/benchmarks/past-bench}"
 PAST_BENCH_BIN="${RSIMEM_ROOT}/.venv/bin/past-bench"
 PYTHON_BIN="${RSIMEM_ROOT}/.venv/bin/python"
 REPLICATES="${RSIMEM_REPLICATES:-1}"
+TASK_FAMILY="memory_ability/SM01_preference_adoption"
 
 if [[ -z "${GPT_LUNA_API_KEY:-}" ]]; then
   echo "GPT_LUNA_API_KEY is required." >&2
@@ -26,15 +27,23 @@ if [[ ! "${REPLICATES}" =~ ^[1-9][0-9]*$ ]]; then
   exit 2
 fi
 
-batch_id="$(date +%Y%m%d_%H%M%S)"
+batch_id="${RSIMEM_BATCH_ID:-$(date +%Y%m%d_%H%M%S)}"
+if [[ ! "${batch_id}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "RSIMEM_BATCH_ID contains unsupported characters." >&2
+  exit 2
+fi
 batch_root="${RSIMEM_ROOT}/outputs/matched/hermes_luna_sm01/${batch_id}"
 manifest_path="${batch_root}/batch_manifest.json"
 rsimem_commit="$(git -C "${RSIMEM_ROOT}" rev-parse HEAD)"
 past_bench_commit="$(git -C "${RSIMEM_ROOT}" log -1 --format=%H -- benchmarks/past-bench)"
 past_bench_tree="$(git -C "${RSIMEM_ROOT}" rev-parse HEAD:benchmarks/past-bench)"
-working_tree_dirty=false
+rsimem_working_tree_dirty=false
 if [[ -n "$(git -C "${RSIMEM_ROOT}" status --porcelain)" ]]; then
-  working_tree_dirty=true
+  rsimem_working_tree_dirty=true
+fi
+past_bench_dirty=false
+if [[ -n "$(git -C "${RSIMEM_ROOT}" status --porcelain -- benchmarks/past-bench)" ]]; then
+  past_bench_dirty=true
 fi
 proxy_args=()
 if [[ -n "${PAST_BENCH_PROXY:-}" ]]; then
@@ -42,20 +51,46 @@ if [[ -n "${PAST_BENCH_PROXY:-}" ]]; then
 fi
 mkdir -p "${batch_root}"
 
+PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.preflight \
+  --state-dir "${batch_root}/preflight_state" \
+  --past-bench-root "${PAST_BENCH_ROOT}" \
+  --registry "${RSIMEM_ROOT}/configs/agents.yaml" \
+  --agent hermes-luna \
+  --require-provider
+
 PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
 import sys
 from pathlib import Path
-from rsimem.experiment_manifest import initialize_batch_manifest
+from rsimem.experiment_manifest import (
+    initialize_batch_manifest,
+    resolved_family_budget,
+    resolved_model_profile,
+)
 
 initialize_batch_manifest(
     Path(sys.argv[1]),
     replicates=int(sys.argv[2]),
-    rsimem_commit=sys.argv[3],
-    past_bench_commit=sys.argv[4],
-    past_bench_tree=sys.argv[5],
-    working_tree_dirty=sys.argv[6] == "true",
+    task_family=sys.argv[3],
+    agent="hermes-luna",
+    runtime="local",
+    model=resolved_model_profile(Path(sys.argv[4]), "hermes-luna"),
+    judge={"enabled": False, "profile": "disabled", "modelId": None},
+    budget=resolved_family_budget(Path(sys.argv[5])),
+    persistence_isolation={
+        "strategy": "per_attempt_trace_directory",
+        "compareNoPersistence": True,
+    },
+    rsimem_commit=sys.argv[6],
+    rsimem_working_tree_dirty=sys.argv[7] == "true",
+    past_bench_commit=sys.argv[8],
+    past_bench_tree=sys.argv[9],
+    past_bench_dirty=sys.argv[10] == "true",
 )
-' "${manifest_path}" "${REPLICATES}" "${rsimem_commit}" "${past_bench_commit}" "${past_bench_tree}" "${working_tree_dirty}"
+' "${manifest_path}" "${REPLICATES}" "${TASK_FAMILY}" \
+  "${RSIMEM_ROOT}/configs/agents.yaml" \
+  "${PAST_BENCH_ROOT}/self-evolve-tasks-v2/${TASK_FAMILY}" \
+  "${rsimem_commit}" "${rsimem_working_tree_dirty}" \
+  "${past_bench_commit}" "${past_bench_tree}" "${past_bench_dirty}"
 
 record_attempt() {
   PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
@@ -73,6 +108,23 @@ record_attempt(
     failure_stage=sys.argv[7] or None,
 )
 ' "${manifest_path}" "$1" "$2" "$3" "$4" "$5" "${6:-}"
+}
+
+next_attempt_name() {
+  PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
+import sys
+from pathlib import Path
+from rsimem.experiment_manifest import next_attempt_name
+
+name = next_attempt_name(
+    Path(sys.argv[1]),
+    replicate=int(sys.argv[2]),
+    ordinal=int(sys.argv[3]),
+    mode=sys.argv[4],
+    base_run_name=sys.argv[5],
+)
+print(name if name is not None else "__SKIP__")
+' "${manifest_path}" "$1" "$2" "$3" "$4"
 }
 
 echo "PAST-Bench: ${PAST_BENCH_ROOT}"
@@ -95,14 +147,19 @@ print("\n".join(execution_order(int(sys.argv[1]))))
   for mode in "${modes[@]}"; do
     ordinal=$((ordinal + 1))
     mode_slug="${mode//+/_}"
-    run_name="${batch_id}_r$(printf '%02d' "${replicate}")_${mode_slug}"
+    base_run_name="${batch_id}_r$(printf '%02d' "${replicate}")_${mode_slug}"
+    run_name="$(next_attempt_name "${replicate}" "${ordinal}" "${mode}" "${base_run_name}")"
+    if [[ "${run_name}" == "__SKIP__" ]]; then
+      echo "Skipping completed replicate=${replicate} mode=${mode}"
+      continue
+    fi
     trace_dir="${batch_root}/${run_name}"
     echo
     echo "=== replicate=${replicate} mode=${mode} ==="
     record_attempt "${replicate}" "${ordinal}" "${mode}" "${run_name}" running
 
     if ! "${PAST_BENCH_BIN}" evolve \
-      --family memory_ability/SM01_preference_adoption \
+      --family "${TASK_FAMILY}" \
       --agent hermes-luna \
       --runtime local \
       --sandbox \
