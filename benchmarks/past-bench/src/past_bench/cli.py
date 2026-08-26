@@ -1963,6 +1963,19 @@ def _print_sequence_bucket_summary(label: str, summary: dict) -> None:
     )
 
 
+def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> None:
+    mode = getattr(args, "rsimem_mode", None)
+    failure_policy = getattr(args, "rsimem_adapter_failure_policy", None)
+    if mode is None and failure_policy is None:
+        return
+    if not str(args.agent).startswith("hermes"):
+        raise SystemExit("RSIMem execution overrides require a Hermes agent")
+    if mode is not None:
+        sequence.hermes.rsimem_mode = mode
+    if failure_policy is not None:
+        sequence.hermes.rsimem_adapter_failure_policy = failure_policy
+
+
 def _print_episode_result_summary(result: dict) -> None:
     print(
         "  task: "
@@ -2040,6 +2053,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
         raise SystemExit("either --sequence, --family, or --v2-family is required")
 
     sequence = SelfEvolveSequenceDefinition.from_yaml(sequence_path)
+    _apply_rsimem_execution_overrides(sequence, args)
     judge = _make_judge(cfg, args)
     runtime_mode = _resolve_runtime_mode(args, cfg)
     runtime_temperature = _resolve_runtime_temperature(args, cfg)
@@ -3337,6 +3351,18 @@ def main(argv: list[str] | None = None) -> None:
     p_evolve.add_argument("--compare-no-persistence", action="store_true", help="Run paired with-persistence and without-persistence variants for supported self-evolve agents")
     p_evolve.add_argument("--reflection-off", action="store_true", help="§15 reflection_off control: disable Hermes reflection on this run")
     p_evolve.add_argument("--background-review-wait-s", type=float, default=None, help="Wait time after Hermes finishes so background memory/skill review can flush")
+    p_evolve.add_argument(
+        "--rsimem-mode",
+        choices=["native", "native+ledger", "native+adapter+ledger"],
+        default=None,
+        help="Explicitly override the Hermes RSIMem execution mode for this sequence",
+    )
+    p_evolve.add_argument(
+        "--rsimem-adapter-failure-policy",
+        choices=["fail_closed", "bypass_native"],
+        default=None,
+        help="Explicitly override the RSIMem adapter failure policy",
+    )
 
     # cleanup
     p_cleanup = sub.add_parser("cleanup", help="Remove all PAST-Bench Docker containers")
