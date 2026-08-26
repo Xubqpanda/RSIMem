@@ -1,7 +1,25 @@
 from types import SimpleNamespace
 
 from past_bench.models.tool import ToolEndpoint
-from past_bench.runner.agent_orchestrator import _runtime_tool_endpoints
+from past_bench.runner.agent_orchestrator import _runtime_metadata, _runtime_tool_endpoints
+
+
+def test_runtime_metadata_preserves_join_identity_and_authoritative_trace() -> None:
+    metadata = _runtime_metadata("trace-runtime", {
+        "run_id": "run-sequence",
+        "trace_id": "untrusted-trace",
+        "episode_id": "episode-03",
+        "family_id": "SM01",
+        "stage": "eval_near",
+    })
+
+    assert metadata == {
+        "run_id": "run-sequence",
+        "trace_id": "trace-runtime",
+        "episode_id": "episode-03",
+        "family_id": "SM01",
+        "stage": "eval_near",
+    }
 
 
 def test_runtime_tool_endpoints_adds_sandbox_endpoints_for_container_runtime():

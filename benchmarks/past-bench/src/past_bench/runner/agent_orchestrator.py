@@ -41,6 +41,15 @@ def _complete_usage_sum(records: list[ModelCallRecord], field: str) -> int | Non
     return sum(values)
 
 
+def _runtime_metadata(
+    trace_id: str,
+    supplied: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Join caller-owned experiment identity with the authoritative trace ID."""
+
+    return {**(supplied or {}), "trace_id": trace_id}
+
+
 def _fetch_acontext_block(cfg: Config) -> str | None:
     """Fetch Acontext skills and return a formatted block for the system prompt.
 
@@ -497,6 +506,7 @@ def run_task_via_agent(
     media_cfg: MediaConfig | None = None,
     runtime_temperature: float = 0.0,
     task_timeout_override: int | None = None,
+    runtime_metadata: dict[str, Any] | None = None,
 ) -> Path:
     """Run one task by delegating model turns to a decoupled agent runtime."""
 
@@ -616,7 +626,10 @@ def run_task_via_agent(
                     sandbox_url=sandbox_url,
                 ),
                 model=resolved_model,
-                runtime_config=RuntimeConfigPayload(temperature=runtime_temperature),
+                runtime_config=RuntimeConfigPayload(
+                    temperature=runtime_temperature,
+                    metadata=_runtime_metadata(trace_id, runtime_metadata),
+                ),
             ))
 
             while turn_count < task.environment.max_turns:
