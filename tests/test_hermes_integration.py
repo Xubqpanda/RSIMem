@@ -9,9 +9,11 @@ import pytest
 
 from rsimem.hermes_integration import (
     HermesEquivalenceProbe,
+    HermesExecutionSurface,
     HermesExecutionMode,
     HermesExperimentConfig,
     build_configured_hermes_runtime,
+    run_hermes_execution_equivalence_variants,
     run_hermes_equivalence_variants,
 )
 from rsimem.ledger import LifecycleLedgerObserver
@@ -142,6 +144,36 @@ def test_native_ledger_and_adapter_views_are_equivalent(tmp_path: Path) -> None:
     serialized = json.dumps(asdict(report), default=str)
     assert PRIVATE_PREFERENCE not in serialized
     assert "requested task table" not in serialized
+
+
+def test_real_hermes_system_prompt_is_equivalent_across_variants(
+    tmp_path: Path,
+) -> None:
+    from tools import memory_tool
+
+    home = _hermes_home(tmp_path)
+    original_memory_dir = memory_tool.MEMORY_DIR
+    report = run_hermes_execution_equivalence_variants(home)
+
+    assert report.equivalent is True
+    assert [variant.mode for variant in report.variants] == list(HermesExecutionMode)
+    assert all(variant.equivalent_to_native for variant in report.variants)
+    assert all(
+        variant.checks[0].surface == HermesExecutionSurface.SYSTEM_PROMPT
+        for variant in report.variants
+    )
+    assert all(
+        check.native_content_chars == check.candidate_content_chars
+        for variant in report.variants
+        for check in variant.checks
+    )
+    assert [variant.memory_event_count for variant in report.variants] == [0, 6, 6]
+    assert [variant.ledger_event_count for variant in report.variants] == [0, 6, 6]
+    assert report.variants[1].memory_event_kinds == report.variants[2].memory_event_kinds
+    serialized = json.dumps(asdict(report), default=str)
+    assert PRIVATE_PREFERENCE not in serialized
+    assert "concise status updates" not in serialized
+    assert memory_tool.MEMORY_DIR == original_memory_dir
 
 
 def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) -> None:

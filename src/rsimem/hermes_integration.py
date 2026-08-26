@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import sqlite3
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
+from types import SimpleNamespace
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
@@ -158,6 +162,39 @@ class HermesVariantResult:
 @dataclass(frozen=True, slots=True)
 class HermesEquivalenceReport:
     variants: tuple[HermesVariantResult, ...]
+
+    @property
+    def equivalent(self) -> bool:
+        return all(variant.equivalent_to_native for variant in self.variants)
+
+
+class HermesExecutionSurface(StrEnum):
+    SYSTEM_PROMPT = "system_prompt"
+
+
+@dataclass(frozen=True, slots=True)
+class HermesExecutionSurfaceCheck:
+    surface: HermesExecutionSurface
+    equivalent: bool
+    native_content_chars: int
+    candidate_content_chars: int
+
+
+@dataclass(frozen=True, slots=True)
+class HermesExecutionVariantResult:
+    mode: HermesExecutionMode
+    equivalent_to_native: bool
+    checks: tuple[HermesExecutionSurfaceCheck, ...]
+    ledger_enabled: bool
+    memory_event_count: int
+    memory_event_kinds: tuple[MemoryEventKind, ...]
+    ledger_event_count: int
+    ledger_event_kinds: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class HermesExecutionEquivalenceReport:
+    variants: tuple[HermesExecutionVariantResult, ...]
 
     @property
     def equivalent(self) -> bool:
@@ -405,6 +442,168 @@ class _MemoryEventCollector:
             self.ledger.record(event)
 
 
+_HERMES_NATIVE_BINDING_LOCK = threading.RLock()
+
+
+@contextmanager
+def _bound_hermes_memory_dir(home: Path):
+    """Temporarily point Hermes' import-time memory path at an isolated home."""
+
+    from tools import memory_tool
+
+    with _HERMES_NATIVE_BINDING_LOCK:
+        previous = memory_tool.MEMORY_DIR
+        memory_tool.MEMORY_DIR = home / "memories"
+        try:
+            yield memory_tool
+        finally:
+            memory_tool.MEMORY_DIR = previous
+
+
+@contextmanager
+def _fixed_hermes_clock():
+    """Keep the real Hermes prompt builder deterministic for matched fixtures."""
+
+    import hermes_time
+
+    with _HERMES_NATIVE_BINDING_LOCK:
+        previous = hermes_time.now
+        hermes_time.now = lambda: datetime(2026, 8, 26, 12, 0, 0)
+        try:
+            yield
+        finally:
+            hermes_time.now = previous
+
+
+def _build_real_hermes_system_prompt(store: object) -> str:
+    """Invoke Hermes' real prompt assembly without constructing a model client."""
+
+    from run_agent import AIAgent
+
+    agent = SimpleNamespace(
+        skip_context_files=True,
+        _honcho_config=None,
+        valid_tool_names={"memory"},
+        _honcho=None,
+        _honcho_session_key=None,
+        _memory_store=store,
+        _memory_enabled=True,
+        _user_profile_enabled=True,
+        pass_session_id=False,
+        session_id="execution-equivalence-session",
+        model="fixture-model",
+        provider="fixture-provider",
+        platform="",
+    )
+    with _fixed_hermes_clock():
+        return AIAgent._build_system_prompt(agent, "Matched fixture system message")
+
+
+def _record_native_prompt_memory(
+    store: object,
+    observer: MemoryObserver,
+) -> None:
+    snapshots = (
+        ("memory", tuple(store.memory_entries)),
+        ("user", tuple(store.user_entries)),
+    )
+    for namespace, entries in snapshots:
+        artifact_ids = tuple(
+            f"native-semantic:{namespace}:{index}" for index in range(len(entries))
+        )
+        content_chars = sum(len(entry) for entry in entries)
+        observer.record(MemoryEvent(
+            MemoryEventKind.QUERY,
+            MemoryKind.SEMANTIC,
+            "hermes-native-semantic",
+            query_chars=0,
+            attributes={"limit": 100, "namespace": namespace},
+        ))
+        observer.record(MemoryEvent(
+            MemoryEventKind.RETRIEVED,
+            MemoryKind.SEMANTIC,
+            "hermes-native-semantic",
+            artifact_ids=artifact_ids,
+            content_chars=content_chars,
+            attributes={"count": len(entries)},
+        ))
+    for namespace, entries in snapshots:
+        if entries:
+            artifact_ids = tuple(
+                f"native-semantic:{namespace}:{index}"
+                for index in range(len(entries))
+            )
+            observer.record(MemoryEvent(
+                MemoryEventKind.INJECTED,
+                MemoryKind.SEMANTIC,
+                "hermes-native-semantic",
+                artifact_ids=artifact_ids,
+                content_chars=sum(len(entry) for entry in entries),
+                attributes={"count": len(entries), "surface": "system_prompt"},
+            ))
+
+
+def _capture_native_system_prompt(
+    home: Path,
+    *,
+    observer: MemoryObserver | None = None,
+) -> str:
+    with _bound_hermes_memory_dir(home) as memory_tool:
+        store = memory_tool.MemoryStore(
+            memory_char_limit=_SEMANTIC_LIMITS["memory"],
+            user_char_limit=_SEMANTIC_LIMITS["user"],
+        )
+        store.load_from_disk()
+    prompt = _build_real_hermes_system_prompt(store)
+    if observer is not None:
+        _record_native_prompt_memory(store, observer)
+    return prompt
+
+
+class _AdapterPromptMemoryStore:
+    """Hermes prompt-store surface backed by one frozen typed-runtime read."""
+
+    def __init__(self, runtime: MemoryRuntime) -> None:
+        self.runtime = runtime
+        self._hits = {
+            namespace: runtime.query(MemoryQuery(
+                MemoryKind.SEMANTIC,
+                "",
+                namespace=namespace,
+                limit=100,
+            ))
+            for namespace in ("memory", "user")
+        }
+        self._injected: set[str] = set()
+
+    def format_for_system_prompt(self, target: str) -> str | None:
+        hits = self._hits.get(target, ())
+        if not hits:
+            return None
+        if target not in self._injected:
+            self.runtime.mark_injected(hits, surface="system_prompt")
+            self._injected.add(target)
+        return _render_semantic_block(
+            target,
+            tuple(hit.artifact.content for hit in hits),
+        )
+
+
+def _capture_adapter_system_prompt(
+    home: Path,
+    collector: _MemoryEventCollector,
+) -> str:
+    runtime = build_configured_hermes_runtime(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        observers=(collector,),
+    )
+    try:
+        return _build_real_hermes_system_prompt(_AdapterPromptMemoryStore(runtime))
+    finally:
+        runtime.close()
+
+
 def _capture_adapter(
     home: Path,
     probe: HermesEquivalenceProbe,
@@ -571,3 +770,57 @@ def run_hermes_equivalence_variants(
             ),
         ))
     return HermesEquivalenceReport(tuple(variants))
+
+
+def run_hermes_execution_equivalence_variants(
+    hermes_home: Path,
+) -> HermesExecutionEquivalenceReport:
+    """Compare final model-visible output from real Hermes execution surfaces."""
+
+    home = hermes_home.expanduser().resolve()
+    baseline = _capture_native_system_prompt(home)
+    variants = []
+    for mode in HermesExecutionMode:
+        config = HermesExperimentConfig(mode)
+        ledger = (
+            MemoryLedgerObserver(
+                run_id="execution-surface-fixture",
+                variant=mode.value,
+                trace_id="execution-surface-trace",
+                episode_id="execution-surface-episode",
+                session_id="execution-surface-session",
+                task_id="execution-surface-task",
+                family_id="execution-surface",
+                stage="fixture",
+            )
+            if config.ledger_enabled
+            else None
+        )
+        collector = _MemoryEventCollector(ledger)
+        if mode == HermesExecutionMode.ADAPTER_LEDGER:
+            candidate = _capture_adapter_system_prompt(home, collector)
+        elif mode == HermesExecutionMode.NATIVE_LEDGER:
+            candidate = _capture_native_system_prompt(home, observer=collector)
+        else:
+            candidate = _capture_native_system_prompt(home)
+        check = HermesExecutionSurfaceCheck(
+            surface=HermesExecutionSurface.SYSTEM_PROMPT,
+            equivalent=baseline == candidate,
+            native_content_chars=len(baseline),
+            candidate_content_chars=len(candidate),
+        )
+        variants.append(HermesExecutionVariantResult(
+            mode=mode,
+            equivalent_to_native=check.equivalent,
+            checks=(check,),
+            ledger_enabled=config.ledger_enabled,
+            memory_event_count=len(collector.events),
+            memory_event_kinds=tuple(event.kind for event in collector.events),
+            ledger_event_count=len(ledger.events) if ledger is not None else 0,
+            ledger_event_kinds=(
+                tuple(event["kind"] for event in ledger.events)
+                if ledger is not None
+                else ()
+            ),
+        ))
+    return HermesExecutionEquivalenceReport(tuple(variants))
