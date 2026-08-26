@@ -8,6 +8,7 @@ import json
 import os
 import re
 import tempfile
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -397,21 +398,33 @@ class IdempotencyReceipt:
 class IdempotencyReceiptStore(Protocol):
     def get(self, idempotency_key: str) -> IdempotencyReceipt | None: ...
 
-    def put(self, receipt: IdempotencyReceipt) -> None: ...
+    def reserve_if_absent(
+        self,
+        receipt: IdempotencyReceipt,
+    ) -> tuple[IdempotencyReceipt, bool]: ...
 
 
 class InMemoryIdempotencyReceiptStore:
     def __init__(self) -> None:
         self._receipts: dict[str, IdempotencyReceipt] = {}
+        self._lock = threading.Lock()
 
     def get(self, idempotency_key: str) -> IdempotencyReceipt | None:
-        return self._receipts.get(idempotency_key)
+        with self._lock:
+            return self._receipts.get(idempotency_key)
 
-    def put(self, receipt: IdempotencyReceipt) -> None:
-        existing = self._receipts.get(receipt.idempotency_key)
-        if existing is not None and existing != receipt:
-            raise ValueError("idempotency key already has a different receipt")
-        self._receipts[receipt.idempotency_key] = receipt
+    def reserve_if_absent(
+        self,
+        receipt: IdempotencyReceipt,
+    ) -> tuple[IdempotencyReceipt, bool]:
+        with self._lock:
+            existing = self._receipts.get(receipt.idempotency_key)
+            if existing is not None:
+                if existing != receipt:
+                    raise ValueError("idempotency key already has a different receipt")
+                return existing, False
+            self._receipts[receipt.idempotency_key] = receipt
+            return receipt, True
 
 
 class JsonIdempotencyReceiptStore:
@@ -458,14 +471,17 @@ class JsonIdempotencyReceiptStore:
         with self._lock(fcntl.LOCK_SH):
             return self._read().get(idempotency_key)
 
-    def put(self, receipt: IdempotencyReceipt) -> None:
+    def reserve_if_absent(
+        self,
+        receipt: IdempotencyReceipt,
+    ) -> tuple[IdempotencyReceipt, bool]:
         with self._lock(fcntl.LOCK_EX):
             receipts = self._read()
             existing = receipts.get(receipt.idempotency_key)
             if existing is not None:
                 if existing != receipt:
                     raise ValueError("idempotency key already has a different receipt")
-                return
+                return existing, False
             receipts[receipt.idempotency_key] = receipt
             payload = {
                 key: {
@@ -491,6 +507,7 @@ class JsonIdempotencyReceiptStore:
                 except OSError:
                     pass
                 raise
+            return receipt, True
 
 
 @dataclass(frozen=True, slots=True)
@@ -974,14 +991,19 @@ class WritebackCoordinator:
         if not validation.valid:
             return DryRunReceipt(plan.plan_id, DryRunStatus.REJECTED, validation)
 
-        existing = self.receipt_store.get(plan.idempotency_key)
-        if existing is not None:
+        mutation_id = _stable_hash("mutation", {"idempotency_key": plan.idempotency_key})
+        receipt, reserved = self.receipt_store.reserve_if_absent(IdempotencyReceipt(
+            idempotency_key=plan.idempotency_key,
+            plan_id=plan.plan_id,
+            mutation_id=mutation_id,
+        ))
+        if not reserved:
             self._record(self._event(
                 WritebackEventKind.DRY_RUN_DUPLICATE,
                 current_snapshot,
                 plan.evaluation_id,
                 plan=plan,
-                mutation_id=existing.mutation_id,
+                mutation_id=receipt.mutation_id,
                 status=DryRunStatus.DUPLICATE.value,
                 reason_codes=("idempotent_replay",),
             ))
@@ -989,10 +1011,9 @@ class WritebackCoordinator:
                 plan.plan_id,
                 DryRunStatus.DUPLICATE,
                 validation,
-                existing.mutation_id,
+                receipt.mutation_id,
             )
 
-        mutation_id = _stable_hash("mutation", {"idempotency_key": plan.idempotency_key})
         mutation = DryRunMutation(
             mutation_id=mutation_id,
             plan_id=plan.plan_id,
@@ -1004,11 +1025,6 @@ class WritebackCoordinator:
             target_artifact_id=plan.target_artifact_id,
             expected_memory_revision=plan.expected_memory_revision,
         )
-        self.receipt_store.put(IdempotencyReceipt(
-            idempotency_key=plan.idempotency_key,
-            plan_id=plan.plan_id,
-            mutation_id=mutation_id,
-        ))
         self._dry_run_mutations[plan.idempotency_key] = mutation
         self._record(self._event(
             WritebackEventKind.DRY_RUN_MUTATION,
