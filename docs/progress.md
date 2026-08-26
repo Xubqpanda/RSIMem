@@ -128,6 +128,7 @@ equivalence has not yet been established.
 - [x] Persist runtime evidence incrementally with flush and fsync instead of waiting for bridge shutdown.
 - [x] Project procedural backend hits into an isolated Hermes skills root before native-format rendering and security checks.
 - [x] Project episodic pagination, filters, session lineage, metadata, and full conversation expansion through the backend.
+- [x] Match Hermes FTS5 query normalization, empty-role filtering, corrupt structured-field handling, and assistant-only reasoning replay.
 
 This proves deterministic PAST-Bench adapter-loop equivalence without an
 external model call. It does not prove live-model behavioral equivalence or
@@ -135,7 +136,7 @@ establish a nondeterminism tolerance.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `81 passed`.
+- [x] Pass all RSIMem tests: `82 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `384 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
