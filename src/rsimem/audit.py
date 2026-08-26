@@ -70,10 +70,12 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
                     trace_id,
                     resolve_comparison_evidence_path(episode.get("trace"), run_dir),
                 )
-            memory_entries.extend(
-                entry for entry in episode.get("artifacts", {}).get("memory_entries", [])
-                if isinstance(entry, str) and entry
-            )
+            artifacts = episode.get("artifacts", {})
+            for field in ("memory_entries", "user_entries"):
+                memory_entries.extend(
+                    entry for entry in artifacts.get(field, [])
+                    if isinstance(entry, str) and entry
+                )
 
     totals = Counter()
     statuses = Counter()
@@ -133,6 +135,32 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
             "traceCalls": totals["requests"],
         })
 
+    unresolved_injections = sum(
+        1 for event in ledger if event.get("kind") == "memory_injection_unresolved"
+    )
+    if unresolved_injections:
+        issues.append({
+            "kind": "unresolved_memory_injection",
+            "count": unresolved_injections,
+        })
+    projection_checks = [
+        event for event in ledger if event.get("kind") == "projection_check"
+    ]
+    projection_mismatches = sum(
+        1
+        for event in projection_checks
+        if event.get("data", {}).get("attributes", {}).get("equivalent") is not True
+    )
+    if projection_mismatches:
+        issues.append({"kind": "projection_mismatch", "count": projection_mismatches})
+    adapter_bypasses = sum(
+        1
+        for event in ledger
+        if event.get("data", {}).get("reasonCode") == "adapter_failure_native_bypass"
+    )
+    if adapter_bypasses:
+        issues.append({"kind": "adapter_native_bypass", "count": adapter_bypasses})
+
     memory_leaks = sum(1 for entry in memory_entries if entry in ledger_text)
     if memory_leaks:
         issues.append({"kind": "memory_text_leak", "count": memory_leaks})
@@ -179,6 +207,10 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         "ledgerModelCallViews": len(ledger_calls),
         "ledgerUniqueBillingCalls": len(set(billing_ids)),
         "ledgerDuplicateViews": len(ledger_calls) - len(set(billing_ids)),
+        "projectionChecks": len(projection_checks),
+        "projectionMismatches": projection_mismatches,
+        "adapterNativeBypasses": adapter_bypasses,
+        "unresolvedMemoryInjections": unresolved_injections,
         "privacy": {
             "memoryTextLeaks": memory_leaks,
             "credentialPatternHits": secret_hits,
