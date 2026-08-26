@@ -44,6 +44,10 @@ the corresponding model cost is intended. The current runtime does not expose
 a provider seed, which is recorded explicitly in `batch_manifest.json`; these
 runs must not be described as deterministic seeded executions.
 
+The first live infrastructure replicate, its failed provider attempt, clean
+retry, raw resource totals, and interpretation limits are recorded in
+[`docs/matched_20260827.md`](docs/matched_20260827.md).
+
 ## Verification
 
 Run the RSIMem checks from the repository root:

@@ -101,7 +101,9 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Confirm identical deterministic semantic rendering, episodic FTS views, and procedural resources at the storage-helper boundary.
 - [x] Call Hermes' real memory prompt construction, `session_search`, `skills_list`, and `skill_view` paths in a deterministic execution-surface fixture.
 - [x] Confirm deterministic restart persistence, artifact identity, and explicit fail-closed or native-bypass behavior.
-- [ ] Run matched variants through the PAST-Bench execution path.
+- [x] Run all three modes through a deterministic PAST-Bench Hermes adapter-loop fixture without external model calls.
+- [x] Complete one live-model infrastructure replicate on the earlier hybrid adapter path and retain its clean and failed accounting evidence.
+- [ ] Run at least three order-rotated live-model replicates on the completed semantic, episodic, and procedural projection path.
 - [x] Keep the direct Hermes path unchanged as the control.
 
 ### Stage 5: Validated Memory Writeback
@@ -166,4 +168,4 @@ Acceptance requires native behavior to remain unchanged, the memory artifact to 
 
 ## Current Boundary
 
-The scheduler, evaluator protocol, JSON LLM evaluator, conservative evaluator, lifecycle controller, snapshot contracts, deterministic Hermes fixture, and dry-run writeback coordinator are implemented in `rsimem.lifecycle`. Storage-boundary and deterministic Hermes execution-surface equivalence baselines are complete. The execution fixture calls the real prompt builder and memory-read tool handlers, verifies restart identity, and makes adapter failures explicit. A second deterministic fixture runs through the PAST-Bench Hermes adapter loop and automatically joins its content-free runtime evidence into the ledger. Neither fixture calls an external model, so matched live-model execution equivalence remains unverified. Compiler execution, adaptive policy, and real memory mutation also remain future stages. No PAST-Bench task definition or hidden grading contract should be changed while these stages are implemented.
+The scheduler, evaluator protocol, JSON LLM evaluator, conservative evaluator, lifecycle controller, snapshot contracts, deterministic Hermes fixture, and dry-run writeback coordinator are implemented in `rsimem.lifecycle`. Storage-boundary, deterministic Hermes execution-surface, and deterministic PAST-Bench adapter-loop baselines are complete. One live unseeded infrastructure replicate is recorded in [`matched_20260827.md`](matched_20260827.md), but it predates full procedural and episodic projection and used a fixed mode order. It does not establish live-model equivalence. Compiler execution, adaptive policy, and real memory mutation also remain future stages. No PAST-Bench task definition or hidden grading contract should be changed while these stages are implemented.
