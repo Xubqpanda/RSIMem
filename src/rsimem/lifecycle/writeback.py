@@ -231,17 +231,19 @@ class AllowlistedUpdateTargetResolver:
         ):
             return None
 
-        artifact_ids = tuple(dict.fromkeys(self.search(snapshot, signal)))
+        artifact_ids = tuple(dict.fromkeys(
+            artifact_id
+            for artifact_id in self.search(snapshot, signal)
+            if isinstance(artifact_id, str) and artifact_id.strip()
+        ))
         resolved = []
         for artifact_id in artifact_ids:
-            if not isinstance(artifact_id, str) or not artifact_id.strip():
-                continue
             artifact = backend.get(artifact_id)
             if artifact is None:
                 continue
             if artifact.artifact_id != artifact_id or artifact.kind != signal.memory_kind:
                 continue
-            if artifact.revision is None or not artifact.revision.strip():
+            if not isinstance(artifact.revision, str) or not artifact.revision.strip():
                 continue
             resolved.append(UpdateTarget(
                 backend=descriptor.name,
