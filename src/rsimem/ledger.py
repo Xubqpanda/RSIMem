@@ -14,10 +14,150 @@ from .memory.contracts import MemoryEvent
 
 SCHEMA_VERSION = 1
 
+_MEMORY_RUNTIME_EVENT_FIELDS = {
+    "schemaVersion",
+    "eventId",
+    "runId",
+    "variant",
+    "traceId",
+    "episodeId",
+    "sessionId",
+    "taskId",
+    "familyId",
+    "stage",
+    "snapshotId",
+    "kind",
+    "source",
+    "data",
+}
+_MEMORY_RUNTIME_DATA_FIELDS = {
+    "executionMode",
+    "memoryKind",
+    "backend",
+    "artifactIds",
+    "queryChars",
+    "contentChars",
+    "reasonCode",
+    "attributes",
+}
+_MEMORY_RUNTIME_ATTRIBUTE_FIELDS = {
+    "action",
+    "count",
+    "failure_type",
+    "limit",
+    "namespace",
+    "surface",
+}
+_RSIMEM_EXECUTION_MODES = {"native+ledger", "native+adapter+ledger"}
+
 
 def _json_hash(value: Any, *, length: int = 24) -> str:
     encoded = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:length]
+
+
+def _validate_memory_runtime_event(value: dict[str, Any], source_path: Path) -> None:
+    if set(value) != _MEMORY_RUNTIME_EVENT_FIELDS:
+        raise ValueError(f"invalid RSIMem runtime event fields in {source_path}")
+    if value.get("source") != {"type": "rsimem_memory_runtime"}:
+        raise ValueError(f"invalid RSIMem runtime event source in {source_path}")
+    data = value.get("data")
+    if not isinstance(data, dict) or set(data) != _MEMORY_RUNTIME_DATA_FIELDS:
+        raise ValueError(f"invalid RSIMem runtime event data fields in {source_path}")
+    attributes = data.get("attributes")
+    if not isinstance(attributes, dict) or not set(attributes).issubset(
+        _MEMORY_RUNTIME_ATTRIBUTE_FIELDS
+    ):
+        raise ValueError(f"invalid RSIMem runtime event attributes in {source_path}")
+    if data.get("executionMode") not in _RSIMEM_EXECUTION_MODES:
+        raise ValueError(f"invalid RSIMem execution mode in {source_path}")
+
+
+def load_episode_lifecycle_events(comparison_path: Path) -> tuple[dict[str, Any], ...]:
+    """Load content-free RSIMem evidence adjacent to comparison-owned traces."""
+
+    comparison_path = comparison_path.resolve()
+    root = comparison_path.parent
+    comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+    evidence_identities: dict[Path, set[tuple[Any, ...]]] = {}
+    for variant in ("with_persistence", "without_persistence"):
+        payload = comparison.get(variant, {})
+        episodes = payload.get("episodes", []) if isinstance(payload, dict) else []
+        for episode in episodes:
+            if not isinstance(episode, dict):
+                continue
+            trace_value = str(episode.get("trace") or "").strip()
+            if not trace_value:
+                continue
+            trace_path = Path(trace_value).expanduser()
+            if not trace_path.is_absolute():
+                trace_path = root / trace_path
+            evidence_path = (
+                trace_path.resolve().parent
+                / "artifacts"
+                / "rsimem_memory_events.jsonl"
+            )
+            evidence_identities.setdefault(evidence_path, set()).add((
+                root.name,
+                variant,
+                str(episode.get("trace_id") or ""),
+                episode.get("task_id"),
+                episode.get("family_id"),
+                episode.get("stage"),
+            ))
+
+    events: list[dict[str, Any]] = []
+    events_by_id: dict[str, str] = {}
+    for evidence_path in sorted(evidence_identities, key=str):
+        if not evidence_path.exists():
+            continue
+        allowed_identities = evidence_identities[evidence_path]
+        for line_number, line in enumerate(
+            evidence_path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"malformed RSIMem evidence at {evidence_path}:{line_number}"
+                ) from exc
+            if not isinstance(value, dict):
+                raise ValueError(
+                    f"RSIMem evidence must be an object at {evidence_path}:{line_number}"
+                )
+            _validate_memory_runtime_event(value, evidence_path)
+            identity = (
+                value.get("runId"),
+                value.get("variant"),
+                value.get("traceId"),
+                value.get("taskId"),
+                value.get("familyId"),
+                value.get("stage"),
+            )
+            if identity not in allowed_identities:
+                raise ValueError(
+                    f"RSIMem evidence identity does not match {evidence_path}"
+                )
+            event_id = value.get("eventId")
+            if not isinstance(event_id, str) or not event_id:
+                raise ValueError(f"RSIMem evidence requires eventId in {evidence_path}")
+            canonical = json.dumps(
+                value,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            existing = events_by_id.get(event_id)
+            if existing is not None:
+                if existing != canonical:
+                    raise ValueError(f"conflicting ledger eventId: {event_id}")
+                continue
+            events_by_id[event_id] = canonical
+            events.append(value)
+    return tuple(events)
 
 
 class _RecordIdRegistry:
@@ -652,7 +792,8 @@ def build_events(
         )
         for event in events
     }
-    for event in lifecycle_events:
+    joined_events = (*load_episode_lifecycle_events(comparison_path), *lifecycle_events)
+    for event in joined_events:
         value = dict(event)
         if value.get("schemaVersion") != SCHEMA_VERSION:
             raise ValueError("lifecycle event schema version does not match the ledger")
