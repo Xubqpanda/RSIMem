@@ -60,6 +60,8 @@ The idempotency identity hashes all evidence that can affect compiler-produced m
 
 The signal is a prediction, not a proof of future value. Later retrieval, injection, task, tool, retry, and cost events will provide delayed feedback for the adaptive policy. Raw context remains in the evaluator request only; observer-facing lifecycle evidence contains IDs, counts, actions, and reason codes rather than memory text.
 
+The generic joint-signal fields remain useful for dry-run safety and future hosts, but the current PAST-Bench paper path does not let this evaluator choose semantic versus episodic versus procedural routing or predict ADD versus UPDATE. Phase two freezes Hermes' native route and invocation boundary, sends one ingest/add request to the selected route-specific policy, and records that policy's internal ADD, UPDATE, DELETE, or NONE outcome.
+
 ## Current Usage
 
 The package is available under `rsimem.lifecycle`:
