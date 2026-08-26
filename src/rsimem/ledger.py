@@ -56,6 +56,24 @@ def _json_hash(value: Any, *, length: int = 24) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()[:length]
 
 
+def resolve_comparison_evidence_path(raw_path: Any, root: Path) -> Path:
+    """Resolve absolute or run-anchored PAST evidence paths without cwd state."""
+
+    root = root.resolve()
+    path = Path(str(raw_path)).expanduser()
+    if path.is_absolute():
+        return path.resolve()
+    anchor_indexes = [index for index, part in enumerate(path.parts) if part == root.name]
+    if anchor_indexes:
+        suffix = path.parts[anchor_indexes[-1] + 1 :]
+        if suffix:
+            return root.joinpath(*suffix).resolve()
+    candidate = (root / path).resolve()
+    if not candidate.is_relative_to(root):
+        raise ValueError("relative comparison evidence path escapes the run directory")
+    return candidate
+
+
 def _validate_memory_runtime_event(value: dict[str, Any], source_path: Path) -> None:
     if set(value) != _MEMORY_RUNTIME_EVENT_FIELDS:
         raise ValueError(f"invalid RSIMem runtime event fields in {source_path}")
@@ -89,9 +107,7 @@ def load_episode_lifecycle_events(comparison_path: Path) -> tuple[dict[str, Any]
             trace_value = str(episode.get("trace") or "").strip()
             if not trace_value:
                 continue
-            trace_path = Path(trace_value).expanduser()
-            if not trace_path.is_absolute():
-                trace_path = root / trace_path
+            trace_path = resolve_comparison_evidence_path(trace_value, root)
             evidence_path = (
                 trace_path.resolve().parent
                 / "artifacts"
@@ -431,11 +447,14 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
-def _session_evidence(episode: dict[str, Any]) -> tuple[dict[str, Any] | None, Path | None]:
+def _session_evidence(
+    episode: dict[str, Any],
+    root: Path,
+) -> tuple[dict[str, Any] | None, Path | None]:
     raw_path = episode.get("internal_tools", {}).get("session_file")
     if not raw_path:
         return None, None
-    path = Path(str(raw_path))
+    path = resolve_comparison_evidence_path(raw_path, root)
     return _read_json(path), path
 
 
@@ -446,7 +465,7 @@ def _model_call_events(
     episode: dict[str, Any],
     root: Path,
 ) -> Iterable[dict[str, Any]]:
-    trace_path = Path(str(episode.get("trace", "")))
+    trace_path = resolve_comparison_evidence_path(episode.get("trace", ""), root)
     if not trace_path.exists():
         return
     ordinal = 0
@@ -534,7 +553,7 @@ def _tool_events(
     calls = episode.get("internal_tools", {}).get("calls", [])
     if not isinstance(calls, list):
         return
-    trace_path = Path(str(episode.get("trace", "")))
+    trace_path = resolve_comparison_evidence_path(episode.get("trace", ""), root)
     for index, call in enumerate(calls):
         if not isinstance(call, dict):
             continue
@@ -671,7 +690,7 @@ def build_events(
         for episode_index, episode in enumerate(episodes):
             if not isinstance(episode, dict):
                 continue
-            trace_path = Path(str(episode.get("trace", "")))
+            trace_path = resolve_comparison_evidence_path(episode.get("trace", ""), root)
             trace_source = {"type": "past_bench_sequence_comparison", "path": _relative(comparison_path, root)}
             events.append(_event(
                 run_id=run_id,
@@ -693,7 +712,7 @@ def build_events(
                 },
             ))
 
-            session, session_path = _session_evidence(episode)
+            session, session_path = _session_evidence(episode, root)
             messages = session.get("messages", []) if session else []
             request_count = sum(
                 1 for message in messages
