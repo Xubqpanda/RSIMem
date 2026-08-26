@@ -12,6 +12,7 @@ requires-python = ">=3.11,<3.12"
 rsimem-ledger = "rsimem.ledger:main"
 rsimem-audit = "rsimem.audit:main"
 rsimem-preflight = "rsimem.preflight:main"
+rsimem-analyze-matched = "rsimem.matched_analysis:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
