@@ -25,7 +25,13 @@ from rsimem.hermes_integration import (
 from rsimem.hermes_past_bridge import HermesPastBenchBridge
 from rsimem.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import RawResourceUsage, run_sm01_preference_fixture
-from rsimem.memory import MemoryKind, MemoryQuery
+from rsimem.memory import (
+    MemoryArtifact,
+    MemoryHit,
+    MemoryKind,
+    MemoryQuery,
+    MemoryResource,
+)
 
 
 PRIVATE_PREFERENCE = "Use TSV with owner, priority, task, and due_date."
@@ -393,6 +399,76 @@ def test_past_bench_bridge_failure_policy_controls_native_bypass(
     assert "adapter_failure_native_bypass" in serialized
     assert "RuntimeError" in serialized
     assert "private failure" not in serialized
+
+
+def test_past_bench_bridge_skill_reads_come_from_adapter_projection(
+    tmp_path: Path,
+) -> None:
+    from types import SimpleNamespace
+
+    from tools.registry import registry
+
+    home = _hermes_home(tmp_path)
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-procedural",
+        trace_id="trace-procedural",
+        episode_id="episode-procedural",
+        session_id="session-procedural",
+        task_id="task-procedural",
+        experiment_variant="with_persistence",
+    )
+    original_query = bridge.runtime.query
+    artifact = MemoryArtifact(
+        artifact_id="adapter-only-skill",
+        kind=MemoryKind.PROCEDURAL,
+        namespace="operations",
+        title="adapter-only",
+        content=(
+            "---\nname: adapter-only\ndescription: Adapter projected skill\n---\n"
+            "Read this only through RSIMem."
+        ),
+        metadata={
+            "skill_name": "adapter-only",
+            "description": "Adapter projected skill",
+            "relative_path": "operations/adapter-only",
+        },
+        resources=(MemoryResource(
+            "references/source.md",
+            b"adapter projected resource\n",
+            "text/markdown",
+        ),),
+    )
+    hit = MemoryHit(artifact, rank=1, score=1.0, backend="adapter-procedural")
+
+    def query(value: MemoryQuery):
+        if value.kind == MemoryKind.PROCEDURAL:
+            if not value.text or "adapter-only" in value.text:
+                return (hit,)
+            return ()
+        return original_query(value)
+
+    bridge.runtime.query = query
+    bridge.attach(SimpleNamespace(_memory_store=None, _session_db=None))
+    try:
+        listed = json.loads(registry.dispatch("skills_list", {}))
+        viewed = json.loads(registry.dispatch(
+            "skill_view",
+            {"name": "adapter-only"},
+        ))
+        resource = json.loads(registry.dispatch(
+            "skill_view",
+            {"name": "adapter-only", "file_path": "references/source.md"},
+        ))
+    finally:
+        bridge.close()
+
+    assert [skill["name"] for skill in listed["skills"]] == ["adapter-only"]
+    assert viewed["content"].endswith("Read this only through RSIMem.")
+    assert resource["content"] == "adapter projected resource\n"
+    assert "task-table" not in json.dumps((listed, viewed, resource))
 
 
 def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) -> None:
