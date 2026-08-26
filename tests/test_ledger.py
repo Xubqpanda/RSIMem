@@ -7,15 +7,28 @@ from pathlib import Path
 import pytest
 
 from rsimem.audit import audit_run
-from rsimem.ledger import LifecycleLedgerObserver, build_events, write_ledger
+from rsimem.ledger import (
+    LifecycleLedgerObserver,
+    MemoryLedgerObserver,
+    build_events,
+    load_episode_lifecycle_events,
+    write_ledger,
+)
 from rsimem.lifecycle import (
     HermesMessage,
     HermesSnapshotCollector,
     TaskLifecycleState,
 )
+from rsimem.memory import MemoryEvent, MemoryEventKind, MemoryKind
 
 
 MEMORY = "Use TSV with owner, priority, task, and due_date."
+
+
+def _runtime_evidence_path(comparison: Path) -> Path:
+    data = json.loads(comparison.read_text(encoding="utf-8"))
+    trace = Path(data["with_persistence"]["episodes"][0]["trace"])
+    return trace.parent / "artifacts" / "rsimem_memory_events.jsonl"
 
 
 def _fixture(tmp_path: Path) -> Path:
@@ -130,6 +143,118 @@ def _fixture(tmp_path: Path) -> Path:
         "delta": {},
     }), encoding="utf-8")
     return comparison
+
+
+def _write_runtime_evidence(
+    comparison: Path,
+    *,
+    overrides: dict | None = None,
+    repeat: int = 1,
+) -> dict:
+    observer = MemoryLedgerObserver(
+        run_id=comparison.parent.name,
+        variant="with_persistence",
+        trace_id="trace-1",
+        episode_id="learn",
+        session_id="session-1",
+        task_id="task-1",
+        family_id="family-1",
+        stage="learn",
+        execution_mode="native+adapter+ledger",
+    )
+    observer.record(MemoryEvent(
+        MemoryEventKind.QUERY,
+        MemoryKind.SEMANTIC,
+        "hermes-native-semantic",
+        query_chars=12,
+        attributes={"limit": 5, "namespace": "default"},
+    ))
+    event = json.loads(json.dumps(observer.events[0]))
+    event.update(overrides or {})
+    _runtime_evidence_path(comparison).write_text(
+        "".join(json.dumps(event) + "\n" for _ in range(repeat)),
+        encoding="utf-8",
+    )
+    return event
+
+
+def test_auto_loads_content_free_episode_runtime_evidence(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    runtime_event = _write_runtime_evidence(comparison)
+
+    loaded = load_episode_lifecycle_events(comparison)
+    events = build_events(comparison)
+
+    assert loaded == (runtime_event,)
+    assert events[-1] == runtime_event
+    assert events[-1]["data"]["executionMode"] == "native+adapter+ledger"
+    assert MEMORY not in json.dumps(events)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("runId", "another-run"),
+        ("variant", "without_persistence"),
+        ("traceId", "another-trace"),
+        ("taskId", "another-task"),
+        ("familyId", "another-family"),
+        ("stage", "eval_near"),
+    ),
+)
+def test_auto_loaded_runtime_evidence_must_match_owning_episode(
+    tmp_path: Path,
+    field: str,
+    value: str,
+) -> None:
+    comparison = _fixture(tmp_path)
+    _write_runtime_evidence(comparison, overrides={field: value})
+
+    with pytest.raises(ValueError, match="evidence identity"):
+        build_events(comparison)
+
+
+@pytest.mark.parametrize("serialized", ("not-json\n", "[]\n"))
+def test_auto_loaded_runtime_evidence_rejects_malformed_jsonl(
+    tmp_path: Path,
+    serialized: str,
+) -> None:
+    comparison = _fixture(tmp_path)
+    _runtime_evidence_path(comparison).write_text(serialized, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="malformed|must be an object"):
+        build_events(comparison)
+
+
+def test_auto_loaded_runtime_evidence_rejects_content_fields(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    event = _write_runtime_evidence(comparison)
+    event["data"]["content"] = MEMORY
+    _runtime_evidence_path(comparison).write_text(
+        json.dumps(event) + "\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="runtime event data fields"):
+        build_events(comparison)
+
+
+def test_auto_loaded_runtime_event_duplicates_are_idempotent_but_conflicts_fail(
+    tmp_path: Path,
+) -> None:
+    comparison = _fixture(tmp_path)
+    event = _write_runtime_evidence(comparison, repeat=2)
+    loaded = load_episode_lifecycle_events(comparison)
+    assert loaded == (event,)
+
+    conflicting = json.loads(json.dumps(event))
+    conflicting["data"]["queryChars"] = 99
+    _runtime_evidence_path(comparison).write_text(
+        json.dumps(event) + "\n" + json.dumps(conflicting) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="conflicting ledger eventId"):
+        load_episode_lifecycle_events(comparison)
 
 
 def test_builds_evidence_backed_events_without_memory_text(tmp_path: Path) -> None:
