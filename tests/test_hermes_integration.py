@@ -311,6 +311,9 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
             skill = registry.dispatch("skill_view", {"name": "task-table"})
         assert json.loads(skills)["count"] == 1
         assert json.loads(skill)["name"] == "task-table"
+        persisted_before_close = evidence_path.read_text(encoding="utf-8")
+        assert '"kind": "query"' in persisted_before_close
+        assert '"kind": "injected"' in persisted_before_close
     finally:
         bridge.close()
         db.close()

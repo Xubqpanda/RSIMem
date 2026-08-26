@@ -5,7 +5,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import threading
 from typing import Any, Iterable
 
 from .lifecycle.snapshot import ContextSnapshot
@@ -356,6 +358,7 @@ class MemoryLedgerObserver:
         stage: str | None = None,
         snapshot_id: str | None = None,
         execution_mode: str | None = None,
+        output_path: Path | None = None,
     ) -> None:
         required = (run_id, variant, trace_id, episode_id, session_id, task_id)
         if any(not value.strip() for value in required):
@@ -370,59 +373,72 @@ class MemoryLedgerObserver:
         self.stage = stage
         self.snapshot_id = snapshot_id
         self.execution_mode = execution_mode
+        self.output_path = output_path.expanduser().resolve() if output_path else None
         self._events: list[dict[str, Any]] = []
         self._occurrences: dict[str, int] = {}
+        self._lock = threading.Lock()
+        if self.output_path is not None:
+            self.output_path.parent.mkdir(parents=True, exist_ok=True)
+            self.output_path.write_text("", encoding="utf-8")
 
     @property
     def events(self) -> tuple[dict[str, Any], ...]:
-        return tuple(self._events)
+        with self._lock:
+            return tuple(self._events)
 
     def record(self, event: MemoryEvent) -> None:
-        attributes = dict(event.attributes)
-        logical_identity = {
-            "runId": self.run_id,
-            "variant": self.variant,
-            "traceId": self.trace_id,
-            "snapshotId": self.snapshot_id,
-            "executionMode": self.execution_mode,
-            "kind": event.kind.value,
-            "memoryKind": event.memory_kind.value,
-            "backend": event.backend,
-            "artifactIds": event.artifact_ids,
-            "queryChars": event.query_chars,
-            "contentChars": event.content_chars,
-            "reasonCode": event.reason_code,
-            "attributes": attributes,
-        }
-        logical_key = _json_hash(logical_identity)
-        occurrence = self._occurrences.get(logical_key, 0)
-        self._occurrences[logical_key] = occurrence + 1
-        event_id = f"evt_{_json_hash({**logical_identity, 'occurrence': occurrence})}"
-        self._events.append({
-            "schemaVersion": SCHEMA_VERSION,
-            "eventId": event_id,
-            "runId": self.run_id,
-            "variant": self.variant,
-            "traceId": self.trace_id,
-            "episodeId": self.episode_id,
-            "sessionId": self.session_id,
-            "taskId": self.task_id,
-            "familyId": self.family_id,
-            "stage": self.stage,
-            "snapshotId": self.snapshot_id,
-            "kind": event.kind.value,
-            "source": {"type": "rsimem_memory_runtime"},
-            "data": {
+        with self._lock:
+            attributes = dict(event.attributes)
+            logical_identity = {
+                "runId": self.run_id,
+                "variant": self.variant,
+                "traceId": self.trace_id,
+                "snapshotId": self.snapshot_id,
                 "executionMode": self.execution_mode,
+                "kind": event.kind.value,
                 "memoryKind": event.memory_kind.value,
                 "backend": event.backend,
-                "artifactIds": list(event.artifact_ids),
+                "artifactIds": event.artifact_ids,
                 "queryChars": event.query_chars,
                 "contentChars": event.content_chars,
                 "reasonCode": event.reason_code,
                 "attributes": attributes,
-            },
-        })
+            }
+            logical_key = _json_hash(logical_identity)
+            occurrence = self._occurrences.get(logical_key, 0)
+            event_id = f"evt_{_json_hash({**logical_identity, 'occurrence': occurrence})}"
+            value = {
+                "schemaVersion": SCHEMA_VERSION,
+                "eventId": event_id,
+                "runId": self.run_id,
+                "variant": self.variant,
+                "traceId": self.trace_id,
+                "episodeId": self.episode_id,
+                "sessionId": self.session_id,
+                "taskId": self.task_id,
+                "familyId": self.family_id,
+                "stage": self.stage,
+                "snapshotId": self.snapshot_id,
+                "kind": event.kind.value,
+                "source": {"type": "rsimem_memory_runtime"},
+                "data": {
+                    "executionMode": self.execution_mode,
+                    "memoryKind": event.memory_kind.value,
+                    "backend": event.backend,
+                    "artifactIds": list(event.artifact_ids),
+                    "queryChars": event.query_chars,
+                    "contentChars": event.content_chars,
+                    "reasonCode": event.reason_code,
+                    "attributes": attributes,
+                },
+            }
+            if self.output_path is not None:
+                with self.output_path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(value, ensure_ascii=True, sort_keys=True) + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+            self._occurrences[logical_key] = occurrence + 1
+            self._events.append(value)
 
 
 def _relative(path: Path, root: Path) -> str:
