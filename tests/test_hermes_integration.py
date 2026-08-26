@@ -47,44 +47,23 @@ def _hermes_home(path: Path) -> Path:
         encoding="utf-8",
     )
 
+    from hermes_state import SessionDB
+
+    db = SessionDB(path / "state.db")
+    db.create_session("session-1", "cli", model="fixture-model")
+    db.append_message("session-1", "user", "Please format the project tasks.")
+    db.append_message("session-1", "assistant", "I used the requested task table.")
+    db.append_message("session-1", "user", "The task table looks correct.")
+    db.close()
+
     connection = sqlite3.connect(path / "state.db")
-    connection.executescript(
-        """
-        CREATE TABLE sessions (
-            id TEXT PRIMARY KEY,
-            source TEXT NOT NULL,
-            model TEXT,
-            started_at REAL
-        );
-        CREATE TABLE messages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            session_id TEXT NOT NULL,
-            role TEXT NOT NULL,
-            content TEXT,
-            timestamp REAL NOT NULL,
-            tool_name TEXT
-        );
-        CREATE VIRTUAL TABLE messages_fts USING fts5(
-            content,
-            content=messages,
-            content_rowid=id
-        );
-        CREATE TRIGGER messages_fts_insert AFTER INSERT ON messages BEGIN
-            INSERT INTO messages_fts(rowid, content) VALUES (new.id, new.content);
-        END;
-        """
-    )
     connection.execute(
-        "INSERT INTO sessions(id, source, model, started_at) VALUES (?, ?, ?, ?)",
-        ("session-1", "cli", "fixture-model", 0.0),
+        "UPDATE sessions SET started_at = ?, title = ? WHERE id = ?",
+        (0.0, "Task table fixture", "session-1"),
     )
     connection.executemany(
-        "INSERT INTO messages(session_id, role, content, timestamp, tool_name) VALUES (?, ?, ?, ?, ?)",
-        [
-            ("session-1", "user", "Please format the project tasks.", 1.0, None),
-            ("session-1", "assistant", "I used the requested task table.", 2.0, None),
-            ("session-1", "user", "The task table looks correct.", 3.0, None),
-        ],
+        "UPDATE messages SET timestamp = ? WHERE id = ?",
+        [(1.0, 1), (2.0, 2), (3.0, 3)],
     )
     connection.commit()
     connection.close()
@@ -153,13 +132,16 @@ def test_real_hermes_system_prompt_is_equivalent_across_variants(
 
     home = _hermes_home(tmp_path)
     original_memory_dir = memory_tool.MEMORY_DIR
-    report = run_hermes_execution_equivalence_variants(home)
+    report = run_hermes_execution_equivalence_variants(
+        home,
+        HermesEquivalenceProbe(episodic_query="task table"),
+    )
 
     assert report.equivalent is True
     assert [variant.mode for variant in report.variants] == list(HermesExecutionMode)
     assert all(variant.equivalent_to_native for variant in report.variants)
     assert all(
-        variant.checks[0].surface == HermesExecutionSurface.SYSTEM_PROMPT
+        {check.surface for check in variant.checks} == set(HermesExecutionSurface)
         for variant in report.variants
     )
     assert all(
@@ -167,12 +149,13 @@ def test_real_hermes_system_prompt_is_equivalent_across_variants(
         for variant in report.variants
         for check in variant.checks
     )
-    assert [variant.memory_event_count for variant in report.variants] == [0, 6, 6]
-    assert [variant.ledger_event_count for variant in report.variants] == [0, 6, 6]
+    assert [variant.memory_event_count for variant in report.variants] == [0, 9, 9]
+    assert [variant.ledger_event_count for variant in report.variants] == [0, 9, 9]
     assert report.variants[1].memory_event_kinds == report.variants[2].memory_event_kinds
     serialized = json.dumps(asdict(report), default=str)
     assert PRIVATE_PREFERENCE not in serialized
     assert "concise status updates" not in serialized
+    assert "requested task table" not in serialized
     assert memory_tool.MEMORY_DIR == original_memory_dir
 
 

@@ -170,6 +170,7 @@ class HermesEquivalenceReport:
 
 class HermesExecutionSurface(StrEnum):
     SYSTEM_PROMPT = "system_prompt"
+    SESSION_SEARCH = "session_search"
 
 
 @dataclass(frozen=True, slots=True)
@@ -604,6 +605,212 @@ def _capture_adapter_system_prompt(
         runtime.close()
 
 
+@contextmanager
+def _deterministic_session_summarizer():
+    """Replace only the external LLM call while preserving Hermes search logic."""
+
+    from tools import session_search_tool
+
+    async def summarize(conversation_text: str, query: str, session_meta: dict) -> str:
+        return f"Deterministic summary for {query}:\n{conversation_text}"
+
+    with _HERMES_NATIVE_BINDING_LOCK:
+        previous = session_search_tool._summarize_session
+        session_search_tool._summarize_session = summarize
+        try:
+            yield
+        finally:
+            session_search_tool._summarize_session = previous
+
+
+class _ObservedNativeSessionDb:
+    """Observer-only wrapper around Hermes' unmodified SessionDB results."""
+
+    def __init__(self, db: object, observer: MemoryObserver) -> None:
+        self.db = db
+        self.observer = observer
+        self._hits_by_session: dict[str, tuple[dict[str, Any], ...]] = {}
+        self._injected_sessions: set[str] = set()
+
+    def search_messages(self, *, query: str, **kwargs) -> list[dict[str, Any]]:
+        self.observer.record(MemoryEvent(
+            MemoryEventKind.QUERY,
+            MemoryKind.EPISODIC,
+            "hermes-native-episodic",
+            query_chars=len(query),
+            attributes={"limit": kwargs.get("limit", 50), "namespace": "default"},
+        ))
+        results = self.db.search_messages(query=query, **kwargs)
+        for result in results:
+            self._hits_by_session.setdefault(result["session_id"], tuple())
+            self._hits_by_session[result["session_id"]] += (result,)
+        artifact_ids = tuple(
+            f"native-episodic:message:{result['id']}" for result in results
+        )
+        self.observer.record(MemoryEvent(
+            MemoryEventKind.RETRIEVED,
+            MemoryKind.EPISODIC,
+            "hermes-native-episodic",
+            artifact_ids=artifact_ids,
+            content_chars=sum(len(str(result.get("content") or "")) for result in results),
+            attributes={"count": len(results)},
+        ))
+        return results
+
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
+        return self.db.get_session(session_id)
+
+    def get_messages_as_conversation(self, session_id: str) -> list[dict[str, Any]]:
+        messages = self.db.get_messages_as_conversation(session_id)
+        if session_id not in self._injected_sessions:
+            hits = self._hits_by_session.get(session_id, ())
+            self.observer.record(MemoryEvent(
+                MemoryEventKind.INJECTED,
+                MemoryKind.EPISODIC,
+                "hermes-native-episodic",
+                artifact_ids=tuple(
+                    f"native-episodic:message:{item['id']}" for item in hits
+                ),
+                content_chars=sum(
+                    len(str(message.get("content") or "")) for message in messages
+                ),
+                attributes={"count": len(hits), "surface": "session_search"},
+            ))
+            self._injected_sessions.add(session_id)
+        return messages
+
+
+class _AdapterSessionDb:
+    """Subset of SessionDB consumed by Hermes session_search, backed by runtime hits."""
+
+    def __init__(self, runtime: MemoryRuntime) -> None:
+        self.runtime = runtime
+        self._hits_by_session: dict[str, tuple[Any, ...]] = {}
+        self._injected_sessions: set[str] = set()
+
+    def search_messages(
+        self,
+        *,
+        query: str,
+        role_filter: list[str] | None = None,
+        exclude_sources: list[str] | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        if offset:
+            return []
+        hits = self.runtime.query(MemoryQuery(
+            MemoryKind.EPISODIC,
+            query,
+            limit=limit,
+        ))
+        results = []
+        for hit in hits:
+            metadata = hit.artifact.metadata
+            role = str(metadata.get("role") or "")
+            source = str(metadata.get("source") or "")
+            if role_filter and role not in role_filter:
+                continue
+            if exclude_sources and source in exclude_sources:
+                continue
+            self._hits_by_session.setdefault(hit.artifact.namespace, tuple())
+            self._hits_by_session[hit.artifact.namespace] += (hit,)
+            results.append({
+                "id": metadata.get("message_id"),
+                "session_id": hit.artifact.namespace,
+                "role": role,
+                "snippet": metadata.get("snippet"),
+                "content": hit.artifact.content,
+                "timestamp": metadata.get("timestamp"),
+                "tool_name": None,
+                "source": source,
+                "model": metadata.get("model"),
+                "session_started": metadata.get("session_started"),
+            })
+        return results
+
+    def get_session(self, session_id: str) -> dict[str, Any] | None:
+        hits = self._hits_by_session.get(session_id, ())
+        if not hits:
+            return None
+        metadata = hits[0].artifact.metadata
+        return {
+            "id": session_id,
+            "source": metadata.get("source"),
+            "model": metadata.get("model"),
+            "started_at": metadata.get("session_started"),
+            "title": metadata.get("session_title"),
+            "parent_session_id": metadata.get("parent_session_id"),
+        }
+
+    def get_messages_as_conversation(self, session_id: str) -> list[dict[str, Any]]:
+        hits = self._hits_by_session.get(session_id, ())
+        by_id: dict[int, tuple[str, str]] = {}
+        for hit in hits:
+            for message_id, role, content in (
+                hit.artifact.metadata.get("context_messages") or ()
+            ):
+                by_id[int(message_id)] = (str(role), str(content))
+        ordered = [
+            {"role": role, "content": content}
+            for _, (role, content) in sorted(by_id.items())
+        ]
+        if session_id not in self._injected_sessions:
+            self.runtime.mark_injected(hits, surface="session_search")
+            self._injected_sessions.add(session_id)
+        return ordered
+
+
+def _dispatch_real_session_search(
+    db: object,
+    probe: HermesEquivalenceProbe,
+) -> str:
+    from tools import session_search_tool  # noqa: F401 - registers the real tool
+    from tools.registry import registry
+
+    with _deterministic_session_summarizer():
+        return registry.dispatch(
+            "session_search",
+            {"query": probe.episodic_query, "limit": probe.episodic_limit},
+            db=db,
+            current_session_id="execution-equivalence-current",
+        )
+
+
+def _capture_native_session_search(
+    home: Path,
+    probe: HermesEquivalenceProbe,
+    *,
+    observer: MemoryObserver | None = None,
+) -> str:
+    from hermes_state import SessionDB
+
+    db = SessionDB(home / "state.db")
+    try:
+        execution_db = (
+            _ObservedNativeSessionDb(db, observer) if observer is not None else db
+        )
+        return _dispatch_real_session_search(execution_db, probe)
+    finally:
+        db.close()
+
+
+def _capture_adapter_session_search(
+    home: Path,
+    probe: HermesEquivalenceProbe,
+    collector: _MemoryEventCollector,
+) -> str:
+    runtime = build_configured_hermes_runtime(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        observers=(collector,),
+    )
+    try:
+        return _dispatch_real_session_search(_AdapterSessionDb(runtime), probe)
+    finally:
+        runtime.close()
+
+
 def _capture_adapter(
     home: Path,
     probe: HermesEquivalenceProbe,
@@ -774,11 +981,15 @@ def run_hermes_equivalence_variants(
 
 def run_hermes_execution_equivalence_variants(
     hermes_home: Path,
+    probe: HermesEquivalenceProbe,
 ) -> HermesExecutionEquivalenceReport:
     """Compare final model-visible output from real Hermes execution surfaces."""
 
     home = hermes_home.expanduser().resolve()
-    baseline = _capture_native_system_prompt(home)
+    baseline = {
+        HermesExecutionSurface.SYSTEM_PROMPT: _capture_native_system_prompt(home),
+        HermesExecutionSurface.SESSION_SEARCH: _capture_native_session_search(home, probe),
+    }
     variants = []
     for mode in HermesExecutionMode:
         config = HermesExperimentConfig(mode)
@@ -798,21 +1009,43 @@ def run_hermes_execution_equivalence_variants(
         )
         collector = _MemoryEventCollector(ledger)
         if mode == HermesExecutionMode.ADAPTER_LEDGER:
-            candidate = _capture_adapter_system_prompt(home, collector)
+            candidate = {
+                HermesExecutionSurface.SYSTEM_PROMPT: _capture_adapter_system_prompt(
+                    home, collector
+                ),
+                HermesExecutionSurface.SESSION_SEARCH: _capture_adapter_session_search(
+                    home, probe, collector
+                ),
+            }
         elif mode == HermesExecutionMode.NATIVE_LEDGER:
-            candidate = _capture_native_system_prompt(home, observer=collector)
+            candidate = {
+                HermesExecutionSurface.SYSTEM_PROMPT: _capture_native_system_prompt(
+                    home, observer=collector
+                ),
+                HermesExecutionSurface.SESSION_SEARCH: _capture_native_session_search(
+                    home, probe, observer=collector
+                ),
+            }
         else:
-            candidate = _capture_native_system_prompt(home)
-        check = HermesExecutionSurfaceCheck(
-            surface=HermesExecutionSurface.SYSTEM_PROMPT,
-            equivalent=baseline == candidate,
-            native_content_chars=len(baseline),
-            candidate_content_chars=len(candidate),
+            candidate = {
+                HermesExecutionSurface.SYSTEM_PROMPT: _capture_native_system_prompt(home),
+                HermesExecutionSurface.SESSION_SEARCH: _capture_native_session_search(
+                    home, probe
+                ),
+            }
+        checks = tuple(
+            HermesExecutionSurfaceCheck(
+                surface=surface,
+                equivalent=baseline[surface] == candidate[surface],
+                native_content_chars=len(baseline[surface]),
+                candidate_content_chars=len(candidate[surface]),
+            )
+            for surface in HermesExecutionSurface
         )
         variants.append(HermesExecutionVariantResult(
             mode=mode,
-            equivalent_to_native=check.equivalent,
-            checks=(check,),
+            equivalent_to_native=all(check.equivalent for check in checks),
+            checks=checks,
             ledger_enabled=config.ledger_enabled,
             memory_event_count=len(collector.events),
             memory_event_kinds=tuple(event.kind for event in collector.events),
