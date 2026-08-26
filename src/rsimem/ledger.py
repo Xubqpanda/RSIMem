@@ -638,7 +638,14 @@ def _injection_events(
         messages = session.get("messages")
         if isinstance(messages, list) and messages and isinstance(messages[0], dict):
             visible += "\n" + str(messages[0].get("content") or "")
-    entries = episode.get("artifacts", {}).get("memory_entries", [])
+    artifacts = episode.get("artifacts", {})
+    raw_entries = [
+        *artifacts.get("memory_entries", []),
+        *artifacts.get("user_entries", []),
+    ]
+    entries = list(dict.fromkeys(
+        entry for entry in raw_entries if isinstance(entry, str) and entry
+    ))
     matched = [entry for entry in entries if isinstance(entry, str) and entry and entry in visible]
     source = {
         "type": "hermes_model_visible_context",

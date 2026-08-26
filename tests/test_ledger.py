@@ -336,6 +336,42 @@ def test_ledger_is_deterministic_and_marks_unmatched_injection(tmp_path: Path) -
     assert outcome["data"]["judgeEnabled"] is False
     assert outcome["data"]["judgeConfigurationEvidence"] == "launcher_explicit"
 
+    write_ledger(
+        comparison,
+        comparison.parent / "ledger.jsonl",
+        judge_enabled=False,
+    )
+    report = audit_run(comparison.parent)
+    assert report["ok"] is False
+    assert {issue["kind"] for issue in report["issues"]} == {
+        "unresolved_memory_injection"
+    }
+
+
+def test_user_profile_injection_matches_and_is_privacy_audited(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    data = json.loads(comparison.read_text(encoding="utf-8"))
+    episode = data["with_persistence"]["episodes"][0]
+    session_path = Path(episode["internal_tools"]["session_file"])
+    session = json.loads(session_path.read_text(encoding="utf-8"))
+    private_user_entry = "The user prefers a four-column TSV."
+    session["system_prompt"] = f"User profile:\n{private_user_entry}"
+    session_path.write_text(json.dumps(session), encoding="utf-8")
+    episode["artifacts"]["memory_entries"] = []
+    episode["artifacts"]["user_entries"] = [private_user_entry]
+    comparison.write_text(json.dumps(data), encoding="utf-8")
+
+    output = comparison.parent / "ledger.jsonl"
+    events = write_ledger(comparison, output, judge_enabled=False)
+    injections = [event for event in events if event["kind"] == "memory_injection"]
+
+    assert len(injections) == 1
+    assert not any(event["kind"] == "memory_injection_unresolved" for event in events)
+    assert private_user_entry not in output.read_text(encoding="utf-8")
+    report = audit_run(comparison.parent)
+    assert report["ok"] is True
+    assert report["privacy"]["memoryTextLeaks"] == 0
+
 
 def test_failed_model_call_keeps_unknown_tokens_null(tmp_path: Path) -> None:
     comparison = _fixture(tmp_path)
