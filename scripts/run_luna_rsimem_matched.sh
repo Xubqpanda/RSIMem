@@ -8,6 +8,8 @@ PAST_BENCH_ROOT="${PAST_BENCH_ROOT:-${RSIMEM_ROOT}/benchmarks/past-bench}"
 PAST_BENCH_BIN="${RSIMEM_ROOT}/.venv/bin/past-bench"
 PYTHON_BIN="${RSIMEM_ROOT}/.venv/bin/python"
 REPLICATES="${RSIMEM_REPLICATES:-1}"
+REPLICATE_START="${RSIMEM_REPLICATE_START:-1}"
+REPLICATE_END="${RSIMEM_REPLICATE_END:-${REPLICATES}}"
 TASK_FAMILY="memory_ability/SM01_preference_adoption"
 
 if [[ -z "${GPT_LUNA_API_KEY:-}" ]]; then
@@ -24,6 +26,15 @@ if [[ ! -f "${PAST_BENCH_ROOT}/pyproject.toml" ]]; then
 fi
 if [[ ! "${REPLICATES}" =~ ^[1-9][0-9]*$ ]]; then
   echo "RSIMEM_REPLICATES must be a positive integer." >&2
+  exit 2
+fi
+if (
+  [[ ! "${REPLICATE_START}" =~ ^[1-9][0-9]*$ ]] ||
+  [[ ! "${REPLICATE_END}" =~ ^[1-9][0-9]*$ ]] ||
+  (( REPLICATE_START > REPLICATE_END )) ||
+  (( REPLICATE_END > REPLICATES ))
+); then
+  echo "RSIMEM_REPLICATE_START/END must select a range inside RSIMEM_REPLICATES." >&2
   exit 2
 fi
 
@@ -140,11 +151,12 @@ print(name if name is not None else "__SKIP__")
 echo "PAST-Bench: ${PAST_BENCH_ROOT}"
 echo "Batch root: ${batch_root}"
 echo "Replicates: ${REPLICATES}"
+echo "Selected:   ${REPLICATE_START}-${REPLICATE_END}"
 echo "RSIMem:     ${rsimem_commit}"
 echo "PAST-Bench: ${past_bench_commit} (tree ${past_bench_tree})"
 
 cd "${PAST_BENCH_ROOT}"
-for replicate in $(seq 1 "${REPLICATES}"); do
+for replicate in $(seq "${REPLICATE_START}" "${REPLICATE_END}"); do
   mapfile -t modes < <(
     PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
 import sys
