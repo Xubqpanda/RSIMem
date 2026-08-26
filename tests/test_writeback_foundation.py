@@ -453,13 +453,25 @@ def test_idempotency_covers_compiler_relevant_exit_evidence(
 def test_idempotency_is_stable_across_equivalent_reevaluation() -> None:
     fixture = run_sm01_preference_fixture()
     reevaluation = replace(fixture.evaluation, evaluation_id="evaluation-retry")
-    retry_plan = WritebackCoordinator().create_plans(
+    coordinator = WritebackCoordinator()
+    original_plan = coordinator.create_plans(
+        fixture.snapshot,
+        fixture.evaluation,
+    )[0]
+    retry_plan = coordinator.create_plans(
         fixture.snapshot,
         reevaluation,
     )[0]
+    original_receipt = coordinator.dry_run(original_plan, fixture.snapshot)
+    retry_receipt = coordinator.dry_run(retry_plan, fixture.snapshot)
 
-    assert retry_plan.exit_evidence.provenance != fixture.plans[0].exit_evidence.provenance
-    assert retry_plan.idempotency_key == fixture.plans[0].idempotency_key
+    assert retry_plan.evaluation_id != original_plan.evaluation_id
+    assert retry_plan.exit_evidence.provenance != original_plan.exit_evidence.provenance
+    assert retry_plan.idempotency_key == original_plan.idempotency_key
+    assert retry_plan.plan_id == original_plan.plan_id
+    assert original_receipt.status.value == "accepted"
+    assert retry_receipt.status.value == "duplicate"
+    assert retry_receipt.mutation_id == original_receipt.mutation_id
 
 
 def test_idempotency_covers_resolved_unresolved_state() -> None:
@@ -549,8 +561,16 @@ def test_persistent_idempotency_receipt_survives_coordinator_restart(
     first_coordinator = coordinator()
     plan = first_coordinator.create_plans(fixture.snapshot, evaluation)[0]
     first = first_coordinator.dry_run(plan, fixture.snapshot)
-    second = coordinator().dry_run(plan, fixture.snapshot)
+    second_coordinator = coordinator()
+    reevaluation = replace(evaluation, evaluation_id="evaluation-update-retry")
+    retry_plan = second_coordinator.create_plans(
+        fixture.snapshot,
+        reevaluation,
+    )[0]
+    second = second_coordinator.dry_run(retry_plan, fixture.snapshot)
 
+    assert retry_plan.evaluation_id != plan.evaluation_id
+    assert retry_plan.plan_id == plan.plan_id
     assert first.status.value == "accepted"
     assert second.status.value == "duplicate"
     assert first.mutation_id == second.mutation_id

@@ -939,10 +939,7 @@ class WritebackCoordinator:
             "compiler_version": signal.compiler_version,
         }
         idempotency_key = _stable_hash("idem", key_payload, length=40)
-        plan_id = _stable_hash(
-            "plan",
-            {"evaluation_id": evaluation.evaluation_id, "idempotency_key": idempotency_key},
-        )
+        plan_id = _stable_hash("plan", {"idempotency_key": idempotency_key})
         provenance = replace(
             snapshot.provenance,
             segment_ids=source_ids,
