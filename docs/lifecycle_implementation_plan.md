@@ -86,6 +86,7 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Link every candidate to `session_id`, `task_id`, `evaluation_id`, `segment_id`, and `policy_version`.
 - [x] Enforce target-aware idempotency and support persistent receipts across coordinator restarts.
 - [x] Include all compiler-relevant exit evidence in the canonical idempotency identity while keeping equivalent reevaluations stable.
+- [x] Derive the logical plan ID from the idempotency identity while retaining evaluation IDs in provenance and audit events.
 - [x] Strictly validate deterministic eviction safety as a boolean contract.
 - [x] Atomically reserve persistent dry-run receipts before accepting a mutation simulation.
 - [x] Validate that `add` and `update` decisions declare a compatible memory kind.
