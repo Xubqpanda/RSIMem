@@ -1,6 +1,6 @@
 # RSIMem Progress
 
-Last updated: 2026-08-25
+Last updated: 2026-08-26
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md).
 
@@ -79,9 +79,15 @@ The new memory runtime is not yet connected to the PAST-Bench execution path. He
 - [x] Build a dry-run coordinator that records plan and mutation identifiers without changing Hermes or memory backend state.
 - [x] Protect unresolved segments and require a real current turn or `None`.
 - [x] Require revisioned update targets, backend update capability, compiler versioning, and persistent idempotency receipts.
-- [x] Resolve model UPDATE hints through an allowlisted target resolver before plan creation.
+- [x] Resolve model UPDATE hints through the selected backend registry, verify artifact ownership and existence, and bind the stored revision before plan creation.
 - [x] Carry structured `ExitEvidence` and the complete update hint tuple into `WritebackPlan`.
+- [x] Include every compiler-relevant `ExitEvidence` field in the canonical idempotency identity and strictly require boolean eviction safety.
+- [x] Atomically reserve dry-run idempotency receipts under one store lock so concurrent coordinators cannot both accept the same plan.
 - [x] Fail closed on malformed idempotency receipts and conflicting ledger event payloads.
+
+The receipt reservation closes the dry-run check/reserve race. Real memory
+mutation still requires explicit pending/committed receipt states and crash
+recovery before any exactly-once claim is justified.
 
 ### Storage-Boundary Deterministic Equivalence Baseline
 
@@ -96,7 +102,7 @@ Storage-boundary deterministic equivalence baseline completed. Real Hermes execu
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `44 passed`.
+- [x] Pass all RSIMem tests: `60 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `380 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.

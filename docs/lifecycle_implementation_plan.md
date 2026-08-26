@@ -68,7 +68,7 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Require active, current-turn, unresolved, and open-tool segments to remain in context.
 - [x] Require `current_turn_id` to reference a real turn or be `None`.
 - [x] Require update targets, expected memory revisions, compiler versions, and backend capabilities.
-- [x] Resolve UPDATE hints through an allowlisted backend search before creating an executable plan.
+- [x] Resolve UPDATE hints through the selected backend registry and verify backend ownership, artifact existence, stored revision, allowlist membership, and update capability before creating an executable plan.
 - [x] Carry structured `ExitEvidence` from the signal into the writeback plan.
 - [x] Add deterministic contract tests for duplicate IDs, stale revisions, incomplete decisions, and unsafe eviction.
 
@@ -85,7 +85,9 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Convert validated lifecycle signals into a plan without changing Hermes files.
 - [x] Link every candidate to `session_id`, `task_id`, `evaluation_id`, `segment_id`, and `policy_version`.
 - [x] Enforce target-aware idempotency and support persistent receipts across coordinator restarts.
-- [x] Include the complete update hint tuple in the idempotency identity.
+- [x] Include all compiler-relevant exit evidence in the canonical idempotency identity while keeping equivalent reevaluations stable.
+- [x] Strictly validate deterministic eviction safety as a boolean contract.
+- [x] Atomically reserve persistent dry-run receipts before accepting a mutation simulation.
 - [x] Validate that `add` and `update` decisions declare a compatible memory kind.
 - [x] Emit content-free plan and validation evidence.
 - [x] Fail closed on malformed idempotency receipts and conflicting ledger event payloads.
@@ -108,6 +110,7 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [ ] Validate compiler output before backend mutation.
 - [ ] Persist memory before evicting the source context.
 - [ ] Add revision checks, idempotency, failure bypass, and rollback tests.
+- [ ] Add pending/committed receipt states and crash recovery around real backend mutations; dry-run reservation alone is not an exactly-once guarantee.
 - [ ] Account for compiler model calls, tokens, latency, storage bytes, and rejected mutations.
 
 ### Stage 6: Static RSIMem Evaluation
