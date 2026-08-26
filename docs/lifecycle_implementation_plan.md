@@ -117,7 +117,7 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 ### Stage 6: Static RSIMem Evaluation
 
 - [ ] Run the fixed writeback policy on `SM01_preference_adoption` first.
-- [ ] Compare no persistence, native Hermes, and static RSIMem with matched task order, model, seed, and budget.
+- [ ] Compare no persistence, native Hermes, and static RSIMem with matched task order, model, budget, and provider randomness controls when available.
 - [ ] Report task score, persistence gap, memory retrieval, injected tokens, model calls, tool calls, retries, controller cost, compiler cost, storage cost, and wall time.
 - [ ] Expand to procedural and update families only after the first family is fully attributable.
 
