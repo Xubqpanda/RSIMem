@@ -50,7 +50,7 @@ Raw resource quantities are retained separately from provider prices so that mon
 
 This protocol is frozen before the full-projection live matched results are observed. One analysis unit is a successful `(replicate, execution mode)` run over the complete ordered SM01 family and its paired no-persistence control. At least three successful units are required per mode. Provider-failed attempts remain in the manifest and failure summary but do not enter clean-run quality or resource aggregates.
 
-The integrity gate is exact rather than statistical: every successful run must pass `rsimem-audit`; physical request reconciliation, model-visible adapter input divergence, unexplained task/order/budget/state differences, silent bypass, and missing runtime evidence must each equal zero. Any non-zero value blocks Phase 1C regardless of quality scores.
+The integrity gate is exact rather than statistical: every successful run must pass `rsimem-audit`; physical request reconciliation, same-call adapter/native projection mismatches, unexplained task/order/budget/initial-state differences, silent bypass, unresolved injection, and missing runtime evidence must each equal zero. Adapter runs must contain at least one native-shadow projection check. Any violation blocks Phase 1C regardless of quality scores.
 
 For the small unseeded sample, the report presents every raw replicate value plus the median and full range by mode. It does not use a significance test, confidence interval, post-hoc tolerance, or an equivalence claim based on failure to reject a null hypothesis. Paired mode differences are shown within each rotated replicate for:
 
@@ -58,7 +58,7 @@ For the small unseeded sample, the report presents every raw replicate value plu
 - model request count, input/output/cache-read/cache-write/reasoning tokens, retries, and model duration;
 - tool calls, stored bytes, retrieved records, injected characters, ledger event count, and wall time.
 
-Episode-level attribution follows fixed evidence rules. A changed task manifest, episode order, budget, initial state digest, or model-visible input digest is configuration or adapter divergence. A provider transport/status failure is provider failure. When those invariants match and model-visible inputs are identical, differences in model outputs, tool choices, tokens, or timing are reported as unseeded model/provider variation, not adapter causation. Ambiguous evidence remains unexplained and fails the stage gate.
+Episode-level attribution follows fixed evidence rules. A changed task manifest, episode order, budget, initial state, or adapter/native return value at the same read call is configuration or adapter divergence. A provider transport/status failure is provider failure. When those invariants match and every adapter call returns exactly the native shadow value, differences across independently sampled runs in model outputs, later memory state, tool choices, tokens, or timing are reported as unseeded model/provider variation, not adapter causation. Ambiguous evidence remains unexplained and fails the stage gate.
 
 ## Rollout
 
