@@ -310,6 +310,7 @@ def _execute_trial(
     model_extra_body_override: dict | None = None,
     runtime_temperature: float | None = None,
     task_timeout_override: int | None = None,
+    runtime_metadata: dict | None = None,
 ):
     """Execute one trial with either the legacy or decoupled runtime path."""
     from .runner.loop import run_task
@@ -363,6 +364,7 @@ def _execute_trial(
                     media_cfg=cfg.media,
                     runtime_temperature=0.0 if runtime_temperature is None else runtime_temperature,
                     task_timeout_override=task_timeout_override,
+                    runtime_metadata=runtime_metadata,
                 )
             else:
                 trace_path = run_task(
@@ -405,6 +407,7 @@ def _execute_trial(
             media_cfg=cfg.media,
             runtime_temperature=0.0 if runtime_temperature is None else runtime_temperature,
             task_timeout_override=task_timeout_override,
+            runtime_metadata=runtime_metadata,
         )
         return trace_path, None
 
@@ -2197,6 +2200,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     registry_path=registry_path,
                     model_extra_body_override=model_extra_body_override,
                     runtime_temperature=runtime_temperature,
+                    runtime_metadata={
+                        "run_id": trace_root.name,
+                        "episode_id": episode_dir.name,
+                        "family_id": sequence.name,
+                        "stage": bucket,
+                    },
                 )
 
             artifact_summary = (
@@ -2568,7 +2577,13 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     model_extra_body_override=_sc_extra_body,
                     runtime_temperature=runtime_temperature,
                     task_timeout_override=getattr(args, "task_timeout_override", None),
-            )
+                    runtime_metadata={
+                        "run_id": trace_root.name,
+                        "episode_id": _sc_episode_dir.name,
+                        "family_id": _sc_episode.family_id,
+                        "stage": _sc_episode.stage,
+                    },
+                )
 
             _sc_grader = get_grader(_sc_task.task_id, tasks_dir=_sc_tasks_dir, task_dir=_sc_task_yaml.parent)
             _sc_artifact_summary = persistence_backend.snapshot_after(_sc_artifacts_dir)
@@ -2764,6 +2779,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         model_extra_body_override=model_extra_body_override,
                         runtime_temperature=runtime_temperature,
                         task_timeout_override=getattr(args, "task_timeout_override", None),
+                        runtime_metadata={
+                            "run_id": trace_root.name,
+                            "episode_id": episode_dir.name,
+                            "family_id": episode.family_id,
+                            "stage": episode.stage,
+                        },
                     )
 
                 grader = get_grader(task.task_id, tasks_dir=tasks_dir, task_dir=task_yaml.parent)
@@ -2936,6 +2957,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     model_extra_body_override=reflection_extra_body,
                     runtime_temperature=runtime_temperature,
                     task_timeout_override=getattr(args, "task_timeout_override", None),
+                    runtime_metadata={
+                        "run_id": trace_root.name,
+                        "episode_id": reflection_dir.name,
+                        "family_id": episode.family_id,
+                        "stage": "reflection",
+                    },
                 )
                 reflection_artifacts = persistence_backend.snapshot_after(reflection_artifacts_dir)
                 reflection_result = summarize_reflection_episode(
