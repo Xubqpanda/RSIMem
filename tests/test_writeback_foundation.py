@@ -323,6 +323,19 @@ def test_update_plan_requires_target_revision_and_backend_capability() -> None:
             "revisionless artifact",
         ),
         (
+            _target_resolver(
+                "artifact-a",
+                candidates=([], "artifact-a"),
+                artifacts=(MemoryArtifact(
+                    "artifact-a",
+                    MemoryKind.SEMANTIC,
+                    "Stored preference.",
+                    revision=7,
+                ),),
+            ),
+            "malformed candidate and revision types",
+        ),
+        (
             _target_resolver("artifact-a", updatable=False),
             "read-only backend",
         ),
