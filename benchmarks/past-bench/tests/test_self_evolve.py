@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -23,7 +24,7 @@ from past_bench.runner.self_evolve import (
     summarize_sequence,
     summarize_single_task_sequence,
 )
-from past_bench.cli import _save_episode_history_anchor
+from past_bench.cli import _apply_rsimem_execution_overrides, _save_episode_history_anchor
 from past_bench.runtime.adapters.hermes import HermesAdapter, _build_hermes_prompt
 from past_bench.runtime.protocol import RuntimeConfigPayload, RuntimeModelConfig, StartSessionRequest
 from past_bench.runtime.registry import AgentSpec
@@ -148,6 +149,40 @@ def test_sequence_validates_rsimem_execution_config(tmp_path: Path):
     manifest.write_text(yaml.safe_dump(invalid), encoding="utf-8")
     with pytest.raises(ValueError, match="rsimem_mode"):
         SelfEvolveSequenceDefinition.from_yaml(manifest)
+
+
+def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None:
+    manifest = tmp_path / "sequence.yaml"
+    task_dir = tmp_path / "tasks" / "T_demo"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.yaml").write_text(
+        "task_id: demo\ntask_name: Demo\nprompt:\n  text: hi\n",
+        encoding="utf-8",
+    )
+    manifest.write_text(
+        yaml.safe_dump({
+            "name": "rsimem-cli-mode",
+            "episodes": [{"task": "tasks/T_demo", "cluster_id": "cluster-a"}],
+        }),
+        encoding="utf-8",
+    )
+    sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
+
+    _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
+        agent="hermes-luna",
+        rsimem_mode="native+adapter+ledger",
+        rsimem_adapter_failure_policy="fail_closed",
+    ))
+
+    assert sequence.hermes.rsimem_mode == "native+adapter+ledger"
+    assert sequence.hermes.rsimem_adapter_failure_policy == "fail_closed"
+
+    with pytest.raises(SystemExit, match="Hermes agent"):
+        _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
+            agent="nanobot",
+            rsimem_mode="native+ledger",
+            rsimem_adapter_failure_policy=None,
+        ))
 
 
 def test_hermes_adapter_activates_and_closes_opt_in_rsimem_bridge(
