@@ -173,6 +173,7 @@ class HermesPastBenchBridge:
             family_id=family_id,
             stage=stage,
             execution_mode=config.mode.value,
+            output_path=self.evidence_path,
         )
         self.runtime = build_configured_hermes_runtime(
             hermes_home,
@@ -333,13 +334,5 @@ class HermesPastBenchBridge:
                 if entry is not None:
                     entry.handler = handler
             self._tool_handlers.clear()
-            self.evidence_path.parent.mkdir(parents=True, exist_ok=True)
-            self.evidence_path.write_text(
-                "".join(
-                    json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n"
-                    for event in self.ledger.events
-                ),
-                encoding="utf-8",
-            )
         finally:
             self.runtime.close()
