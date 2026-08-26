@@ -15,3 +15,4 @@ def test_build_hermes_extra_body_carries_session_search_flag() -> None:
     assert '"session_search_enabled": session_search_enabled' in source
     assert 'if session_search_enabled:' in source
     assert 'enabled_toolsets.append("session_search")' in source
+    assert '"evidence_path": str(artifacts_dir / "rsimem_memory_events.jsonl")' in source

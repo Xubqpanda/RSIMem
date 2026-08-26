@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+import pytest
 import yaml
 
 from past_bench.models.content import TextBlock
@@ -82,6 +83,43 @@ def test_build_hermes_extra_body_contains_persistence_overrides(tmp_path: Path):
     assert hermes_cfg["config_overrides"]["skills"]["creation_nudge_interval"] == 4
     assert hermes_cfg["background_review_wait_s"] == 1.5
     assert hermes_cfg["initial_home_fixture_dir"] == ""
+    assert hermes_cfg["rsimem"] == {
+        "mode": "native",
+        "adapter_failure_policy": "fail_closed",
+        "evidence_path": str(tmp_path / "artifacts" / "rsimem_memory_events.jsonl"),
+    }
+
+
+def test_sequence_validates_rsimem_execution_config(tmp_path: Path):
+    manifest = tmp_path / "sequence.yaml"
+    task_dir = tmp_path / "tasks" / "T_demo"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.yaml").write_text(
+        "task_id: demo\ntask_name: Demo\nprompt:\n  text: hi\n",
+        encoding="utf-8",
+    )
+    manifest.write_text(
+        yaml.safe_dump({
+            "name": "rsimem-mode",
+            "hermes": {
+                "rsimem_mode": "native+adapter+ledger",
+                "rsimem_adapter_failure_policy": "bypass_native",
+            },
+            "episodes": [{"task": "tasks/T_demo", "cluster_id": "cluster-a"}],
+        }),
+        encoding="utf-8",
+    )
+
+    sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
+
+    assert sequence.hermes.rsimem_mode == "native+adapter+ledger"
+    assert sequence.hermes.rsimem_adapter_failure_policy == "bypass_native"
+
+    invalid = yaml.safe_load(manifest.read_text(encoding="utf-8"))
+    invalid["hermes"]["rsimem_mode"] = "silent-adapter"
+    manifest.write_text(yaml.safe_dump(invalid), encoding="utf-8")
+    with pytest.raises(ValueError, match="rsimem_mode"):
+        SelfEvolveSequenceDefinition.from_yaml(manifest)
 
 
 def test_resolve_episode_tool_config_isolates_expected_mechanism():
