@@ -290,7 +290,10 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
 
     bridge = HermesPastBenchBridge(
         home,
-        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        HermesExperimentConfig(
+            HermesExecutionMode.ADAPTER_LEDGER,
+            verify_native_projection=True,
+        ),
         evidence_path=evidence_path,
         run_id="run-bridge",
         trace_id="trace-bridge",
@@ -303,6 +306,13 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
     bridge.attach(agent)
     wrapped_skill_handler = registry._tools["skill_view"].handler
     try:
+        assert agent._memory_store.format_for_system_prompt("memory") == native_memory
+        updated_preference = "Use CSV with an explicit owner column."
+        (home / "memories" / "MEMORY.md").write_text(
+            updated_preference,
+            encoding="utf-8",
+        )
+        assert store.format_for_system_prompt("memory") == native_memory
         assert agent._memory_store.format_for_system_prompt("memory") == native_memory
         assert agent._session_db.search_messages(
             query="task table",
@@ -328,6 +338,7 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
     serialized = evidence_path.read_text(encoding="utf-8")
     assert '"kind": "query"' in serialized
     assert '"kind": "injected"' in serialized
+    assert '"kind": "projection_check"' in serialized
     assert PRIVATE_PREFERENCE not in serialized
     assert "requested task table" not in serialized
     assert "Use the requested columns" not in serialized
@@ -399,6 +410,54 @@ def test_past_bench_bridge_failure_policy_controls_native_bypass(
     assert "adapter_failure_native_bypass" in serialized
     assert "RuntimeError" in serialized
     assert "private failure" not in serialized
+
+
+def test_past_bench_bridge_fails_closed_on_projection_mismatch(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    class Store:
+        def format_for_system_prompt(self, target: str) -> str:
+            return "native prompt"
+
+        def _render_block(self, target: str, entries: list[str]) -> str:
+            return f"adapter prompt: {entries[0]}"
+
+    bridge = HermesPastBenchBridge(
+        _hermes_home(tmp_path),
+        HermesExperimentConfig(
+            HermesExecutionMode.ADAPTER_LEDGER,
+            verify_native_projection=True,
+        ),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-mismatch",
+        trace_id="trace-mismatch",
+        episode_id="episode-mismatch",
+        session_id="session-mismatch",
+        task_id="task-mismatch",
+        experiment_variant="with_persistence",
+    )
+    artifact = MemoryArtifact(
+        artifact_id="adapter-only",
+        kind=MemoryKind.SEMANTIC,
+        namespace="memory",
+        content="adapter-only content",
+    )
+    bridge.runtime.query = lambda query: (
+        MemoryHit(artifact, rank=1, score=1.0, backend="hermes-native-semantic"),
+    )
+    agent = SimpleNamespace(_memory_store=Store(), _session_db=None)
+    bridge.attach(agent)
+    try:
+        with pytest.raises(HermesAdapterExecutionError, match="projection mismatch"):
+            agent._memory_store.format_for_system_prompt("memory")
+    finally:
+        bridge.close()
+
+    serialized = (tmp_path / "artifacts" / "events.jsonl").read_text(encoding="utf-8")
+    assert '"kind": "projection_check"' in serialized
+    assert '"equivalent": false' in serialized
+    assert "adapter-only content" not in serialized
+    assert "native prompt" not in serialized
 
 
 def test_past_bench_bridge_skill_reads_come_from_adapter_projection(

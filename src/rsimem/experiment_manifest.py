@@ -27,6 +27,7 @@ _REQUIRED_CONFIGURATION = {
     "executionModes",
     "persistenceIsolation",
     "adapterFailurePolicy",
+    "adapterProjectionVerification",
     "seedControl",
 }
 _REQUIRED_REVISIONS = {
@@ -277,6 +278,8 @@ def validate_manifest(value: Any) -> dict[str, Any]:
     for field in ("taskFamily", "agent", "runtime", "adapterFailurePolicy", "seedControl"):
         if not isinstance(configuration.get(field), str) or not configuration[field]:
             raise ValueError(f"manifest {field} is invalid")
+    if configuration.get("adapterProjectionVerification") is not True:
+        raise ValueError("matched manifest requires native projection verification")
     model = _validate_non_empty_object(configuration.get("model"), "model")
     _require_exact_fields(
         model,
@@ -410,6 +413,7 @@ def initialize_batch_manifest(
     budget: dict[str, Any],
     environment: dict[str, Any],
     persistence_isolation: dict[str, Any],
+    adapter_projection_verification: bool,
     rsimem_commit: str,
     rsimem_working_tree_dirty: bool,
     past_bench_commit: str,
@@ -431,6 +435,7 @@ def initialize_batch_manifest(
         "executionModes": list(EXECUTION_MODES),
         "persistenceIsolation": persistence_isolation,
         "adapterFailurePolicy": "fail_closed",
+        "adapterProjectionVerification": adapter_projection_verification,
         "seedControl": "independent_unseeded_replicates",
     }
     revisions = {

@@ -321,6 +321,9 @@ class HermesAdapter(RuntimeAdapter):
                 adapter_failure_policy=HermesAdapterFailurePolicy(
                     str(rsimem_cfg.get("adapter_failure_policy") or "fail_closed")
                 ),
+                verify_native_projection=(
+                    rsimem_cfg.get("verify_native_projection") is True
+                ),
             ),
             evidence_path=evidence_path,
             run_id=str(metadata.get("run_id") or self.request.session_id),

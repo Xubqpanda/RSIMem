@@ -76,6 +76,7 @@ def _request(home: Path, artifacts: Path, mode: str) -> StartSessionRequest:
                 "rsimem": {
                     "mode": mode,
                     "adapter_failure_policy": "fail_closed",
+                    "verify_native_projection": True,
                     "evidence_path": str(artifacts / "rsimem_memory_events.jsonl"),
                 },
             }},
@@ -194,3 +195,4 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
         assert '"kind": "injected"' in serialized
         assert PRIVATE_MEMORY not in serialized
         assert "task table is ready" not in serialized.lower()
+    assert '"kind": "projection_check"' in evidence["native+adapter+ledger"]

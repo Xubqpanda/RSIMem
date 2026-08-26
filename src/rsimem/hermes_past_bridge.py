@@ -59,11 +59,19 @@ class _PromptMemoryStore:
                 [hit.artifact.content for hit in hits],
             )
 
-        return self._bridge.adapter_call(
+        adapter_result = self._bridge.adapter_call(
             "system_prompt",
             adapter_read,
             lambda: self._native.format_for_system_prompt(target),
         )
+        self._bridge.verify_projection(
+            MemoryKind.SEMANTIC,
+            "hermes-native-semantic",
+            "system_prompt",
+            adapter_result,
+            lambda: self._native.format_for_system_prompt(target),
+        )
+        return adapter_result
 
 
 class _SessionDb:
@@ -142,7 +150,15 @@ class _SessionDb:
                 })
             return results
 
-        return self._bridge.adapter_call("session_search", adapter_read, native_call)
+        adapter_result = self._bridge.adapter_call("session_search", adapter_read, native_call)
+        self._bridge.verify_projection(
+            MemoryKind.EPISODIC,
+            "hermes-native-episodic",
+            "session_search",
+            adapter_result,
+            native_call,
+        )
+        return adapter_result
 
     def _cache_projection(self, hit: Any) -> None:
         lineage = hit.artifact.metadata.get("session_lineage")
@@ -185,7 +201,15 @@ class _SessionDb:
             return self._native.get_session(session_id)
         session = self._sessions.get(session_id)
         if session is not None:
-            return dict(session)
+            result = dict(session)
+            self._bridge.verify_projection(
+                MemoryKind.EPISODIC,
+                "hermes-native-episodic",
+                "session_get",
+                result,
+                lambda: self._native.get_session(session_id),
+            )
+            return result
         if session_id == self._current_session_id:
             return self._native.get_session(session_id)
         raise KeyError(f"session is absent from episodic projection: {session_id}")
@@ -200,7 +224,15 @@ class _SessionDb:
         if hits and session_id not in self._injected_sessions:
             self._bridge.runtime.mark_injected(hits, surface="session_search")
             self._injected_sessions.add(session_id)
-        return [dict(message) for message in messages]
+        result = [dict(message) for message in messages]
+        self._bridge.verify_projection(
+            MemoryKind.EPISODIC,
+            "hermes-native-episodic",
+            "session_conversation",
+            result,
+            lambda: self._native.get_messages_as_conversation(session_id),
+        )
+        return result
 
 
 class HermesPastBenchBridge:
@@ -300,6 +332,40 @@ class HermesPastBenchBridge:
                 f"Hermes adapter operation failed closed: {operation} ({failure_type})"
             ) from exc
 
+    def verify_projection(
+        self,
+        kind: MemoryKind,
+        backend: str,
+        surface: str,
+        adapter_value: Any,
+        native_call: Callable[[], Any],
+    ) -> None:
+        if not self.config.verify_native_projection:
+            return
+        native_value = native_call()
+        equivalent = adapter_value == native_value
+        if isinstance(adapter_value, str):
+            content_chars = len(adapter_value)
+        else:
+            content_chars = len(json.dumps(
+                adapter_value,
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+            ))
+        self.ledger.record(MemoryEvent(
+            MemoryEventKind.PROJECTION_CHECK,
+            kind,
+            backend,
+            content_chars=content_chars,
+            reason_code=None if equivalent else "projection_mismatch",
+            attributes={"surface": surface, "equivalent": equivalent},
+        ))
+        if not equivalent:
+            raise HermesAdapterExecutionError(
+                f"Hermes adapter projection mismatch: {surface}"
+            )
+
     def observe_query(
         self,
         kind: MemoryKind,
@@ -398,7 +464,15 @@ class HermesPastBenchBridge:
                         self.runtime.mark_injected(hits, surface=_tool_name)
                     return result
 
-                return self.adapter_call(_tool_name, adapter_read, native_call)
+                adapter_result = self.adapter_call(_tool_name, adapter_read, native_call)
+                self.verify_projection(
+                    MemoryKind.PROCEDURAL,
+                    "hermes-native-procedural",
+                    _tool_name,
+                    adapter_result,
+                    native_call,
+                )
+                return adapter_result
 
             entry.handler = handler
 

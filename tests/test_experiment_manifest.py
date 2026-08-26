@@ -47,6 +47,7 @@ def _manifest_kwargs() -> dict[str, object]:
             "strategy": "per_attempt_trace_directory",
             "compareNoPersistence": True,
         },
+        "adapter_projection_verification": True,
         "environment": {
             "pythonVersion": "3.11.0",
             "distributions": {

@@ -38,6 +38,7 @@ class MemoryEventKind(StrEnum):
     MUTATION_COMMITTED = "mutation_committed"
     MUTATION_REJECTED = "mutation_rejected"
     INJECTED = "injected"
+    PROJECTION_CHECK = "projection_check"
 
 
 def _frozen_metadata(value: Mapping[str, Any] | None) -> Mapping[str, Any]:

@@ -39,6 +39,7 @@ def build_hermes_extra_body(
     preseed_artifacts_dir: Path | None = None,
     rsimem_mode: str = "native",
     rsimem_adapter_failure_policy: str = "fail_closed",
+    rsimem_verify_native_projection: bool = False,
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -72,6 +73,7 @@ def build_hermes_extra_body(
             "rsimem": {
                 "mode": rsimem_mode,
                 "adapter_failure_policy": rsimem_adapter_failure_policy,
+                "verify_native_projection": rsimem_verify_native_projection,
                 "evidence_path": str(artifacts_dir / "rsimem_memory_events.jsonl"),
             },
         }
@@ -480,6 +482,9 @@ class HermesPersistenceBackend(PersistenceBackend):
             rsimem_mode=sequence.hermes.rsimem_mode,
             rsimem_adapter_failure_policy=(
                 sequence.hermes.rsimem_adapter_failure_policy
+            ),
+            rsimem_verify_native_projection=(
+                sequence.hermes.rsimem_verify_native_projection
             ),
         )
 

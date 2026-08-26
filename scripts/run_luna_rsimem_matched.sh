@@ -88,6 +88,7 @@ initialize_batch_manifest(
         "strategy": "per_attempt_trace_directory",
         "compareNoPersistence": True,
     },
+    adapter_projection_verification=True,
     rsimem_commit=sys.argv[7],
     rsimem_working_tree_dirty=sys.argv[8] == "true",
     past_bench_commit=sys.argv[9],
@@ -180,6 +181,7 @@ print("\n".join(execution_order(int(sys.argv[1]))))
       --trace-dir "${trace_dir}" \
       --rsimem-mode "${mode}" \
       --rsimem-adapter-failure-policy fail_closed \
+      --rsimem-verify-native-projection \
       "${proxy_args[@]}"; then
       record_attempt "${replicate}" "${ordinal}" "${mode}" "${run_name}" failed past_bench
       exit 1

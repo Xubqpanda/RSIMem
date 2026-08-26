@@ -66,6 +66,7 @@ class HermesExperimentConfig:
     adapter_failure_policy: HermesAdapterFailurePolicy = (
         HermesAdapterFailurePolicy.FAIL_CLOSED
     )
+    verify_native_projection: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "mode", HermesExecutionMode(self.mode))
@@ -80,6 +81,8 @@ class HermesExperimentConfig:
         if any(not backend.strip() for backend in routes.values()):
             raise ValueError("Hermes backend route names must not be empty")
         object.__setattr__(self, "routes", MappingProxyType(routes))
+        if not isinstance(self.verify_native_projection, bool):
+            raise TypeError("verify_native_projection must be a bool")
 
     @property
     def uses_adapter(self) -> bool:

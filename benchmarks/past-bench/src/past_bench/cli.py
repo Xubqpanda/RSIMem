@@ -1966,7 +1966,8 @@ def _print_sequence_bucket_summary(label: str, summary: dict) -> None:
 def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> None:
     mode = getattr(args, "rsimem_mode", None)
     failure_policy = getattr(args, "rsimem_adapter_failure_policy", None)
-    if mode is None and failure_policy is None:
+    verify_projection = getattr(args, "rsimem_verify_native_projection", False)
+    if mode is None and failure_policy is None and not verify_projection:
         return
     if not str(args.agent).startswith("hermes"):
         raise SystemExit("RSIMem execution overrides require a Hermes agent")
@@ -1974,6 +1975,8 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         sequence.hermes.rsimem_mode = mode
     if failure_policy is not None:
         sequence.hermes.rsimem_adapter_failure_policy = failure_policy
+    if verify_projection:
+        sequence.hermes.rsimem_verify_native_projection = True
 
 
 def _print_episode_result_summary(result: dict) -> None:
@@ -3362,6 +3365,11 @@ def main(argv: list[str] | None = None) -> None:
         choices=["fail_closed", "bypass_native"],
         default=None,
         help="Explicitly override the RSIMem adapter failure policy",
+    )
+    p_evolve.add_argument(
+        "--rsimem-verify-native-projection",
+        action="store_true",
+        help="Fail closed unless each adapter read exactly matches a native shadow read",
     )
 
     # cleanup
