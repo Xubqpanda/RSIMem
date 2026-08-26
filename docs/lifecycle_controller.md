@@ -76,4 +76,4 @@ plan concurrently. It does not yet provide exactly-once real memory mutation;
 that path needs pending/committed receipt states and crash recovery around the
 backend operation.
 
-The real Hermes prompt builder, `session_search`, `skills_list`, and `skill_view` surfaces now pass deterministic native/adapter equivalence checks with observer-only instrumentation, restart-stable identities, and explicit failure policy. The next implementation step is opt-in PAST-Bench runner wiring and matched agent-loop execution. The current result is an execution-surface baseline, not matched PAST-Bench execution equivalence.
+The real Hermes prompt builder, `session_search`, `skills_list`, and `skill_view` surfaces now pass deterministic native/adapter equivalence checks with observer-only instrumentation, restart-stable identities, and explicit failure policy. An opt-in PAST-Bench bridge also passes a deterministic adapter-loop fixture and automatically joins content-free episode evidence into the ledger. The next implementation step is a matched live-model SM01 run. The current result does not establish live-model PAST-Bench execution equivalence.

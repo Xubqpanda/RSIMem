@@ -57,10 +57,13 @@ Events contain backend names, opaque artifact IDs, character counts, operation t
 
 ## Current Boundary
 
-The adapter API is available for isolated experiments, but the PAST-Bench runner still uses Hermes' native tools directly. Storage-boundary deterministic equivalence is complete for semantic rendering, episodic FTS views, and procedural resources. A second deterministic fixture now invokes Hermes' real `AIAgent._build_system_prompt`, `session_search`, `skills_list`, and `skill_view` paths across `native`, `native+ledger`, and `native+adapter+ledger`. The session-search fixture replaces only the external summarizer with a deterministic function. It also verifies restart-stable artifact identity and explicit fail-closed or native-bypass behavior.
+The adapter API is now available through an opt-in PAST-Bench Hermes bridge; direct native remains the default. Storage-boundary deterministic equivalence is complete for semantic rendering, episodic FTS views, and procedural resources. A second deterministic fixture invokes Hermes' real `AIAgent._build_system_prompt`, `session_search`, `skills_list`, and `skill_view` paths across `native`, `native+ledger`, and `native+adapter+ledger`. The session-search fixture replaces only the external summarizer with a deterministic function. It also verifies restart-stable artifact identity and explicit fail-closed or native-bypass behavior.
 
 This establishes deterministic execution-surface equivalence, not matched
-PAST-Bench execution equivalence. Direct native remains the default, and the
-benchmark runner has not yet been routed through the adapter path.
+live-model PAST-Bench execution equivalence. A deterministic PAST-Bench
+adapter-loop fixture now reaches all read surfaces and produces identical
+final output across the three modes without making a model API call. Episode
+runtime evidence is automatically joined into the ledger through comparison
+identity validation.
 
-The context lifecycle control plane now lives in [`lifecycle_controller.md`](lifecycle_controller.md). It decides when to evaluate a context snapshot and validates a joint context/memory signal, but it does not yet invoke compilers or route real mutations. The next integration milestone is wiring the explicit mode and failure policy into the PAST-Bench/Hermes execution path and running matched executions. Only after those checks pass should lifecycle signals invoke compilers and route mutations through this runtime.
+The context lifecycle control plane now lives in [`lifecycle_controller.md`](lifecycle_controller.md). It decides when to evaluate a context snapshot and validates a joint context/memory signal, but it does not yet invoke compilers or route real mutations. The next integration milestone is running matched live-model executions under the explicit mode and failure-policy configuration. Only after those checks pass should lifecycle signals invoke compilers and route mutations through this runtime.
