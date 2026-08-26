@@ -6,11 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "rsimem"
 version = "0.1.0"
 description = "Experiment instrumentation and evaluation for LightRSI memory research"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 
 [project.scripts]
 rsimem-ledger = "rsimem.ledger:main"
 rsimem-audit = "rsimem.audit:main"
+rsimem-preflight = "rsimem.preflight:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
