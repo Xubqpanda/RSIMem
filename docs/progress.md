@@ -1,8 +1,8 @@
 # RSIMem Progress
 
-Last updated: 2026-08-26
+Last updated: 2026-08-27
 
-This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md).
+This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
 ## Status Legend
 
@@ -14,7 +14,9 @@ This document tracks implementation progress, the current experimental boundary,
 
 RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for every exposed model request, derive a privacy-safe lifecycle ledger, audit run completeness, and represent Hermes semantic, episodic, and procedural memory through typed backend contracts.
 
-The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem compiler, real writeback mutation, static policy, or adaptive policy is active yet.
+The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem ingestor, real writeback mutation, static policy, or adaptive policy is active yet. The active implementation scope is now semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
+
+Phase 1A environment/configuration freeze and Phase 1B deterministic read-path equivalence are complete. Phase 1C live matched read-path validation is the active gate; lifecycle dry-run integration and all Phase 2 implementation remain blocked until it passes.
 
 ## Completed Work
 
@@ -26,6 +28,8 @@ The typed memory runtime is connected to the PAST-Bench Hermes execution path be
 - [x] Establish a Python 3.11 development environment and reproducible local installation procedure.
 - [x] Preserve task definitions, graders, answer keys, and native persistence semantics.
 - [x] Add a repeatable GPT-Luna smoke launcher for `SM01_preference_adoption`.
+- [x] Add a secret-free Python/dependency/state/provider preflight and verify a clean temporary installation.
+- [x] Freeze a fail-closed matched experiment manifest with resolved model, judge, task budgets, environment versions, revisions, persistence isolation, restart identity, and append-only attempt evidence.
 
 ### Baseline And Usage Evidence
 
@@ -136,7 +140,7 @@ establish a nondeterminism tolerance.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `82 passed`.
+- [x] Pass all RSIMem tests: `90 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `384 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
@@ -145,7 +149,7 @@ establish a nondeterminism tolerance.
 
 ### **Current: Live Matched Runtime Validation**
 
-The immediate objective is to validate the opt-in typed memory read path under matched live-model SM01 runs without changing the native Hermes baseline. Follow [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md) for the later snapshot, compiler, writeback, and acceptance order.
+The immediate objective is to complete at least three order-rotated, independently unseeded replicates per mode on the current full semantic/episodic/procedural projection path, audit every successful run, preserve failed attempts, and publish a dated Phase 1C report. Phase 1D snapshot/evaluator/dry-run wiring does not begin until this gate passes.
 
 - [x] Define an experiment configuration that selects one backend for each memory kind and defaults to native Hermes behavior.
 - [x] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
@@ -181,48 +185,51 @@ Acceptance criteria:
 - [ ] Establish an explicit tolerance for nondeterministic model variation and require zero unexplained accounting drift.
 - [ ] Treat adapter instrumentation as behaviorally neutral only after the matched comparison passes.
 
-### Compiler Baselines
+### Memory Policy Baselines
 
-- [ ] Implement a deterministic pass-through compiler for fixtures and contract validation.
-- [ ] Define candidate provenance so every compiled mutation links back to its source episode and context-exit event.
-- [ ] Implement fixed semantic, episodic, and procedural compiler baselines without adaptive LightRSI decisions.
-- [ ] Represent Text2Skill and SkillCreator as procedural compilers rather than storage backends.
-- [ ] Record compiler model requests, latency, tokens, accepted mutations, rejected mutations, and stored bytes as lifecycle cost.
-- [ ] Add validation, rollback, and idempotency tests for compiler-produced mutations.
+- [ ] Freeze Hermes routing and the semantic invocation boundary across all active policy variants.
+- [ ] Implement a deterministic pass-through ingestor for fixtures and contract validation.
+- [ ] Define provenance so every ingestion links back to its source episode, fixed route, internal operation, and later retrieval.
+- [ ] Locally reimplement Mem0 flat fact extraction, related-memory comparison, and internal ADD/UPDATE/DELETE/NONE policy from the pinned MemBase source.
+- [ ] Keep MemBase datasets, runners, evaluation code, graph store, and runtime imports outside RSIMem.
+- [ ] Add a bounded MemTrace-inspired, content-free atomic operation graph without importing MemTrace/smartcomment runtime or tracing arbitrary calls.
+- [ ] Attribute failures to extraction, internal decision, mutation, or retrieval subgraphs before updating policy.
+- [ ] Keep episodic and procedural policy implementation disabled until their separate research gates select a method and matched baseline.
+- [ ] Record ingestion model requests, latency, tokens, internal operations, rejected operations, and stored bytes as lifecycle cost.
+- [ ] Add validation, rollback, and idempotency tests for framework-produced internal operations.
 
 ### Static LightRSI Writeback
 
-- [ ] Define task-aligned context-exit candidates without using hidden benchmark labels or grader evidence.
-- [ ] Implement one fixed joint action space: discard, retain as episodic, distill as semantic, distill as procedural, update, or supersede.
-- [ ] Define the first fixed utility-per-cost criterion used consistently for writeback and later retrieval.
-- [ ] Link source context, compiler execution, stored artifact, retrieval, injection, downstream execution, and outcome through stable lifecycle IDs.
+- [ ] Invoke the Hermes semantic route at the same task/session boundary used by its control policy.
+- [ ] Expose only ingest/add externally; let the semantic policy produce ADD, UPDATE, DELETE, or NONE.
+- [ ] Define one fixed future-utility-per-cost objective for evaluating semantic construction/update and retrieval behavior.
+- [ ] Link source context, ingestion execution, internal operation, stored artifact, retrieval, injection, downstream execution, and outcome through stable lifecycle IDs.
 - [ ] Compare no persistence, native memory, and static LightRSI under matched settings.
-- [ ] Verify that quality gains are reported together with controller, compilation, storage, retrieval, injection, and recovery costs.
+- [ ] Verify that quality gains are reported together with ingestion-policy, storage, retrieval, injection, and recovery costs.
 
 ### Adaptive LightRSI Loop
 
 - [ ] Collect deployment-observable delayed feedback from retrieval, injection, task completion, tool behavior, retries, supersession, and non-use.
 - [ ] Estimate realized future utility without reading hidden task scores into the policy update path.
-- [ ] Version the joint context-exit, memory-form, and retrieval policy.
+- [ ] Version semantic extraction, operation/consolidation, and retrieval policies without changing routing or invocation frequency.
 - [ ] Validate proposed policy updates against held-out deployment evidence.
 - [ ] Support acceptance, rejection, rollback, and reproducible replay of every policy update.
 - [ ] Compare static and adaptive LightRSI on the cost-quality frontier.
 
-### Backend And Benchmark Expansion
+### PAST-Bench Task-Family Expansion
 
-- [ ] Add Mem0 as the first external storage and retrieval backend.
-- [ ] Add LangMem or Graphiti after the adapter contract is stable.
-- [ ] Keep every comparison paired as native backend versus the same backend with LightRSI.
-- [ ] Expand from `SM01` to all memory-ability families.
-- [ ] Add update-ability, procedural-reuse, and proactive-information-gathering families.
-- [ ] Evaluate a second long-horizon benchmark only after PAST-Bench accounting and lifecycle attribution are stable.
+- [ ] Expand from `SM01` to the preselected semantic-relevant memory-ability families.
+- [ ] Add semantic-relevant update-ability families.
+- [ ] Add episodic/procedural families only after their method-selection gates pass; they do not block the semantic-first paper path.
+- [ ] Keep Hermes native memory as the fixed backend across all current-paper experiments.
+- [ ] Keep MemBase runtime/evaluation code, external memory backends, other hosts, and additional benchmarks outside the current implementation scope.
 
 ## Required Experiment Invariants
 
 - [ ] Never modify benchmark task semantics, hidden expectations, answer keys, or grading criteria to improve results.
-- [ ] Never expose hidden grader evidence to a compiler, backend, controller, or policy update.
+- [ ] Never expose hidden grader evidence to an ingestor/generator, backend, controller, or policy update.
 - [ ] Keep raw resource quantities separate from provider prices.
-- [ ] Account for controller and compiler calls as experiment cost rather than free preprocessing.
+- [ ] Account for controller, ingestion/generation, retrieval-policy, and policy-update calls as experiment cost rather than free preprocessing.
 - [ ] Deduplicate physical model requests across shared executions before reporting cost.
 - [ ] Keep memory content out of the lifecycle ledger and audit outputs.
 - [ ] Pin benchmark, agent, LightRSI, model profile, judge profile, task manifest, and seed for every reported run.
@@ -233,7 +240,7 @@ Acceptance criteria:
 1. Run matched independent replicates and compare quality, usage, tool, storage, injection, and timing evidence.
 2. Define and enforce the acceptable live-model nondeterminism boundary.
 3. Add provider-seed control only if the selected runtime exposes and verifies it.
-4. Implement validated compiler and backend mutation baselines.
+4. Implement the validated Mem0-style semantic ingestor and backend mutation baseline.
 5. Begin the static RSIMem writeback policy only after runtime equivalence is established.
 
 ## Update Policy
