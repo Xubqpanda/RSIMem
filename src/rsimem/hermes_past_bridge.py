@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Callable
 
 from .hermes_integration import (
@@ -11,6 +12,8 @@ from .hermes_integration import (
     HermesAdapterFailurePolicy,
     HermesExecutionMode,
     HermesExperimentConfig,
+    _bound_hermes_skills_dir,
+    _materialize_procedural_hits,
     build_configured_hermes_runtime,
 )
 from .ledger import MemoryLedgerObserver
@@ -313,8 +316,22 @@ class HermesPastBenchBridge:
                         query,
                         limit=100 if _tool_name == "skills_list" else 5,
                     ))
-                    result = native_call()
-                    if hits:
+                    projected_hits = hits
+                    if _tool_name == "skill_view" and not projected_hits:
+                        projected_hits = self.runtime.query(MemoryQuery(
+                            MemoryKind.PROCEDURAL,
+                            "",
+                            limit=100,
+                        ))
+                    with TemporaryDirectory(
+                        prefix="rsimem-hermes-live-skills-"
+                    ) as directory:
+                        skills_dir = Path(directory) / "skills"
+                        _materialize_procedural_hits(skills_dir, projected_hits)
+                        with _bound_hermes_skills_dir(skills_dir):
+                            result = _original(args, **kwargs)
+                    payload = json.loads(result)
+                    if hits and payload.get("success") is True:
                         self.runtime.mark_injected(hits, surface=_tool_name)
                     return result
 
