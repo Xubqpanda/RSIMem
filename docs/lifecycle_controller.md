@@ -54,7 +54,9 @@ confidence: [0, 1]
 reason_codes: content-free machine-readable evidence
 ```
 
-The evaluator must return exactly one signal per input segment. Active, current-turn, unresolved, and open-tool segments cannot be evicted. `add` requires an explicit memory kind without an existing target. For `update`, the evaluator supplies only update hints/mode; a trusted target resolver must search an allowlisted backend, bind one artifact and expected revision, and the coordinator rejects ambiguous or unsupported candidates. Compiler version is supplied by the host runtime, not trusted from model output. A retained segment cannot be marked for discard.
+The evaluator must return exactly one signal per input segment. Active, current-turn, unresolved, and open-tool segments cannot be evicted. `add` requires an explicit memory kind without an existing target. For `update`, the evaluator supplies only update hints/mode. The trusted resolver uses the selected `MemoryBackendRegistry` route, verifies update capability and the backend allowlist, loads each candidate artifact through that backend, and binds the stored revision. Fabricated, missing, revisionless, ambiguous, and unsupported candidates are rejected. Compiler version is supplied by the host runtime, not trusted from model output. A retained segment cannot be marked for discard.
+
+The idempotency identity hashes all evidence that can affect compiler-produced memory: completion status and evidence, unresolved state, scope, temporal validity, reusable facts, reusable procedures, and update hints. Stable source IDs, context revision, target identity, policy version, and compiler version remain explicit parts of the key. Evaluation IDs stay in audit provenance but do not make an otherwise equivalent retry a new mutation. `safe_to_evict` is a deterministic runtime boolean and is validated strictly.
 
 The signal is a prediction, not a proof of future value. Later retrieval, injection, task, tool, retry, and cost events will provide delayed feedback for the adaptive policy. Raw context remains in the evaluator request only; observer-facing lifecycle evidence contains IDs, counts, actions, and reason codes rather than memory text.
 
@@ -67,6 +69,11 @@ The package is available under `rsimem.lifecycle`:
 - `scheduler.py`: event-to-evaluation cadence decisions.
 - `evaluators.py`: injected JSON LLM adapter and deterministic baseline.
 - `controller.py`: scheduling, validation, and observer notification.
-- `writeback.py`: revisioned plans, target-aware idempotency, persistent receipts, and dry-run coordination.
+- `writeback.py`: revisioned plans, backend-bound update resolution, compiler-input-aware idempotency, atomic dry-run receipt reservation, and dry-run coordination.
+
+Atomic reservation prevents two dry-run coordinators from accepting the same
+plan concurrently. It does not yet provide exactly-once real memory mutation;
+that path needs pending/committed receipt states and crash recovery around the
+backend operation.
 
 The next implementation step is calling real Hermes prompt, session-search, and skill surfaces under observer-only instrumentation, followed by restart and failure-bypass checks. The current result is a storage-boundary deterministic equivalence baseline, not execution equivalence.

@@ -29,3 +29,24 @@ The smoke runs the native-persistence and no-persistence variants of `memory_abi
 After a successful paired run, the launcher derives `ledger.jsonl` from PAST-Bench traces and Hermes artifacts. The ledger records evidence-backed model calls, token buckets, tools, memory operations, model-visible memory injections, storage snapshots, latency, and outcomes without retaining memory text. Every physical model request exposed by the Hermes runtime receives a sanitized `model_call_usage` event; provider fields that are unavailable remain explicit `null` values rather than inferred zeros.
 
 The launcher then runs `rsimem-audit` and writes `audit.json`. The audit fails the run when request events do not reconcile with `TraceEnd`, billing identities cannot be deduplicated, usage is incomplete, or the ledger contains memory text, absolute source paths, or credential-shaped values. Existing runs can be checked independently with `rsimem-audit outputs/smoke/<run>`.
+
+## Verification
+
+Run the RSIMem checks from the repository root:
+
+```bash
+.venv/bin/python -m compileall -q src
+.venv/bin/pytest -q tests
+.venv/bin/pip check
+```
+
+Run the vendored PAST-Bench suite from its own directory so its top-level
+`agent` package is resolved consistently:
+
+```bash
+cd benchmarks/past-bench
+../../.venv/bin/pytest -q
+```
+
+Do not substitute `pytest -q benchmarks/past-bench` from the RSIMem root; that
+layout can collect a conflicting `agent.evolve_controller` module.
