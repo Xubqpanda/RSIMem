@@ -2163,6 +2163,10 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     if sequence.hermes.initial_home_fixture_dir
                     else None,
                     preseed_artifacts_dir=preseed_dir,
+                    rsimem_mode=sequence.hermes.rsimem_mode,
+                    rsimem_adapter_failure_policy=(
+                        sequence.hermes.rsimem_adapter_failure_policy
+                    ),
                 )
 
             print(

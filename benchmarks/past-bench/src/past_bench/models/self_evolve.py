@@ -446,6 +446,15 @@ class HermesPersistenceConfig(BaseModel):
     background_review_wait_s: float = 1.0
     preseed_artifacts_dir: str = ""
     initial_home_fixture_dir: str = ""
+    rsimem_mode: Literal[
+        "native",
+        "native+ledger",
+        "native+adapter+ledger",
+    ] = "native"
+    rsimem_adapter_failure_policy: Literal[
+        "fail_closed",
+        "bypass_native",
+    ] = "fail_closed"
 
 
 class SelfEvolveTaskRef(BaseModel):

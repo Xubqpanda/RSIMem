@@ -37,6 +37,8 @@ def build_hermes_extra_body(
     background_review_wait_s: float,
     initial_home_fixture_dir: Path | None = None,
     preseed_artifacts_dir: Path | None = None,
+    rsimem_mode: str = "native",
+    rsimem_adapter_failure_policy: str = "fail_closed",
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -67,6 +69,11 @@ def build_hermes_extra_body(
             },
             "initial_home_fixture_dir": str(initial_home_fixture_dir) if initial_home_fixture_dir else "",
             "preseed_artifacts_dir": str(preseed_artifacts_dir) if preseed_artifacts_dir else "",
+            "rsimem": {
+                "mode": rsimem_mode,
+                "adapter_failure_policy": rsimem_adapter_failure_policy,
+                "evidence_path": str(artifacts_dir / "rsimem_memory_events.jsonl"),
+            },
         }
     }
 
@@ -470,6 +477,10 @@ class HermesPersistenceBackend(PersistenceBackend):
             memory_flush_min_turns=sequence.hermes.memory_flush_min_turns,
             skill_creation_nudge_interval=sequence.hermes.skill_creation_nudge_interval,
             background_review_wait_s=review_wait_s,
+            rsimem_mode=sequence.hermes.rsimem_mode,
+            rsimem_adapter_failure_policy=(
+                sequence.hermes.rsimem_adapter_failure_policy
+            ),
         )
 
     def snapshot_before(self, state_root: Path, *, include_contents: bool = False) -> dict[str, Any]:
