@@ -344,16 +344,24 @@ class HermesEpisodicBackend:
                 "role": row["role"],
                 "content": row["content"],
             }
-            for field in ("tool_call_id", "tool_name", "reasoning"):
+            for field in ("tool_call_id", "tool_name"):
                 if field in keys and row[field]:
                     message[field] = row[field]
-            for field in ("tool_calls", "reasoning_details", "codex_reasoning_items"):
-                if field not in keys or not row[field]:
-                    continue
+            if "tool_calls" in keys and row["tool_calls"]:
                 try:
-                    message[field] = json.loads(row[field])
+                    message["tool_calls"] = json.loads(row["tool_calls"])
                 except (json.JSONDecodeError, TypeError):
-                    message[field] = row[field]
+                    pass
+            if row["role"] == "assistant":
+                if "reasoning" in keys and row["reasoning"]:
+                    message["reasoning"] = row["reasoning"]
+                for field in ("reasoning_details", "codex_reasoning_items"):
+                    if field not in keys or not row[field]:
+                        continue
+                    try:
+                        message[field] = json.loads(row[field])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
             messages.append(message)
         return tuple(messages)
 
@@ -388,15 +396,46 @@ class HermesEpisodicBackend:
             raise ValueError(f"episodic query filter {name} must be a list")
         return tuple(str(item) for item in value)
 
+    @staticmethod
+    def _sanitize_fts5_query(query: str) -> str:
+        """Mirror Hermes SessionDB FTS5 normalization without importing Hermes."""
+
+        quoted_parts: list[str] = []
+
+        def preserve_quoted(match: re.Match[str]) -> str:
+            quoted_parts.append(match.group(0))
+            return f"\x00Q{len(quoted_parts) - 1}\x00"
+
+        sanitized = re.sub(r'"[^"]*"', preserve_quoted, query)
+        sanitized = re.sub(r'[+{}()"^]', " ", sanitized)
+        sanitized = re.sub(r"\*+", "*", sanitized)
+        sanitized = re.sub(r"(^|\s)\*", r"\1", sanitized)
+        sanitized = re.sub(
+            r"(?i)^(AND|OR|NOT)\b\s*",
+            "",
+            sanitized.strip(),
+        )
+        sanitized = re.sub(
+            r"(?i)\s+(AND|OR|NOT)\s*$",
+            "",
+            sanitized.strip(),
+        )
+        sanitized = re.sub(r"\b(\w+(?:-\w+)+)\b", r'"\1"', sanitized)
+        for index, quoted in enumerate(quoted_parts):
+            sanitized = sanitized.replace(f"\x00Q{index}\x00", quoted)
+        return sanitized.strip()
+
     def query(self, query: MemoryQuery) -> tuple[MemoryHit, ...]:
         if not self.state_db.exists():
             return ()
-        terms = query.text.strip()
+        terms = self._sanitize_fts5_query(query.text.strip())
         if not terms:
             return ()
         source_filter = self._filter_values(query.filters, "source_filter")
         exclude_sources = self._filter_values(query.filters, "exclude_sources")
         role_filter = self._filter_values(query.filters, "role_filter")
+        if role_filter == ():
+            role_filter = None
         offset = query.filters.get("offset", 0)
         if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
             raise ValueError("episodic query offset must be a non-negative integer")

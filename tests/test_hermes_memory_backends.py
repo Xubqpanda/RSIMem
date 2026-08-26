@@ -176,6 +176,77 @@ def test_episodic_backend_searches_fts_and_is_read_only(tmp_path: Path) -> None:
     assert rejected.reason_code == "read_only_backend"
 
 
+def test_episodic_backend_matches_native_search_and_conversation_projection(
+    tmp_path: Path,
+) -> None:
+    from hermes_state import SessionDB
+
+    state_db = tmp_path / "state.db"
+    native = SessionDB(state_db)
+    native.create_session("session-native", "cli", model="fixture-model")
+    user_id = native.append_message(
+        "session-native",
+        "user",
+        "Use chat-send for hello task with an unterminated marker.",
+        reasoning="user reasoning must not replay",
+    )
+    assistant_id = native.append_message(
+        "session-native",
+        "assistant",
+        "The task was completed through chat-send.",
+        tool_calls=[{"name": "chat_send"}],
+        reasoning="assistant reasoning",
+        codex_reasoning_items=[{"type": "reasoning"}],
+    )
+    native.close()
+    connection = sqlite3.connect(state_db)
+    connection.execute(
+        "UPDATE messages SET tool_calls = ?, reasoning_details = ? WHERE id = ?",
+        ("{broken", "{broken", user_id),
+    )
+    connection.execute(
+        "UPDATE messages SET reasoning_details = ? WHERE id = ?",
+        ("{broken", assistant_id),
+    )
+    connection.commit()
+    connection.close()
+
+    native = SessionDB(state_db)
+    backend = HermesEpisodicBackend(state_db)
+    try:
+        for query in ("chat-send", "hello AND", "(task)", '"unterminated'):
+            native_results = native.search_messages(
+                query=query,
+                role_filter=[],
+                limit=20,
+                offset=0,
+            )
+            adapter_hits = backend.query(MemoryQuery(
+                MemoryKind.EPISODIC,
+                query,
+                limit=20,
+                filters={"role_filter": []},
+            ))
+            assert [hit.artifact.metadata["message_id"] for hit in adapter_hits] == [
+                result["id"] for result in native_results
+            ]
+
+        projected = backend.query(MemoryQuery(
+            MemoryKind.EPISODIC,
+            "chat-send",
+        ))[0].artifact.metadata["session_lineage"][0][2]
+        assert list(projected) == native.get_messages_as_conversation(
+            "session-native"
+        )
+        assert "reasoning" not in projected[0]
+        assert "tool_calls" not in projected[0]
+        assert projected[1]["reasoning"] == "assistant reasoning"
+        assert "reasoning_details" not in projected[1]
+        assert projected[1]["codex_reasoning_items"] == [{"type": "reasoning"}]
+    finally:
+        native.close()
+
+
 def test_procedural_backend_crud_replaces_resource_set(tmp_path: Path) -> None:
     skills = tmp_path / "skills"
     backend = HermesProceduralBackend(skills)
