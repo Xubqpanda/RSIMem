@@ -31,6 +31,13 @@ from .memory.live_writeback import (
     StaticSemanticWritebackRuntime,
 )
 from .memory.adaptive_policy_store import JsonAdaptivePolicyStore
+from .memory.future_trace import (
+    SemanticFeedbackContract,
+    SemanticFeedbackResolver,
+    SemanticFutureEvidence,
+    SemanticFutureTraceRecorder,
+)
+from .memory.operation_graph import OperationContext
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
 
 
@@ -53,6 +60,7 @@ class _PromptMemoryStore:
                 limit=100,
                 surface="system_prompt" if result else None,
             )
+            self._bridge.record_semantic_prompt(result, target)
             return result
 
         def adapter_read() -> str | None:
@@ -304,6 +312,8 @@ class HermesPastBenchBridge:
         self._lifecycle_failures: list[tuple[str, str]] = []
         self._static_results: list[StaticSemanticBoundaryResult] = []
         self._static_failures: list[tuple[str, str]] = []
+        self._semantic_futures: list[tuple[SemanticFutureEvidence, str]] = []
+        self._semantic_outcomes_recorded = False
         lifecycle_config = lifecycle_config or HermesLifecycleConfig()
         self.lifecycle = (
             HermesLifecycleDryRunRuntime(
@@ -381,8 +391,39 @@ class HermesPastBenchBridge:
                 adaptive_parameters=static_writeback_config.adaptive_parameters,
                 require_adaptive_policy=static_writeback_config.adaptive_enabled,
             )
+            if (
+                static_writeback_config.feedback_contract
+                != SemanticFeedbackContract.DISABLED
+            ):
+                if not family_id or not stage:
+                    raise ValueError(
+                        "semantic feedback contract requires family and stage"
+                    )
+                descriptor = self.static_writeback.policy.descriptor
+                self.semantic_future_recorder = SemanticFutureTraceRecorder(
+                    self.static_writeback.operation_recorder,
+                    OperationContext(
+                        run_id,
+                        episode_id,
+                        session_id,
+                        task_id,
+                        descriptor.policy_version,
+                        descriptor.prompt_version,
+                        descriptor.framework_version,
+                    ),
+                )
+                self.semantic_feedback_resolver = SemanticFeedbackResolver(
+                    static_writeback_config.feedback_contract,
+                    family_id=family_id,
+                    stage=stage,
+                )
+            else:
+                self.semantic_future_recorder = None
+                self.semantic_feedback_resolver = None
         else:
             self.static_writeback = None
+            self.semantic_future_recorder = None
+            self.semantic_feedback_resolver = None
         self._closed = False
 
     @property
@@ -422,6 +463,7 @@ class HermesPastBenchBridge:
     def on_task_completed(self, result: Mapping[str, Any]) -> None:
         """Receive the explicit post-conversation task boundary from PAST."""
 
+        self._record_semantic_outcomes(result)
         if self.lifecycle is None or result.get("completed") is not True:
             return
         self._last_task_completed = True
@@ -438,6 +480,37 @@ class HermesPastBenchBridge:
                 EvaluationTrigger.TASK_COMPLETED.value,
                 type(exc).__name__,
             ))
+
+    def record_semantic_prompt(self, prompt: str | None, namespace: str) -> None:
+        if self.semantic_future_recorder is None or not prompt:
+            return
+        step_id = f"future-semantic.{namespace}.{len(self._semantic_futures) + 1}"
+        future = self.semantic_future_recorder.record_prompt_injection(
+            self.runtime.registry,
+            prompt,
+            namespace=namespace,
+            parent_operation_ids=(),
+            step_id=step_id,
+        )
+        self._semantic_futures.append((future, step_id))
+
+    def _record_semantic_outcomes(self, result: Mapping[str, Any]) -> None:
+        if (
+            self.semantic_future_recorder is None
+            or self.semantic_feedback_resolver is None
+            or self._semantic_outcomes_recorded
+        ):
+            return
+        for future, step_id in self._semantic_futures:
+            resolution = self.semantic_feedback_resolver.resolve(future, result)
+            self.semantic_future_recorder.record_use_and_outcome(
+                future,
+                used_artifact_ids=resolution.used_artifact_ids,
+                outcome_status=resolution.outcome_status,
+                outcome_reason_code=resolution.outcome_reason_code,
+                step_id=step_id,
+            )
+        self._semantic_outcomes_recorded = True
 
     def _process_lifecycle_boundary(
         self,

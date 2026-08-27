@@ -38,6 +38,12 @@ from rsimem.memory import (
     MemoryResource,
 )
 from rsimem.memory.live_writeback import StaticSemanticWritebackConfig
+from rsimem.memory.operation_graph import (
+    AppendOnlyOperationEvidenceLog,
+    OperationKind,
+    OperationStatus,
+    materialize_operation_graph,
+)
 from rsimem.memory.adaptive_policy import AdaptiveParameterName
 from rsimem.memory.adaptive_mem0_binding import TrustedAdaptiveMem0Parameter
 from rsimem.memory_systems.mem0_flat import (
@@ -930,6 +936,105 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
     assert any("pipe-delimited" in hit.artifact.content for hit in hits)
     restarted.close()
     db.close()
+
+
+def test_live_bridge_records_content_free_sm01_future_feedback(tmp_path: Path) -> None:
+    from hermes_state import SessionDB
+
+    home = _hermes_home(tmp_path / "home")
+    (home / "memories" / "MEMORY.md").write_text(
+        PRIVATE_PREFERENCE,
+        encoding="utf-8",
+    )
+    (home / "memories" / "USER.md").write_text("", encoding="utf-8")
+    db = SessionDB(home / "state.db")
+    artifacts = tmp_path / "artifacts"
+    operations_path = artifacts / "operations.jsonl"
+    client = FakeCompletionClient({
+        POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id: json.dumps({"facts": []}),
+        POLICY_INTERNAL_OPERATION_PROMPT.artifact.prompt_id: json.dumps({
+            "operations": [],
+        }),
+    })
+
+    class NativeStore:
+        def format_for_system_prompt(self, target: str) -> str | None:
+            if target != "memory":
+                return None
+            return f"MEMORY\n{PRIVATE_PREFERENCE}"
+
+    agent = SimpleNamespace(
+        _memory_store=NativeStore(),
+        _session_db=db,
+        session_id="session-1",
+    )
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=artifacts / "memory.jsonl",
+        run_id="run-future-live",
+        trace_id="trace-future-live",
+        episode_id="episode-future-live",
+        session_id="session-1",
+        task_id="SM01_EVAL_NEAR_001",
+        experiment_variant="static-rsimem",
+        family_id="SM01_preference_adoption",
+        stage="eval_near",
+        lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
+        static_writeback_config=StaticSemanticWritebackConfig(
+            mode="static_utility",
+            feedback_contract="sm01_tsv_v1",
+        ),
+        static_completion_client=client,
+        static_operation_evidence_path=operations_path,
+    )
+    bridge.attach(agent)
+    prompt = agent._memory_store.format_for_system_prompt("memory")
+    assert prompt is not None
+    bridge.on_task_completed({
+        "completed": True,
+        "final_response": (
+            "owner\tpriority\ttask\tdue_date\n"
+            "Iris Chen\tHigh\tFix drift\t2026/04/28"
+        ),
+    })
+    bridge.close()
+    db.close()
+
+    graph = materialize_operation_graph(
+        AppendOnlyOperationEvidenceLog(operations_path).events
+    )
+    future = {
+        operation.kind: operation
+        for operation in graph.operations
+        if operation.kind in {
+            OperationKind.FUTURE_QUERY,
+            OperationKind.RETRIEVAL,
+            OperationKind.INJECTION,
+            OperationKind.USE,
+            OperationKind.DOWNSTREAM_OUTCOME,
+        }
+    }
+    assert set(future) == {
+        OperationKind.FUTURE_QUERY,
+        OperationKind.RETRIEVAL,
+        OperationKind.INJECTION,
+        OperationKind.USE,
+        OperationKind.DOWNSTREAM_OUTCOME,
+    }
+    assert all(operation.status == OperationStatus.SUCCESS for operation in future.values())
+    memory_ids = tuple(
+        artifact.artifact_id
+        for artifact in graph.artifacts
+        if artifact.kind.value == "memory_artifact"
+    )
+    assert len(memory_ids) == 1
+    injected_ids = set(future[OperationKind.INJECTION].input_artifact_ids)
+    used_ids = set(future[OperationKind.USE].input_artifact_ids)
+    assert set(memory_ids).issubset(injected_ids)
+    assert set(memory_ids).issubset(used_ids)
+    serialized = operations_path.read_text(encoding="utf-8")
+    assert PRIVATE_PREFERENCE not in serialized
 
 
 def test_static_writeback_bridge_requires_native_ledger_and_lifecycle(tmp_path: Path) -> None:
