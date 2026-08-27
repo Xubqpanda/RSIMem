@@ -562,16 +562,6 @@ class FeedbackDatasetAudit:
 
 
 @dataclass(frozen=True, slots=True)
-class FeedbackDatasetStageGateAudit:
-    ok: bool
-    issues: tuple[str, ...]
-    dataset_id: str
-    replay_dataset_id: str
-    config_digest: str
-    observation_count: int
-
-
-@dataclass(frozen=True, slots=True)
 class FeedbackDatasetReport:
     observation_count: int
     opportunity_count: int
@@ -1405,6 +1395,16 @@ def evaluate_feedback_dataset_stage_gate(
     issues.update(audit.issues)
     if dataset.config != expected_config:
         issues.add("frozen_config_mismatch")
+    if expected_config.feature_schema != STATIC_UTILITY_FEATURE_SCHEMA:
+        issues.add("feature_schema_not_frozen")
+    if expected_config.label_schema != DELAYED_FEEDBACK_LABEL_SCHEMA:
+        issues.add("label_schema_not_frozen")
+    if expected_config.dataset_version != DELAYED_FEEDBACK_DATASET_VERSION:
+        issues.add("dataset_version_not_frozen")
+    if expected_config.window_version != DELAYED_FEEDBACK_WINDOW_VERSION:
+        issues.add("window_version_not_frozen")
+    if dataset.window.version != expected_config.window_version:
+        issues.add("window_config_mismatch")
     replay = None
     try:
         replay = DelayedFeedbackDatasetBuilder(expected_config).build(
@@ -1425,41 +1425,4 @@ def evaluate_feedback_dataset_stage_gate(
         actual_config_digest=dataset.config.digest,
         audit=audit,
         report=build_feedback_dataset_report(dataset),
-    )
-
-
-def audit_feedback_dataset_stage_gate(
-    dataset: DelayedFeedbackDataset,
-    replay: DelayedFeedbackDataset,
-    graph: OperationGraph,
-    *,
-    expected_policy_version: str,
-) -> FeedbackDatasetStageGateAudit:
-    _require_identifier(expected_policy_version, "expected feedback policy version")
-    issues = set()
-    primary_audit = audit_feedback_dataset(dataset, graph)
-    replay_audit = audit_feedback_dataset(replay, graph)
-    issues.update(f"primary_{issue}" for issue in primary_audit.issues)
-    issues.update(f"replay_{issue}" for issue in replay_audit.issues)
-    if dataset.payload() != replay.payload():
-        issues.add("canonical_replay_mismatch")
-    if dataset.config.policy_version != expected_policy_version:
-        issues.add("policy_version_not_frozen")
-    if dataset.config.feature_schema != STATIC_UTILITY_FEATURE_SCHEMA:
-        issues.add("feature_schema_not_frozen")
-    if dataset.config.label_schema != DELAYED_FEEDBACK_LABEL_SCHEMA:
-        issues.add("label_schema_not_frozen")
-    if dataset.config.dataset_version != DELAYED_FEEDBACK_DATASET_VERSION:
-        issues.add("dataset_version_not_frozen")
-    if dataset.config.window_version != DELAYED_FEEDBACK_WINDOW_VERSION:
-        issues.add("window_version_not_frozen")
-    if dataset.window.version != dataset.config.window_version:
-        issues.add("window_config_mismatch")
-    return FeedbackDatasetStageGateAudit(
-        ok=not issues,
-        issues=tuple(sorted(issues)),
-        dataset_id=dataset.dataset_id,
-        replay_dataset_id=replay.dataset_id,
-        config_digest=dataset.config.digest,
-        observation_count=len(dataset.examples),
     )
