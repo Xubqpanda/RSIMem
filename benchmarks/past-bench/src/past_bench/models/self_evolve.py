@@ -554,6 +554,8 @@ class HermesPersistenceConfig(BaseModel):
     rsimem_semantic_feedback_contract: Literal[
         "disabled",
         "sm01_tsv_v1",
+        "sm02_boundary_v1",
+        "sm05_normalized_tsv_v1",
     ] = "disabled"
     rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | None = None
     rsimem_adaptive_policy_source_path: str = Field(default="", exclude=True)

@@ -3532,7 +3532,12 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_evolve.add_argument(
         "--rsimem-semantic-feedback-contract",
-        choices=["disabled", "sm01_tsv_v1"],
+        choices=[
+            "disabled",
+            "sm01_tsv_v1",
+            "sm02_boundary_v1",
+            "sm05_normalized_tsv_v1",
+        ],
         default=None,
         help="Pre-registered deployment signal contract for semantic feedback",
     )
