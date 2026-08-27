@@ -22,6 +22,7 @@ from ..lifecycle import (
     WritebackPlanValidator,
 )
 from .contracts import MemoryAccessMode, MemoryExperience, MemoryKind
+from .extraction_source import ExtractionSourceProjection, ExtractionSourceProjector
 
 
 INGESTION_CONTRACT_SCHEMA_VERSION = 1
@@ -174,6 +175,7 @@ class IngestionProvenance:
 def _semantic_request_identity(
     *,
     source_experience: MemoryExperience,
+    source_projection: ExtractionSourceProjection,
     fixed_route: FixedMemoryRoute,
     exit_evidence: ExitEvidence,
     scope: MemoryScope,
@@ -203,6 +205,8 @@ def _semantic_request_identity(
             ],
             "metadata": dict(source.metadata),
         },
+        "source_projection": source_projection.identity_payload(),
+        "source_projection_digest": source_projection.projection_digest,
         "route": {
             "kind": fixed_route.kind.value,
             "backend": fixed_route.backend,
@@ -235,6 +239,7 @@ def _semantic_request_identity(
 @dataclass(frozen=True, slots=True)
 class SemanticIngestRequest:
     source_experience: MemoryExperience
+    source_projection: ExtractionSourceProjection
     fixed_route: FixedMemoryRoute
     exit_evidence: ExitEvidence
     scope: MemoryScope
@@ -283,6 +288,21 @@ class SemanticIngestRequest:
             or experience.task_id != source.task_id
         ):
             raise ValueError("semantic ingestion source identity must match provenance")
+        if (
+            self.source_projection.snapshot_id != source.snapshot_id
+            or self.source_projection.context_revision != self.provenance.base_revision
+            or self.source_projection.source_segment_ids != source.segment_ids
+        ):
+            raise ValueError("semantic ingestion projection and provenance differ")
+        projected_messages = tuple(
+            (message.role, message.content)
+            for message in self.source_projection.messages
+        )
+        experience_messages = tuple(
+            (message.role, message.content) for message in experience.messages
+        )
+        if experience_messages != projected_messages:
+            raise ValueError("semantic experience must exactly match source projection")
         if self.exit_evidence.scope != self.scope:
             raise ValueError("semantic ingestion scope must match exit evidence")
         if self.exit_evidence.temporal_validity != self.validity:
@@ -296,6 +316,7 @@ class SemanticIngestRequest:
         cls,
         *,
         source_experience: MemoryExperience,
+        source_projection: ExtractionSourceProjection,
         fixed_route: FixedMemoryRoute,
         exit_evidence: ExitEvidence,
         scope: MemoryScope,
@@ -311,6 +332,7 @@ class SemanticIngestRequest:
         normalized_trigger = SemanticCompilationTrigger(trigger)
         values = {
             "source_experience": source_experience,
+            "source_projection": source_projection,
             "fixed_route": fixed_route,
             "exit_evidence": exit_evidence,
             "scope": normalized_scope,
@@ -330,6 +352,7 @@ class SemanticIngestRequest:
     def identity_payload(self) -> dict[str, object]:
         return _semantic_request_identity(
             source_experience=self.source_experience,
+            source_projection=self.source_projection,
             fixed_route=self.fixed_route,
             exit_evidence=self.exit_evidence,
             scope=self.scope,
@@ -365,6 +388,7 @@ def build_semantic_ingest_request(
     """Project a validated completed source into operation-free ingestion."""
 
     router = router or FixedMemoryRouter()
+    projection = ExtractionSourceProjector().project(snapshot)
     if snapshot.task_state != TaskLifecycleState.COMPLETED:
         raise ValueError("completed semantic ingestion requires completed task state")
     if snapshot.current_turn_id is not None or snapshot.active_segment_ids:
@@ -384,17 +408,33 @@ def build_semantic_ingest_request(
         raise ValueError("semantic ingestion requires a currently valid source plan")
     if experience.session_id != snapshot.session_id or experience.task_id != snapshot.task_id:
         raise ValueError("semantic experience identity must match the source snapshot")
+    projected_experience = projection.to_experience(snapshot)
+    if tuple((item.role, item.content) for item in experience.messages) != tuple(
+        (item.role, item.content) for item in projected_experience.messages
+    ):
+        raise ValueError("semantic experience must match canonical source projection")
     if plan.base_revision != snapshot.context_revision:
         raise ValueError("semantic ingestion source plan is stale")
     if plan.exit_evidence.scope is None or plan.exit_evidence.temporal_validity is None:
         raise ValueError("semantic ingestion requires resolved scope and validity")
+    source = ProvenanceRef(
+        run_id=snapshot.run_id,
+        episode_id=snapshot.episode_id,
+        session_id=snapshot.session_id,
+        task_id=snapshot.task_id,
+        snapshot_id=snapshot.snapshot_id,
+        source_ref=snapshot.provenance.source_ref,
+        segment_ids=projection.source_segment_ids,
+        evaluation_id=plan.evaluation_id,
+    )
     provenance = IngestionProvenance(
-        plan.provenance,
+        source,
         plan.plan_id,
         plan.base_revision,
     )
     return SemanticIngestRequest.create(
-        source_experience=experience,
+        source_experience=projected_experience,
+        source_projection=projection,
         fixed_route=router.semantic,
         exit_evidence=plan.exit_evidence,
         scope=plan.exit_evidence.scope,
@@ -408,7 +448,6 @@ def build_semantic_ingest_request(
 
 def build_completed_task_semantic_ingest_request(
     snapshot: ContextSnapshot,
-    experience: MemoryExperience,
     *,
     policy_version: str,
     framework_version: str,
@@ -417,6 +456,7 @@ def build_completed_task_semantic_ingest_request(
     """Build compilation directly from a trusted completed-task snapshot."""
 
     router = router or FixedMemoryRouter()
+    projection = ExtractionSourceProjector().project(snapshot)
     if snapshot.task_state != TaskLifecycleState.COMPLETED:
         raise ValueError("semantic compilation requires completed task state")
     if snapshot.lifecycle_state != SemanticCompilationTrigger.TASK_COMPLETED.value:
@@ -427,17 +467,15 @@ def build_completed_task_semantic_ingest_request(
         raise ValueError("unresolved source cannot enter semantic compilation")
     if any(not closure.closed for closure in snapshot.tool_closures):
         raise ValueError("open tool closure cannot enter semantic compilation")
-    if experience.session_id != snapshot.session_id or (
-        experience.task_id != snapshot.task_id
-    ):
-        raise ValueError("semantic experience identity must match source snapshot")
-    source_segment_ids = tuple(segment.segment_id for segment in snapshot.segments)
+    experience = projection.to_experience(snapshot)
+    source_segment_ids = projection.source_segment_ids
     compilation_identity = {
         "schema_version": INGESTION_CONTRACT_SCHEMA_VERSION,
         "trigger": SemanticCompilationTrigger.TASK_COMPLETED.value,
         "snapshot_id": snapshot.snapshot_id,
         "context_revision": snapshot.context_revision,
         "source_segment_ids": source_segment_ids,
+        "source_projection_digest": projection.projection_digest,
         "policy_version": policy_version,
         "framework_version": framework_version,
     }
@@ -467,6 +505,7 @@ def build_completed_task_semantic_ingest_request(
     )
     return SemanticIngestRequest.create(
         source_experience=experience,
+        source_projection=projection,
         fixed_route=router.semantic,
         exit_evidence=evidence,
         scope=MemoryScope.USER,
@@ -890,6 +929,7 @@ class SemanticIngestionCoordinator:
             raise ValueError("semantic request framework version differs from runtime binding")
 
         request_digest = _digest(request.canonical_payload())
+        source_digest = request.source_projection.projection_digest
         previous = self._results.get(request.idempotency_key)
         if previous is not None:
             if previous[0] != request_digest:
@@ -912,7 +952,7 @@ class SemanticIngestionCoordinator:
                 request,
                 descriptor,
                 execution_id,
-                request_digest,
+                source_digest,
                 status=MemoryIngestStatus.FAILED,
                 reason_code=exc.reason_code,
                 usage=exc.usage,
@@ -924,7 +964,7 @@ class SemanticIngestionCoordinator:
                 request,
                 descriptor,
                 execution_id,
-                request_digest,
+                source_digest,
                 status=MemoryIngestStatus.FAILED,
                 reason_code="policy_timeout",
             )
@@ -935,7 +975,7 @@ class SemanticIngestionCoordinator:
                 request,
                 descriptor,
                 execution_id,
-                request_digest,
+                source_digest,
                 status=MemoryIngestStatus.REJECTED,
                 reason_code="invalid_policy_json",
             )
@@ -946,7 +986,7 @@ class SemanticIngestionCoordinator:
                 request,
                 descriptor,
                 execution_id,
-                request_digest,
+                source_digest,
                 status=MemoryIngestStatus.FAILED,
                 reason_code="policy_exception",
             )
@@ -957,14 +997,14 @@ class SemanticIngestionCoordinator:
                 request,
                 descriptor,
                 execution_id,
-                request_digest,
+                source_digest,
                 status=MemoryIngestStatus.REJECTED,
                 reason_code="invalid_policy_result",
             )
             self._results[request.idempotency_key] = (request_digest, result)
             return result
         result = self._resolve_decision(
-            request, descriptor, decision, candidates, execution_id, request_digest,
+            request, descriptor, decision, candidates, execution_id, source_digest,
         )
         self._results[request.idempotency_key] = (request_digest, result)
         return result

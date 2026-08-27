@@ -71,6 +71,7 @@ class SemanticCompilationReceiptStatus(StrEnum):
 class SemanticCompilationReceipt:
     compilation_id: str
     request_digest: str
+    source_projection_digest: str
     snapshot_id: str
     context_revision: str
     status: SemanticCompilationReceiptStatus
@@ -92,11 +93,11 @@ class SemanticCompilationReceipt:
             self.context_revision,
         )):
             raise ValueError("semantic compilation receipt identity is incomplete")
-        if len(self.request_digest) != 64 or any(
-            character not in "0123456789abcdef"
-            for character in self.request_digest
-        ):
-            raise ValueError("semantic compilation request digest is invalid")
+        for digest in (self.request_digest, self.source_projection_digest):
+            if len(digest) != 64 or any(
+                character not in "0123456789abcdef" for character in digest
+            ):
+                raise ValueError("semantic compilation receipt digest is invalid")
         if self.status == SemanticCompilationReceiptStatus.PENDING and (
             self.ingestion_execution_id is not None or self.mutation_ids
         ):
@@ -111,6 +112,7 @@ class SemanticCompilationReceipt:
             "schema_version": self.schema_version,
             "compilation_id": self.compilation_id,
             "request_digest": self.request_digest,
+            "source_projection_digest": self.source_projection_digest,
             "snapshot_id": self.snapshot_id,
             "context_revision": self.context_revision,
             "status": self.status.value,
@@ -203,6 +205,8 @@ class JsonSemanticCompilationReceiptStore:
             if existing is not None:
                 if (
                     existing.request_digest != receipt.request_digest
+                    or existing.source_projection_digest
+                    != receipt.source_projection_digest
                     or existing.snapshot_id != receipt.snapshot_id
                     or existing.context_revision != receipt.context_revision
                 ):
@@ -547,19 +551,8 @@ class StaticSemanticWritebackRuntime:
 
         if self._closed:
             raise RuntimeError("static semantic writeback runtime is closed")
-        experience = MemoryExperience(
-            experience_id=f"experience.{snapshot.snapshot_id}",
-            session_id=snapshot.session_id,
-            task_id=snapshot.task_id,
-            outcome="completed",
-            messages=tuple(
-                MemoryMessage(segment.role, segment.content)
-                for segment in snapshot.segments
-            ),
-        )
         request = build_completed_task_semantic_ingest_request(
             snapshot,
-            experience,
             policy_version=self.policy.descriptor.policy_version,
             framework_version=self.policy.descriptor.framework_version,
         )
@@ -579,6 +572,7 @@ class StaticSemanticWritebackRuntime:
         pending = SemanticCompilationReceipt(
             compilation_id=request.provenance.compilation_id,
             request_digest=request_digest,
+            source_projection_digest=request.source_projection.projection_digest,
             snapshot_id=snapshot.snapshot_id,
             context_revision=snapshot.context_revision,
             status=SemanticCompilationReceiptStatus.PENDING,
@@ -601,6 +595,7 @@ class StaticSemanticWritebackRuntime:
         completed = self.compilation_receipts.complete(SemanticCompilationReceipt(
             compilation_id=receipt.compilation_id,
             request_digest=receipt.request_digest,
+            source_projection_digest=receipt.source_projection_digest,
             snapshot_id=receipt.snapshot_id,
             context_revision=receipt.context_revision,
             status=SemanticCompilationReceiptStatus.COMPLETED,

@@ -542,8 +542,10 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         if self.operation_recorder is None:
             return None
         context = self._operation_context(request)
-        source_payload = _canonical_json(request.canonical_payload())
-        source_digest = _sha(source_payload)
+        source_payload = _canonical_json(
+            request.source_projection.identity_payload()
+        )
+        source_digest = request.source_projection.projection_digest
         source = self._artifact_node(
             context,
             ArtifactKind.SOURCE_OBSERVATION,
@@ -661,14 +663,10 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         )
         with extraction_scope as extraction_operation:
             extraction = self.fact_prompt.render({
-                "source_messages": [
-                    {
-                        "role": message.role,
-                        "content": message.content,
-                        "name": message.name,
-                    }
-                    for message in request.source_experience.messages
-                ],
+                "source_messages": request.source_projection.prompt_messages(),
+                "source_projection_digest": (
+                    request.source_projection.projection_digest
+                ),
                 "exit_evidence": request.exit_evidence.compiler_input_payload(),
             })
             extraction_result = self.completion_client.complete(extraction)

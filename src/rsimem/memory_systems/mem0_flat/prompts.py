@@ -293,9 +293,14 @@ FACT_EXTRACTION_INPUT_SCHEMA = {
     **_OBJECT,
     "properties": {
         "source_messages": {"type": "array", "items": {"type": "object"}},
+        "source_projection_digest": {"type": "string"},
         "exit_evidence": {"type": "object"},
     },
-    "required": ["source_messages", "exit_evidence"],
+    "required": [
+        "source_messages",
+        "source_projection_digest",
+        "exit_evidence",
+    ],
 }
 FACT_EXTRACTION_OUTPUT_SCHEMA = {
     **_OBJECT,
@@ -342,6 +347,9 @@ Use only the supplied source and deterministic exit evidence. Return JSON matchi
 
 Source messages JSON:
 $source_messages
+
+Source projection digest:
+$source_projection_digest
 
 Exit evidence JSON:
 $exit_evidence
@@ -481,6 +489,9 @@ Use only the supplied source messages and deterministic exit evidence. Return ex
 
 Source messages JSON:
 $source_messages
+
+Source projection digest:
+$source_projection_digest
 
 Exit evidence JSON:
 $exit_evidence

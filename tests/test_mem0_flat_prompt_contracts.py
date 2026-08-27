@@ -89,6 +89,7 @@ def test_rendered_prompt_and_completion_text_never_enter_observer_evidence() -> 
     sentinel = "SENTINEL_RAW_PROMPT_CONTENT_7f3a"
     rendered = FACT_EXTRACTION_PROMPT.render({
         "source_messages": [{"role": "user", "content": sentinel}],
+        "source_projection_digest": "0" * 64,
         "exit_evidence": {"safe_to_evict": True},
     })
     assert sentinel in rendered.text
