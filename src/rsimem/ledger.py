@@ -63,6 +63,7 @@ _LIFECYCLE_EVENT_KINDS = {
     "plan_validated",
     "dry_run_mutation",
     "dry_run_duplicate",
+    "memory_ingestion",
 }
 _LIFECYCLE_SNAPSHOT_DATA_FIELDS = {
     "segmentCount",
@@ -115,6 +116,24 @@ _LIFECYCLE_RESOURCE_FIELDS = {
     "retryCount",
     "durationMs",
     "storageBytes",
+}
+_LIFECYCLE_INGESTION_DATA_FIELDS = {
+    "executionId",
+    "status",
+    "outcome",
+    "routeBackend",
+    "memoryKind",
+    "policyProvider",
+    "policyVersion",
+    "frameworkVersion",
+    "promptVersion",
+    "featureSchemaVersion",
+    "operationIds",
+    "operationActions",
+    "sourceDigest",
+    "contentDigests",
+    "reasonCodes",
+    "resources",
 }
 _MACHINE_REASON_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
@@ -190,6 +209,8 @@ def _validate_lifecycle_contract_event(value: dict[str, Any], source_path: Path)
         if kind in {"evaluation_accepted", "evaluation_rejected"}
         else _LIFECYCLE_BOUNDARY_DATA_FIELDS
         if kind == "boundary_rejected"
+        else _LIFECYCLE_INGESTION_DATA_FIELDS
+        if kind == "memory_ingestion"
         else _LIFECYCLE_PLAN_DATA_FIELDS
     )
     if not isinstance(data, dict) or set(data) != expected_fields:
@@ -415,6 +436,9 @@ class LifecycleLedgerObserver:
                 "status": data.get("status"),
                 "reasonCodes": data.get("reasonCodes"),
             }
+            if data.get("executionId") is not None:
+                identity["executionId"] = data["executionId"]
+                identity["operationIds"] = data.get("operationIds")
             event_id = f"evt_{_json_hash(identity)}"
             event = {
                 "schemaVersion": SCHEMA_VERSION,
@@ -562,6 +586,51 @@ class LifecycleLedgerObserver:
                 "sourceSegmentCount": event.source_segment_count,
                 "status": event.status,
                 "reasonCodes": list(event.reason_codes),
+                "resources": {
+                    "schemaVersion": resources.schema_version,
+                    "inputTokens": resources.input_tokens,
+                    "outputTokens": resources.output_tokens,
+                    "cacheReadTokens": resources.cache_read_tokens,
+                    "cacheWriteTokens": resources.cache_write_tokens,
+                    "reasoningTokens": resources.reasoning_tokens,
+                    "modelRequests": resources.model_requests,
+                    "retryCount": resources.retry_count,
+                    "durationMs": resources.duration_ms,
+                    "storageBytes": resources.storage_bytes,
+                },
+            },
+        )
+
+    def record_ingestion(self, request: Any, result: Any) -> None:
+        """Record content-free ingestion result and complete raw usage buckets."""
+
+        if result.idempotency_key != request.idempotency_key:
+            raise ValueError("ingestion result does not match request identity")
+        provenance = request.provenance.source
+        resources = result.usage
+        self._append(
+            kind="memory_ingestion",
+            run_id=provenance.run_id,
+            episode_id=provenance.episode_id,
+            session_id=provenance.session_id,
+            task_id=provenance.task_id,
+            snapshot_id=provenance.snapshot_id,
+            data={
+                "executionId": result.execution_id,
+                "status": result.status.value,
+                "outcome": result.outcome.value,
+                "routeBackend": result.fixed_route.backend,
+                "memoryKind": result.fixed_route.kind.value,
+                "policyProvider": result.policy_provider,
+                "policyVersion": result.policy_version,
+                "frameworkVersion": result.framework_version,
+                "promptVersion": result.prompt_version,
+                "featureSchemaVersion": result.feature_schema_version,
+                "operationIds": [item.operation_id for item in result.operations],
+                "operationActions": [item.action.value for item in result.operations],
+                "sourceDigest": result.source_digest,
+                "contentDigests": list(result.content_digests),
+                "reasonCodes": list(result.reason_codes),
                 "resources": {
                     "schemaVersion": resources.schema_version,
                     "inputTokens": resources.input_tokens,

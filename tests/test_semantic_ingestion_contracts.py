@@ -5,11 +5,13 @@ from dataclasses import replace
 
 import pytest
 
+from rsimem.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import (
     DeterministicPreferenceEvaluator,
     EvaluationTrigger,
     HermesMessage,
     HermesSnapshotCollector,
+    RawResourceUsage,
     SegmentKind,
     TaskLifecycleState,
     WritebackCoordinator,
@@ -22,16 +24,21 @@ from rsimem.memory import (
     MemoryKind,
     MemoryMessage,
 )
+from rsimem.memory.backends import HermesSemanticBackend
 from rsimem.memory.ingestion import (
     BoundSemanticPolicy,
     ContextExitSemantics,
+    DeterministicPassThroughIngestor,
     ExistingMemoryCandidate,
     FixedMemoryRoute,
     FixedMemoryRouter,
     HERMES_NATIVE_ROUTES,
     InternalMemoryAction,
     InternalOperationProposal,
+    InvalidPolicyOutputError,
+    MemoryIngestOutcome,
     MemoryIngestStatus,
+    PolicyExecutionError,
     PolicyCapability,
     SemanticIngestRequest,
     SemanticIngestionCoordinator,
@@ -111,13 +118,19 @@ def _ingestion_fixture():
     return snapshot, plan
 
 
-def _request(policy_version="policy-v1") -> SemanticIngestRequest:
+def _request(
+    policy_version="policy-v1",
+    framework_version="framework-v1",
+    *,
+    experience=None,
+) -> SemanticIngestRequest:
     snapshot, plan = _ingestion_fixture()
     return build_semantic_ingest_request(
         snapshot,
         plan,
-        _experience(snapshot),
+        experience or _experience(snapshot),
         policy_version=policy_version,
+        framework_version=framework_version,
     )
 
 
@@ -166,7 +179,11 @@ def test_external_contract_has_fixed_route_and_no_operation_or_target_fields() -
     assert set(request.__dataclass_fields__) == {
         "source_experience",
         "fixed_route",
+        "exit_evidence",
+        "scope",
+        "validity",
         "policy_version",
+        "framework_version",
         "provenance",
         "idempotency_key",
         "trigger",
@@ -219,6 +236,7 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
             plan,
             experience,
             policy_version="policy-v1",
+            framework_version="framework-v1",
         )
     unresolved_segments = (
         replace(snapshot.segments[0], completed=False),
@@ -230,6 +248,7 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
             plan,
             experience,
             policy_version="policy-v1",
+            framework_version="framework-v1",
         )
 
     open_snapshot = HermesSnapshotCollector().collect(
@@ -255,6 +274,7 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
             plan,
             experience,
             policy_version="policy-v1",
+            framework_version="framework-v1",
         )
 
 
@@ -401,9 +421,9 @@ def test_none_failure_idempotency_and_disabled_mode_have_distinct_semantics() ->
             MemoryIngestStatus.FAILED, (), reason_codes=("framework_exception",),
         ),
     )
-    failed_request = replace(request, policy_version="policy-v1", idempotency_key="failed")
-    failed = _coordinator(failed_policy).ingest(failed_request, _Candidates())
+    failed = _coordinator(failed_policy).ingest(request, _Candidates())
     assert failed is not None and failed.status == MemoryIngestStatus.FAILED
+    assert failed.outcome == MemoryIngestOutcome.FAILED
     assert failed.operations == ()
 
     disabled = SemanticIngestionCoordinator(
@@ -470,3 +490,267 @@ def test_unknown_provider_policy_mismatch_and_non_natural_exit_fail_closed() -> 
             provider="fake_semantic",
             exit_semantics=ContextExitSemantics.PHYSICAL,
         )
+
+
+def test_request_identity_is_order_stable_and_covers_framework_evidence() -> None:
+    first_experience = replace(
+        _experience(),
+        metadata={"fixture": {"z": 2, "a": 1}},
+    )
+    second_experience = replace(
+        _experience(),
+        metadata={"fixture": {"a": 1, "z": 2}},
+    )
+    first = _request(experience=first_experience)
+    second = _request(experience=second_experience)
+    assert first.idempotency_key == second.idempotency_key
+    assert first.canonical_payload() == second.canonical_payload()
+
+    changed_source = _request(experience=replace(
+        second_experience,
+        metadata={"fixture": {"a": 1, "z": 3}},
+    ))
+    assert changed_source.idempotency_key != first.idempotency_key
+
+    changed_evidence = replace(
+        first.exit_evidence,
+        reusable_facts=("durable preference candidate",),
+    )
+    rebound = SemanticIngestRequest.create(
+        source_experience=first.source_experience,
+        fixed_route=first.fixed_route,
+        exit_evidence=changed_evidence,
+        scope=first.scope,
+        validity=first.validity,
+        policy_version=first.policy_version,
+        framework_version=first.framework_version,
+        provenance=first.provenance,
+        trigger=first.trigger,
+    )
+    assert rebound.idempotency_key != first.idempotency_key
+
+    framework_changed = _request(framework_version="framework-v2")
+    assert framework_changed.idempotency_key != _request().idempotency_key
+
+
+def test_request_rejects_missing_versions_noncanonical_identity_and_stale_source() -> None:
+    request = _request()
+    with pytest.raises(ValueError, match="policy, framework"):
+        replace(request, framework_version="")
+    with pytest.raises(ValueError, match="not canonical"):
+        replace(request, idempotency_key="forged")
+
+    policy = BoundSemanticPolicy(
+        _descriptor(),
+        lambda request, candidates: SemanticPolicyDecision(
+            MemoryIngestStatus.SUCCESS,
+            (InternalOperationProposal(InternalMemoryAction.NONE, "no_change"),),
+        ),
+    )
+    with pytest.raises(ValueError, match="source snapshot is stale"):
+        _coordinator(policy).ingest(
+            request,
+            _Candidates(),
+            current_source_revision="rev_newer",
+        )
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "outcome", "reason_code"),
+    (
+        (
+            TimeoutError("SENTINEL_PRIVATE_TIMEOUT"),
+            MemoryIngestStatus.FAILED,
+            MemoryIngestOutcome.FAILED,
+            "policy_timeout",
+        ),
+        (
+            InvalidPolicyOutputError("SENTINEL_INVALID_JSON"),
+            MemoryIngestStatus.REJECTED,
+            MemoryIngestOutcome.REJECTED,
+            "invalid_policy_json",
+        ),
+        (
+            RuntimeError("SENTINEL_PRIVATE_EXCEPTION"),
+            MemoryIngestStatus.FAILED,
+            MemoryIngestOutcome.FAILED,
+            "policy_exception",
+        ),
+    ),
+)
+def test_policy_failures_are_structured_without_source_or_exception_text(
+    error,
+    status,
+    outcome,
+    reason_code,
+) -> None:
+    def fail(request, candidates):
+        raise error
+
+    policy = BoundSemanticPolicy(_descriptor(), fail)
+    result = _coordinator(policy).ingest(_request(), _Candidates())
+    assert result is not None
+    assert result.status == status
+    assert result.outcome == outcome
+    assert result.reason_codes == (reason_code,)
+    assert result.operations == ()
+    evidence = repr(result.observer_evidence())
+    assert "SENTINEL" not in evidence
+    assert "Always use TSV" not in evidence
+
+
+def test_structured_policy_error_preserves_content_free_usage() -> None:
+    usage = RawResourceUsage(
+        input_tokens=11,
+        output_tokens=2,
+        model_requests=1,
+        duration_ms=19,
+    )
+
+    def fail(request, candidates):
+        raise PolicyExecutionError("provider_timeout", usage)
+
+    policy = BoundSemanticPolicy(_descriptor(), fail)
+    result = _coordinator(policy).ingest(_request(), _Candidates())
+    assert result is not None
+    assert result.status == MemoryIngestStatus.FAILED
+    assert result.reason_codes == ("provider_timeout",)
+    assert result.usage == usage
+
+
+@pytest.mark.parametrize(
+    "proposal",
+    (
+        InternalOperationProposal(
+            InternalMemoryAction.ADD,
+            "new_fact",
+            new_content_digest=_sha("new"),
+        ),
+        InternalOperationProposal(
+            InternalMemoryAction.UPDATE,
+            "updated_fact",
+            candidate_id="candidate-1",
+            new_content_digest=_sha("updated"),
+        ),
+        InternalOperationProposal(
+            InternalMemoryAction.DELETE,
+            "expired_fact",
+            candidate_id="candidate-1",
+        ),
+        InternalOperationProposal(InternalMemoryAction.NONE, "duplicate_fact"),
+    ),
+)
+def test_deterministic_pass_through_ingestor_supports_all_internal_actions_without_mutation(
+    tmp_path,
+    proposal,
+) -> None:
+    memories = tmp_path / "memories"
+    memories.mkdir()
+    memory_file = memories / "MEMORY.md"
+    memory_file.write_text("existing native memory\n", encoding="utf-8")
+    before = memory_file.read_bytes()
+    backend = HermesSemanticBackend(memories)
+
+    usage = RawResourceUsage(duration_ms=3)
+    ingestor = DeterministicPassThroughIngestor((proposal,), usage=usage)
+    registry = SemanticPolicyRegistry()
+    registry.register(ingestor)
+    coordinator = SemanticIngestionCoordinator(
+        registry,
+        provider=ingestor.descriptor.provider,
+    )
+    candidate = ExistingMemoryCandidate(
+        "candidate-1",
+        "artifact-real",
+        "revision-1",
+        _sha("old"),
+    )
+    request = _request(
+        ingestor.descriptor.policy_version,
+        ingestor.descriptor.framework_version,
+    )
+    result = coordinator.ingest(request, _Candidates((candidate,)))
+    replay = SemanticIngestionCoordinator(
+        registry,
+        provider=ingestor.descriptor.provider,
+    ).ingest(request, _Candidates((candidate,)))
+
+    assert result is not None and replay is not None
+    assert ingestor.fixture_only is True
+    assert result.execution_id == replay.execution_id
+    assert result.operations[0].operation_id == replay.operations[0].operation_id
+    assert result.operations[0].action == proposal.action
+    assert result.usage == usage
+    assert result.outcome == (
+        MemoryIngestOutcome.NO_CHANGE
+        if proposal.action == InternalMemoryAction.NONE
+        else MemoryIngestOutcome.PLANNED_MUTATION
+    )
+    assert memory_file.read_bytes() == before
+    assert backend.get("missing-artifact") is None
+
+
+def test_ingestion_success_and_failure_usage_enter_content_free_ledger(tmp_path) -> None:
+    usage = RawResourceUsage(
+        input_tokens=13,
+        output_tokens=5,
+        cache_read_tokens=2,
+        cache_write_tokens=1,
+        reasoning_tokens=3,
+        model_requests=1,
+        retry_count=1,
+        duration_ms=21,
+        storage_bytes=0,
+    )
+    ingestor = DeterministicPassThroughIngestor(
+        (InternalOperationProposal(InternalMemoryAction.NONE, "duplicate_fact"),),
+        usage=usage,
+    )
+    registry = SemanticPolicyRegistry()
+    registry.register(ingestor)
+    request = _request(
+        ingestor.descriptor.policy_version,
+        ingestor.descriptor.framework_version,
+    )
+    result = SemanticIngestionCoordinator(
+        registry,
+        provider=ingestor.descriptor.provider,
+    ).ingest(request, _Candidates())
+    assert result is not None
+
+    path = tmp_path / "lifecycle.jsonl"
+    observer = LifecycleLedgerObserver(
+        variant="fixture",
+        trace_id="trace-ingestion",
+        family_id="SM01",
+        stage="learn",
+        output_path=path,
+    )
+    observer.record_ingestion(request, result)
+    event = observer.events[0]
+    assert event["kind"] == "memory_ingestion"
+    assert event["data"]["resources"] == {
+        "schemaVersion": 1,
+        "inputTokens": 13,
+        "outputTokens": 5,
+        "cacheReadTokens": 2,
+        "cacheWriteTokens": 1,
+        "reasoningTokens": 3,
+        "modelRequests": 1,
+        "retryCount": 1,
+        "durationMs": 21,
+        "storageBytes": 0,
+    }
+    serialized = path.read_text(encoding="utf-8")
+    assert "Always use TSV" not in serialized
+    assert "existing native memory" not in serialized
+
+    restarted = LifecycleLedgerObserver(
+        variant="fixture",
+        trace_id="trace-ingestion",
+        family_id="SM01",
+        stage="learn",
+        output_path=path,
+    )
+    restarted.record_ingestion(request, result)
+    assert len(restarted.events) == 1
