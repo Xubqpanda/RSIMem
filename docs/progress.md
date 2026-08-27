@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem ingestor, real writeback mutation, static policy, or adaptive policy is active yet. The active implementation scope is now semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E and Phase 2A are complete. Phase 2B versioned prompt and ingestion infrastructure is the active milestone; no compiler or real RSIMem mutation is enabled yet.
+Phase 1A-1E, Phase 2A, and Phase 2B are complete. Phase 2C host-neutral mutation validation and the semantic security boundary are the active milestone; no real RSIMem mutation is enabled yet.
 
 ## Completed Work
 
@@ -138,18 +138,31 @@ This proves deterministic PAST-Bench adapter-loop equivalence without an
 external model call. It does not prove live-model behavioral equivalence or
 establish a nondeterminism tolerance.
 
+### Phase 2B Prompt And Ingestion Infrastructure
+
+- [x] Freeze v1 prompt, ingestion, and atomic operation evidence contracts.
+- [x] Pin and attribute the MemBase Mem0 prompt source while keeping its runtime, datasets, and evaluation code outside RSIMem.
+- [x] Add canonical route-specific ingestion requests, structured results/failures, deterministic fixture ingestion, and auditable raw usage.
+- [x] Add a bounded, content-free append-only operation evidence graph with offline joins, privacy checks, observer-failure isolation, and tracing overhead reports.
+- [x] Prove planning/executor separation and leave Hermes backend bytes unchanged in fixtures.
+
+Known boundary: prompt completion and pass-through ingestion are fixture-only;
+the operation graph's mutation fixture is synthetic. No real model-based memory
+construction, validator, transaction executor, backend mutation, or live-run
+operation tracing is enabled.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `127 passed`.
+- [x] Pass all RSIMem tests: `154 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `385 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2B Prompt And Ingestion Infrastructure**
+### **Current: Phase 2C Mutation Validation And Security Boundary**
 
-The Phase 1C live matched gate and Phase 1 lifecycle acceptance passed on the frozen v1 contract. Phase 2A now fixes all three Hermes native routes while enabling policy only on semantic ingestion, exposes an operation-free external request, and binds internal proposals through a host-neutral policy registry and trusted candidate reader. The immediate objective is Phase 2B: version prompt artifacts and ingestion results without writing Hermes memory.
+Phase 2B now provides versioned prompt artifacts, canonical ingestion planning, deterministic failure semantics, content-free usage accounting, and append-only operation evidence without writing Hermes memory. The immediate objective is Phase 2C: validate every framework-produced semantic mutation at a host-neutral security boundary before any output can reach `MemoryRuntime.mutate()` or a Hermes file.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -189,15 +202,15 @@ Acceptance criteria:
 
 ### Memory Policy Baselines
 
-- [ ] Freeze Hermes routing and the semantic invocation boundary across all active policy variants.
-- [ ] Implement a deterministic pass-through ingestor for fixtures and contract validation.
-- [ ] Define provenance so every ingestion links back to its source episode, fixed route, internal operation, and later retrieval.
+- [x] Freeze Hermes routing and the semantic invocation boundary across all active policy variants.
+- [x] Implement a deterministic pass-through ingestor for fixtures and contract validation.
+- [x] Define provenance so every ingestion links back to its source episode, fixed route, internal operation, and later retrieval.
 - [ ] Locally reimplement Mem0 flat fact extraction, related-memory comparison, and internal ADD/UPDATE/DELETE/NONE policy from the pinned MemBase source.
-- [ ] Keep MemBase datasets, runners, evaluation code, graph store, and runtime imports outside RSIMem.
-- [ ] Add a bounded MemTrace-inspired, content-free atomic operation graph without importing MemTrace/smartcomment runtime or tracing arbitrary calls.
+- [x] Keep MemBase datasets, runners, evaluation code, graph store, and runtime imports outside RSIMem.
+- [x] Add a bounded MemTrace-inspired, content-free atomic operation graph without importing MemTrace/smartcomment runtime or tracing arbitrary calls.
 - [ ] Attribute failures to extraction, internal decision, mutation, or retrieval subgraphs before updating policy.
-- [ ] Keep episodic and procedural policy implementation disabled until their separate research gates select a method and matched baseline.
-- [ ] Record ingestion model requests, latency, tokens, internal operations, rejected operations, and stored bytes as lifecycle cost.
+- [x] Keep episodic and procedural policy implementation disabled until their separate research gates select a method and matched baseline.
+- [x] Record ingestion model requests, latency, tokens, internal operations, rejected operations, and stored bytes as lifecycle cost.
 - [ ] Add validation, rollback, and idempotency tests for framework-produced internal operations.
 
 ### Static LightRSI Writeback
@@ -239,11 +252,11 @@ Acceptance criteria:
 
 ## Immediate Execution Order
 
-1. Run matched independent replicates and compare quality, usage, tool, storage, injection, and timing evidence.
-2. Define and enforce the acceptable live-model nondeterminism boundary.
-3. Add provider-seed control only if the selected runtime exposes and verifies it.
-4. Implement the validated Mem0-style semantic ingestor and backend mutation baseline.
-5. Begin the static RSIMem writeback policy only after runtime equivalence is established.
+1. Implement the Phase 2C host-neutral validation result and failure pipeline.
+2. Add the semantic allow/reject matrix for namespace, content, provenance, ownership, revision, and security constraints.
+3. Prove rejected output never calls `backend.mutate` and keep episodic/procedural mutation disabled.
+4. Begin the Phase 2D transaction executor only after the full 2C gate passes.
+5. Connect model-based Mem0-flat semantic construction and the SM01 loop only after transactional recovery is proven.
 
 ## Update Policy
 
