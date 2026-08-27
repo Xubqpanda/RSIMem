@@ -42,6 +42,12 @@ from .operation_graph import (
 )
 from .prompt_components import PromptAdapterRegistry
 from .receipts import JsonMutationReceiptStore
+from .receipt_audit import (
+    MutationReceiptAuditReport,
+    audit_mutation_receipts,
+    capture_semantic_mutation_audit_scope,
+)
+from .receipts import SemanticMutationWriter
 from .semantic_loop import SemanticWritebackLoop, SemanticWritebackLoopResult
 from .validation import MutationValidator
 from ..memory_systems.mem0_flat.policy import (
@@ -414,6 +420,11 @@ class StaticSemanticWritebackRuntime:
         self.hermes_home = hermes_home.expanduser().resolve()
         self.registry = build_hermes_native_registry(self.hermes_home)
         self.receipts = JsonMutationReceiptStore(mutation_receipt_path)
+        self.mutation_audit_scope = capture_semantic_mutation_audit_scope(
+            self.receipts,
+            self.registry,
+        )
+        self.mutation_audit_report: MutationReceiptAuditReport | None = None
         self.compilation_receipts = JsonSemanticCompilationReceiptStore(
             compilation_receipt_path
             or mutation_receipt_path.with_name("semantic_compilation_receipts.json")
@@ -680,4 +691,19 @@ class StaticSemanticWritebackRuntime:
         if self._closed:
             return
         self._closed = True
-        self.registry.close()
+        try:
+            self.mutation_audit_report = audit_mutation_receipts(
+                self.receipts,
+                self.registry,
+                semantic_scope=self.mutation_audit_scope,
+                allowed_writers=(SemanticMutationWriter.RSIMEM_EXECUTOR,),
+            )
+            if not self.mutation_audit_report.ok:
+                kinds = sorted({
+                    issue.kind for issue in self.mutation_audit_report.issues
+                })
+                raise ValueError(
+                    "semantic mutation audit failed: " + ", ".join(kinds)
+                )
+        finally:
+            self.registry.close()
