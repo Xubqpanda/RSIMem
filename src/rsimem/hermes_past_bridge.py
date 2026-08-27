@@ -30,7 +30,7 @@ from .memory.live_writeback import (
     StaticSemanticWritebackConfig,
     StaticSemanticWritebackRuntime,
 )
-from .memory_systems.mem0_flat import CompletionClient
+from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
 
 
 class _PromptMemoryStore:
@@ -353,6 +353,11 @@ class HermesPastBenchBridge:
                 ),
                 observer=self.ledger,
                 ingestion_observer=self.lifecycle.observer,
+                utility_gate=(
+                    FrozenMem0UtilityGate()
+                    if static_writeback_config.utility_enabled
+                    else None
+                ),
             )
         else:
             self.static_writeback = None

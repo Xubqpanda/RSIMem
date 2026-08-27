@@ -864,7 +864,9 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
         lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
         lifecycle_evidence_path=artifacts / "lifecycle.jsonl",
         lifecycle_receipt_path=artifacts / "lifecycle-receipts.json",
-        static_writeback_config=StaticSemanticWritebackConfig(mode="static"),
+        static_writeback_config=StaticSemanticWritebackConfig(
+            mode="static_utility"
+        ),
         static_completion_client=client,
     )
     bridge.attach(SimpleNamespace(
@@ -886,6 +888,18 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
     assert [event["kind"] for event in lifecycle_events].count(
         "memory_ingestion"
     ) == 1
+    utility_events = [
+        event
+        for event in lifecycle_events
+        if event["kind"] == "static_utility_decisions"
+    ]
+    assert len(utility_events) == 1
+    assert utility_events[0]["data"]["decisionCount"] == 3
+    assert [
+        decision["target"]
+        for decision in utility_events[0]["data"]["decisions"]
+    ] == ["generation", "retrieval", "internal_operation"]
+    assert "pipe-delimited" not in json.dumps(utility_events[0], sort_keys=True)
     bridge.close()
 
     assert len(bridge.lifecycle_results) == 2
