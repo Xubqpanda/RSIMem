@@ -17,6 +17,7 @@ from .adaptive_policy_store import JsonAdaptivePolicyStore
 from .backends import build_hermes_native_registry
 from .contracts import MemoryExperience, MemoryKind, MemoryMessage, MemoryObserver
 from .executor import TransactionalMutationExecutor
+from .future_trace import SemanticFeedbackContract
 from .ingestion import (
     SemanticIngestionCoordinator,
     SemanticPolicyRegistry,
@@ -55,6 +56,7 @@ class StaticSemanticWritebackConfig:
     adaptive_policy_store_path: str | None = None
     adaptive_trusted_roots: tuple[str, ...] = ()
     adaptive_parameters: tuple[TrustedAdaptiveMem0Parameter, ...] = ()
+    feedback_contract: SemanticFeedbackContract = SemanticFeedbackContract.DISABLED
     schema_version: int = STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -69,6 +71,11 @@ class StaticSemanticWritebackConfig:
             tuple(self.adaptive_trusted_roots),
         )
         object.__setattr__(self, "adaptive_parameters", tuple(self.adaptive_parameters))
+        object.__setattr__(
+            self,
+            "feedback_contract",
+            SemanticFeedbackContract(self.feedback_contract),
+        )
         adaptive_fields = bool(
             self.adaptive_policy_store_path
             or self.adaptive_trusted_roots
@@ -82,6 +89,8 @@ class StaticSemanticWritebackConfig:
             raise ValueError("adaptive semantic writeback configuration is incomplete")
         if not self.adaptive_enabled and adaptive_fields:
             raise ValueError("adaptive semantic fields require adaptive_utility mode")
+        if not self.enabled and self.feedback_contract != SemanticFeedbackContract.DISABLED:
+            raise ValueError("semantic feedback contract requires writeback mode")
 
     @property
     def enabled(self) -> bool:
@@ -111,6 +120,7 @@ class StaticSemanticWritebackConfig:
             "adaptive_policy_store_path",
             "adaptive_trusted_roots",
             "adaptive_parameters",
+            "feedback_contract",
         }
         unknown = set(value) - allowed
         if unknown:
@@ -154,6 +164,9 @@ class StaticSemanticWritebackConfig:
             ),
             adaptive_trusted_roots=tuple(str(item) for item in roots),
             adaptive_parameters=tuple(parameters),
+            feedback_contract=SemanticFeedbackContract(
+                str(value.get("feedback_contract") or SemanticFeedbackContract.DISABLED)
+            ),
         )
 
 

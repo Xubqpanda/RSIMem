@@ -113,6 +113,11 @@ def test_static_config_is_default_disabled_and_strict() -> None:
     })
     assert adaptive.adaptive_enabled is True
     assert adaptive.utility_enabled is True
+    feedback = StaticSemanticWritebackConfig.from_mapping({
+        "mode": "static_utility",
+        "feedback_contract": "sm01_tsv_v1",
+    })
+    assert feedback.feedback_contract.value == "sm01_tsv_v1"
     with pytest.raises(ValueError, match="configuration is incomplete"):
         StaticSemanticWritebackConfig.from_mapping({"mode": "adaptive_utility"})
     with pytest.raises(ValueError, match="require adaptive_utility"):
@@ -122,6 +127,11 @@ def test_static_config_is_default_disabled_and_strict() -> None:
         })
     with pytest.raises(ValueError, match="unknown static semantic"):
         StaticSemanticWritebackConfig.from_mapping({"provider_seed": 7})
+    with pytest.raises(ValueError, match="requires writeback mode"):
+        StaticSemanticWritebackConfig.from_mapping({
+            "mode": "disabled",
+            "feedback_contract": "sm01_tsv_v1",
+        })
 
 
 def test_explicit_adaptive_runtime_rejects_empty_store_before_model_call(
