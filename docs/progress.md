@@ -193,11 +193,11 @@ The 2J.1 learner now produces deterministic, content-addressed semantic paramete
 
 Phase 2J is complete at the deterministic implementation gate. Time-ordered splits, offline screening, matched held-out activation, rollback, active-artifact binding, actual-version evidence, and one replayable N -> feedback -> N+1 -> changed future memory decision loop are implemented. This does not establish PAST-Bench adaptive quality, repeated recursive improvement, or cross-family generalization; those claims remain gated on Phase 2K experiments.
 
-Phase 2K.1 execution plumbing is complete. A strict adaptive JSON contract, attempt-local prepared-store materialization, ACTIVE policy manifest identity, frozen five-method execution profiles, rotated scheduling, and an SM01 launcher now fail closed before model use. No live adaptive replicate has run: the next prerequisite is an independently prepared ACTIVE store derived from prior deployment feedback, not from the official/test run it will evaluate.
+Phase 2K.1 execution plumbing now covers the complete production preparation boundary. A live feedback batch is content-addressed and reloaded before a run-qualified time split trains only the stable retrieval threshold. Offline screening stops at `VALIDATED/REJECTED`; a separate static/proposal held-out launcher derives labels and costs only from audited operation/deployment evidence, and only an accepted matched decision can create a production ACTIVE store and config. Validation-only trial configs are rejected by the official five-method resolver. No new live feedback, held-out validation, or adaptive five-method replicate has run because the current shell has no provider credential.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `323 passed`.
+- [x] Pass all RSIMem tests: `342 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `390 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
@@ -208,7 +208,7 @@ Phase 2K.1 execution plumbing is complete. A strict adaptive JSON contract, atte
 
 Phase 2H freezes one interpretable future-utility-per-cost objective across semantic generation admission, internal operation admission, and retrieval filtering/ranking without changing route or invocation scheduling. Deterministic matched fixtures and the audited live SM01 batch establish fixed policy identity, content-free evidence, raw-cost accounting, and explicit limitations.
 
-Phase 2I constructs, independently rebuilds, and audits a versioned delayed-feedback dataset from the atomic operation graph. Phase 2J trains, validates, activates, binds, audits, and rolls back a deterministic adaptive Mem0-flat policy while preserving the fixed route and invocation cadence. Phase 2K.1 now transports that ACTIVE policy into isolated PAST-Bench attempts and freezes the five-method launcher and manifest identity. The immediate objective is to implement and audit the production preparation path from prior deployment feedback, freeze its train/validation membership and cutoff, then run the first three-replicate SM01 batch. Raw outputs and credentials remain outside tracked files.
+Phase 2I constructs, independently rebuilds, and audits a versioned delayed-feedback dataset from the atomic operation graph. Phase 2J trains, validates, activates, binds, audits, and rolls back a deterministic adaptive Mem0-flat policy while preserving the fixed route and invocation cadence. Phase 2K.1 now has both the production preparation/activation chain and the isolated five-method launcher. The immediate objective is to run the predeclared three-replicate feedback collector, inspect its offline decision, run the separate held-out static/proposal validation, and only after an accepted activation run the first three-replicate five-method SM01 batch. Raw outputs and credentials remain outside tracked files.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -302,7 +302,11 @@ Acceptance criteria:
 2. [x] Define bounded related-memory retrieval parameters and bind candidate targets through the committed ownership resolver.
 3. [x] Complete the SM01 learn -> ingest -> validate -> mutate -> restart -> native injection -> downstream-use fixture.
 4. [x] Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
-5. [ ] Run static SM01 matched comparisons only after the deterministic end-to-end and audit gates pass.
+5. [x] Run and audit the static SM01 matched comparison.
+6. [ ] Run the three-replicate `feedback` collector and audit the prepared dataset/offline decision.
+7. [ ] Run the separate static/proposal held-out validation and require a matched accepted activation.
+8. [ ] Run the three-replicate five-method adaptive SM01 batch using only the production activation config.
+9. [ ] Produce dated reports for the feedback, activation, and five-method batches before closing 2K metrics or claims.
 
 ## Update Policy
 
