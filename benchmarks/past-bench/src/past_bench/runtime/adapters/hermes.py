@@ -6,6 +6,7 @@ Modified by RSIMem to map Hermes request-level usage into runtime evidence.
 from __future__ import annotations
 
 import importlib
+import hashlib
 import json
 import os
 import shutil
@@ -29,6 +30,107 @@ from .sandbox_workspace import SandboxWorkspaceMirror
 _HERMES_ROOT_DEFAULT = Path(__file__).resolve().parents[4] / "agents" / "hermes-agent"
 _PAST_BENCH_TOOLSET = "past_bench_runtime"
 _MISSING = object()
+
+
+class _RecordedHermesCompletionClient:
+    """Run RSIMem policy prompts through Hermes request accounting."""
+
+    def __init__(
+        self,
+        agent: Any,
+        *,
+        model: str,
+        base_url: str | None,
+        api_key: str | None,
+        timeout_seconds: float,
+        max_output_tokens: int,
+    ) -> None:
+        self.agent = agent
+        self.model = model
+        self.base_url = base_url
+        self.api_key = api_key
+        self.timeout_seconds = timeout_seconds
+        self.max_output_tokens = max_output_tokens
+
+    @staticmethod
+    def _sum_usage(records: list[dict[str, Any]], field: str) -> int | None:
+        values = [record.get("usage", {}).get(field) for record in records]
+        if any(type(value) is not int for value in values):
+            return None
+        return sum(values)
+
+    def complete(self, prompt: Any) -> Any:
+        from agent.auxiliary_client import call_llm
+        from rsimem.lifecycle import RawResourceUsage
+        from rsimem.memory_systems.mem0_flat import (
+            CompletionResult,
+            POLICY_FACT_EXTRACTION_PROMPT,
+        )
+
+        component = (
+            "semantic_fact_extraction"
+            if prompt.artifact.prompt_id
+            == POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id
+            else "semantic_operation_decision"
+        )
+        records = getattr(self.agent, "model_call_usage_records", None)
+        if not isinstance(records, list):
+            raise ValueError("static semantic completion requires Hermes usage records")
+        before = len(records)
+
+        def recorded_request(request, **kwargs):
+            return self.agent._execute_recorded_model_call(
+                request,
+                component=component,
+                **kwargs,
+            )
+
+        response = call_llm(
+            task=component,
+            provider="custom",
+            model=self.model,
+            base_url=self.base_url,
+            api_key=self.api_key,
+            messages=[{"role": "user", "content": prompt.text}],
+            temperature=0.0,
+            max_tokens=self.max_output_tokens,
+            timeout=self.timeout_seconds,
+            request_executor=recorded_request,
+        )
+        choices = getattr(response, "choices", None)
+        message = getattr(choices[0], "message", None) if choices else None
+        content = getattr(message, "content", None)
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("static semantic completion returned no JSON text")
+        new_records = records[before:]
+        if not new_records:
+            raise ValueError("static semantic completion bypassed request accounting")
+        duration_values = [record.get("duration_ms") for record in new_records]
+        duration_ms = (
+            int(round(sum(float(value) for value in duration_values)))
+            if all(isinstance(value, (int, float)) for value in duration_values)
+            else None
+        )
+        usage = RawResourceUsage(
+            input_tokens=self._sum_usage(new_records, "input_tokens"),
+            output_tokens=self._sum_usage(new_records, "output_tokens"),
+            cache_read_tokens=self._sum_usage(new_records, "cache_read_tokens"),
+            cache_write_tokens=self._sum_usage(new_records, "cache_write_tokens"),
+            reasoning_tokens=self._sum_usage(new_records, "reasoning_tokens"),
+            model_requests=len(new_records),
+            retry_count=sum(
+                int(record.get("usage", {}).get("retry_count") or 0)
+                for record in new_records
+            ),
+            duration_ms=duration_ms,
+        )
+        completion_id = "completion." + hashlib.sha256(
+            json.dumps({
+                "render_id": prompt.render_id,
+                "output_digest": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+            }, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()[:40]
+        return CompletionResult(completion_id, prompt.render_id, content, usage)
 
 
 def _get_hermes_root(agent_name: str = "hermes") -> Path:
@@ -111,8 +213,17 @@ class HermesAdapter(RuntimeAdapter):
             sys.path.insert(0, hermes_root)
 
         extra = self.request.model.extra_body or {}
-        hermes_cfg = extra.get("hermes", {}) if isinstance(extra, dict) else {}
+        hermes_cfg = dict(extra.get("hermes", {})) if isinstance(extra, dict) else {}
         persistence_enabled = bool(hermes_cfg.get("persistence_enabled", False))
+        rsimem_cfg = dict(hermes_cfg.get("rsimem") or {})
+        semantic_writeback_cfg = dict(rsimem_cfg.get("semantic_writeback") or {})
+        if not persistence_enabled:
+            semantic_writeback_cfg["mode"] = "disabled"
+        rsimem_cfg["semantic_writeback"] = semantic_writeback_cfg
+        hermes_cfg["rsimem"] = rsimem_cfg
+        static_writeback_enabled = (
+            str(semantic_writeback_cfg.get("mode") or "disabled") == "static"
+        )
         hermes_home = None
         if hermes_cfg.get("home_dir"):
             hermes_home = Path(str(hermes_cfg["home_dir"])).expanduser().resolve()
@@ -147,6 +258,12 @@ class HermesAdapter(RuntimeAdapter):
                 enabled_toolsets = list(enabled_toolsets)
                 if _PAST_BENCH_TOOLSET not in enabled_toolsets:
                     enabled_toolsets.append(_PAST_BENCH_TOOLSET)
+        if static_writeback_enabled:
+            enabled_toolsets = [
+                toolset
+                for toolset in (enabled_toolsets or [])
+                if toolset != "memory"
+            ]
 
         memory_cfg = hermes_cfg.get("config_overrides", {}).get("memory", {})
         memory_active = bool(memory_cfg.get("memory_enabled", True) or memory_cfg.get("user_profile_enabled", True))
@@ -175,7 +292,14 @@ class HermesAdapter(RuntimeAdapter):
             enabled_toolsets=enabled_toolsets,
             disabled_toolsets=hermes_cfg.get("disabled_toolsets"),
             skip_context_files=bool(hermes_cfg.get("skip_context_files", True)),
-            skip_memory=bool(hermes_cfg.get("skip_memory", (not persistence_enabled) or (not memory_active))),
+            skip_memory=(
+                False
+                if static_writeback_enabled
+                else bool(hermes_cfg.get(
+                    "skip_memory",
+                    (not persistence_enabled) or (not memory_active),
+                ))
+            ),
             quiet_mode=True,
             session_db=session_db,
             model_usage_callback=collected_model_calls.append,
@@ -322,6 +446,7 @@ class HermesAdapter(RuntimeAdapter):
             HermesLifecycleConfig,
             HermesLifecycleEvaluatorMode,
         )
+        from rsimem.memory.live_writeback import StaticSemanticWritebackConfig
 
         metadata = self.request.runtime_config.metadata
         experiment_variant = str(metadata.get("experiment_variant") or "").strip()
@@ -331,6 +456,9 @@ class HermesAdapter(RuntimeAdapter):
             )
         lifecycle_config = HermesLifecycleConfig.from_mapping(
             rsimem_cfg.get("lifecycle")
+        )
+        static_writeback_config = StaticSemanticWritebackConfig.from_mapping(
+            rsimem_cfg.get("semantic_writeback")
         )
         lifecycle_complete = None
         if (
@@ -366,6 +494,19 @@ class HermesAdapter(RuntimeAdapter):
                     raise ValueError("lifecycle evaluator returned no JSON text")
                 return content
 
+        static_completion_client = (
+            _RecordedHermesCompletionClient(
+                agent,
+                model=self.request.model.model_id,
+                base_url=self.request.model.base_url,
+                api_key=self.request.model.api_key,
+                timeout_seconds=static_writeback_config.timeout_seconds,
+                max_output_tokens=static_writeback_config.max_output_tokens,
+            )
+            if static_writeback_config.enabled
+            else None
+        )
+
         bridge = HermesPastBenchBridge(
             hermes_home,
             HermesExperimentConfig(
@@ -394,6 +535,11 @@ class HermesAdapter(RuntimeAdapter):
                 capture_dir / "rsimem_lifecycle_receipts.json"
             ),
             lifecycle_complete=lifecycle_complete,
+            static_writeback_config=static_writeback_config,
+            static_completion_client=static_completion_client,
+            static_operation_evidence_path=(
+                capture_dir / "rsimem_semantic_operations.jsonl"
+            ),
         )
         try:
             bridge.attach(agent)

@@ -300,3 +300,185 @@ def test_past_bench_emits_explicit_lifecycle_boundaries(
     assert "Always use TSV output." not in serialized
     assert str(home) not in serialized
     assert (artifacts / "rsimem_lifecycle_receipts.json").exists()
+
+
+def test_past_bench_static_writeback_disables_native_writer_and_persists(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from agent import auxiliary_client
+    from tools import memory_tool
+
+    home = tmp_path / "home"
+    (home / "memories").mkdir(parents=True)
+    artifacts = tmp_path / "artifacts"
+    fake_run_agent = types.ModuleType("run_agent")
+    captured: dict[str, object] = {}
+
+    class StaticAgent:
+        def __init__(self, **kwargs):
+            captured["enabled_toolsets"] = kwargs["enabled_toolsets"]
+            captured["skip_memory"] = kwargs["skip_memory"]
+            self._session_db = kwargs["session_db"]
+            self.session_id = "native-static-session"
+            self.session_log_file = None
+            self.model_call_usage_records = []
+            self.model_usage_callback = kwargs["model_usage_callback"]
+            self._sequence = 0
+            self._memory_store = memory_tool.MemoryStore()
+            self._memory_store.load_from_disk()
+            self._session_db.create_session(
+                self.session_id,
+                "past_bench",
+                model="fixture-model",
+            )
+
+        def _execute_recorded_model_call(self, request, **kwargs):
+            response = request()
+            self._sequence += 1
+            record = {
+                "call_id": f"static-call-{self._sequence}",
+                "sequence": self._sequence,
+                "component": kwargs["component"],
+                "purpose": kwargs.get("purpose") or kwargs["component"],
+                "provider": kwargs.get("provider"),
+                "model": kwargs.get("model"),
+                "api_mode": kwargs.get("api_mode"),
+                "attempt": kwargs.get("attempt", 1),
+                "status": "success",
+                "usage": {
+                    "input_tokens": 11,
+                    "output_tokens": 5,
+                    "cache_read_tokens": 2,
+                    "cache_write_tokens": 0,
+                    "reasoning_tokens": 1,
+                    "request_count": 1,
+                    "retry_count": 0,
+                    "usage_complete": True,
+                },
+                "usage_available": True,
+                "duration_ms": 3.0,
+                "http_status": 200,
+                "error_category": None,
+            }
+            self.model_call_usage_records.append(record)
+            self.model_usage_callback(record.copy())
+            return response
+
+        async def _execute_recorded_async_model_call(self, *args, **kwargs):
+            return None
+
+        def run_conversation(self, **kwargs):
+            assert self._memory_store.format_for_system_prompt("user") is None
+            self._session_db.append_message(
+                self.session_id,
+                "user",
+                "Always use TSV output.",
+            )
+            self._session_db.append_message(
+                self.session_id,
+                "assistant",
+                "Understood.",
+            )
+            return {
+                "final_response": "Understood.",
+                "completed": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+            }
+
+        def wait_for_background_reviews(self, timeout=0):
+            return True
+
+    def call_llm(**kwargs):
+        content = (
+            json.dumps({"facts": [PRIVATE_MEMORY]})
+            if kwargs["task"] == "semantic_fact_extraction"
+            else json.dumps({
+                "operations": [{
+                    "fact_index": 0,
+                    "action": "add",
+                    "candidate_id": None,
+                }],
+            })
+        )
+        response = types.SimpleNamespace(choices=[types.SimpleNamespace(
+            message=types.SimpleNamespace(content=content),
+        )])
+        return kwargs["request_executor"](
+            lambda: response,
+            attempt=1,
+            purpose=kwargs["task"],
+            provider="custom",
+            model="fixture-model",
+            api_mode="chat_completions",
+        )
+
+    fake_run_agent.AIAgent = StaticAgent
+    monkeypatch.setitem(sys.modules, "run_agent", fake_run_agent)
+    monkeypatch.setattr(auxiliary_client, "call_llm", call_llm)
+    monkeypatch.setattr(memory_tool, "MEMORY_DIR", home / "memories")
+    monkeypatch.setattr(
+        HermesAdapter,
+        "_reload_hermes_modules_if_needed",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr("hermes_state.DEFAULT_DB_PATH", home / "state.db")
+
+    request = _request(home, artifacts, "native+ledger")
+    request.session_id = "session-static-writeback"
+    rsimem = request.model.extra_body["hermes"]["rsimem"]
+    rsimem["lifecycle"] = {
+        "evaluator_mode": "deterministic",
+        "policy_version": "static-fixture-v1",
+        "compiler_version": "uncompiled-v0",
+    }
+    rsimem["semantic_writeback"] = {
+        "mode": "static",
+        "timeout_seconds": 10.0,
+        "max_output_tokens": 512,
+    }
+    request.model.extra_body["hermes"]["enabled_toolsets"] = [
+        "memory",
+        "skills",
+    ]
+    adapter = HermesAdapter(
+        AgentSpec(name="hermes", adapter="hermes"),
+        request,
+    )
+    try:
+        response = adapter.step(StepRequest(
+            session_id=request.session_id,
+            step_id=0,
+        ))
+        captured["static_failures"] = adapter._rsimem_bridge.static_failures
+        captured["static_results"] = tuple(
+            result.observer_evidence()
+            for result in adapter._rsimem_bridge.static_results
+        )
+    finally:
+        adapter.close("static fixture complete")
+
+    assert response.status == "finished", response.error
+    assert captured["enabled_toolsets"] == ["skills"]
+    assert captured["skip_memory"] is False
+    assert captured["static_failures"] == ()
+    assert captured["static_results"][0]["writeback"]["logical_exit"] is True
+    assert [record.component for record in response.model_calls] == [
+        "semantic_fact_extraction",
+        "semantic_operation_decision",
+    ]
+    assert response.usage.request_count == 2
+    assert response.usage.input_tokens == 22
+    assert response.usage.output_tokens == 10
+    assert PRIVATE_MEMORY in (home / "memories" / "USER.md").read_text(
+        encoding="utf-8"
+    )
+    ledger = (artifacts / "rsimem_memory_events.jsonl").read_text(
+        encoding="utf-8"
+    )
+    assert '"kind": "mutation_committed"' in ledger
+    assert PRIVATE_MEMORY not in ledger
+    assert PRIVATE_MEMORY not in (
+        artifacts / "rsimem_semantic_operations.jsonl"
+    ).read_text(encoding="utf-8")
