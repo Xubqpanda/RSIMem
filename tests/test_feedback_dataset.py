@@ -19,6 +19,7 @@ from rsimem.memory.feedback_dataset import (
     JsonDelayedFeedbackDatasetStore,
     PropensitySource,
     audit_feedback_dataset,
+    audit_feedback_dataset_stage_gate,
     build_feedback_dataset_report,
     evaluate_feedback_dataset_stage_gate,
     validate_feedback_estimator,
@@ -986,6 +987,45 @@ def test_stage_gate_rebuilds_audits_and_binds_frozen_config() -> None:
         "example_identity_mismatch",
         "label_evidence_mismatch",
     } <= set(tampered.issues)
+
+
+def test_external_replay_stage_audit_fails_closed() -> None:
+    graph = _graph("used")
+    dataset = _dataset(graph)
+    replay = _dataset(graph)
+
+    accepted = audit_feedback_dataset_stage_gate(
+        dataset,
+        replay,
+        graph,
+        expected_policy_version=POLICY_VERSION,
+    )
+    assert accepted.ok is True
+    assert accepted.dataset_id == accepted.replay_dataset_id
+    assert accepted.observation_count == 1
+
+    wrong_policy = audit_feedback_dataset_stage_gate(
+        dataset,
+        replay,
+        graph,
+        expected_policy_version="policy-drift-v1",
+    )
+    assert wrong_policy.ok is False
+    assert "policy_version_not_frozen" in wrong_policy.issues
+
+    tampered = replace(
+        dataset,
+        examples=(replace(dataset.examples[0], label=FeedbackLabel.NEGATIVE),),
+    )
+    rejected = audit_feedback_dataset_stage_gate(
+        tampered,
+        replay,
+        graph,
+        expected_policy_version=POLICY_VERSION,
+    )
+    assert rejected.ok is False
+    assert "canonical_replay_mismatch" in rejected.issues
+    assert "primary_label_evidence_mismatch" in rejected.issues
 
 
 @pytest.mark.parametrize(
