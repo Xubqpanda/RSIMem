@@ -20,6 +20,13 @@ from .contracts import (
 from .controller import LifecycleController
 from .evaluators import ConservativeContextEvaluator, JsonLlmContextEvaluator
 from .scheduler import EvaluationScheduler
+from .live import (
+    DeterministicHermesDryRunEvaluator,
+    HermesLifecycleConfig,
+    HermesLifecycleDryRunResult,
+    HermesLifecycleDryRunRuntime,
+    HermesLifecycleEvaluatorMode,
+)
 from .hermes import (
     DeterministicPreferenceEvaluator,
     HermesMessage,
@@ -72,6 +79,7 @@ __all__ = [
     "ContextSegment",
     "ConservativeContextEvaluator",
     "DeterministicPreferenceEvaluator",
+    "DeterministicHermesDryRunEvaluator",
     "DryRunMutation",
     "DryRunReceipt",
     "DryRunStatus",
@@ -89,6 +97,10 @@ __all__ = [
     "EvaluationTrigger",
     "JsonLlmContextEvaluator",
     "HermesMessage",
+    "HermesLifecycleConfig",
+    "HermesLifecycleDryRunResult",
+    "HermesLifecycleDryRunRuntime",
+    "HermesLifecycleEvaluatorMode",
     "HermesSnapshotCollector",
     "HermesStateSnapshotCollector",
     "LifecycleController",
