@@ -25,6 +25,7 @@ from .operation_graph import (
     OperationRecord,
     OperationStatus,
 )
+from .utility import STATIC_UTILITY_FEATURE_SCHEMA
 
 
 DELAYED_FEEDBACK_SCHEMA_VERSION = 1
@@ -561,6 +562,16 @@ class FeedbackDatasetAudit:
 
 
 @dataclass(frozen=True, slots=True)
+class FeedbackDatasetStageGateAudit:
+    ok: bool
+    issues: tuple[str, ...]
+    dataset_id: str
+    replay_dataset_id: str
+    config_digest: str
+    observation_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class FeedbackDatasetReport:
     observation_count: int
     opportunity_count: int
@@ -571,6 +582,18 @@ class FeedbackDatasetReport:
     censoring_rate: float
     label_counts: tuple[tuple[FeedbackLabel, int], ...]
     exposure_counts: tuple[tuple[ExposureState, int], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FeedbackDatasetStageGate:
+    ok: bool
+    issues: tuple[str, ...]
+    dataset_id: str
+    replay_dataset_id: str | None
+    expected_config_digest: str
+    actual_config_digest: str
+    audit: FeedbackDatasetAudit
+    report: FeedbackDatasetReport
 
 
 def build_feedback_dataset_report(
@@ -1367,4 +1390,76 @@ def audit_feedback_dataset(
         tuple(sorted(issues)),
         len(dataset.examples),
         tuple((label, counts[label]) for label in FeedbackLabel),
+    )
+
+
+def evaluate_feedback_dataset_stage_gate(
+    dataset: DelayedFeedbackDataset,
+    graph: OperationGraph,
+    *,
+    expected_config: DelayedFeedbackConfig,
+    attribution_reports: Sequence[AttributionReport] = (),
+) -> FeedbackDatasetStageGate:
+    issues = set()
+    audit = audit_feedback_dataset(dataset, graph)
+    issues.update(audit.issues)
+    if dataset.config != expected_config:
+        issues.add("frozen_config_mismatch")
+    replay = None
+    try:
+        replay = DelayedFeedbackDatasetBuilder(expected_config).build(
+            graph,
+            dataset.window,
+            attribution_reports=attribution_reports,
+        )
+    except (TypeError, ValueError):
+        issues.add("rebuild_failed")
+    if replay is not None and replay.payload() != dataset.payload():
+        issues.add("canonical_rebuild_mismatch")
+    return FeedbackDatasetStageGate(
+        ok=not issues,
+        issues=tuple(sorted(issues)),
+        dataset_id=dataset.dataset_id,
+        replay_dataset_id=None if replay is None else replay.dataset_id,
+        expected_config_digest=expected_config.digest,
+        actual_config_digest=dataset.config.digest,
+        audit=audit,
+        report=build_feedback_dataset_report(dataset),
+    )
+
+
+def audit_feedback_dataset_stage_gate(
+    dataset: DelayedFeedbackDataset,
+    replay: DelayedFeedbackDataset,
+    graph: OperationGraph,
+    *,
+    expected_policy_version: str,
+) -> FeedbackDatasetStageGateAudit:
+    _require_identifier(expected_policy_version, "expected feedback policy version")
+    issues = set()
+    primary_audit = audit_feedback_dataset(dataset, graph)
+    replay_audit = audit_feedback_dataset(replay, graph)
+    issues.update(f"primary_{issue}" for issue in primary_audit.issues)
+    issues.update(f"replay_{issue}" for issue in replay_audit.issues)
+    if dataset.payload() != replay.payload():
+        issues.add("canonical_replay_mismatch")
+    if dataset.config.policy_version != expected_policy_version:
+        issues.add("policy_version_not_frozen")
+    if dataset.config.feature_schema != STATIC_UTILITY_FEATURE_SCHEMA:
+        issues.add("feature_schema_not_frozen")
+    if dataset.config.label_schema != DELAYED_FEEDBACK_LABEL_SCHEMA:
+        issues.add("label_schema_not_frozen")
+    if dataset.config.dataset_version != DELAYED_FEEDBACK_DATASET_VERSION:
+        issues.add("dataset_version_not_frozen")
+    if dataset.config.window_version != DELAYED_FEEDBACK_WINDOW_VERSION:
+        issues.add("window_version_not_frozen")
+    if dataset.window.version != dataset.config.window_version:
+        issues.add("window_config_mismatch")
+    return FeedbackDatasetStageGateAudit(
+        ok=not issues,
+        issues=tuple(sorted(issues)),
+        dataset_id=dataset.dataset_id,
+        replay_dataset_id=replay.dataset_id,
+        config_digest=dataset.config.digest,
+        observation_count=len(dataset.examples),
     )
