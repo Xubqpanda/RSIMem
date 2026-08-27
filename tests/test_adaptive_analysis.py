@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from rsimem.adaptive_analysis import analyze_adaptive_batch
 from rsimem.experiment_manifest import (
     ADAPTIVE_METHOD_VARIANTS,
@@ -226,6 +228,15 @@ def test_adaptive_analysis_rebuilds_five_method_raw_and_derived_metrics(
     assert adaptive["futureUtilityPerCost"]["missingCount"] == 0
     assert report["providerPricing"] is None
     assert len(report["costQualityFrontier"]) == 5
+    paired = report["pairedStaticAdaptiveDelta"]
+    assert paired["primaryScore"]["mean"] == pytest.approx(0.05)
+    assert paired["requests"]["mean"] == 0
+    assert report["claimGate"]["memoryMediatedSelfImprovement"][
+        "eligible"
+    ] is True
+    assert report["claimGate"]["recursiveSelfImprovement"]["eligible"] is False
+    assert report["claimGate"]["pastBenchGeneralization"]["eligible"] is False
+    assert report["claimGate"]["qualitySuperiority"]["eligible"] is False
     assert PRIVATE_MEMORY not in json.dumps(report)
 
 
