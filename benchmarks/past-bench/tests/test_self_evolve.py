@@ -195,11 +195,12 @@ def test_static_semantic_writeback_isolated_from_native_and_no_persistence(
             persistence_enabled=True,
             **{**common, "rsimem_mode": "native+adapter+ledger"},
         )
-    with pytest.raises(ValueError, match="requires lifecycle"):
-        build_hermes_extra_body(
-            persistence_enabled=True,
-            **{**common, "rsimem_lifecycle_evaluator_mode": "disabled"},
-        )
+    evaluator_free = build_hermes_extra_body(
+        persistence_enabled=True,
+        **{**common, "rsimem_lifecycle_evaluator_mode": "disabled"},
+    )["hermes"]
+    assert evaluator_free["rsimem"]["lifecycle"]["evaluator_mode"] == "disabled"
+    assert evaluator_free["rsimem"]["semantic_writeback"]["mode"] == "static_utility"
 
 
 def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
@@ -288,13 +289,14 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
             rsimem_adaptive_policy_source_path=str(source_store),
             **{**common, "rsimem_mode": "native+adapter+ledger"},
         )
-    with pytest.raises(ValueError, match="requires lifecycle"):
-        build_hermes_extra_body(
-            persistence_enabled=True,
-            rsimem_adaptive_config=_adaptive_config(),
-            rsimem_adaptive_policy_source_path=str(source_store),
-            **{**common, "rsimem_lifecycle_evaluator_mode": "disabled"},
-        )
+    evaluator_free = build_hermes_extra_body(
+        persistence_enabled=True,
+        rsimem_adaptive_config=_adaptive_config(),
+        rsimem_adaptive_policy_source_path=str(source_store),
+        **{**common, "rsimem_lifecycle_evaluator_mode": "disabled"},
+    )["hermes"]
+    assert evaluator_free["rsimem"]["lifecycle"]["evaluator_mode"] == "disabled"
+    assert evaluator_free["rsimem"]["semantic_writeback"]["mode"] == "adaptive_utility"
     with pytest.raises(ValueError, match="requires adaptive_utility"):
         build_hermes_extra_body(
             persistence_enabled=True,

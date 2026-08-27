@@ -273,14 +273,18 @@ class HermesAdapter(RuntimeAdapter):
         memory_active = bool(memory_cfg.get("memory_enabled", True) or memory_cfg.get("user_profile_enabled", True))
         rsimem_cfg = hermes_cfg.get("rsimem") or {}
         lifecycle_cfg = rsimem_cfg.get("lifecycle") or {}
-        lifecycle_snapshot_required = (
-            str(rsimem_cfg.get("mode") or "native") != "native"
-            and str(lifecycle_cfg.get("evaluator_mode") or "disabled") != "disabled"
+        persisted_snapshot_required = (
+            rsimem_writeback_enabled
+            or (
+                str(rsimem_cfg.get("mode") or "native") != "native"
+                and str(lifecycle_cfg.get("evaluator_mode") or "disabled")
+                != "disabled"
+            )
         )
         session_db = None
         if hermes_home is not None and (
             hermes_cfg.get("session_search_enabled", False)
-            or lifecycle_snapshot_required
+            or persisted_snapshot_required
         ):
             session_db = SessionDB()
             self._session_db = session_db

@@ -459,17 +459,14 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
     request = _request(home, artifacts, "native+ledger")
     request.session_id = "session-static-writeback"
     rsimem = request.model.extra_body["hermes"]["rsimem"]
-    rsimem["lifecycle"] = {
-        "evaluator_mode": "deterministic",
-        "policy_version": "static-fixture-v1",
-        "compiler_version": "uncompiled-v0",
-    }
+    rsimem["lifecycle"] = {"evaluator_mode": "disabled"}
     rsimem["semantic_writeback"] = {
         "mode": "static_utility",
         "timeout_seconds": 10.0,
         "max_output_tokens": 512,
     }
     request.model.extra_body["hermes"]["enabled_toolsets"] = configured_toolsets
+    request.model.extra_body["hermes"]["session_search_enabled"] = False
     adapter = HermesAdapter(
         AgentSpec(name="hermes", adapter="hermes"),
         request,
