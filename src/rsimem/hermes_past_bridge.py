@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Callable, Mapping
@@ -38,6 +40,11 @@ from .memory.future_trace import (
     SemanticFeedbackResolver,
     SemanticFutureEvidence,
     SemanticFutureTraceRecorder,
+)
+from .memory.extraction_feedback import (
+    DeploymentObservation,
+    ObservableToolEvent,
+    detect_current_input_semantic_keys,
 )
 from .memory.operation_graph import OperationContext
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
@@ -293,6 +300,8 @@ class HermesPastBenchBridge:
         self._episode_id = episode_id
         self._session_id = session_id
         self._task_id = task_id
+        self._family_id = family_id
+        self._stage = stage
         self._snapshot_collector = HermesStateSnapshotCollector()
         self.ledger = MemoryLedgerObserver(
             run_id=run_id,
@@ -544,7 +553,8 @@ class HermesPastBenchBridge:
         ):
             return
         for future, step_id in self._semantic_futures:
-            resolution = self.semantic_feedback_resolver.resolve(future, result)
+            observation = self._semantic_deployment_observation(result)
+            resolution = self.semantic_feedback_resolver.resolve(future, observation)
             self.semantic_future_recorder.record_use_and_outcome(
                 future,
                 used_artifact_ids=resolution.used_artifact_ids,
@@ -553,6 +563,141 @@ class HermesPastBenchBridge:
                 step_id=step_id,
             )
         self._semantic_outcomes_recorded = True
+
+    def _semantic_deployment_observation(
+        self,
+        result: Mapping[str, Any],
+    ) -> DeploymentObservation:
+        resolver = self.semantic_feedback_resolver
+        if resolver is None or self._family_id is None or self._stage is None:
+            raise ValueError("semantic feedback resolver identity is unavailable")
+        contract = resolver.registry.resolver(self._family_id).contract
+        raw_messages = result.get("messages")
+        messages = (
+            tuple(value for value in raw_messages if isinstance(value, Mapping))
+            if isinstance(raw_messages, (list, tuple))
+            else ()
+        )
+        user_inputs = tuple(
+            str(message.get("content") or "")
+            for message in messages
+            if message.get("role") == "user"
+        )
+        current_input = user_inputs[-1] if user_inputs else ""
+        current_keys = detect_current_input_semantic_keys(
+            self._family_id,
+            current_input,
+        )
+        task_keys = (
+            contract.opportunity.memory_scope_keys
+            if self._stage in contract.opportunity.eligible_stages
+            else ()
+        )
+        observation_complete = not (
+            result.get("partial") is True or result.get("interrupted") is True
+        )
+        identity = json.dumps({
+            "family_id": self._family_id,
+            "stage": self._stage,
+            "task_id": self._task_id,
+            "current_input_digest": hashlib.sha256(
+                current_input.encode("utf-8")
+            ).hexdigest(),
+        }, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        return DeploymentObservation(
+            observation_id=(
+                "observation."
+                + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:40]
+            ),
+            family_id=self._family_id,
+            stage=self._stage,
+            task_id=self._task_id,
+            current_input_projection_digest=hashlib.sha256(
+                current_input.encode("utf-8")
+            ).hexdigest(),
+            current_input_semantic_keys=current_keys,
+            task_semantic_keys=task_keys,
+            final_response=str(result.get("final_response") or ""),
+            tool_events=self._observable_tool_events(messages),
+            completed=result.get("completed") is True,
+            observation_complete=observation_complete,
+            censor_reason=(None if observation_complete else "execution_incomplete"),
+        )
+
+    @staticmethod
+    def _observable_tool_events(
+        messages: tuple[Mapping[str, Any], ...],
+    ) -> tuple[ObservableToolEvent, ...]:
+        calls: dict[str, tuple[str, Mapping[str, Any]]] = {}
+        events = []
+        for message in messages:
+            if message.get("role") == "assistant":
+                raw_calls = message.get("tool_calls")
+                if not isinstance(raw_calls, (list, tuple)):
+                    continue
+                for ordinal, call in enumerate(raw_calls, start=1):
+                    if not isinstance(call, Mapping):
+                        continue
+                    function = call.get("function")
+                    if not isinstance(function, Mapping):
+                        continue
+                    name = str(function.get("name") or "")
+                    if name != "notes_share":
+                        continue
+                    call_id = str(call.get("id") or f"notes-share-{ordinal}")
+                    arguments = function.get("arguments")
+                    if isinstance(arguments, str):
+                        try:
+                            arguments = json.loads(arguments)
+                        except json.JSONDecodeError:
+                            arguments = {}
+                    calls[call_id] = (
+                        name,
+                        arguments if isinstance(arguments, Mapping) else {},
+                    )
+                continue
+            if message.get("role") != "tool":
+                continue
+            call_id = str(message.get("tool_call_id") or "")
+            call = calls.get(call_id)
+            if call is None:
+                continue
+            name, arguments = call
+            content = message.get("content")
+            if isinstance(content, str):
+                try:
+                    content = json.loads(content)
+                except json.JSONDecodeError:
+                    content = {}
+            success = isinstance(content, Mapping) and content.get("success") is True
+
+            def normalized(value: object) -> str:
+                text = re.sub(r"[^a-z0-9]+", "_", str(value).casefold()).strip("_")
+                return text or "unknown"
+
+            recipients = arguments.get("recipients")
+            recipient_ids = tuple(dict.fromkeys(
+                normalized(value)
+                for value in recipients
+            )) if isinstance(recipients, (list, tuple)) else ()
+            note_id = arguments.get("note_id")
+            subject_ids = (normalized(note_id),) if note_id is not None else ()
+            event_identity = json.dumps({
+                "call_id": call_id,
+                "tool_name": name,
+                "subject_ids": subject_ids,
+                "recipient_ids": recipient_ids,
+                "success": success,
+            }, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+            events.append(ObservableToolEvent(
+                "tool-event."
+                + hashlib.sha256(event_identity.encode("utf-8")).hexdigest()[:40],
+                name,
+                success,
+                subject_ids,
+                recipient_ids,
+            ))
+        return tuple(events)
 
     def _process_lifecycle_boundary(
         self,

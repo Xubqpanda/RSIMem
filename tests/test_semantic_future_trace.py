@@ -11,6 +11,10 @@ from rsimem.memory.future_trace import (
     SemanticFutureEvidence,
     SemanticFutureTraceRecorder,
 )
+from rsimem.memory.extraction_feedback import (
+    DeploymentObservation,
+    ObservableToolEvent,
+)
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     AtomicOperationRecorder,
@@ -56,6 +60,35 @@ def _environment(tmp_path, *, memory: str | None):
     return registry, log, SemanticFutureTraceRecorder(recorder, context)
 
 
+def _observation(
+    *,
+    family_id: str = "SM01_preference_adoption",
+    stage: str = "eval_near",
+    response: str,
+    completed: bool = True,
+    current_keys: tuple[str, ...] = (),
+    task_keys: tuple[str, ...] = ("preference.summary.tsv",),
+    recipients: tuple[str, ...] = ("owner",),
+) -> DeploymentObservation:
+    return DeploymentObservation(
+        "observation.fixture",
+        family_id,
+        stage,
+        "task.fixture",
+        "a" * 64,
+        current_keys,
+        task_keys,
+        response,
+        (ObservableToolEvent(
+            "tool.share",
+            "notes_share",
+            True,
+            recipient_ids=recipients,
+        ),),
+        completed,
+    )
+
+
 def test_future_retrieval_miss_is_distinct_from_unexposed_use(tmp_path) -> None:
     registry, log, recorder = _environment(tmp_path, memory=None)
     future = recorder.record_prompt_injection(
@@ -95,27 +128,24 @@ def test_sm01_feedback_contract_uses_only_predeclared_deployment_signal() -> Non
         family_id="SM01_preference_adoption",
         stage="eval_near",
     )
-    positive = resolver.resolve(future, {
-        "completed": True,
-        "final_response": (
+    positive = resolver.resolve(future, _observation(
+        response=(
             "owner\tpriority\ttask\tdue_date\n"
             "Iris Chen\tHigh\tFix drift\t2026/04/28"
         ),
-        "task_score": 0.0,
-    })
+    ))
     assert positive.used_artifact_ids == ("memory.one",)
     assert positive.outcome_status == OperationStatus.SUCCESS
     assert positive.outcome_reason_code is None
     assert positive.reuse_signal_observed is True
 
-    negative = resolver.resolve(future, {
-        "completed": True,
-        "final_response": "- Iris Chen: Fix drift",
-        "task_score": 1.0,
-    })
+    negative = resolver.resolve(
+        future,
+        _observation(response="- Iris Chen: Fix drift"),
+    )
     assert negative.used_artifact_ids == ()
-    assert negative.outcome_status == OperationStatus.FAILED
-    assert negative.outcome_reason_code == "reuse_signal_absent"
+    assert negative.outcome_status == OperationStatus.NONE
+    assert negative.outcome_reason_code == "injected_not_used"
     assert negative.reuse_signal_observed is False
 
 
@@ -133,15 +163,18 @@ def test_sm01_feedback_contract_censors_ineligible_or_ambiguous_evidence() -> No
         ("revision.one",),
         "artifact.injection",
     )
-    censored = ineligible.resolve(future, {
-        "completed": True,
-        "final_response": "owner\tpriority\ttask\tdue_date\na\tb\tc\td",
-    })
+    censored = ineligible.resolve(
+        future,
+        _observation(
+            stage="learn_a",
+            response="owner\tpriority\ttask\tdue_date\na\tb\tc\td",
+        ),
+    )
     assert censored.eligible is False
     assert censored.outcome_status == OperationStatus.NONE
     assert censored.outcome_reason_code == "observation_censored"
 
-    ambiguous = SemanticFeedbackResolver(
+    set_level = SemanticFeedbackResolver(
         SemanticFeedbackContract.SM01_TSV_V1,
         family_id="SM01_preference_adoption",
         stage="eval_far",
@@ -152,17 +185,80 @@ def test_sm01_feedback_contract_censors_ineligible_or_ambiguous_evidence() -> No
         ("memory.one", "memory.two"),
         ("revision.one", "revision.two"),
         "artifact.injection",
-    ), {
-        "completed": True,
-        "final_response": "owner\tpriority\ttask\tdue_date\na\tb\tc\td",
-    })
-    assert ambiguous.eligible is False
-    assert ambiguous.outcome_status == OperationStatus.NONE
+    ), _observation(
+        stage="eval_far",
+        response="owner\tpriority\ttask\tdue_date\na\tb\tc\td",
+    ))
+    assert set_level.eligible is True
+    assert set_level.used_artifact_ids == ("memory.one", "memory.two")
+    assert set_level.outcome_status == OperationStatus.SUCCESS
 
-    with pytest.raises(ValueError, match="requires the SM01 family"):
+    with pytest.raises(ValueError, match="requires family SM01_preference_adoption"):
         SemanticFeedbackResolver(
             SemanticFeedbackContract.SM01_TSV_V1,
             family_id="SM02_constraint_retention",
+            stage="eval_near",
+        )
+
+
+@pytest.mark.parametrize(
+    ("contract", "family_id", "response", "task_keys", "recipients"),
+    (
+        (
+            SemanticFeedbackContract.SM02_BOUNDARY_V1,
+            "SM02_constraint_retention",
+            "The note was shared with the permitted recipients.",
+            ("constraint.share.exclude_ava_chen",),
+            ("iris_chen",),
+        ),
+        (
+            SemanticFeedbackContract.SM05_NORMALIZED_TSV_V1,
+            "SM05_weak_trigger_preference_adoption",
+            "owner\tpriority\ttask\tdue_date\nIris\tHigh\tFix drift\t2026/04/28",
+            (
+                "preference.summary.tsv",
+                "preference.priority.normalized",
+                "preference.date.yyyy_mm_dd",
+            ),
+            ("iris_chen",),
+        ),
+    ),
+)
+def test_family_feedback_contracts_resolve_only_their_registered_family(
+    contract: SemanticFeedbackContract,
+    family_id: str,
+    response: str,
+    task_keys: tuple[str, ...],
+    recipients: tuple[str, ...],
+) -> None:
+    future = SemanticFutureEvidence(
+        "op.query",
+        "op.retrieval",
+        "op.injection",
+        tuple(f"memory.{index}" for index, _ in enumerate(task_keys, start=1)),
+        tuple(f"revision.{index}" for index, _ in enumerate(task_keys, start=1)),
+        "artifact.injection",
+    )
+    resolver = SemanticFeedbackResolver(
+        contract,
+        family_id=family_id,
+        stage="eval_near",
+    )
+    resolution = resolver.resolve(future, _observation(
+        family_id=family_id,
+        response=response,
+        task_keys=task_keys,
+        recipients=recipients,
+    ))
+    assert resolution.used_artifact_ids == future.memory_artifact_ids
+    assert resolution.outcome_status == OperationStatus.SUCCESS
+    assert resolution.reuse_signal_observed is True
+
+    wrong_family = "SM01_preference_adoption"
+    with pytest.raises(ValueError, match="requires family"):
+        SemanticFeedbackResolver(
+            contract,
+            family_id=wrong_family,
             stage="eval_near",
         )
 

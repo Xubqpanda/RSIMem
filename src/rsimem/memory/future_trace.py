@@ -6,9 +6,15 @@ import hashlib
 import json
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Mapping
-
 from .contracts import MemoryKind, MemoryQuery
+from .extraction_feedback import (
+    ArtifactSemanticBinding,
+    DeploymentObservation,
+    ExposureMode,
+    FeedbackContractRegistry,
+    FutureMemoryEvidence,
+    default_feedback_contract_registry,
+)
 from .operation_graph import (
     ArtifactKind,
     ArtifactNode,
@@ -29,6 +35,17 @@ SEMANTIC_FUTURE_TRACE_SCHEMA_VERSION = 1
 class SemanticFeedbackContract(StrEnum):
     DISABLED = "disabled"
     SM01_TSV_V1 = "sm01_tsv_v1"
+    SM02_BOUNDARY_V1 = "sm02_boundary_v1"
+    SM05_NORMALIZED_TSV_V1 = "sm05_normalized_tsv_v1"
+
+
+_SEMANTIC_FEEDBACK_FAMILIES = {
+    SemanticFeedbackContract.SM01_TSV_V1: "SM01_preference_adoption",
+    SemanticFeedbackContract.SM02_BOUNDARY_V1: "SM02_constraint_retention",
+    SemanticFeedbackContract.SM05_NORMALIZED_TSV_V1: (
+        "SM05_weak_trigger_preference_adoption"
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,47 +71,31 @@ class SemanticFeedbackResolver:
         *,
         family_id: str,
         stage: str,
+        registry: FeedbackContractRegistry | None = None,
     ) -> None:
         self.contract = SemanticFeedbackContract(contract)
         self.family_id = family_id
         self.stage = stage
-        if self.contract == SemanticFeedbackContract.SM01_TSV_V1 and (
-            family_id != "SM01_preference_adoption"
-        ):
-            raise ValueError("SM01 feedback contract requires the SM01 family")
-
-    @staticmethod
-    def _has_tsv_reuse_signal(value: object) -> bool:
-        if not isinstance(value, str) or not value.strip():
-            return False
-        rows = []
-        for line in value.splitlines():
-            stripped = line.strip().strip("`")
-            if not stripped or "\t" not in stripped:
-                continue
-            fields = tuple(field.strip() for field in stripped.split("\t"))
-            if len(fields) == 4:
-                rows.append(fields)
-        header_index = next((
-            index
-            for index, row in enumerate(rows)
-            if tuple(field.casefold() for field in row)
-            == ("owner", "priority", "task", "due_date")
-        ), None)
-        return header_index is not None and any(
-            all(field for field in row)
-            for row in rows[header_index + 1:]
-        )
+        self.registry = registry or default_feedback_contract_registry()
+        expected_family = _SEMANTIC_FEEDBACK_FAMILIES.get(self.contract)
+        if expected_family is not None and family_id != expected_family:
+            raise ValueError(
+                f"{self.contract.value} feedback contract requires family "
+                f"{expected_family}"
+            )
 
     def resolve(
         self,
         future: "SemanticFutureEvidence",
-        result: Mapping[str, object],
+        observation: DeploymentObservation,
     ) -> SemanticFeedbackResolution:
         if self.contract == SemanticFeedbackContract.DISABLED:
             raise ValueError("disabled semantic feedback contract cannot resolve")
-        eligible = self.stage in {"eval_near", "eval_far"}
-        if not eligible or len(future.memory_artifact_ids) > 1:
+        if observation.family_id != self.family_id or observation.stage != self.stage:
+            raise ValueError("semantic feedback observation identity mismatch")
+        resolver = self.registry.resolver(self.family_id)
+        eligible = self.stage in resolver.contract.opportunity.eligible_stages
+        if not eligible:
             return SemanticFeedbackResolution(
                 (),
                 OperationStatus.NONE,
@@ -102,25 +103,71 @@ class SemanticFeedbackResolver:
                 False,
                 False,
             )
-        reuse = self._has_tsv_reuse_signal(result.get("final_response"))
-        completed = result.get("completed") is True
-        used = (
-            future.memory_artifact_ids
-            if reuse
-            and future.injection_artifact_id is not None
-            and len(future.memory_artifact_ids) == 1
-            else ()
-        )
-        if not completed:
-            status = OperationStatus.FAILED
-            reason = "task_incomplete"
-        elif not reuse:
-            status = OperationStatus.FAILED
-            reason = "reuse_signal_absent"
+        scope = resolver.contract.opportunity.memory_scope_keys
+        if len(scope) == 1:
+            semantic_keys = tuple(scope[0] for _ in future.memory_artifact_ids)
+        elif len(scope) == len(future.memory_artifact_ids):
+            semantic_keys = scope
         else:
+            semantic_keys = ()
+        bindings = tuple(
+            ArtifactSemanticBinding(artifact_id, semantic_key)
+            for artifact_id, semantic_key in zip(
+                future.memory_artifact_ids,
+                semantic_keys,
+            )
+        )
+        future_contract = FutureMemoryEvidence(
+            future_opportunity_id=f"opportunity.{future.query_operation_id}",
+            exposure_mode=(
+                ExposureMode.EAGER_SYSTEM_PROMPT
+                if future.injection_artifact_id is not None
+                else ExposureMode.NOT_EXPOSED
+            ),
+            artifact_bindings=bindings,
+            opportunity_operation_id=future.query_operation_id,
+            injection_operation_id=(
+                future.injection_operation_id
+                if future.injection_artifact_id is not None
+                else None
+            ),
+        )
+        resolution = resolver.resolve(observation, future_contract)
+        if not observation.observation_complete:
+            status = OperationStatus.NONE
+            reason = observation.censor_reason or "observation_censored"
+        elif resolution.current_input_confounded:
+            status = OperationStatus.NONE
+            reason = "current_input_confounded"
+        elif not resolution.opportunity_observed:
+            status = OperationStatus.NONE
+            reason = "opportunity_not_observed"
+        elif not resolution.explicit_use:
+            status = OperationStatus.NONE
+            reason = (
+                "injected_not_used"
+                if future.injection_artifact_id is not None
+                else "not_exposed"
+            )
+        elif not resolution.used_artifact_ids:
+            status = OperationStatus.NONE
+            reason = "use_not_bound_to_memory"
+        elif resolution.successful_outcome is True:
             status = OperationStatus.SUCCESS
             reason = None
-        return SemanticFeedbackResolution(used, status, reason, reuse, True)
+        elif resolution.harmful_outcome:
+            status = OperationStatus.FAILED
+            reason = "memory_use_harmfully_attributed"
+        else:
+            status = OperationStatus.NONE
+            reason = "outcome_not_attributable"
+        return SemanticFeedbackResolution(
+            resolution.used_artifact_ids,
+            status,
+            reason,
+            resolution.explicit_use,
+            resolution.opportunity_observed and not resolution.current_input_confounded,
+        )
 
 
 def _canonical_json(value: object) -> str:
