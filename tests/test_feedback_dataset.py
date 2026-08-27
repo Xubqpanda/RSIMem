@@ -20,6 +20,7 @@ from rsimem.memory.feedback_dataset import (
     PropensitySource,
     audit_feedback_dataset,
     build_feedback_dataset_report,
+    evaluate_feedback_dataset_stage_gate,
     validate_feedback_estimator,
 )
 from rsimem.memory.ingestion import InternalMemoryAction
@@ -938,6 +939,52 @@ def test_dataset_payload_is_content_free_and_has_no_hidden_score_surface() -> No
         assert forbidden not in serialized
     assert dataset.examples[0].resources.model_requests == 2
     assert dataset.examples[0].resources.storage_bytes == 64
+
+
+def test_stage_gate_rebuilds_audits_and_binds_frozen_config() -> None:
+    graph = _graph("used")
+    dataset = _dataset(graph)
+    gate = evaluate_feedback_dataset_stage_gate(
+        dataset,
+        graph,
+        expected_config=dataset.config,
+    )
+
+    assert gate.ok is True
+    assert gate.issues == ()
+    assert gate.dataset_id == gate.replay_dataset_id
+    assert gate.expected_config_digest == gate.actual_config_digest
+    assert gate.audit.ok is True
+    assert gate.report.observation_count == 1
+
+    wrong_config = replace(dataset.config, feature_schema="different-features-v1")
+    frozen = evaluate_feedback_dataset_stage_gate(
+        dataset,
+        graph,
+        expected_config=wrong_config,
+    )
+    assert frozen.ok is False
+    assert {
+        "canonical_rebuild_mismatch",
+        "frozen_config_mismatch",
+    } <= set(frozen.issues)
+
+    tampered_example = replace(
+        dataset.examples[0],
+        label=FeedbackLabel.NEGATIVE,
+    )
+    tampered = evaluate_feedback_dataset_stage_gate(
+        replace(dataset, examples=(tampered_example,)),
+        graph,
+        expected_config=dataset.config,
+    )
+    assert tampered.ok is False
+    assert {
+        "canonical_rebuild_mismatch",
+        "dataset_identity_mismatch",
+        "example_identity_mismatch",
+        "label_evidence_mismatch",
+    } <= set(tampered.issues)
 
 
 def test_immediate_failure_attribution_cannot_determine_delayed_label() -> None:
