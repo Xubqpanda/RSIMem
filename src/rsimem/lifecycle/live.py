@@ -249,6 +249,33 @@ class HermesLifecycleDryRunRuntime:
             observers=(self.observer,),
         )
 
+    def record_boundary_rejection(
+        self,
+        trigger: EvaluationTrigger,
+        error: BaseException,
+    ) -> None:
+        trigger = EvaluationTrigger(trigger)
+        boundary_id = _stable_hash(
+            "boundary",
+            {
+                "run_id": self.run_id,
+                "episode_id": self.episode_id,
+                "session_id": self.session_id,
+                "task_id": self.task_id,
+                "trigger": trigger.value,
+                "policy_version": self.config.policy_version,
+            },
+        )
+        self.observer.record_boundary_rejection(
+            run_id=self.run_id,
+            episode_id=self.episode_id,
+            session_id=self.session_id,
+            task_id=self.task_id,
+            boundary_id=boundary_id,
+            trigger=trigger.value,
+            reason_code=f"host_{type(error).__name__.lower()}",
+        )
+
     def process(
         self,
         rows: Sequence[Mapping[str, object]],

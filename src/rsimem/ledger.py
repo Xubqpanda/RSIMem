@@ -279,7 +279,7 @@ class LifecycleLedgerObserver:
         episode_id: str,
         session_id: str,
         task_id: str,
-        snapshot_id: str,
+        snapshot_id: str | None,
         data: dict[str, Any],
     ) -> None:
         with self._lock:
@@ -382,6 +382,35 @@ class LifecycleLedgerObserver:
                 "policyVersion": policy_version,
                 "status": status,
                 "reasonCodes": list(reason_codes),
+            },
+        )
+
+    def record_boundary_rejection(
+        self,
+        *,
+        run_id: str,
+        episode_id: str,
+        session_id: str,
+        task_id: str,
+        boundary_id: str,
+        trigger: str,
+        reason_code: str,
+    ) -> None:
+        """Record a host failure that occurs before a snapshot can exist."""
+
+        self._append(
+            kind="boundary_rejected",
+            run_id=run_id,
+            episode_id=episode_id,
+            session_id=session_id,
+            task_id=task_id,
+            snapshot_id=None,
+            data={
+                "evaluationId": boundary_id,
+                "boundaryId": boundary_id,
+                "trigger": trigger,
+                "status": "rejected",
+                "reasonCodes": [reason_code],
             },
         )
 
