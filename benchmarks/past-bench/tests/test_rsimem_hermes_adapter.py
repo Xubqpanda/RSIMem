@@ -5,6 +5,8 @@ import sys
 import types
 from pathlib import Path
 
+import pytest
+
 from past_bench.models.content import TextBlock
 from past_bench.models.message import Message
 from past_bench.runtime.adapters.hermes import HermesAdapter
@@ -288,8 +290,9 @@ def test_past_bench_emits_explicit_lifecycle_boundaries(
         .read_text(encoding="utf-8")
         .splitlines()
     ]
-    assert [event["kind"] for event in events].count("context_snapshot") == 2
-    assert [event["kind"] for event in events].count("dry_run_mutation") == 2
+    assert [event["kind"] for event in events].count("context_snapshot") == 1
+    assert [event["kind"] for event in events].count("evaluation_accepted") == 1
+    assert [event["kind"] for event in events].count("dry_run_mutation") == 1
     assert {event["data"].get("status") for event in events} >= {
         "accepted",
         "created",
@@ -302,9 +305,19 @@ def test_past_bench_emits_explicit_lifecycle_boundaries(
     assert (artifacts / "rsimem_lifecycle_receipts.json").exists()
 
 
+@pytest.mark.parametrize(
+    ("configured_toolsets", "expected_toolsets"),
+    [
+        (None, []),
+        ([], []),
+        (["memory", "skills"], ["skills"]),
+    ],
+)
 def test_past_bench_static_writeback_disables_native_writer_and_persists(
     tmp_path: Path,
     monkeypatch,
+    configured_toolsets,
+    expected_toolsets,
 ) -> None:
     from agent import auxiliary_client
     from tools import memory_tool
@@ -318,7 +331,15 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
     class StaticAgent:
         def __init__(self, **kwargs):
             captured["enabled_toolsets"] = kwargs["enabled_toolsets"]
+            captured["disabled_toolsets"] = kwargs["disabled_toolsets"]
             captured["skip_memory"] = kwargs["skip_memory"]
+            self.tools = [
+                {"type": "function", "function": {"name": "memory"}},
+                {"type": "function", "function": {"name": "skills_list"}},
+            ]
+            self.valid_tool_names = {"memory", "skills_list"}
+            self._memory_nudge_interval = 1
+            self._skill_nudge_interval = 1
             self._session_db = kwargs["session_db"]
             self.session_id = "native-static-session"
             self.session_log_file = None
@@ -369,6 +390,12 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
             return None
 
         def run_conversation(self, **kwargs):
+            captured["model_tools"] = tuple(
+                tool["function"]["name"] for tool in self.tools
+            )
+            captured["valid_tool_names"] = set(self.valid_tool_names)
+            captured["memory_nudge_interval"] = self._memory_nudge_interval
+            captured["skill_nudge_interval"] = self._skill_nudge_interval
             assert self._memory_store.format_for_system_prompt("user") is None
             self._session_db.append_message(
                 self.session_id,
@@ -388,6 +415,10 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
             }
 
         def wait_for_background_reviews(self, timeout=0):
+            captured["background_review_requests"] = sum(
+                record["component"] == "memory_controller"
+                for record in self.model_call_usage_records
+            )
             return True
 
     def call_llm(**kwargs):
@@ -438,10 +469,7 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
         "timeout_seconds": 10.0,
         "max_output_tokens": 512,
     }
-    request.model.extra_body["hermes"]["enabled_toolsets"] = [
-        "memory",
-        "skills",
-    ]
+    request.model.extra_body["hermes"]["enabled_toolsets"] = configured_toolsets
     adapter = HermesAdapter(
         AgentSpec(name="hermes", adapter="hermes"),
         request,
@@ -460,8 +488,14 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
         adapter.close("static fixture complete")
 
     assert response.status == "finished", response.error
-    assert captured["enabled_toolsets"] == ["skills"]
+    assert captured["enabled_toolsets"] == expected_toolsets
+    assert captured["disabled_toolsets"] == ["memory"]
     assert captured["skip_memory"] is False
+    assert captured["model_tools"] == ("skills_list",)
+    assert captured["valid_tool_names"] == {"skills_list"}
+    assert captured["memory_nudge_interval"] == 0
+    assert captured["skill_nudge_interval"] == 0
+    assert captured["background_review_requests"] == 0
     assert captured["static_failures"] == ()
     assert captured["static_results"][0]["writeback"]["logical_exit"] is True
     assert [record.component for record in response.model_calls] == [
