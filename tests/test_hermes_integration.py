@@ -877,6 +877,15 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
     assert len(bridge.static_results) == 1
     assert bridge.static_results[0].writeback.logical_exit is True
     assert bridge.static_failures == ()
+    lifecycle_events = [
+        json.loads(line)
+        for line in (artifacts / "lifecycle.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [event["kind"] for event in lifecycle_events].count(
+        "memory_ingestion"
+    ) == 1
     bridge.close()
 
     assert len(bridge.lifecycle_results) == 2

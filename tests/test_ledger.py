@@ -199,6 +199,49 @@ def test_auto_loads_content_free_episode_runtime_evidence(tmp_path: Path) -> Non
     assert MEMORY not in json.dumps(events)
 
 
+def test_auto_loads_content_free_static_mutation_identities(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    observer = MemoryLedgerObserver(
+        run_id=comparison.parent.name,
+        variant="with_persistence",
+        trace_id="trace-1",
+        episode_id="learn",
+        session_id="session-1",
+        task_id="task-1",
+        family_id="family-1",
+        stage="learn",
+        execution_mode="native+ledger",
+    )
+    observer.record(MemoryEvent(
+        MemoryEventKind.MUTATION_COMMITTED,
+        MemoryKind.SEMANTIC,
+        "hermes-native-semantic",
+        artifact_ids=("artifact.user.1",),
+        attributes={
+            "action": "add",
+            "execution_id": "ingest.1",
+            "operation_id": "operation.1",
+            "snapshot_id": "snapshot_1",
+            "mutation_id": "mutation.1",
+            "receipt_id": "receipt.1",
+        },
+    ))
+    event = json.loads(json.dumps(observer.events[0]))
+    _runtime_evidence_path(comparison).write_text(
+        json.dumps(event) + "\n",
+        encoding="utf-8",
+    )
+    assert load_episode_lifecycle_events(comparison) == (event,)
+
+    event["data"]["attributes"]["operation_id"] = "private operation text"
+    _runtime_evidence_path(comparison).write_text(
+        json.dumps(event) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="operation identity"):
+        load_episode_lifecycle_events(comparison)
+
+
 def test_auto_loads_strict_projection_check_evidence(tmp_path: Path) -> None:
     comparison = _fixture(tmp_path)
     observer = MemoryLedgerObserver(
