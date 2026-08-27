@@ -22,12 +22,15 @@ complete only as legacy retrieval-threshold infrastructure; extraction-prompt
 adaptation is pending. Stage 1 of the extraction-prompt handoff checklist is
 the active milestone. No new adaptive live batch runs before Stage 1 closes.
 
-Extraction-prompt Stage 1A and 1B are complete. Legacy threshold artifacts now
+Extraction-prompt Stage 1A through 1C are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
 semantic compilation runs directly from a trusted completed-task snapshot,
 independent of keep/evict evaluation; session end creates no second attempt,
 and a persistent content-free compilation receipt prevents replayed model
-calls. Canonical extraction source projection is the next milestone.
+calls. A versioned canonical source projection now binds the exact prompt
+messages, stable IDs, tool closures, deterministic truncation, request and
+receipt identity, operation artifact, and prompt input digest. Component-level
+prompt identity and host-neutral prompt adapters are the next milestone.
 
 ## Completed Work
 
@@ -210,7 +213,7 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `350 passed`.
+- [x] Pass all RSIMem tests: `353 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `390 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
