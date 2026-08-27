@@ -549,52 +549,52 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 功能需求：
 
-- □ 定义 prompt ID、version、template digest、input schema、output schema、model profile 和 policy version。
-- □ Mem0 fact extraction、Mem0 internal operation decision 和可选 semantic retrieval scorer 使用统一 prompt contract。
-- □ Prompt template 与 rendered prompt 分离。
-- □ Prompt artifact 可进入 manifest；rendered prompt 不进入 ledger、receipt 或 report。
-- □ 记录 MemBase commit `d2aca6c7abcb1d67b331586cb834495d037fa3a6`、原 prompt 路径、MIT attribution 和本地修改 digest。
-- □ 不原样保留 Mem0 中与 memory construction 无关或不适合 PAST-Bench 的指令，例如要求谎称信息来自公开互联网的回答规则。
+- √ 定义 prompt ID、version、template digest、input schema、output schema、model profile 和 policy version。
+- √ Mem0 fact extraction、Mem0 internal operation decision 和可选 semantic retrieval scorer 使用统一 prompt contract。
+- √ Prompt template 与 rendered prompt 分离。
+- √ Prompt artifact 可进入 manifest；rendered prompt 不进入 ledger、receipt 或 report。
+- √ 记录 MemBase commit `d2aca6c7abcb1d67b331586cb834495d037fa3a6`、原 prompt 路径、MIT attribution 和本地修改 digest。
+- √ 不原样保留 Mem0 中与 memory construction 无关或不适合 PAST-Bench 的指令，例如要求谎称信息来自公开互联网的回答规则。
 
 验收需求：
 
-- □ Digest 与 template 内容确定性绑定。
-- □ 缺失 schema、model profile 或 version 的 artifact 构造失败。
-- □ Rendered prompt 中的 sentinel text 不出现在 observer-facing evidence。
-- □ Fake completion client 可在无 provider 环境下验证 contract。
+- √ Digest 与 template 内容确定性绑定。
+- √ 缺失 schema、model profile 或 version 的 artifact 构造失败。
+- √ Rendered prompt 中的 sentinel text 不出现在 observer-facing evidence。
+- √ Fake completion client 可在无 provider 环境下验证 contract。
 
 ### 2B.2 Ingest Request 与 Result
 
 功能需求：
 
-- □ `MemoryIngestRequest` 包含 source、fixed route、exit evidence、scope、validity、framework version、policy version 和 provenance。
-- □ 外部 request 不携带预先决定的 ADD/UPDATE operation 或 target。
-- □ `MemoryIngestResult` 包含 execution ID、status、ordered internal operations、usage、reason codes 和 content digests。
-- □ Internal UPDATE/DELETE operation 必须返回 candidate target，trusted resolver 再绑定真实 artifact 和 revision。
-- □ Framework 只能返回 host-neutral operation/artifact，不能返回 Hermes/OpenAI/Anthropic native payload。
-- □ 区分 rejected、failed、successful NONE 和 successful mutation。
+- √ `MemoryIngestRequest` 包含 source、fixed route、exit evidence、scope、validity、framework version、policy version 和 provenance。
+- √ 外部 request 不携带预先决定的 ADD/UPDATE operation 或 target。
+- √ `MemoryIngestResult` 包含 execution ID、status、ordered internal operations、usage、reason codes 和 content digests。
+- √ Internal UPDATE/DELETE operation 必须返回 candidate target，trusted resolver 再绑定真实 artifact 和 revision。
+- √ Framework 只能返回 host-neutral operation/artifact，不能返回 Hermes/OpenAI/Anthropic native payload。
+- √ 区分 rejected、failed、successful NONE 和 successful mutation。
 
 验收需求：
 
-- □ Missing provenance、source、route 或 version 被拒绝。
-- □ Stale snapshot、unknown route、ambiguous internal target、duplicate operation 和 invalid resource 被拒绝。
-- □ Canonical identity 不受 key order 影响，但任一 framework-relevant evidence 变化都会改变。
-- □ Timeout、invalid JSON 和 exception 转为结构化 failure，不泄漏 source content。
+- √ Missing provenance、source、route 或 version 被拒绝。
+- √ Stale snapshot、unknown route、ambiguous internal target、duplicate operation 和 invalid resource 被拒绝。
+- √ Canonical identity 不受 key order 影响，但任一 framework-relevant evidence 变化都会改变。
+- √ Timeout、invalid JSON 和 exception 转为结构化 failure，不泄漏 source content。
 
 ### 2B.3 Deterministic Ingestor
 
 功能需求：
 
-- □ 实现仅供 fixture 使用的 deterministic pass-through ingestor。
-- □ 支持 semantic ingestion 内部产生 ADD/UPDATE/DELETE/NONE。
-- □ 不调用模型、不读取 grader、不读取隐藏状态。
-- □ Ingestion planning 完成后 backend 保持不变。
+- √ 实现仅供 fixture 使用的 deterministic pass-through ingestor。
+- √ 支持 semantic ingestion 内部产生 ADD/UPDATE/DELETE/NONE。
+- √ 不调用模型、不读取 grader、不读取隐藏状态。
+- √ Ingestion planning 完成后 backend 保持不变。
 
 验收需求：
 
-- □ 相同 request 重启前后生成相同 execution、mutation 和 digest。
-- □ Malformed candidate、stale target 和 unsupported capability 被拒绝。
-- □ Ingestor success/failure usage 可进入 ledger 和 audit。
+- √ 相同 request 重启前后生成相同 execution、mutation 和 digest。
+- √ Malformed candidate、stale target 和 unsupported capability 被拒绝。
+- √ Ingestor success/failure usage 可进入 ledger 和 audit。
 
 ### 2B.4 Atomic Memory Operation Graph
 
@@ -602,31 +602,39 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 功能需求：
 
-- □ 只为 source observation、fact extraction、related-memory retrieval、internal operation decision、target resolution、validation、mutation、reread verification、future query、retrieval、injection、use 和 downstream outcome 等预定义高价值边界记录 operation；不做 per-token、任意函数调用或完整 Python call graph tracing。
-- □ 提供最小 instrumentation API，例如 `operation_scope`、`record_artifact` 和 `record_mutation`；允许用 decorator/context manager 降低接线成本，但 operation identity、parent edge 和 failure semantics 由显式 contract 决定，不能依赖函数名或调用栈猜测。
-- □ 每次 operation 记录 `operation_id`、parent operation IDs、typed input/output artifact IDs、run/episode/session、policy/prompt/framework version、status、reason code、latency、model usage 和 retry identity。
-- □ Variable/artifact node 只记录 stable ID、kind、schema version、content digest、byte/token size、revision 和 provenance reference；原文只留在 owner-controlled source/backend。
-- □ Mutation edge 记录 target ID、expected revision、before/after digest、internal `ADD/UPDATE/DELETE/NONE` 和 receipt ID，不复制 before/after content。
-- □ 支持一条 source 产生多个 fact、一条 fact 检索多个 related memories、多个 proposal 归并为一个 mutation，以及一个 artifact 多次 retrieval/use。
-- □ Operation graph 从 append-only lifecycle evidence 派生，不建立第二套可修改的事实来源。
-- □ 在线 critical path 只追加定长/有界 event；parent traversal、subgraph materialization、failure grouping 和 policy-target join 在 episode 后离线执行。
-- □ 支持 `minimal`、`sampled` 和 `diagnostic` tracing level；论文主实验默认 `minimal`，`diagnostic` 只用于受控失败分析，不能静默启用。
-- □ Tracing 为 observer-only；graph writer、digest、serialization 或 flush failure 不能改变 ingestion decision、backend mutation 或 model-visible memory。
+- √ 只为 source observation、fact extraction、related-memory retrieval、internal operation decision、target resolution、validation、mutation、reread verification、future query、retrieval、injection、use 和 downstream outcome 等预定义高价值边界记录 operation；不做 per-token、任意函数调用或完整 Python call graph tracing。
+- √ 提供最小 instrumentation API，例如 `operation_scope`、`record_artifact` 和 `record_mutation`；允许用 decorator/context manager 降低接线成本，但 operation identity、parent edge 和 failure semantics 由显式 contract 决定，不能依赖函数名或调用栈猜测。
+- √ 每次 operation 记录 `operation_id`、parent operation IDs、typed input/output artifact IDs、run/episode/session、policy/prompt/framework version、status、reason code、latency、model usage 和 retry identity。
+- √ Variable/artifact node 只记录 stable ID、kind、schema version、content digest、byte/token size、revision 和 provenance reference；原文只留在 owner-controlled source/backend。
+- √ Mutation edge 记录 target ID、expected revision、before/after digest、internal `ADD/UPDATE/DELETE/NONE` 和 receipt ID，不复制 before/after content。
+- √ 支持一条 source 产生多个 fact、一条 fact 检索多个 related memories、多个 proposal 归并为一个 mutation，以及一个 artifact 多次 retrieval/use。
+- √ Operation graph 从 append-only lifecycle evidence 派生，不建立第二套可修改的事实来源。
+- √ 在线 critical path 只追加定长/有界 event；parent traversal、subgraph materialization、failure grouping 和 policy-target join 在 episode 后离线执行。
+- √ 支持 `minimal`、`sampled` 和 `diagnostic` tracing level；论文主实验默认 `minimal`，`diagnostic` 只用于受控失败分析，不能静默启用。
+- √ Tracing 为 observer-only；graph writer、digest、serialization 或 flush failure 不能改变 ingestion decision、backend mutation 或 model-visible memory。
 
 验收需求：
 
-- □ Deterministic Mem0 fixture 可重建 `source -> extraction -> related retrieval -> decision -> mutation -> verification` 子图。
-- □ Future-use fixture 可继续连接 `artifact -> retrieval -> injection -> use/non-use -> outcome`，且 operation/artifact identity 不重不漏。
-- □ Parallel model calls、retry、NONE、rejected proposal、failed mutation 和 restart recovery 不会错误合并为同一 operation。
-- □ Ledger/graph privacy audit 证明不存在 raw source、memory、query、prompt、response、credential 或绝对路径。
-- □ 强制注入 tracing failure 时，memory result 与 tracing-disabled control 等价，并产生独立的 observer failure evidence 或显式 audit gap。
-- □ 分别报告 tracing-disabled、minimal 和 diagnostic 的 event count、serialized bytes、CPU time、wall-time overhead 和 peak memory；超过预先配置预算时降级为 minimal 并标记 attribution gap。
+- √ Deterministic Mem0 fixture 可重建 `source -> extraction -> related retrieval -> decision -> mutation -> verification` 子图。
+- √ Future-use fixture 可继续连接 `artifact -> retrieval -> injection -> use/non-use -> outcome`，且 operation/artifact identity 不重不漏。
+- √ Parallel model calls、retry、NONE、rejected proposal、failed mutation 和 restart recovery 不会错误合并为同一 operation。
+- √ Ledger/graph privacy audit 证明不存在 raw source、memory、query、prompt、response、credential 或绝对路径。
+- √ 强制注入 tracing failure 时，memory result 与 tracing-disabled control 等价，并产生独立的 observer failure evidence 或显式 audit gap。
+- √ 分别报告 tracing-disabled、minimal 和 diagnostic 的 event count、serialized bytes、CPU time、wall-time overhead 和 peak memory；超过预先配置预算时降级为 minimal 并标记 attribution gap。
 
 ### 2B.5 阶段闸门
 
-- □ Prompt、request、result、deterministic ingestion 和 atomic operation graph contract 冻结版本。
-- □ Ingestor 与 executor 已证明解耦。
-- □ 尚未执行真实 backend mutation。
+- √ Prompt、request、result、deterministic ingestion 和 atomic operation graph contract 冻结版本。
+- √ Ingestor 与 executor 已证明解耦。
+- √ 尚未执行真实 backend mutation。
+
+### 2B 验收记录（2026-08-27）
+
+- Contract：`PROMPT_CONTRACT_SCHEMA_VERSION=1`、`INGESTION_CONTRACT_SCHEMA_VERSION=1` 和 `OPERATION_GRAPH_SCHEMA_VERSION=1`；schema mismatch 均 fail closed。`MemoryIngestRequest` 当前是唯一启用的 route-specific `SemanticIngestRequest` 的显式别名。
+- Commits：`d9b2b28`（prompt artifacts 与 MemBase provenance）、`19d6a3a`（request/result、deterministic ingestor 与 usage ledger）、`0ec25b5`（atomic operation evidence graph）、`b185088`（ambiguous target、schema 与 audit gate hardening）、`b4ed32b`（public contract alias 与 tracing report gate）。
+- Focused evidence：`test_mem0_flat_prompt_contracts.py`、`test_semantic_ingestion_contracts.py` 和 `test_atomic_operation_graph.py` 覆盖 prompt privacy、canonical identity、structured failure、四类 internal operation、restart、graph reconstruction、observer failure 与 tracing overhead。
+- Full acceptance：RSIMem `154 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
+- 已知限制：completion client 和 pass-through ingestor 仍为 fixture-only；尚未接真实 extraction/update model、semantic validator、transaction executor 或 live PAST-Bench ingestion。Graph 中的 mutation/verification fixture 是合成 evidence contract，不代表 Hermes backend 已写入。Operation evidence 尚未接入 live runner，overhead 数值只在 deterministic fixture 中验证，不能作为论文性能结果。可选 semantic retrieval scorer 目前只有 versioned prompt contract，没有 retrieval implementation。
 
 ## 14. 第二阶段 2C：Mutation Validation 与 Security Boundary
 
