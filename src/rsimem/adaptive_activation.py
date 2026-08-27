@@ -63,6 +63,12 @@ _SOURCE_RUN_FIELDS = {
     "taskInputDigest",
     "budgetId",
     "evidenceCutoff",
+    "derivedDatasetId",
+    "derivedExampleId",
+    "derivedEpisodeId",
+    "operationGraphDigest",
+    "resourceUsageDigest",
+    "feedbackContract",
 }
 
 
@@ -176,12 +182,18 @@ def load_matched_observation_batch(
             or source["ordinal"] not in {1, 2}
             or not isinstance(source["runId"], str)
             or not source["runId"].strip()
+            or source["feedbackContract"] != "sm01_tsv_v1"
+            or not isinstance(source["derivedDatasetId"], str)
+            or not isinstance(source["derivedExampleId"], str)
+            or not isinstance(source["derivedEpisodeId"], str)
         ):
             raise ValueError("matched observation source run mismatch")
         for digest_field in (
             "auditDigest",
             "manifestDigest",
             "modelProfileDigest",
+            "operationGraphDigest",
+            "resourceUsageDigest",
         ):
             value = source[digest_field]
             if (
@@ -192,6 +204,23 @@ def load_matched_observation_batch(
                 raise ValueError("matched observation source digest is invalid")
         model_digests.add(source["modelProfileDigest"])
         manifest_digests.add(source["manifestDigest"])
+        evidence_identity = {
+            key: source[key]
+            for key in sorted(_SOURCE_RUN_FIELDS - {
+                "observationId",
+                "evidenceId",
+            })
+        }
+        if source["evidenceId"] != (
+            f"matched-evidence.{_digest(evidence_identity)[:40]}"
+        ):
+            raise ValueError("matched observation evidence identity mismatch")
+        observation_identity = observation.payload()
+        observation_identity.pop("observation_id")
+        if observation.observation_id != (
+            f"matched-observation.{_digest(observation_identity)[:40]}"
+        ):
+            raise ValueError("matched observation identity mismatch")
     if len(model_digests) != 1 or len(manifest_digests) != 1:
         raise ValueError("matched observation execution profile differs")
     for source_pair in runs_by_example.values():

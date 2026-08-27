@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -32,18 +33,19 @@ def _observation_batch(
     official_evaluation: bool = False,
     audit_ok: bool = True,
 ) -> Path:
-    observations = _observations(
+    raw_observations = _observations(
         preparation.artifact,
         preparation.split,
         proposal_positive=proposal_positive,
         proposal_cost=proposal_cost,
     )
+    observations = []
     source_runs = []
-    for observation in observations:
+    for observation in raw_observations:
         ordinal = 1 if observation.variant.value == "static" else 2
-        source_runs.append({
-            "observationId": observation.observation_id,
-            "evidenceId": observation.evidence_id,
+        source = {
+            "observationId": "pending",
+            "evidenceId": "pending",
             "variant": observation.variant.value,
             "runId": f"held-out-r01-{observation.variant.value}",
             "replicate": 1,
@@ -56,7 +58,35 @@ def _observation_batch(
             "taskInputDigest": observation.task_input_digest,
             "budgetId": observation.budget_id,
             "evidenceCutoff": observation.evidence_cutoff,
-        })
+            "derivedDatasetId": f"derived-dataset.{ordinal}",
+            "derivedExampleId": f"derived-example.{ordinal}",
+            "derivedEpisodeId": f"derived-episode.{ordinal}",
+            "operationGraphDigest": "5" * 64,
+            "resourceUsageDigest": "6" * 64,
+            "feedbackContract": "sm01_tsv_v1",
+        }
+        evidence_identity = {
+            key: source[key]
+            for key in sorted(set(source) - {"observationId", "evidenceId"})
+        }
+        evidence_id = f"matched-evidence.{_digest(evidence_identity)[:40]}"
+        observation = replace(
+            observation,
+            observation_id="matched-observation.pending",
+            evidence_id=evidence_id,
+        )
+        observation_identity = observation.payload()
+        observation_identity.pop("observation_id")
+        observation = replace(
+            observation,
+            observation_id=(
+                f"matched-observation.{_digest(observation_identity)[:40]}"
+            ),
+        )
+        source["observationId"] = observation.observation_id
+        source["evidenceId"] = evidence_id
+        observations.append(observation)
+        source_runs.append(source)
     identity = {
         "schemaVersion": MATCHED_OBSERVATION_BATCH_SCHEMA_VERSION,
         "sourceAdaptivePreparationId": preparation.manifest[
