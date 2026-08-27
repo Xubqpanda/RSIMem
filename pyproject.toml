@@ -17,6 +17,7 @@ rsimem-prepare-adaptive = "rsimem.adaptive_preparation:main"
 rsimem-activate-adaptive = "rsimem.adaptive_activation:main"
 rsimem-prepare-adaptive-validation = "rsimem.adaptive_validation_runtime:main"
 rsimem-assemble-adaptive-validation = "rsimem.adaptive_validation_evidence:main"
+rsimem-analyze-adaptive = "rsimem.adaptive_analysis:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

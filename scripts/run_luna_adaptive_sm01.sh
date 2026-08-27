@@ -241,4 +241,29 @@ if method == "adaptive-rsimem":
   done
 done
 
+adaptive_complete="$(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
+import sys
+from pathlib import Path
+from rsimem.experiment_manifest import ADAPTIVE_METHOD_VARIANTS, load_manifest
+manifest = load_manifest(Path(sys.argv[1]))
+completed = {
+    (item["replicate"], item["mode"])
+    for item in manifest["attempts"]
+    if item["status"] == "completed"
+}
+expected = {
+    (replicate, method)
+    for replicate in range(1, manifest["replicates"] + 1)
+    for method in ADAPTIVE_METHOD_VARIANTS
+}
+print("true" if completed == expected else "false")
+' "${manifest_path}")"
+if [[ "${adaptive_complete}" == "true" ]]; then
+  PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.adaptive_analysis \
+    "${batch_root}" --required-replicates "${REPLICATES}" \
+    --output "${batch_root}/adaptive_analysis.json" >/dev/null
+else
+  echo "Adaptive batch is partial; five-method analysis deferred."
+fi
+
 echo "Adaptive SM01 batch complete: ${batch_root}"
