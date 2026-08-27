@@ -25,7 +25,11 @@ from past_bench.runner.self_evolve import (
     summarize_single_task_sequence,
 )
 from past_bench.cli import _apply_rsimem_execution_overrides, _save_episode_history_anchor
-from past_bench.runtime.adapters.hermes import HermesAdapter, _build_hermes_prompt
+from past_bench.runtime.adapters.hermes import (
+    HermesAdapter,
+    _RecordedHermesCompletionClient,
+    _build_hermes_prompt,
+)
 from past_bench.runtime.protocol import RuntimeConfigPayload, RuntimeModelConfig, StartSessionRequest
 from past_bench.runtime.registry import AgentSpec
 
@@ -433,6 +437,94 @@ def test_injected_lifecycle_uses_recorded_hermes_model_call(
     assert call["api_key"] == "fixture-key"
     assert captured["recorded"]["component"] == "lifecycle_evaluator"
     assert captured["recorded"]["purpose"] == "rsimem_lifecycle"
+
+
+def test_static_completion_uses_hermes_accounting_and_raw_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from agent import auxiliary_client
+    from rsimem.memory_systems.mem0_flat import POLICY_FACT_EXTRACTION_PROMPT
+
+    captured: dict[str, object] = {}
+
+    class Agent:
+        def __init__(self):
+            self.model_call_usage_records = []
+
+        def _execute_recorded_model_call(self, request, **kwargs):
+            captured["recorded"] = kwargs
+            response = request()
+            self.model_call_usage_records.append({
+                "duration_ms": 12.4,
+                "usage": {
+                    "input_tokens": 90,
+                    "output_tokens": 15,
+                    "cache_read_tokens": 30,
+                    "cache_write_tokens": 2,
+                    "reasoning_tokens": 4,
+                    "retry_count": 1,
+                },
+            })
+            return response
+
+    def call_llm(**kwargs):
+        captured["call"] = kwargs
+        response = SimpleNamespace(choices=[SimpleNamespace(
+            message=SimpleNamespace(content='{"facts": ["fixture fact"]}'),
+        )])
+        return kwargs["request_executor"](
+            lambda: response,
+            attempt=2,
+            purpose=kwargs["task"],
+            provider="custom",
+            model="fixture-model",
+            api_mode="chat_completions",
+        )
+
+    monkeypatch.setattr(auxiliary_client, "call_llm", call_llm)
+    agent = Agent()
+    client = _RecordedHermesCompletionClient(
+        agent,
+        model="fixture-model",
+        base_url="https://fixture.invalid/v1",
+        api_key="fixture-key",
+        timeout_seconds=8.0,
+        max_output_tokens=512,
+    )
+    prompt = POLICY_FACT_EXTRACTION_PROMPT.render({
+        "source_messages": [],
+        "exit_evidence": {},
+    })
+    result = client.complete(prompt)
+
+    assert result.output_text == '{"facts": ["fixture fact"]}'
+    assert result.usage.to_dict() == {
+        "schema_version": 1,
+        "input_tokens": 90,
+        "output_tokens": 15,
+        "cache_read_tokens": 30,
+        "cache_write_tokens": 2,
+        "reasoning_tokens": 4,
+        "model_requests": 1,
+        "retry_count": 1,
+        "duration_ms": 12,
+        "storage_bytes": 0,
+    }
+    assert captured["call"]["task"] == "semantic_fact_extraction"
+    assert captured["call"]["timeout"] == 8.0
+    assert captured["call"]["max_tokens"] == 512
+    assert captured["recorded"]["component"] == "semantic_fact_extraction"
+
+    agent.model_call_usage_records.clear()
+    monkeypatch.setattr(
+        auxiliary_client,
+        "call_llm",
+        lambda **kwargs: SimpleNamespace(choices=[SimpleNamespace(
+            message=SimpleNamespace(content='{"facts": []}'),
+        )]),
+    )
+    with pytest.raises(ValueError, match="bypassed request accounting"):
+        client.complete(prompt)
 
 
 def test_resolve_episode_tool_config_isolates_expected_mechanism():
