@@ -95,6 +95,10 @@ def test_live_runtime_restart_returns_persistent_duplicate(tmp_path) -> None:
 def test_injected_json_cannot_override_host_policy_version(tmp_path) -> None:
     def complete(prompt: str) -> str:
         request = json.loads(prompt)
+        assert request["context_revision"].startswith("rev_")
+        assert request["turn_index"] == 1
+        assert request["protected_segment_ids"] == []
+        assert request["host_policy_version"] == "host-policy-v3"
         return json.dumps({
             "policy_version": "model-controlled",
             "signals": [

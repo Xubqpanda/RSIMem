@@ -286,6 +286,7 @@ class HermesLifecycleDryRunRuntime:
             evaluation_id=evaluation_id,
             trigger=trigger,
             turn_index=sum(1 for row in rows if row.get("role") == "user"),
+            policy_version=self.config.policy_version,
         )
         try:
             evaluation = self._controller.evaluate(request, force=True)
