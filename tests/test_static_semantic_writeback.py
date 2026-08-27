@@ -142,6 +142,52 @@ def test_static_utility_runtime_preserves_boundary_and_invocation_count(
     runtime.close()
 
 
+def test_static_and_utility_modes_share_route_boundary_and_raw_usage(
+    tmp_path,
+) -> None:
+    baseline_lifecycle = _lifecycle(tmp_path / "baseline")
+    utility_lifecycle = _lifecycle(tmp_path / "utility")
+    baseline_client = _client()
+    utility_client = _client()
+    baseline = _runtime(tmp_path / "baseline", baseline_client)
+    utility = StaticSemanticWritebackRuntime(
+        tmp_path / "utility" / "hermes-home",
+        utility_client,
+        operation_evidence_path=tmp_path / "utility" / "episode" / "operations.jsonl",
+        mutation_receipt_path=(
+            tmp_path / "utility" / "hermes-home" / "rsimem-receipts.json"
+        ),
+        utility_gate=FrozenMem0UtilityGate(),
+    )
+
+    baseline_result = baseline.process(baseline_lifecycle)[0]
+    utility_result = utility.process(utility_lifecycle)[0]
+    baseline_ingestion = baseline_result.writeback.ingestion
+    utility_ingestion = utility_result.writeback.ingestion
+    baseline_execution = baseline_result.writeback.executions[0]
+    utility_execution = utility_result.writeback.executions[0]
+
+    assert baseline_lifecycle.snapshot == utility_lifecycle.snapshot
+    assert baseline_result.snapshot_id == utility_result.snapshot_id
+    assert baseline_ingestion.fixed_route == utility_ingestion.fixed_route
+    assert baseline_ingestion.usage == utility_ingestion.usage
+    assert [item.action for item in baseline_ingestion.operations] == [
+        item.action for item in utility_ingestion.operations
+    ]
+    assert len(baseline_client.calls) == len(utility_client.calls) == 2
+    assert baseline_ingestion.policy_version != utility_ingestion.policy_version
+    assert baseline_ingestion.feature_schema_version != (
+        utility_ingestion.feature_schema_version
+    )
+    assert baseline_execution.context_exit == utility_execution.context_exit
+    assert baseline_execution.context_exit.natural_exit is True
+    assert baseline_execution.context_exit.logical_exit is True
+    assert baseline_execution.context_exit.physical_rewrite is False
+    assert baseline_execution.context_exit.saved_tokens is None
+    baseline.close()
+    utility.close()
+
+
 def test_static_runtime_commits_restart_duplicate_and_emits_content_free_evidence(
     tmp_path,
 ) -> None:
