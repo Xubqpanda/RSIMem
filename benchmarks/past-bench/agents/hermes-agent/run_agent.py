@@ -1227,6 +1227,7 @@ class AIAgent:
         provider: str | None = None,
         model: str | None = None,
         api_mode: str | None = None,
+        component: str | None = None,
     ) -> dict[str, Any]:
         self._model_request_sequence += 1
         return {
@@ -1237,6 +1238,7 @@ class AIAgent:
             "provider": provider or self.provider,
             "model": model or self.model,
             "api_mode": api_mode or self.api_mode,
+            "component": component or self.usage_component,
             "started_at": time.monotonic(),
             "recorded": False,
         }
@@ -1296,7 +1298,7 @@ class AIAgent:
         record = {
             "call_id": context["call_id"],
             "sequence": int(context["sequence"]),
-            "component": self.usage_component,
+            "component": context["component"],
             "purpose": context["purpose"],
             "provider": provider,
             "model": model,
@@ -1334,6 +1336,7 @@ class AIAgent:
         provider: str | None = None,
         model: str | None = None,
         api_mode: str | None = None,
+        component: str | None = None,
     ) -> Any:
         context = self._begin_model_call(
             attempt=attempt,
@@ -1341,6 +1344,7 @@ class AIAgent:
             provider=provider,
             model=model,
             api_mode=api_mode,
+            component=component,
         )
         try:
             response = request()
@@ -1362,6 +1366,7 @@ class AIAgent:
         provider: str | None = None,
         model: str | None = None,
         api_mode: str | None = None,
+        component: str | None = None,
     ) -> Any:
         context = self._begin_model_call(
             attempt=attempt,
@@ -1369,6 +1374,7 @@ class AIAgent:
             provider=provider,
             model=model,
             api_mode=api_mode,
+            component=component,
         )
         try:
             response = await request()

@@ -49,6 +49,8 @@ class HermesLifecycleConfig:
     evaluator_mode: HermesLifecycleEvaluatorMode = HermesLifecycleEvaluatorMode.DISABLED
     policy_version: str = "phase1-dry-run-v1"
     compiler_version: str = "uncompiled-v0"
+    timeout_seconds: float = 30.0
+    max_output_tokens: int = 4096
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -58,6 +60,10 @@ class HermesLifecycleConfig:
         )
         if not self.policy_version.strip() or not self.compiler_version.strip():
             raise ValueError("lifecycle policy and compiler versions must not be empty")
+        if self.timeout_seconds <= 0:
+            raise ValueError("lifecycle evaluator timeout must be positive")
+        if self.max_output_tokens < 1:
+            raise ValueError("lifecycle evaluator max_output_tokens must be positive")
 
     @property
     def enabled(self) -> bool:
@@ -66,7 +72,13 @@ class HermesLifecycleConfig:
     @classmethod
     def from_mapping(cls, value: Mapping[str, object] | None) -> "HermesLifecycleConfig":
         value = value or {}
-        allowed = {"evaluator_mode", "policy_version", "compiler_version"}
+        allowed = {
+            "evaluator_mode",
+            "policy_version",
+            "compiler_version",
+            "timeout_seconds",
+            "max_output_tokens",
+        }
         unknown = set(value) - allowed
         if unknown:
             raise ValueError(
@@ -79,6 +91,8 @@ class HermesLifecycleConfig:
             ),
             policy_version=str(value.get("policy_version") or "phase1-dry-run-v1"),
             compiler_version=str(value.get("compiler_version") or "uncompiled-v0"),
+            timeout_seconds=float(value.get("timeout_seconds") or 30.0),
+            max_output_tokens=int(value.get("max_output_tokens") or 4096),
         )
 
 

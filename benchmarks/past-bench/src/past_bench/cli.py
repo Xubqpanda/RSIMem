@@ -2197,6 +2197,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     rsimem_lifecycle_compiler_version=(
                         sequence.hermes.rsimem_lifecycle_compiler_version
                     ),
+                    rsimem_lifecycle_timeout_seconds=(
+                        sequence.hermes.rsimem_lifecycle_timeout_seconds
+                    ),
+                    rsimem_lifecycle_max_output_tokens=(
+                        sequence.hermes.rsimem_lifecycle_max_output_tokens
+                    ),
                 )
 
             print(

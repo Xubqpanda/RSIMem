@@ -309,7 +309,10 @@ class HermesAdapter(RuntimeAdapter):
             HermesExperimentConfig,
         )
         from rsimem.hermes_past_bridge import HermesPastBenchBridge
-        from rsimem.lifecycle import HermesLifecycleConfig
+        from rsimem.lifecycle import (
+            HermesLifecycleConfig,
+            HermesLifecycleEvaluatorMode,
+        )
 
         metadata = self.request.runtime_config.metadata
         experiment_variant = str(metadata.get("experiment_variant") or "").strip()
@@ -317,6 +320,43 @@ class HermesAdapter(RuntimeAdapter):
             raise ValueError(
                 "RSIMem Hermes execution requires experiment_variant metadata"
             )
+        lifecycle_config = HermesLifecycleConfig.from_mapping(
+            rsimem_cfg.get("lifecycle")
+        )
+        lifecycle_complete = None
+        if (
+            lifecycle_config.evaluator_mode
+            == HermesLifecycleEvaluatorMode.INJECTED_JSON
+        ):
+            from agent.auxiliary_client import call_llm
+
+            def lifecycle_complete(prompt: str) -> str:
+                def recorded_request(request, **kwargs):
+                    return agent._execute_recorded_model_call(
+                        request,
+                        component="lifecycle_evaluator",
+                        **kwargs,
+                    )
+
+                response = call_llm(
+                    task="rsimem_lifecycle",
+                    provider="custom",
+                    model=self.request.model.model_id,
+                    base_url=self.request.model.base_url,
+                    api_key=self.request.model.api_key,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.0,
+                    max_tokens=lifecycle_config.max_output_tokens,
+                    timeout=lifecycle_config.timeout_seconds,
+                    request_executor=recorded_request,
+                )
+                choices = getattr(response, "choices", None)
+                message = getattr(choices[0], "message", None) if choices else None
+                content = getattr(message, "content", None)
+                if not isinstance(content, str) or not content.strip():
+                    raise ValueError("lifecycle evaluator returned no JSON text")
+                return content
+
         bridge = HermesPastBenchBridge(
             hermes_home,
             HermesExperimentConfig(
@@ -337,15 +377,14 @@ class HermesAdapter(RuntimeAdapter):
             experiment_variant=experiment_variant,
             family_id=(str(metadata["family_id"]) if metadata.get("family_id") else None),
             stage=(str(metadata["stage"]) if metadata.get("stage") else None),
-            lifecycle_config=HermesLifecycleConfig.from_mapping(
-                rsimem_cfg.get("lifecycle")
-            ),
+            lifecycle_config=lifecycle_config,
             lifecycle_evidence_path=(
                 capture_dir / "rsimem_lifecycle_events.jsonl"
             ),
             lifecycle_receipt_path=(
                 capture_dir / "rsimem_lifecycle_receipts.json"
             ),
+            lifecycle_complete=lifecycle_complete,
         )
         try:
             bridge.attach(agent)

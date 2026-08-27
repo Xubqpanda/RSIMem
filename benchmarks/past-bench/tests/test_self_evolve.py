@@ -121,6 +121,8 @@ def test_build_hermes_extra_body_contains_persistence_overrides(tmp_path: Path):
             "evaluator_mode": "disabled",
             "policy_version": "phase1-dry-run-v1",
             "compiler_version": "uncompiled-v0",
+            "timeout_seconds": 30.0,
+            "max_output_tokens": 4096,
         },
     }
 
@@ -284,6 +286,84 @@ def test_hermes_adapter_keeps_native_default_and_rejects_evidence_escape(
             )
     finally:
         escaped.close("test")
+
+
+def test_injected_lifecycle_uses_recorded_hermes_model_call(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import rsimem.hermes_past_bridge as bridge_module
+    from agent import auxiliary_client
+
+    captured: dict[str, object] = {}
+
+    class Bridge:
+        def __init__(self, home, config, **kwargs):
+            captured["complete"] = kwargs["lifecycle_complete"]
+
+        def attach(self, agent):
+            return None
+
+        def close(self):
+            return None
+
+    class Agent:
+        def _execute_recorded_model_call(self, request, **kwargs):
+            captured["recorded"] = kwargs
+            return request()
+
+    def call_llm(**kwargs):
+        captured["call"] = kwargs
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(
+                message=SimpleNamespace(content='{"signals": []}'),
+            )],
+        )
+        return kwargs["request_executor"](
+            lambda: response,
+            attempt=1,
+            purpose="rsimem_lifecycle",
+            provider="custom",
+            model="fixture-model",
+            api_mode="chat_completions",
+        )
+
+    monkeypatch.setattr(bridge_module, "HermesPastBenchBridge", Bridge)
+    monkeypatch.setattr(auxiliary_client, "call_llm", call_llm)
+    request = _rsimem_adapter_request(tmp_path, {
+        "mode": "native+adapter+ledger",
+        "evidence_path": str(tmp_path / "artifacts" / "events.jsonl"),
+        "lifecycle": {
+            "evaluator_mode": "injected_json",
+            "policy_version": "host-policy-v2",
+            "compiler_version": "uncompiled-v0",
+            "timeout_seconds": 12.5,
+            "max_output_tokens": 2048,
+        },
+    })
+    request.model.api_key = "fixture-key"
+    request.model.base_url = "https://fixture.invalid/v1"
+    adapter = HermesAdapter(AgentSpec(name="hermes", adapter="hermes"), request)
+    try:
+        adapter._activate_rsimem_bridge(
+            Agent(),
+            request.model.extra_body["hermes"],
+            tmp_path / "home",
+        )
+        complete = captured["complete"]
+        assert callable(complete)
+        assert complete("fixture prompt") == '{"signals": []}'
+    finally:
+        adapter.close("test")
+
+    call = captured["call"]
+    assert call["task"] == "rsimem_lifecycle"
+    assert call["timeout"] == 12.5
+    assert call["max_tokens"] == 2048
+    assert call["base_url"] == "https://fixture.invalid/v1"
+    assert call["api_key"] == "fixture-key"
+    assert captured["recorded"]["component"] == "lifecycle_evaluator"
+    assert captured["recorded"]["purpose"] == "rsimem_lifecycle"
 
 
 def test_resolve_episode_tool_config_isolates_expected_mechanism():

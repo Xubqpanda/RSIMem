@@ -43,6 +43,8 @@ def build_hermes_extra_body(
     rsimem_lifecycle_evaluator_mode: str = "disabled",
     rsimem_lifecycle_policy_version: str = "phase1-dry-run-v1",
     rsimem_lifecycle_compiler_version: str = "uncompiled-v0",
+    rsimem_lifecycle_timeout_seconds: float = 30.0,
+    rsimem_lifecycle_max_output_tokens: int = 4096,
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -82,6 +84,8 @@ def build_hermes_extra_body(
                     "evaluator_mode": rsimem_lifecycle_evaluator_mode,
                     "policy_version": rsimem_lifecycle_policy_version,
                     "compiler_version": rsimem_lifecycle_compiler_version,
+                    "timeout_seconds": rsimem_lifecycle_timeout_seconds,
+                    "max_output_tokens": rsimem_lifecycle_max_output_tokens,
                 },
             },
         }
@@ -502,6 +506,12 @@ class HermesPersistenceBackend(PersistenceBackend):
             ),
             rsimem_lifecycle_compiler_version=(
                 sequence.hermes.rsimem_lifecycle_compiler_version
+            ),
+            rsimem_lifecycle_timeout_seconds=(
+                sequence.hermes.rsimem_lifecycle_timeout_seconds
+            ),
+            rsimem_lifecycle_max_output_tokens=(
+                sequence.hermes.rsimem_lifecycle_max_output_tokens
             ),
         )
 
