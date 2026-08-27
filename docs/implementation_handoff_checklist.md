@@ -1007,21 +1007,28 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2J.1 Policy Learner 与 Artifact
 
-- □ 首先实现可解释 learner，例如 Bayesian estimate、regularized linear scorer 或 contextual bandit。
-- □ Learner 只读取冻结 feature/label dataset。
-- □ 记录 training config、seed、feature、objective 和 regularization。
-- □ Low-sample、missing feature 和 distribution shift 使用 conservative fallback。
-- □ Policy learner 只更新 semantic route 内 extraction、operation、consolidation 或 retrieval parameters/prompt，不更新 route selector 或 invocation schedule。
-- □ Prompt/parameter update 使用 attributed failure subgraph 聚合，不把所有 task failure 同时归因给全部历史 operation。
-- □ Policy artifact 包含 version、parent、dataset version、schema、parameters、prompt refs、metrics 和 digest。
-- □ Proposal、validated、active、rejected 和 rolled_back 使用显式状态。
+- √ 首先实现可解释 learner，例如 Bayesian estimate、regularized linear scorer 或 contextual bandit。
+- √ Learner 只读取冻结 feature/label dataset。
+- √ 记录 training config、seed、feature、objective 和 regularization。
+- √ Low-sample、missing feature 和 distribution shift 使用 conservative fallback。
+- √ Policy learner 只更新 semantic route 内 extraction、operation、consolidation 或 retrieval parameters/prompt，不更新 route selector 或 invocation schedule。
+- √ Prompt/parameter update 使用 attributed failure subgraph 聚合，不把所有 task failure 同时归因给全部历史 operation。
+- √ Policy artifact 包含 version、parent、dataset version、schema、parameters、prompt refs、metrics 和 digest。
+- √ Proposal、validated、active、rejected 和 rolled_back 使用显式状态。
 
 验收需求：
 
-- □ 相同 dataset/config/seed 产生相同 artifact。
-- □ Hidden grader evidence 不进入 learner input。
-- □ Tampering、unknown parent、schema mismatch 和 missing provenance 被拒绝。
-- □ Restart 后 active policy 唯一且可验证。
+- √ 相同 dataset/config/seed 产生相同 artifact。
+- √ Hidden grader evidence 不进入 learner input。
+- √ Tampering、unknown parent、schema mismatch 和 missing provenance 被拒绝。
+- √ Restart 后 active policy 唯一且可验证。
+
+2J.1 验收记录：
+
+- Learner：使用 parameter-owner-bound Bayesian negative-rate posterior 与 L2 shrinkage；正向 label 只作用于实际 owner，负向 label 还必须命中对应 semantic component 的 attributed failure subgraph。Low sample、missing component evidence 或 missing-propensity distribution shift 均输出零 delta。
+- Artifact/store：记录 parent、dataset ID/payload digest、冻结 schema、training config/seed/objective/regularization、bounded parameter、prompt ref、content-free metrics/provenance 和 content digest。Lifecycle state 与 immutable artifact 分离，使用文件锁、原子 replace、transition-id 幂等、连续 history audit 和唯一 active pointer。
+- Commits：`91eb9f2`（frozen dataset -> deterministic proposal）和 `580f71a`（crash-safe lifecycle store）。Focused adaptive learner/store/feedback tests `34 passed`；full RSIMem `300 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check` 和 diff check 通过。
+- 已知限制：2J.1 只证明 proposal 与 lifecycle persistence contract。Held-out split、acceptance criterion、validation decision 和真实 activation 尚未实现；在 2J.2 关闭前，不允许把通用 state transition 接入 live adaptive policy。
 
 ### 2J.2 Validation、Activation 与 Rollback
 

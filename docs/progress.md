@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default. Static Mem0-flat semantic writeback is now available only through the explicit live experiment configuration; adaptive policy updates remain disabled. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E, Phase 2A-2E, Phase 2H, and Phase 2I are complete. Phase 2J adaptive memory policy is the active milestone. Live mutation remains opt-in and restricted to the audited static experiment path; adaptive policy updates remain disabled until the 2J validation and activation gates pass.
+Phase 1A-1E, Phase 2A-2E, Phase 2H, Phase 2I, and Phase 2J.1 are complete. Phase 2J.2 validation, activation, and rollback is the active milestone. Live mutation remains opt-in and restricted to the audited static experiment path; adaptive policy updates remain disabled until the 2J validation and activation gates pass.
 
 ## Completed Work
 
@@ -189,20 +189,22 @@ The frozen static utility gate is also complete for SM01. The accepted 3-replica
 
 The delayed-feedback lifecycle join, exposure-bias contracts, and deterministic stage gate are complete. Versioned content-free datasets preserve artifact-specific future evidence, observation cutoffs, four-state labels, attribution provenance, exposure opportunity, candidate/filter disposition, propensity availability, raw resource usage, integrity audit results, aggregate censoring reports, and frozen config identity. Adaptive policy learning remains disabled until the 2J validation and activation gates pass.
 
+The 2J.1 learner now produces deterministic, content-addressed semantic parameter proposals from frozen delayed feedback. Parameter ownership and negative updates are bound to attributed failure subgraphs, while low sample, missing evidence, and propensity-distribution gaps fall back to the parent value. A crash-safe store preserves immutable artifacts, explicit lifecycle states, idempotent transition history, and one verifiable active pointer; no proposal is eligible for live activation until 2J.2 adds held-out validation decisions.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `290 passed`.
+- [x] Pass all RSIMem tests: `300 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `387 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2J Adaptive Memory Policy**
+### **Current: Phase 2J.2 Validation, Activation, And Rollback**
 
 Phase 2H freezes one interpretable future-utility-per-cost objective across semantic generation admission, internal operation admission, and retrieval filtering/ranking without changing route or invocation scheduling. Deterministic matched fixtures and the audited live SM01 batch establish fixed policy identity, content-free evidence, raw-cost accounting, and explicit limitations.
 
-Phase 2I now constructs, independently rebuilds, and audits a versioned delayed-feedback dataset from the atomic operation graph. It keeps official scores and raw content outside learner input, distinguishes utility evidence from exposure eligibility, and binds the accepted dataset to frozen policy, feature, label, and window identities. The immediate objective is 2J: train a deterministic, conservative semantic-policy proposal from this frozen dataset, validate it on held-out deployment evidence, and keep activation fail closed.
+Phase 2I constructs, independently rebuilds, and audits a versioned delayed-feedback dataset from the atomic operation graph. Phase 2J.1 now trains a deterministic, conservative semantic-policy proposal from that frozen dataset and persists its immutable artifact and explicit lifecycle state. The immediate objective is 2J.2: create auditable time/task-group splits, compare proposals with the frozen parent on held-out deployment evidence, and permit atomic activation only through a replayable acceptance decision with operator and automatic rollback.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
