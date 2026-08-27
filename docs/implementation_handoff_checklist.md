@@ -747,37 +747,45 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2E.1 Mem0 Flat Ingestion
 
-- □ 基于 Mem0 `FACT_RETRIEVAL_PROMPT` 重写 PAST-Bench semantic fact/preference extraction prompt。
-- □ 基于 Mem0 `DEFAULT_UPDATE_MEMORY_PROMPT` 实现 related-memory comparison 和内部 `ADD/UPDATE/DELETE/NONE` decision。
-- □ 关闭 graph store，不复制 MemBase runner/evaluation，只实现 flat semantic construction 与 retrieval。
-- □ Add-time related-memory candidate reader 对 Hermes semantic entries 建立受控的 flat search projection；它只服务 internal operation decision，不替换 Hermes future-task eager injection surface。
-- □ 明确 candidate retrieval 的 embedding/model、top-k、threshold、index revision 和 rebuild semantics，并纳入 policy version 与 usage accounting。
-- □ 将 durable fact、preference、rule 和 constraint提取为最小独立 entry，不复制完整轨迹、失败尝试、tool noise 或 unresolved information。
-- □ Internal UPDATE/DELETE suggestion 经 trusted resolver 绑定唯一 target/revision；ambiguous target fail closed。
-- □ Duplicate 使用 NONE，superseded artifact 保留 provenance 和 replacement relation。
+- √ 基于 Mem0 `FACT_RETRIEVAL_PROMPT` 重写 PAST-Bench semantic fact/preference extraction prompt。
+- √ 基于 Mem0 `DEFAULT_UPDATE_MEMORY_PROMPT` 实现 related-memory comparison 和内部 `ADD/UPDATE/DELETE/NONE` decision。
+- √ 关闭 graph store，不复制 MemBase runner/evaluation，只实现 flat semantic construction 与 retrieval。
+- √ Add-time related-memory candidate reader 对 Hermes semantic entries 建立受控的 flat search projection；它只服务 internal operation decision，不替换 Hermes future-task eager injection surface。
+- √ 明确 candidate retrieval 的 embedding/model、top-k、threshold、index revision 和 rebuild semantics，并纳入 policy version 与 usage accounting。
+- √ 将 durable fact、preference、rule 和 constraint提取为最小独立 entry，不复制完整轨迹、失败尝试、tool noise 或 unresolved information。
+- √ Internal UPDATE/DELETE suggestion 经 trusted resolver 绑定唯一 target/revision；ambiguous target fail closed。
+- √ Duplicate 使用 NONE，superseded artifact 保留 provenance 和 replacement relation。
 
 验收需求：
 
-- □ SM01 fixture 通过统一 ingest 请求生成一条最小、可重新注入的 preference。
-- □ Temporary、contradictory、unknown-owner 和 unresolved candidate 被拒绝或 defer。
-- □ 重复 experience 不新增 duplicate entry。
-- □ 新信息、冲突信息、重复信息和应删除信息分别覆盖内部 ADD、UPDATE、NONE 和 DELETE。
-- □ Prompt malformed、timeout 和 hallucinated target fail closed。
+- √ SM01 fixture 通过统一 ingest 请求生成一条最小、可重新注入的 preference。
+- √ Temporary、contradictory、unknown-owner 和 unresolved candidate 被拒绝或 defer。
+- √ 重复 experience 不新增 duplicate entry。
+- √ 新信息、冲突信息、重复信息和应删除信息分别覆盖内部 ADD、UPDATE、NONE 和 DELETE。
+- √ Prompt malformed、timeout 和 hallucinated target fail closed。
 
 ### 2E.2 SM01 End-To-End
 
-- □ Learn episode 在固定 semantic route/boundary 产生 snapshot 和 ingest request，不额外判断 memory form。
-- □ Mem0-style ingestor、validation 和 executor 写入 isolated `MEMORY.md` 或 `USER.md`。
-- □ 新进程/fresh session 通过 Hermes native prompt builder 注入 memory。
-- □ 连接 source、ingestion、internal operation、mutation、artifact、retrieval、injection 和 downstream task。
+- √ Learn episode 在固定 semantic route/boundary 产生 snapshot 和 ingest request，不额外判断 memory form。
+- √ Mem0-style ingestor、validation 和 executor 写入 isolated `MEMORY.md` 或 `USER.md`。
+- √ 新进程/fresh session 通过 Hermes native prompt builder 注入 memory。
+- √ 连接 source、ingestion、internal operation、mutation、artifact、retrieval、injection 和 downstream task。
 
 验收需求：
 
-- □ Restart 后 artifact 存在且 digest/revision 可验证。
-- □ Model-visible prompt 不由测试直接注入答案。
-- □ Disabled mode 恢复 direct native behavior。
-- □ Ledger 可重建链路但不包含 preference 原文。
-- □ Failure 不导致 source evidence 丢失。
+- √ Restart 后 artifact 存在且 digest/revision 可验证。
+- √ Model-visible prompt 不由测试直接注入答案。
+- √ Disabled mode 恢复 direct native behavior。
+- √ Ledger 可重建链路但不包含 preference 原文。
+- √ Failure 不导致 source evidence 丢失。
+
+2E.1/2E.2 闸门记录：
+
+- Contract：Mem0-flat 使用两个冻结 v2 prompt artifact、受控 token-hash cosine flat retrieval 和 committed-receipt ownership binding。SM01 loop 只连接既有 ingestion、validation 与 default-disabled isolated executor，不开放新的外部 mutation contract，也不执行 physical context rewrite。
+- Commits：`c77224f`（Mem0-flat semantic policy）与 `2fb3967`（SM01 learn -> writeback -> restart -> native Hermes prompt injection、稳定 artifact ledger join 和 failure controls）。
+- Focused evidence：`test_mem0_flat_policy.py` 覆盖 ADD/UPDATE/DELETE/NONE、duplicate、unknown-owner、temporary/unresolved、malformed/timeout/hallucinated target；`test_sm01_semantic_loop.py` 覆盖 committed ADD、receipt audit、restart digest/revision、真实 Hermes prompt builder、deterministic downstream use、disabled mode、malformed ingestion、stale source 和 content-free ledger join。
+- Full acceptance：RSIMem `228 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
+- 已知限制：本闸门使用 deterministic completion fixture 和 isolated native files，尚未把真实 Mem0 policy 的 extraction/retrieval/decision/target-resolution 全部接入 atomic operation recorder，也未运行 static writeback matched model experiment。后续由 2E.3 和 2E.4 分别完成，不据此宣称 adaptive self-improvement。
 
 ### 2E.3 Operation-Level Attribution
 

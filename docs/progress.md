@@ -14,9 +14,9 @@ This document tracks implementation progress, the current experimental boundary,
 
 RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for every exposed model request, derive a privacy-safe lifecycle ledger, audit run completeness, and represent Hermes semantic, episodic, and procedural memory through typed backend contracts.
 
-The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem ingestor, real writeback mutation, static policy, or adaptive policy is active yet. The active implementation scope is now semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
+The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and RSIMem ingestion/writeback is enabled only in isolated deterministic fixtures; no static or adaptive policy is active in the live PAST-Bench/Hermes path. The active implementation scope is semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E and Phase 2A-2D are complete. Phase 2E Mem0-style semantic construction and the first SM01 restart/retrieval/injection loop are the active milestone. Real mutation remains disabled outside isolated fixtures.
+Phase 1A-1E, Phase 2A-2D, and Phase 2E.1-2E.2 are complete. Phase 2E.3 operation-level attribution is the active milestone. Real mutation remains disabled outside isolated fixtures.
 
 ## Completed Work
 
@@ -184,9 +184,9 @@ operator/recovery handling rather than being guessed.
 
 ## Next Milestone
 
-### **Current: Phase 2E Mem0-Style Semantic Memory And SM01 Loop**
+### **Current: Phase 2E Operation-Level Attribution**
 
-Phase 2D now provides a default-disabled isolated transaction/recovery path and proves verified semantic mutation without weakening native read behavior. The immediate objective is Phase 2E: implement the actual Mem0-flat extraction and related-memory operation decision, drive the existing validation/executor through the SM01 learn episode, restart into a fresh Hermes session, and connect retrieval/injection/downstream-use evidence.
+Phase 2E.1-2E.2 now provide Mem0-flat extraction and related-memory operation decisions plus a deterministic SM01 learn -> writeback -> restart -> native Hermes injection -> downstream-use fixture. The immediate objective is Phase 2E.3: connect extraction, related retrieval, internal decision, target resolution, validation, mutation, verification, future retrieval, injection, use/non-use, and outcome into the content-free atomic operation graph before running static matched comparisons.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -229,7 +229,7 @@ Acceptance criteria:
 - [x] Freeze Hermes routing and the semantic invocation boundary across all active policy variants.
 - [x] Implement a deterministic pass-through ingestor for fixtures and contract validation.
 - [x] Define provenance so every ingestion links back to its source episode, fixed route, internal operation, and later retrieval.
-- [ ] Locally reimplement Mem0 flat fact extraction, related-memory comparison, and internal ADD/UPDATE/DELETE/NONE policy from the pinned MemBase source.
+- [x] Locally reimplement Mem0 flat fact extraction, related-memory comparison, and internal ADD/UPDATE/DELETE/NONE policy from the pinned MemBase source.
 - [x] Keep MemBase datasets, runners, evaluation code, graph store, and runtime imports outside RSIMem.
 - [x] Add a bounded MemTrace-inspired, content-free atomic operation graph without importing MemTrace/smartcomment runtime or tracing arbitrary calls.
 - [ ] Attribute failures to extraction, internal decision, mutation, or retrieval subgraphs before updating policy.
@@ -276,11 +276,11 @@ Acceptance criteria:
 
 ## Immediate Execution Order
 
-1. Implement Mem0-flat fact extraction and internal ADD/UPDATE/DELETE/NONE decision using the frozen prompt/completion contracts.
-2. Define bounded related-memory retrieval parameters and bind candidate targets through the committed ownership resolver.
-3. Complete the SM01 learn -> ingest -> validate -> mutate -> restart -> native injection -> downstream-use fixture.
-4. Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
-5. Run static SM01 matched comparisons only after the deterministic end-to-end and audit gates pass.
+1. [x] Implement Mem0-flat fact extraction and internal ADD/UPDATE/DELETE/NONE decision using the frozen prompt/completion contracts.
+2. [x] Define bounded related-memory retrieval parameters and bind candidate targets through the committed ownership resolver.
+3. [x] Complete the SM01 learn -> ingest -> validate -> mutate -> restart -> native injection -> downstream-use fixture.
+4. [ ] Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
+5. [ ] Run static SM01 matched comparisons only after the deterministic end-to-end and audit gates pass.
 
 ## Update Policy
 
