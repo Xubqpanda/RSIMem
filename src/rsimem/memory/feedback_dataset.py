@@ -44,6 +44,15 @@ _FORBIDDEN_KEYS = {
     "response",
     "score",
 }
+_DELAYED_LABEL_OPERATION_KINDS = {
+    OperationKind.RETRIEVAL,
+    OperationKind.INJECTION,
+    OperationKind.USE,
+    OperationKind.TOOL_BEHAVIOR,
+    OperationKind.DOWNSTREAM_OUTCOME,
+    OperationKind.SUPERSESSION,
+    OperationKind.RECOVERY,
+}
 
 
 def _canonical(value: object) -> str:
@@ -68,6 +77,24 @@ def _require_ids(values: tuple[str, ...], name: str) -> None:
         not _IDENTIFIER.fullmatch(value) for value in values
     ):
         raise ValueError(f"{name} must be unique stable identifiers")
+
+
+def _is_delayed_deterministic_failure(
+    *,
+    method: AttributionMethod,
+    category: FailureCategory,
+    candidate_operation_ids: Sequence[str],
+    operations: Mapping[str, OperationRecord],
+) -> bool:
+    return (
+        category != FailureCategory.UNRESOLVED_TASK_FAILURE
+        and method not in {AttributionMethod.MODEL, AttributionMethod.UNRESOLVED}
+        and any(
+            operations[operation_id].kind in _DELAYED_LABEL_OPERATION_KINDS
+            for operation_id in candidate_operation_ids
+            if operation_id in operations
+        )
+    )
 
 
 class FeedbackLabel(StrEnum):
@@ -598,9 +625,12 @@ class DelayedFeedbackDatasetBuilder:
                     failure_subgraph.extend(record.candidate_operation_ids)
                     policy_parameters.extend(record.policy_parameter_ids)
                     deterministic_failure = deterministic_failure or (
-                        record.category != FailureCategory.UNRESOLVED_TASK_FAILURE
-                        and record.method
-                        not in {AttributionMethod.MODEL, AttributionMethod.UNRESOLVED}
+                        _is_delayed_deterministic_failure(
+                            method=record.method,
+                            category=record.category,
+                            candidate_operation_ids=record.candidate_operation_ids,
+                            operations=by_id,
+                        )
                     )
 
             def matching(kind: OperationKind) -> tuple[OperationRecord, ...]:
@@ -1021,8 +1051,12 @@ def audit_feedback_dataset(
             for item in outcomes
         )
         deterministic_failure = any(
-            category != FailureCategory.UNRESOLVED_TASK_FAILURE
-            and method not in {AttributionMethod.MODEL, AttributionMethod.UNRESOLVED}
+            _is_delayed_deterministic_failure(
+                method=method,
+                category=category,
+                candidate_operation_ids=example.attributed_operation_ids,
+                operations=operations,
+            )
             for method, category in zip(
                 example.attribution_methods,
                 example.failure_categories,
