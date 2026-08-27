@@ -15,6 +15,7 @@ from rsimem.memory.receipts import (
     MutationReceipt,
     MutationReceiptPhase,
     MutationReceiptStatus,
+    SemanticMutationWriter,
 )
 from rsimem.memory.validation import ValidationProvenance
 
@@ -93,6 +94,7 @@ def _commit(store: JsonMutationReceiptStore, receipt: MutationReceipt) -> Mutati
             applied_artifact_id="artifact.applied",
             applied_revision="1abc2345",
             applied_content_digest=applying.after_content_digest,
+            writer_identity=SemanticMutationWriter.RSIMEM_EXECUTOR,
             storage_bytes=11,
             store_revision=2,
         ),
@@ -123,7 +125,7 @@ def _commit(store: JsonMutationReceiptStore, receipt: MutationReceipt) -> Mutati
 
 
 def test_receipt_state_machine_and_durable_ownership_resolution(tmp_path) -> None:
-    assert MUTATION_RECEIPT_SCHEMA_VERSION == 1
+    assert MUTATION_RECEIPT_SCHEMA_VERSION == 2
     path = tmp_path / "receipts.json"
     store = JsonMutationReceiptStore(path)
     pending = _receipt()
@@ -204,6 +206,7 @@ def test_transition_is_cas_and_immutable_identity_is_enforced(tmp_path) -> None:
                 applied_artifact_id="artifact.applied",
                 applied_revision="revision-2",
                 applied_content_digest=stored.after_content_digest,
+                writer_identity=SemanticMutationWriter.RSIMEM_EXECUTOR,
                 store_revision=2,
             ),
             expected_store_revision=1,
@@ -215,7 +218,7 @@ def test_transition_is_cas_and_immutable_identity_is_enforced(tmp_path) -> None:
     (
         "not json",
         "[]",
-        '{"schema_version": 1, "receipts": []}',
+        '{"schema_version": 2, "receipts": []}',
         '{"schema_version": 99, "receipts": {}}',
         '{"schema_version": 1, "receipts": {"key": 7}}',
     ),
@@ -239,7 +242,7 @@ def test_receipt_payload_corruption_and_schema_mismatch_fail_closed(tmp_path) ->
         store.get(receipt.idempotency_key)
 
     with pytest.raises(ValueError, match="unsupported mutation receipt schema"):
-        replace(receipt, schema_version=2)
+        replace(receipt, schema_version=3)
     with pytest.raises(ValueError, match="counters"):
         replace(receipt, attempt=True)
 
