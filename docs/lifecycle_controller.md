@@ -6,7 +6,7 @@ Phase 1 freezes the host-neutral lifecycle contracts at `LIFECYCLE_CONTRACT_SCHE
 
 The lifecycle controller is the decision layer between an agent's active context and the typed memory runtime. It evaluates context candidates at explicit lifecycle boundaries and produces one joint signal for context retention and future memory writeback.
 
-The first implementation is intentionally a control-plane scaffold. It does not mutate Hermes, invoke a memory compiler, or change PAST-Bench behavior. A later writeback coordinator will consume the validated signals and account for compilation, storage, retrieval, and injection costs.
+The lifecycle controller remains a control-plane component and does not itself mutate Hermes or change default PAST-Bench behavior. Downstream isolated fixtures now consume its validated signals through Mem0-flat ingestion, validation, transactional semantic mutation, restart injection, and content-free operation attribution; live activation remains opt-in and gated.
 
 ## Boundaries
 
@@ -76,8 +76,9 @@ The package is available under `rsimem.lifecycle`:
 - `writeback.py`: revisioned plans, backend-bound update resolution, compiler-input-aware idempotency, atomic dry-run receipt reservation, and dry-run coordination.
 
 Atomic reservation prevents two dry-run coordinators from accepting the same
-plan concurrently. It does not yet provide exactly-once real memory mutation;
-that path needs pending/committed receipt states and crash recovery around the
-backend operation.
+plan concurrently. A separate default-disabled isolated executor now provides
+pending/committed receipts, target locking, reread verification, and conservative
+crash recovery for semantic mutation. This is a single-host fixture contract,
+not a distributed exactly-once claim or live PAST-Bench activation.
 
-The real Hermes prompt builder, `session_search`, `skills_list`, and `skill_view` surfaces now pass deterministic native/adapter equivalence checks with observer-only instrumentation, restart-stable identities, and explicit failure policy. An opt-in PAST-Bench bridge also passes a deterministic adapter-loop fixture and automatically joins content-free episode evidence into the ledger. The next implementation step is a matched live-model SM01 run. The current result does not establish live-model PAST-Bench execution equivalence.
+The real Hermes prompt builder, `session_search`, `skills_list`, and `skill_view` surfaces pass deterministic native/adapter equivalence checks with observer-only instrumentation, restart-stable identities, and explicit failure policy. The isolated SM01 writeback fixture now additionally connects semantic extraction through future use/outcome and deterministic-first attribution. The next implementation step is the pre-registered static SM01 matched comparison; current evidence still does not establish live-model writeback quality or broad PAST-Bench equivalence.

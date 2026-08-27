@@ -108,15 +108,17 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 
 ### Stage 5: Validated Semantic Memory Writeback
 
-- [ ] Invoke the semantic ingestor only at the frozen Hermes semantic boundary.
-- [ ] Keep all Hermes routing fixed and do not predict memory form; episodic/procedural policy implementation remains disabled.
-- [ ] Expose ingest/add externally and treat framework-internal ADD/UPDATE/DELETE/NONE as observable outcomes.
-- [ ] Validate every internal operation before backend mutation.
-- [ ] Persist memory before evicting the source context.
-- [ ] Add revision checks, idempotency, failure bypass, and rollback tests.
-- [ ] Add pending/committed receipt states and crash recovery around real backend mutations; dry-run reservation alone is not an exactly-once guarantee.
-- [ ] Account for ingestor model calls, tokens, latency, storage bytes, and rejected mutations.
-- [ ] Record content-free atomic operations for extraction, related-memory retrieval, internal decision, target resolution, validation, mutation, verification, future retrieval, injection, use, and outcome.
+- [x] Invoke the semantic ingestor only at the frozen Hermes semantic boundary.
+- [x] Keep all Hermes routing fixed and do not predict memory form; episodic/procedural policy implementation remains disabled.
+- [x] Expose ingest/add externally and treat framework-internal ADD/UPDATE/DELETE/NONE as observable outcomes.
+- [x] Validate every internal operation before backend mutation.
+- [x] Persist memory before evicting the source context.
+- [x] Add revision checks, idempotency, failure bypass, and rollback tests.
+- [x] Add pending/committed receipt states and crash recovery around real backend mutations; dry-run reservation alone is not an exactly-once guarantee.
+- [x] Account for ingestor model calls, tokens, latency, storage bytes, and rejected mutations.
+- [x] Record content-free atomic operations for extraction, related-memory retrieval, internal decision, target resolution, validation, mutation, verification, future retrieval, injection, use, and outcome.
+
+Stage 5 is complete for the isolated deterministic path. Live PAST-Bench activation and matched static evaluation remain Stage 6 work; physical context rewrite remains disabled.
 
 ### Stage 6: Static RSIMem Evaluation
 
