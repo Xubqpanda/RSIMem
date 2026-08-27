@@ -146,7 +146,11 @@ class JsonLlmContextEvaluator:
                     "decision jointly. Never evict an active segment. Return JSON only."
                 ),
                 "trigger": request.trigger.value,
-                "active_segment_ids": request.active_segment_ids,
+                "evaluation_id": request.evaluation_id,
+                "context_revision": request.context_revision,
+                "turn_index": request.turn_index,
+                "protected_segment_ids": request.active_segment_ids,
+                "host_policy_version": request.metadata.get("policy_version"),
                 "response_schema": schema,
                 "segments": segments,
             },

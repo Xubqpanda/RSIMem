@@ -417,7 +417,10 @@ def snapshot_to_evaluation_request(
     evaluation_id: str,
     trigger: EvaluationTrigger = EvaluationTrigger.TASK_COMPLETED,
     turn_index: int = 0,
+    policy_version: str | None = None,
 ) -> ContextEvaluationRequest:
+    if policy_version is not None and not policy_version.strip():
+        raise ValueError("policy_version must be non-empty when present")
     return ContextEvaluationRequest(
         evaluation_id=evaluation_id,
         session_id=snapshot.session_id,
@@ -442,7 +445,10 @@ def snapshot_to_evaluation_request(
             )
             for segment in snapshot.segments
         ),
-        metadata={"snapshot_id": snapshot.snapshot_id},
+        metadata={
+            "snapshot_id": snapshot.snapshot_id,
+            "policy_version": policy_version,
+        },
     )
 
 

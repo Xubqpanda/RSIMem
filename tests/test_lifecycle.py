@@ -168,6 +168,23 @@ def test_json_llm_evaluator_requires_complete_typed_output() -> None:
     assert '"content": "Completed deployment output."' in evaluator.build_prompt(_request())
 
 
+def test_json_evaluator_prompt_carries_host_request_identity() -> None:
+    request = _request()
+    from dataclasses import replace
+
+    request = replace(
+        request,
+        context_revision="rev-host-7",
+        metadata={"snapshot_id": "snapshot-7", "policy_version": "host-policy-7"},
+    )
+    prompt = json.loads(JsonLlmContextEvaluator(lambda _: "{}").build_prompt(request))
+    assert prompt["evaluation_id"] == "eval-1"
+    assert prompt["context_revision"] == "rev-host-7"
+    assert prompt["turn_index"] == 4
+    assert prompt["protected_segment_ids"] == ["current"]
+    assert prompt["host_policy_version"] == "host-policy-7"
+
+
 def test_json_llm_evaluator_rejects_missing_segment() -> None:
     evaluator = JsonLlmContextEvaluator(lambda _: '{"signals": []}')
     with pytest.raises(ValueError, match="omitted segment IDs"):
