@@ -8,6 +8,7 @@ import yaml
 from past_bench.models.content import TextBlock
 from past_bench.models.message import Message
 from past_bench.models.self_evolve import (
+    HermesPersistenceConfig,
     RSIMemAdaptiveWritebackConfig,
     SelfEvolveEpisode,
     SelfEvolveSequenceDefinition,
@@ -304,7 +305,6 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
             rsimem_adaptive_policy_source_path=str(source_store),
             **{**common, "rsimem_semantic_writeback_mode": "static_utility"},
         )
-
     malformed = {**_adaptive_config(), "unknown": True}
     with pytest.raises(ValueError, match="Extra inputs are not permitted"):
         RSIMemAdaptiveWritebackConfig.model_validate(malformed)
@@ -314,6 +314,30 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
     }
     with pytest.raises(ValueError, match="relative to Hermes home"):
         RSIMemAdaptiveWritebackConfig.model_validate(escaped)
+
+
+@pytest.mark.parametrize(
+    "feedback_contract",
+    (
+        "sm01_tsv_v1",
+        "sm02_boundary_v1",
+        "sm05_normalized_tsv_v1",
+    ),
+)
+def test_semantic_feedback_contract_transport_accepts_registered_families(
+    feedback_contract: str,
+) -> None:
+    config = HermesPersistenceConfig(
+        rsimem_semantic_feedback_contract=feedback_contract,
+    )
+    assert config.rsimem_semantic_feedback_contract == feedback_contract
+
+
+def test_semantic_feedback_contract_transport_rejects_unknown_contract() -> None:
+    with pytest.raises(ValueError, match="Input should be"):
+        HermesPersistenceConfig(
+            rsimem_semantic_feedback_contract="unregistered_v1"
+        )
 
 
 def test_sequence_validates_rsimem_execution_config(tmp_path: Path):
