@@ -5,11 +5,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
 import threading
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from .lifecycle.snapshot import ContextSnapshot
 from .lifecycle.writeback import WritebackEvent
@@ -76,6 +77,7 @@ _LIFECYCLE_EVENT_KINDS = {
     "dry_run_mutation",
     "dry_run_duplicate",
     "memory_ingestion",
+    "static_utility_decisions",
 }
 _LIFECYCLE_SNAPSHOT_DATA_FIELDS = {
     "segmentCount",
@@ -147,7 +149,36 @@ _LIFECYCLE_INGESTION_DATA_FIELDS = {
     "reasonCodes",
     "resources",
 }
+_LIFECYCLE_UTILITY_DATA_FIELDS = {
+    "executionId",
+    "operationIds",
+    "requestId",
+    "gateVersion",
+    "gateDigest",
+    "featureSchemaVersion",
+    "decisionCount",
+    "decisions",
+}
+_LIFECYCLE_UTILITY_DECISION_FIELDS = {
+    "schema_version",
+    "target",
+    "disposition",
+    "score",
+    "predicted_benefit",
+    "lifecycle_cost",
+    "risk",
+    "contributions",
+    "reason_codes",
+    "feature_digest",
+    "cost_digest",
+    "feature_schema",
+    "cost_schema",
+    "policy_version",
+    "cutoff",
+}
 _MACHINE_REASON_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 
 
 def _json_hash(value: Any, *, length: int = 24) -> str:
@@ -232,6 +263,8 @@ def _validate_lifecycle_contract_event(value: dict[str, Any], source_path: Path)
         if kind == "boundary_rejected"
         else _LIFECYCLE_INGESTION_DATA_FIELDS
         if kind == "memory_ingestion"
+        else _LIFECYCLE_UTILITY_DATA_FIELDS
+        if kind == "static_utility_decisions"
         else _LIFECYCLE_PLAN_DATA_FIELDS
     )
     if not isinstance(data, dict) or set(data) != expected_fields:
@@ -242,7 +275,9 @@ def _validate_lifecycle_contract_event(value: dict[str, Any], source_path: Path)
         for code in reason_codes
     ):
         raise ValueError(f"invalid RSIMem lifecycle reason codes in {source_path}")
-    if kind not in {
+    if kind == "static_utility_decisions":
+        _validate_static_utility_data(data, source_path)
+    elif kind not in {
         "context_snapshot",
         "evaluation_accepted",
         "evaluation_rejected",
@@ -251,6 +286,95 @@ def _validate_lifecycle_contract_event(value: dict[str, Any], source_path: Path)
         resources = data.get("resources")
         if not isinstance(resources, dict) or set(resources) != _LIFECYCLE_RESOURCE_FIELDS:
             raise ValueError(f"invalid RSIMem lifecycle resources in {source_path}")
+
+
+def _validate_static_utility_data(data: dict[str, Any], source_path: Path) -> None:
+    string_fields = (
+        "executionId",
+        "requestId",
+        "gateVersion",
+        "featureSchemaVersion",
+    )
+    if any(
+        not isinstance(data.get(field), str)
+        or not _IDENTIFIER.fullmatch(data[field])
+        for field in string_fields
+    ) or not isinstance(data.get("gateDigest"), str) or not _SHA256.fullmatch(
+        data["gateDigest"]
+    ):
+        raise ValueError(f"invalid static utility identity in {source_path}")
+    operation_ids = data.get("operationIds")
+    decisions = data.get("decisions")
+    if (
+        not isinstance(operation_ids, list)
+        or len(operation_ids) != len(set(operation_ids))
+        or any(
+            not isinstance(item, str) or not _IDENTIFIER.fullmatch(item)
+            for item in operation_ids
+        )
+        or not isinstance(decisions, list)
+        or type(data.get("decisionCount")) is not int
+        or data["decisionCount"] != len(decisions)
+    ):
+        raise ValueError(f"invalid static utility decision collection in {source_path}")
+    for decision in decisions:
+        if not isinstance(decision, dict) or set(decision) != (
+            _LIFECYCLE_UTILITY_DECISION_FIELDS
+        ):
+            raise ValueError(f"invalid static utility decision fields in {source_path}")
+        if (
+            decision.get("schema_version") != 1
+            or decision.get("target")
+            not in {"generation", "internal_operation", "retrieval"}
+            or decision.get("disposition") not in {"accept", "defer", "reject"}
+            or type(decision.get("cutoff")) is not int
+            or decision["cutoff"] < 0
+        ):
+            raise ValueError(f"invalid static utility decision contract in {source_path}")
+        for field, lower, upper in (
+            ("score", -1.0, 1.0),
+            ("predicted_benefit", 0.0, 1.0),
+            ("lifecycle_cost", 0.0, 1.0),
+            ("risk", 0.0, 1.0),
+        ):
+            number = decision.get(field)
+            if (
+                not isinstance(number, (int, float))
+                or isinstance(number, bool)
+                or not math.isfinite(float(number))
+                or not lower <= float(number) <= upper
+            ):
+                raise ValueError(f"invalid static utility numeric evidence in {source_path}")
+        if any(
+            not isinstance(decision.get(field), str)
+            or not _SHA256.fullmatch(decision[field])
+            for field in ("feature_digest", "cost_digest")
+        ) or any(
+            not isinstance(decision.get(field), str)
+            or not _IDENTIFIER.fullmatch(decision[field])
+            for field in (
+                "feature_schema",
+                "cost_schema",
+                "policy_version",
+            )
+        ):
+            raise ValueError(f"invalid static utility schema evidence in {source_path}")
+        contributions = decision.get("contributions")
+        if not isinstance(contributions, dict) or any(
+            not isinstance(name, str)
+            or not _IDENTIFIER.fullmatch(name)
+            or not isinstance(amount, (int, float))
+            or isinstance(amount, bool)
+            or not math.isfinite(float(amount))
+            for name, amount in contributions.items()
+        ):
+            raise ValueError(f"invalid static utility contributions in {source_path}")
+        reasons = decision.get("reason_codes")
+        if not isinstance(reasons, list) or not reasons or any(
+            not isinstance(reason, str) or not _MACHINE_REASON_CODE.fullmatch(reason)
+            for reason in reasons
+        ):
+            raise ValueError(f"invalid static utility reason codes in {source_path}")
 
 
 def load_episode_lifecycle_events(comparison_path: Path) -> tuple[dict[str, Any], ...]:

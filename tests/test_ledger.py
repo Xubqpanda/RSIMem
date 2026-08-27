@@ -4,6 +4,7 @@ import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -19,9 +20,15 @@ from rsimem.lifecycle import (
     HermesMessage,
     HermesSnapshotCollector,
     TaskLifecycleState,
+    RawResourceUsage,
     run_sm01_preference_fixture,
 )
 from rsimem.memory import MemoryEvent, MemoryEventKind, MemoryKind
+from rsimem.memory.ingestion import (
+    InternalMemoryAction,
+    MemoryIngestOutcome,
+    MemoryIngestStatus,
+)
 
 
 MEMORY = "Use TSV with owner, priority, task, and due_date."
@@ -186,6 +193,83 @@ def _write_runtime_evidence(
     return event
 
 
+def _write_static_utility_evidence(
+    comparison: Path,
+    *,
+    execution_id: str = "ingest.utility.1",
+    gate_digest: str = "a" * 64,
+) -> tuple[dict, dict]:
+    source = SimpleNamespace(
+        run_id=comparison.parent.name,
+        episode_id="learn",
+        session_id="session-1",
+        task_id="task-1",
+        snapshot_id="snapshot-1",
+    )
+    request = SimpleNamespace(
+        idempotency_key=f"semantic_request.{execution_id}",
+        provenance=SimpleNamespace(source=source),
+    )
+    operation = SimpleNamespace(
+        operation_id=f"operation.{execution_id}",
+        action=InternalMemoryAction.ADD,
+    )
+    result = SimpleNamespace(
+        idempotency_key=request.idempotency_key,
+        execution_id=execution_id,
+        status=MemoryIngestStatus.SUCCESS,
+        outcome=MemoryIngestOutcome.PLANNED_MUTATION,
+        fixed_route=SimpleNamespace(
+            backend="hermes-native-semantic",
+            kind=MemoryKind.SEMANTIC,
+        ),
+        policy_provider="mem0_flat",
+        policy_version="mem0-flat.utility.fixture",
+        framework_version="mem0-flat-framework-v1",
+        prompt_version="mem0-flat-prompts-v1",
+        feature_schema_version="semantic-static-utility-features-v1",
+        operations=(operation,),
+        source_digest="b" * 64,
+        content_digests=("c" * 64,),
+        reason_codes=(),
+        usage=RawResourceUsage(model_requests=2),
+    )
+    evidence = {
+        "schema_version": 1,
+        "gate_version": "mem0-flat-static-utility-gate-v1",
+        "gate_digest": gate_digest,
+        "feature_schema": "semantic-static-utility-features-v1",
+        "request_id": request.idempotency_key,
+        "decisions": [{
+            "schema_version": 1,
+            "target": "generation",
+            "disposition": "accept",
+            "score": 0.5,
+            "predicted_benefit": 0.7,
+            "lifecycle_cost": 0.1,
+            "risk": 0.1,
+            "contributions": {"benefit.scope": 0.05},
+            "reason_codes": ["utility_accepted"],
+            "feature_digest": "d" * 64,
+            "cost_digest": "e" * 64,
+            "feature_schema": "semantic-static-utility-features-v1",
+            "cost_schema": "semantic-lifecycle-cost-v1",
+            "policy_version": "semantic-static-utility-policy-v1",
+            "cutoff": 0,
+        }],
+    }
+    observer = LifecycleLedgerObserver(
+        variant="with_persistence",
+        trace_id="trace-1",
+        family_id="family-1",
+        stage="learn",
+        output_path=_lifecycle_evidence_path(comparison),
+    )
+    observer.record_ingestion(request, result)
+    observer.record_utility_decisions(request, result, evidence)
+    return observer.events[-2], observer.events[-1]
+
+
 def test_auto_loads_content_free_episode_runtime_evidence(tmp_path: Path) -> None:
     comparison = _fixture(tmp_path)
     runtime_event = _write_runtime_evidence(comparison)
@@ -315,6 +399,72 @@ def test_auto_loads_strict_lifecycle_contract_evidence(tmp_path: Path) -> None:
     path.write_text(json.dumps(event) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="lifecycle event data fields"):
         load_episode_lifecycle_events(comparison)
+
+
+def test_static_utility_evidence_joins_ingestion_and_audits_frozen_policy(
+    tmp_path: Path,
+) -> None:
+    comparison = _fixture(tmp_path)
+    ingestion, utility = _write_static_utility_evidence(comparison)
+
+    assert load_episode_lifecycle_events(comparison) == (ingestion, utility)
+    write_ledger(
+        comparison,
+        comparison.parent / "ledger.jsonl",
+        judge_enabled=False,
+    )
+    report = audit_run(comparison.parent)
+
+    assert report["ok"] is True
+    assert report["staticUtility"] == {
+        "events": 1,
+        "uniqueExecutions": 1,
+        "duplicateViews": 0,
+        "decisionCount": 1,
+        "targets": {"generation": 1},
+        "dispositions": {"accept": 1},
+        "gateDigests": ["a" * 64],
+        "gateVersions": ["mem0-flat-static-utility-gate-v1"],
+        "featureSchemas": ["semantic-static-utility-features-v1"],
+        "policyVersions": ["semantic-static-utility-policy-v1"],
+    }
+
+
+def test_static_utility_evidence_rejects_content_and_policy_drift(
+    tmp_path: Path,
+) -> None:
+    comparison = _fixture(tmp_path)
+    _write_static_utility_evidence(comparison)
+    path = _lifecycle_evidence_path(comparison)
+    events = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+    ]
+    events[-1]["data"]["decisions"][0]["raw_content"] = MEMORY
+    path.write_text(
+        "".join(json.dumps(event) + "\n" for event in events),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="utility decision fields"):
+        load_episode_lifecycle_events(comparison)
+
+    path.unlink()
+    _write_static_utility_evidence(comparison)
+    _write_static_utility_evidence(
+        comparison,
+        execution_id="ingest.utility.2",
+        gate_digest="f" * 64,
+    )
+    write_ledger(
+        comparison,
+        comparison.parent / "ledger.jsonl",
+        judge_enabled=False,
+    )
+    report = audit_run(comparison.parent)
+    assert report["ok"] is False
+    assert {issue["kind"] for issue in report["issues"]} == {
+        "static_utility_gate_changed_within_run"
+    }
 
 
 def test_run_anchored_relative_paths_are_cwd_independent(tmp_path: Path) -> None:
