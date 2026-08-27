@@ -96,6 +96,8 @@ Validate, accept, or roll back each proposal without using hidden benchmark grad
 
 The stage passes when policy versions are reproducible and adaptive LightRSI can be compared against the static policy.
 
+The deterministic learner, validation, activation, rollback, and runtime binding gates are complete. The PAST-Bench execution layer now consumes only a separately prepared ACTIVE store through a strict versioned config, copies it into each isolated attempt home, and records config/store/artifact identity in the matched manifest. Live adaptive comparison remains unproven until the preparation dataset cutoff is frozen and the predeclared replicates finish audit.
+
 ### Stage 4: Expand Task Coverage
 
 Run semantic-relevant memory-ability families first.
