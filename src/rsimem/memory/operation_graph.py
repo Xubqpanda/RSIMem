@@ -79,7 +79,10 @@ class OperationKind(StrEnum):
     RETRIEVAL = "retrieval"
     INJECTION = "injection"
     USE = "use"
+    TOOL_BEHAVIOR = "tool_behavior"
     DOWNSTREAM_OUTCOME = "downstream_outcome"
+    SUPERSESSION = "supersession"
+    RECOVERY = "recovery"
 
 
 class ArtifactKind(StrEnum):
