@@ -208,6 +208,14 @@ def test_matched_rejection_and_pair_drift_fail_closed(tmp_path) -> None:
             (observations[0], drifted_budget, *observations[2:]),
             criteria,
         )
+    wrong_episode = replace(observations[0], episode_id="learn-1")
+    with pytest.raises(ValueError, match="outside validation split"):
+        validator.evaluate(
+            artifact,
+            split,
+            (wrong_episode, *observations[1:]),
+            criteria,
+        )
     with pytest.raises(ValueError, match="decision ID mismatch"):
         replace(
             decision,

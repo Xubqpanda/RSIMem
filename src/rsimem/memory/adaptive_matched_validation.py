@@ -326,6 +326,13 @@ class AdaptiveRollbackEvidence:
             raise ValueError("adaptive rollback requires reason codes")
         if type(self.evidence_cutoff) is not int or self.evidence_cutoff < 0:
             raise ValueError("adaptive rollback cutoff is invalid")
+        expected_reasons = (
+            ("stability_regression",)
+            if self.automatic
+            else ("operator_requested",)
+        )
+        if self.reason_codes != expected_reasons:
+            raise ValueError("adaptive rollback reasons conflict with trigger")
         if self.evidence_id != f"rollback-evidence.{_digest(self.identity_payload())[:40]}":
             raise ValueError("adaptive rollback evidence identity is invalid")
 
@@ -378,13 +385,14 @@ class MatchedAdaptivePolicyValidator:
         ):
             raise ValueError("matched observations must be unique")
         validation_ids = set(split.validation_example_ids)
-        validation_episodes = set(split.validation_episode_ids)
+        validation_membership = dict(split.validation_membership)
         pairs: dict[str, dict[MatchedPolicyVariant, MatchedPolicyObservation]] = {}
         for observation in observations:
             if (
                 observation.split_id != split.split_id
                 or observation.example_id not in validation_ids
-                or observation.episode_id not in validation_episodes
+                or validation_membership.get(observation.example_id)
+                != observation.episode_id
             ):
                 raise ValueError("matched observation is outside validation split")
             expected_policy = (

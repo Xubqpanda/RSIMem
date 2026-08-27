@@ -119,6 +119,7 @@ class AdaptiveValidationSplit:
     strategy: AdaptiveSplitStrategy
     training_example_ids: tuple[str, ...]
     validation_example_ids: tuple[str, ...]
+    validation_membership: tuple[tuple[str, str], ...]
     training_episode_ids: tuple[str, ...]
     validation_episode_ids: tuple[str, ...]
     training_task_ids: tuple[str, ...]
@@ -166,6 +167,12 @@ class AdaptiveValidationSplit:
             raise ValueError("adaptive train and validation examples overlap")
         if set(self.training_episode_ids) & set(self.validation_episode_ids):
             raise ValueError("adaptive train and validation episodes overlap")
+        membership_examples = tuple(item[0] for item in self.validation_membership)
+        if membership_examples != self.validation_example_ids:
+            raise ValueError("adaptive validation example membership is inconsistent")
+        for example_id, episode_id in self.validation_membership:
+            _require_identifier(example_id, "adaptive validation example")
+            _require_identifier(episode_id, "adaptive validation episode")
         if self.training_cutoff_example_id != self.training_example_ids[-1]:
             raise ValueError("adaptive training cutoff is inconsistent")
         if self.split_digest != _digest(self.identity_payload()):
@@ -183,6 +190,9 @@ class AdaptiveValidationSplit:
             "strategy": self.strategy.value,
             "training_example_ids": list(self.training_example_ids),
             "validation_example_ids": list(self.validation_example_ids),
+            "validation_membership": [
+                list(item) for item in self.validation_membership
+            ],
             "training_episode_ids": list(self.training_episode_ids),
             "validation_episode_ids": list(self.validation_episode_ids),
             "training_task_ids": list(self.training_task_ids),
@@ -253,6 +263,9 @@ class TimeOrderedAdaptiveSplitter:
             "strategy": config.strategy.value,
             "training_example_ids": [item.example_id for item in training],
             "validation_example_ids": [item.example_id for item in validation],
+            "validation_membership": [
+                [item.example_id, item.source_episode_id] for item in validation
+            ],
             "training_episode_ids": list(training_episodes),
             "validation_episode_ids": list(validation_episodes),
             "training_task_ids": list(training_tasks),
@@ -269,6 +282,9 @@ class TimeOrderedAdaptiveSplitter:
             strategy=config.strategy,
             training_example_ids=tuple(item.example_id for item in training),
             validation_example_ids=tuple(item.example_id for item in validation),
+            validation_membership=tuple(
+                (item.example_id, item.source_episode_id) for item in validation
+            ),
             training_episode_ids=training_episodes,
             validation_episode_ids=validation_episodes,
             training_task_ids=training_tasks,

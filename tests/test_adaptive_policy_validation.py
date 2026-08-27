@@ -117,6 +117,10 @@ def test_time_ordered_split_is_deterministic_complete_and_auditable() -> None:
     assert first.payload() == replay.payload()
     assert first.training_example_ids == (dataset.examples[0].example_id,)
     assert first.validation_example_ids == (dataset.examples[1].example_id,)
+    assert first.validation_membership == ((
+        dataset.examples[1].example_id,
+        "learn-2",
+    ),)
     assert first.training_episode_ids == ("learn-1",)
     assert first.validation_episode_ids == ("learn-2",)
     assert first.training_cutoff_example_id == dataset.examples[0].example_id
