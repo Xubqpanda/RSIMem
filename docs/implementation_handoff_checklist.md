@@ -379,15 +379,15 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 - √ 配置显式选择 deterministic evaluator 或 injected JSON lifecycle evaluator，默认关闭。
 - √ evaluator request 携带 snapshot revision、protected IDs、trigger、turn index 和 host-selected policy version。
 - √ policy version 由 host configuration 固定，模型不能声明或覆盖版本。
-- □ evaluator timeout、invalid JSON、missing signal、unknown segment 和 unsafe action 产生结构化 rejection。
-- □ evaluator failure 不推进 scheduler state，允许使用同一 boundary retry。
+- √ evaluator timeout、invalid JSON、missing signal、unknown segment 和 unsafe action 产生结构化 rejection。
+- √ evaluator failure 不推进 scheduler state，允许使用同一 boundary retry。
 
 验收需求：
 
 - √ deterministic evaluator 在固定 fixture 上完全可重现。
-- □ mocked evaluator 覆盖 valid、malformed、partial、timeout、exception 和 policy-version override。
+- √ mocked evaluator 覆盖 valid、malformed、partial、timeout、exception 和 policy-version override。
 - √ evaluator failure 不产生 accepted plan、receipt 或 mutation event，并允许同一 boundary retry。
-- □ lifecycle evaluator 的模型调用进入 usage accounting，但 prompt/response 原文不进入 ledger。
+- √ lifecycle evaluator 的模型调用以 `component=lifecycle_evaluator`、`purpose=rsimem_lifecycle` 进入 Hermes request accounting，prompt/response 原文不进入 ledger。
 
 ### 1D.4 Dry-Run Plan 与 Evidence
 
@@ -409,9 +409,9 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 ### 1D.5 阶段闸门
 
 - □ 真实 Hermes loop 能产出 snapshot、evaluation、validated dry-run plan 和完整 content-free evidence。
-- □ disabled、success、failure、retry 和 restart 路径均有 deterministic test。
-- □ 三个 execution mode 的 read-path equivalence 继续通过。
-- □ RSIMem 与 PAST-Bench 全量回归通过。
+- √ disabled、success、failure、retry 和 restart 路径均有 deterministic test。
+- √ 三个 execution mode 的 deterministic read-path equivalence 与 Phase 1C accepted live baseline 继续通过；当前 revision 的 lifecycle-enabled live acceptance 尚未运行。
+- √ RSIMem 与 PAST-Bench 全量回归通过。
 - √ 没有真实 memory generation、memory mutation 或 context eviction。
 
 ## 10. 第一阶段 1E：最终验收与冻结

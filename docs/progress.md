@@ -140,8 +140,8 @@ establish a nondeterminism tolerance.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `108 passed`.
-- [x] Pass the vendored PAST-Bench regression suite: `384 passed, 2 skipped`.
+- [x] Pass all RSIMem tests: `114 passed`.
+- [x] Pass the vendored PAST-Bench regression suite: `385 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
@@ -151,12 +151,12 @@ establish a nondeterminism tolerance.
 
 The Phase 1C live matched gate passed on three order-rotated, independently unseeded replicates per mode. The dated report is [`matched_phase1c_20260827.md`](matched_phase1c_20260827.md). The immediate objective is Phase 1D: wire snapshot collection, lifecycle evaluation, and validated dry-run plans into explicit real Hermes task-completion and session-end events without memory mutation or context eviction.
 
-The deterministic Phase 1D path is now wired behind the default-disabled lifecycle configuration. A real PAST-Bench `HermesAdapter.step()` fixture emits explicit task-completed and session-end boundaries, projects persisted `state.db` rows into stable snapshots, binds evaluation to a host-selected policy identity, and reserves content-free dry-run plans with persistent receipts. Evaluator failure/retry and coordinator restart are covered without compiler or backend mutation. Phase 1D remains open until the injected evaluator has enforced timeout and request accounting, pre-snapshot host failures have persistent rejection evidence, and the final live three-mode acceptance is recorded.
+The deterministic Phase 1D path is now wired behind the default-disabled lifecycle configuration. A PAST-Bench `HermesAdapter.step()` execution fixture emits explicit task-completed and session-end boundaries, projects persisted `state.db` rows into stable snapshots, binds evaluation to a host-selected policy identity, and reserves content-free dry-run plans with persistent receipts. Injected evaluator calls use the Hermes recorded-request path with enforced timeout and raw usage accounting; evaluator and pre-snapshot host failures produce strict content-free rejection evidence. Both memory and lifecycle JSONL files are automatically validated and joined by the ledger. Phase 1D remains open until the same path passes a real-provider Hermes acceptance run on the current revision.
 
 - [x] Define an experiment configuration that selects one backend for each memory kind and defaults to native Hermes behavior.
 - [x] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
 - [x] Construct context snapshots at explicit task-completion and session-end boundaries; context-pressure remains unavailable until Hermes exposes trusted usage and threshold inputs.
-- [x] Add default-disabled deterministic and injected-JSON lifecycle evaluator modes; live model-client accounting and enforced timeout remain open.
+- [x] Add default-disabled deterministic and injected-JSON lifecycle evaluator modes using Hermes request accounting and enforced provider timeout.
 - [x] Identify and exercise the Hermes semantic prompt, episodic search, and skill read interception points in an isolated execution fixture; mutation interception remains gated on compiler validation.
 - [x] Add an opt-in adapter execution path while retaining the direct native path as the control.
 - [x] Forward runtime lifecycle events into the existing ledger through stable run, episode, session, and artifact identifiers.
