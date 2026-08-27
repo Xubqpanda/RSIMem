@@ -5,20 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.memory.adaptive_matched_validation import (
-    JsonMatchedValidationDecisionStore,
-    MatchedAcceptanceCriteria,
-    MatchedAdaptivePolicyActivationCoordinator,
-    MatchedAdaptivePolicyValidator,
-)
-from rsimem.memory_systems.mem0_flat import FrozenMem0UtilityGate
-from rsimem.memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
+from rsimem.adaptive_activation import activate_adaptive_policy
 from rsimem.experiment_manifest import (
     ADAPTIVE_METHOD_VARIANTS,
+    ADAPTIVE_VALIDATION_METHOD_VARIANTS,
     FEEDBACK_METHOD_VARIANTS,
     STATIC_METHOD_VARIANTS,
     STATIC_UTILITY_METHOD_VARIANTS,
     adaptive_method_execution_profile,
+    adaptive_validation_method_execution_profile,
     execution_order,
     initialize_batch_manifest,
     load_manifest,
@@ -31,7 +26,7 @@ from rsimem.experiment_manifest import (
     resolved_run_profile,
     validate_manifest,
 )
-from test_adaptive_matched_validation import _observations, _offline_validated
+from test_adaptive_activation import _observation_batch, _offline
 
 
 def _manifest_kwargs() -> dict[str, object]:
@@ -164,6 +159,50 @@ def test_adaptive_method_execution_profiles_freeze_only_intended_differences() -
     with pytest.raises(ValueError, match="unknown adaptive"):
         adaptive_method_execution_profile("static-utility-rsimem")
 
+    validation = {
+        method: adaptive_validation_method_execution_profile(method)
+        for method in ADAPTIVE_VALIDATION_METHOD_VARIANTS
+    }
+    assert validation["static-rsimem"]["adaptiveConfigRequired"] is False
+    assert validation["proposal-rsimem"]["adaptiveConfigRequired"] is True
+    assert validation["proposal-rsimem"]["validationOnly"] is True
+    assert execution_order(2, ADAPTIVE_VALIDATION_METHOD_VARIANTS) == (
+        "proposal-rsimem",
+        "static-rsimem",
+    )
+
+
+def test_proposal_validation_manifest_is_distinct_from_official_adaptive(
+    tmp_path: Path,
+) -> None:
+    profile = _adaptive_profile()
+    profile["preparation"] = "matched_validation_trial_store"
+    path = tmp_path / "proposal-validation.json"
+    initialize_batch_manifest(
+        path,
+        **_manifest_kwargs(),
+        execution_modes=ADAPTIVE_VALIDATION_METHOD_VARIANTS,
+        adaptive_policy=profile,
+        semantic_feedback_contract="sm01_tsv_v1",
+    )
+    manifest = load_manifest(path)
+    assert manifest["configuration"]["executionModes"] == list(
+        ADAPTIVE_VALIDATION_METHOD_VARIANTS
+    )
+    assert manifest["configuration"]["adaptivePolicy"]["preparation"] == (
+        "matched_validation_trial_store"
+    )
+
+    official = _adaptive_profile()
+    with pytest.raises(ValueError, match="adaptive policy schema"):
+        initialize_batch_manifest(
+            tmp_path / "wrong-profile.json",
+            **_manifest_kwargs(),
+            execution_modes=ADAPTIVE_VALIDATION_METHOD_VARIANTS,
+            adaptive_policy=official,
+            semantic_feedback_contract="sm01_tsv_v1",
+        )
+
 
 def test_manifest_records_effective_configuration_and_attempt_order(tmp_path: Path) -> None:
     path = tmp_path / "batch_manifest.json"
@@ -279,64 +318,42 @@ def test_manifest_schedules_static_method_variants(tmp_path: Path) -> None:
 def test_resolved_adaptive_policy_profile_binds_real_active_store(
     tmp_path: Path,
 ) -> None:
-    base_gate = FrozenMem0UtilityGate()
-    base_policy = Mem0FlatSemanticPolicy(object(), utility_gate=base_gate)
-    _, split, artifact, store, _ = _offline_validated(
-        tmp_path,
-        suffix="manifest",
-        policy_version=base_policy.descriptor.policy_version,
+    offline_root, preparation = _offline(tmp_path)
+    observations = _observation_batch(
+        tmp_path / "manifest-observations.json",
+        preparation,
     )
-    observations = _observations(artifact, split)
-    criteria = MatchedAcceptanceCriteria()
-    decision = MatchedAdaptivePolicyValidator().evaluate(
-        artifact,
-        split,
+    active_root = tmp_path / "active"
+    activate_adaptive_policy(
+        offline_root,
         observations,
-        criteria,
+        output_root=active_root,
     )
-    coordinator = MatchedAdaptivePolicyActivationCoordinator(
-        store,
-        JsonMatchedValidationDecisionStore(tmp_path / "matched-manifest"),
-    )
-    coordinator.apply(
-        artifact,
-        decision,
-        split=split,
-        observations=observations,
-        criteria=criteria,
-    )
-    config_path = tmp_path / "adaptive-config.json"
-    config_path.write_text(json.dumps({
-        "schema_version": 1,
-        "prepared_policy_store_file": store.path.name,
-        "adaptive_policy_store_path": ".rsimem/adaptive-policies.json",
-        "adaptive_trusted_roots": [base_policy.descriptor.policy_version],
-        "adaptive_parameters": [{
-            "parameter_id": "parameter.fact",
-            "name": "retrieval_accept_threshold",
-            "prompt_ref": "mem0-flat.retrieval",
-            "baseline_value": 0.35,
-        }],
-    }), encoding="utf-8")
+    config_path = active_root / "adaptive-config.json"
 
     profile = resolved_adaptive_policy_profile(config_path)
 
-    assert profile["activePolicyVersion"] == artifact.policy_version
-    assert profile["activeArtifactId"] == artifact.artifact_id
-    assert profile["activeArtifactDigest"] == artifact.content_digest
+    assert profile["activePolicyVersion"] == preparation.artifact.policy_version
+    assert profile["activeArtifactId"] == preparation.artifact.artifact_id
+    assert profile["activeArtifactDigest"] == preparation.artifact.content_digest
     assert len(profile["configDigest"]) == 64
     assert len(profile["storeDigest"]) == 64
     assert profile["preparation"] == "external_audited_active_store"
 
-    empty_config = tmp_path / "empty-config.json"
-    empty_store = tmp_path / "empty-store.json"
-    empty_config.write_text(config_path.read_text(encoding="utf-8").replace(
-        store.path.name,
-        empty_store.name,
-    ), encoding="utf-8")
+    empty_root = tmp_path / "empty"
+    empty_root.mkdir()
+    empty_config = empty_root / "adaptive-config.json"
+    empty_store = empty_root / "adaptive-policy-store.json"
+    empty_config.write_text(config_path.read_text(encoding="utf-8"), encoding="utf-8")
+    (empty_root / "adaptive-activation-manifest.json").write_text(
+        (active_root / "adaptive-activation-manifest.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     empty_store.write_text(json.dumps({
         "schema_version": 1,
-        "trusted_root_policy_versions": [base_policy.descriptor.policy_version],
+        "trusted_root_policy_versions": [
+            preparation.artifact.parent_policy_version
+        ],
         "artifacts": {},
         "records": {},
         "transitions": {},
