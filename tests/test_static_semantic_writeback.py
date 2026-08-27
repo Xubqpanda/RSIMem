@@ -21,6 +21,9 @@ from rsimem.memory import (
     MemoryQuery,
 )
 from rsimem.memory.live_writeback import (
+    LEGACY_ADAPTIVE_UTILITY_ID,
+    LEGACY_STATIC_UTILITY_ID,
+    STATIC_EXTRACTION_PARENT_ID,
     STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION,
     StaticSemanticWritebackConfig,
     StaticSemanticWritebackMode,
@@ -105,11 +108,18 @@ def test_static_config_is_default_disabled_and_strict() -> None:
         "timeout_seconds": 12,
         "max_output_tokens": 512,
     }).mode == StaticSemanticWritebackMode.STATIC
+    plain = StaticSemanticWritebackConfig.from_mapping({"mode": "static"})
+    assert plain.plain_extraction_parent is True
+    assert plain.utility_enabled is False
+    assert plain.adaptive_enabled is False
+    assert plain.method_identity == STATIC_EXTRACTION_PARENT_ID
     utility = StaticSemanticWritebackConfig.from_mapping({
         "mode": "static_utility",
     })
     assert utility.enabled is True
     assert utility.utility_enabled is True
+    assert utility.plain_extraction_parent is False
+    assert utility.method_identity == LEGACY_STATIC_UTILITY_ID
     adaptive = StaticSemanticWritebackConfig.from_mapping({
         "mode": "adaptive_utility",
         "adaptive_policy_store_path": ".rsimem/adaptive-policies.json",
@@ -123,6 +133,7 @@ def test_static_config_is_default_disabled_and_strict() -> None:
     })
     assert adaptive.adaptive_enabled is True
     assert adaptive.utility_enabled is True
+    assert adaptive.method_identity == LEGACY_ADAPTIVE_UTILITY_ID
     feedback = StaticSemanticWritebackConfig.from_mapping({
         "mode": "static_utility",
         "feedback_contract": "sm01_tsv_v1",
@@ -169,6 +180,14 @@ def test_explicit_adaptive_runtime_rejects_empty_store_before_model_call(
             require_adaptive_policy=True,
         )
     assert client.calls == ()
+
+
+def test_plain_runtime_identifies_static_extraction_parent(tmp_path) -> None:
+    runtime = _runtime(tmp_path, _client())
+    assert runtime.static_parent_identity == STATIC_EXTRACTION_PARENT_ID
+    assert runtime.utility_gate is None
+    assert runtime.adaptive_binding is None
+    runtime.close()
 
 
 def test_static_utility_runtime_preserves_boundary_and_invocation_count(

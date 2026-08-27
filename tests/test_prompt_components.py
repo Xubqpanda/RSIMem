@@ -12,6 +12,7 @@ from rsimem.memory.prompt_components import (
     PromptComponentArtifact,
     PromptPolicyStage,
     PromptSlotDescriptor,
+    MatchedSemanticPolicyManifest,
     SemanticPolicyManifest,
     content_digest,
     text_digest,
@@ -190,3 +191,51 @@ def test_composite_manifest_changes_only_with_extraction_component() -> None:
     assert parent_manifest.composite_policy_version != (
         child_manifest.composite_policy_version
     )
+    matched = MatchedSemanticPolicyManifest.create(
+        parent_manifest,
+        child_manifest,
+    )
+    assert matched.intervention_component == PromptPolicyStage.EXTRACTION
+    assert matched.parent == parent_manifest
+    assert matched.candidate == child_manifest
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("route", "different-route-v1"),
+        ("boundary", "different-boundary-v1"),
+        ("backend", "different-backend-v1"),
+        ("framework_version", "different-framework-v1"),
+        ("model_profile", "different-model-v1"),
+        ("update_component_id", "different-update-v1"),
+        ("update_component_digest", "3" * 64),
+        ("retrieval_component_id", "different-retrieval-v1"),
+        ("retrieval_component_digest", "4" * 64),
+    ],
+)
+def test_matched_semantic_manifest_rejects_non_extraction_drift(
+    field: str,
+    value: str,
+) -> None:
+    parent = _manifest("extraction.parent", "a" * 64)
+    values = {
+        key: item
+        for key, item in parent.identity_payload().items()
+        if key not in {"schema_version", "manifest_schema"}
+    }
+    values.update({
+        "extraction_component_id": "extraction.candidate",
+        "extraction_component_digest": "b" * 64,
+        field: value,
+    })
+    candidate = SemanticPolicyManifest.create(**values)
+
+    with pytest.raises(ValueError, match="drift outside extraction"):
+        MatchedSemanticPolicyManifest.create(parent, candidate)
+
+
+def test_matched_semantic_manifest_rejects_no_extraction_intervention() -> None:
+    parent = _manifest("extraction.parent", "a" * 64)
+    with pytest.raises(ValueError, match="must change"):
+        MatchedSemanticPolicyManifest.create(parent, parent)

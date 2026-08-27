@@ -17,6 +17,7 @@ PROMPT_SLOT_SCHEMA = "memory-prompt-slot-v1"
 PROMPT_COMPONENT_ARTIFACT_SCHEMA = "memory-prompt-component-artifact-v1"
 PROMPT_BINDING_SCHEMA = "memory-prompt-binding-v1"
 SEMANTIC_POLICY_MANIFEST_SCHEMA = "semantic-policy-manifest-v1"
+MATCHED_SEMANTIC_POLICY_MANIFEST_SCHEMA = "matched-semantic-policy-manifest-v1"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
@@ -442,4 +443,96 @@ class SemanticPolicyManifest:
             **self.identity_payload(),
             "composite_digest": self.composite_digest,
             "composite_policy_version": self.composite_policy_version,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class MatchedSemanticPolicyManifest:
+    parent: SemanticPolicyManifest
+    candidate: SemanticPolicyManifest
+    intervention_component: PromptPolicyStage
+    matched_digest: str
+    manifest_schema: str = MATCHED_SEMANTIC_POLICY_MANIFEST_SCHEMA
+    schema_version: int = PROMPT_COMPONENT_SCHEMA_VERSION
+
+    _FROZEN_FIELDS = (
+        "route",
+        "boundary",
+        "backend",
+        "framework_version",
+        "model_profile",
+        "update_component_id",
+        "update_component_digest",
+        "retrieval_component_id",
+        "retrieval_component_digest",
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "intervention_component",
+            PromptPolicyStage(self.intervention_component),
+        )
+        if (
+            self.schema_version != PROMPT_COMPONENT_SCHEMA_VERSION
+            or self.manifest_schema != MATCHED_SEMANTIC_POLICY_MANIFEST_SCHEMA
+        ):
+            raise ValueError("unsupported matched semantic policy manifest schema")
+        if self.intervention_component != PromptPolicyStage.EXTRACTION:
+            raise ValueError("the current matched intervention must be extraction")
+        drift = tuple(
+            field
+            for field in self._FROZEN_FIELDS
+            if getattr(self.parent, field) != getattr(self.candidate, field)
+        )
+        if drift:
+            raise ValueError(
+                "matched semantic policy drift outside extraction: "
+                + ", ".join(drift)
+            )
+        if (
+            self.parent.extraction_component_id
+            == self.candidate.extraction_component_id
+            or self.parent.extraction_component_digest
+            == self.candidate.extraction_component_digest
+        ):
+            raise ValueError("matched extraction intervention must change its artifact")
+        if self.parent.composite_digest == self.candidate.composite_digest:
+            raise ValueError("matched extraction intervention must change composite identity")
+        if self.matched_digest != content_digest(self.identity_payload()):
+            raise ValueError("matched semantic policy digest mismatch")
+
+    @classmethod
+    def create(
+        cls,
+        parent: SemanticPolicyManifest,
+        candidate: SemanticPolicyManifest,
+    ) -> "MatchedSemanticPolicyManifest":
+        core = {
+            "schema_version": PROMPT_COMPONENT_SCHEMA_VERSION,
+            "manifest_schema": MATCHED_SEMANTIC_POLICY_MANIFEST_SCHEMA,
+            "intervention_component": PromptPolicyStage.EXTRACTION.value,
+            "parent": parent.payload(),
+            "candidate": candidate.payload(),
+        }
+        return cls(
+            parent=parent,
+            candidate=candidate,
+            intervention_component=PromptPolicyStage.EXTRACTION,
+            matched_digest=content_digest(core),
+        )
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "manifest_schema": self.manifest_schema,
+            "intervention_component": self.intervention_component.value,
+            "parent": self.parent.payload(),
+            "candidate": self.candidate.payload(),
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            **self.identity_payload(),
+            "matched_digest": self.matched_digest,
         }
