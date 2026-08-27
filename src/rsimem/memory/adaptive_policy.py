@@ -141,6 +141,7 @@ class AdaptiveTrainingConfig:
     parent_policy_version: str
     seed: int
     parameters: tuple[AdaptiveParameterSpec, ...]
+    training_example_ids: tuple[str, ...] = ()
     minimum_resolved_examples: int = 2
     maximum_missing_propensity_rate: float = 0.25
     prior_positive: float = 1.0
@@ -186,6 +187,8 @@ class AdaptiveTrainingConfig:
             raise ValueError("adaptive training requires trusted semantic parameters")
         object.__setattr__(self, "parameters", tuple(self.parameters))
         object.__setattr__(self, "feature_names", tuple(self.feature_names))
+        object.__setattr__(self, "training_example_ids", tuple(self.training_example_ids))
+        _require_ids(self.training_example_ids, "adaptive training examples")
         parameter_ids = tuple(item.parameter_id for item in self.parameters)
         parameter_names = tuple(item.name for item in self.parameters)
         if (
@@ -243,6 +246,7 @@ class AdaptiveTrainingConfig:
             "seed": self.seed,
             "objective": self.objective,
             "parameters": [item.payload() for item in self.parameters],
+            "training_example_ids": list(self.training_example_ids),
             "minimum_resolved_examples": self.minimum_resolved_examples,
             "maximum_missing_propensity_rate": (
                 self.maximum_missing_propensity_rate
@@ -424,6 +428,7 @@ class AdaptivePolicyArtifact:
     invocation_boundary: str
     parameters: tuple[AdaptiveParameterUpdate, ...]
     prompt_refs: tuple[str, ...]
+    training_example_ids: tuple[str, ...]
     metrics: AdaptiveTrainingMetrics
     provenance_example_ids: tuple[str, ...]
     provenance_operation_ids: tuple[str, ...]
@@ -480,6 +485,7 @@ class AdaptivePolicyArtifact:
             raise ValueError("adaptive artifact prompt refs are incomplete")
         for reference in self.prompt_refs:
             _require_identifier(reference, "adaptive artifact prompt reference")
+        _require_ids(self.training_example_ids, "adaptive artifact training examples")
         _require_ids(self.provenance_example_ids, "adaptive artifact examples")
         _require_ids(self.provenance_operation_ids, "adaptive artifact operations")
         expected_examples = tuple(sorted({
@@ -495,6 +501,7 @@ class AdaptivePolicyArtifact:
         if (
             self.provenance_example_ids != expected_examples
             or self.provenance_operation_ids != expected_operations
+            or not set(self.provenance_example_ids).issubset(self.training_example_ids)
         ):
             raise ValueError("adaptive artifact provenance is incomplete")
         expected_digest = _digest(self.identity_payload())
@@ -524,6 +531,7 @@ class AdaptivePolicyArtifact:
             "invocation_boundary": self.invocation_boundary,
             "parameters": [item.payload() for item in self.parameters],
             "prompt_refs": list(self.prompt_refs),
+            "training_example_ids": list(self.training_example_ids),
             "metrics": self.metrics.payload(),
             "provenance_example_ids": list(self.provenance_example_ids),
             "provenance_operation_ids": list(self.provenance_operation_ids),
@@ -564,6 +572,10 @@ class AdaptivePolicyArtifact:
             for operation_id in update.failure_subgraph_operation_ids
         }))
         prompt_refs = tuple(spec.prompt_ref for spec in config.parameters)
+        training_example_ids = tuple(
+            config.training_example_ids
+            or (example.example_id for example in dataset.examples)
+        )
         basis = {
             "schema_version": ADAPTIVE_POLICY_SCHEMA_VERSION,
             "artifact_schema": ADAPTIVE_POLICY_ARTIFACT_SCHEMA,
@@ -582,6 +594,7 @@ class AdaptivePolicyArtifact:
             "invocation_boundary": config.invocation_boundary,
             "parameters": [item.payload() for item in parameters],
             "prompt_refs": list(prompt_refs),
+            "training_example_ids": list(training_example_ids),
             "metrics": metrics.payload(),
             "provenance_example_ids": list(provenance_examples),
             "provenance_operation_ids": list(provenance_operations),
@@ -608,6 +621,7 @@ class AdaptivePolicyArtifact:
             invocation_boundary=config.invocation_boundary,
             parameters=parameters,
             prompt_refs=prompt_refs,
+            training_example_ids=training_example_ids,
             metrics=metrics,
             provenance_example_ids=provenance_examples,
             provenance_operation_ids=provenance_operations,
@@ -698,6 +712,11 @@ class DeterministicAdaptivePolicyLearner:
             for spec in config.parameters
         ):
             raise ValueError("adaptive learner has an unknown policy parameter")
+        available_examples = {example.example_id for example in dataset.examples}
+        if config.training_example_ids and not set(
+            config.training_example_ids
+        ).issubset(available_examples):
+            raise ValueError("adaptive learner training membership is invalid")
 
     def learn(
         self,
@@ -706,15 +725,21 @@ class DeterministicAdaptivePolicyLearner:
         config: AdaptiveTrainingConfig,
     ) -> AdaptivePolicyArtifact:
         self._validate_inputs(dataset, gate, config)
+        selected_ids = set(config.training_example_ids)
+        examples = tuple(
+            example
+            for example in dataset.examples
+            if not selected_ids or example.example_id in selected_ids
+        )
         label_counts = {label: 0 for label in FeedbackLabel}
-        for example in dataset.examples:
+        for example in examples:
             label_counts[example.label] += 1
         missing_propensity_count = sum(
-            example.selection_propensity is None for example in dataset.examples
+            example.selection_propensity is None for example in examples
         )
         missing_propensity_rate = (
-            missing_propensity_count / len(dataset.examples)
-            if dataset.examples
+            missing_propensity_count / len(examples)
+            if examples
             else 0.0
         )
         distribution_shift = (
@@ -725,7 +750,7 @@ class DeterministicAdaptivePolicyLearner:
             positive_ids = set()
             negative_ids = set()
             failure_ids = set()
-            for example in dataset.examples:
+            for example in examples:
                 if spec.parameter_id not in example.policy_parameter_ids:
                     continue
                 if example.label == FeedbackLabel.POSITIVE:
@@ -777,7 +802,7 @@ class DeterministicAdaptivePolicyLearner:
                 failure_subgraph_operation_ids=tuple(sorted(failure_ids)),
             ))
         metrics = AdaptiveTrainingMetrics(
-            observation_count=len(dataset.examples),
+            observation_count=len(examples),
             positive_count=label_counts[FeedbackLabel.POSITIVE],
             negative_count=label_counts[FeedbackLabel.NEGATIVE],
             unresolved_count=label_counts[FeedbackLabel.UNRESOLVED],
