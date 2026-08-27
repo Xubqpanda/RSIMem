@@ -823,16 +823,12 @@ def test_live_bridge_persists_pre_snapshot_failure_without_failing_task(tmp_path
     assert bridge.lifecycle_results == ()
     assert bridge.lifecycle_failures == (
         ("task_completed", "ValueError"),
-        ("session_end", "ValueError"),
     )
     events = [
         json.loads(line)
         for line in lifecycle_path.read_text(encoding="utf-8").splitlines()
     ]
-    assert [event["kind"] for event in events] == [
-        "boundary_rejected",
-        "boundary_rejected",
-    ]
+    assert [event["kind"] for event in events] == ["boundary_rejected"]
     assert all(event["snapshotId"] is None for event in events)
     assert PRIVATE_PREFERENCE not in json.dumps(events, ensure_ascii=True)
 
@@ -883,6 +879,9 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
         session_id=session_id,
     ))
 
+    bridge.on_task_completed({"completed": False})
+    assert bridge.static_results == ()
+    assert client.calls == ()
     bridge.on_task_completed({"completed": True})
     assert len(bridge.static_results) == 1
     assert bridge.static_results[0].writeback.logical_exit is True
@@ -910,7 +909,7 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
     assert "pipe-delimited" not in json.dumps(utility_events[0], sort_keys=True)
     bridge.close()
 
-    assert len(bridge.lifecycle_results) == 2
+    assert len(bridge.lifecycle_results) == 1
     assert len(bridge.static_results) == 1
     assert len(client.calls) == 2
     serialized = (artifacts / "memory.jsonl").read_text(encoding="utf-8")
@@ -935,6 +934,61 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
     ))
     assert any("pipe-delimited" in hit.artifact.content for hit in hits)
     restarted.close()
+    db.close()
+
+
+def test_live_bridge_compiles_completed_task_without_lifecycle_evaluator(
+    tmp_path: Path,
+) -> None:
+    from hermes_state import SessionDB
+
+    home = _hermes_home(tmp_path / "home")
+    db = SessionDB(home / "state.db")
+    session_id = "session-direct-compilation"
+    db.create_session(session_id, "past_bench", model="fixture-model")
+    db.append_message(session_id, "user", "Always use pipe-delimited output.")
+    db.append_message(session_id, "assistant", "Understood.")
+    client = FakeCompletionClient({
+        POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id: json.dumps({
+            "facts": ["Use pipe-delimited output for future tables."],
+        }),
+        POLICY_INTERNAL_OPERATION_PROMPT.artifact.prompt_id: json.dumps({
+            "operations": [{
+                "fact_index": 0,
+                "action": "add",
+                "candidate_id": None,
+            }],
+        }),
+    })
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "memory.jsonl",
+        run_id="run-direct-compilation",
+        trace_id="trace-direct-compilation",
+        episode_id="episode-direct-compilation",
+        session_id=session_id,
+        task_id="SM01-direct-compilation",
+        experiment_variant="static-rsimem",
+        static_writeback_config=StaticSemanticWritebackConfig(mode="static"),
+        static_completion_client=client,
+    )
+    bridge.attach(SimpleNamespace(
+        _memory_store=None,
+        _session_db=db,
+        session_id=session_id,
+    ))
+
+    bridge.on_task_completed({"completed": True})
+    bridge.on_task_completed({"completed": True})
+    bridge.close()
+
+    assert bridge.lifecycle is None
+    assert bridge.lifecycle_results == ()
+    assert bridge.lifecycle_failures == ()
+    assert len(bridge.static_results) == 1
+    assert bridge.static_results[0].writeback.logical_exit is True
+    assert len(client.calls) == 2
     db.close()
 
 
@@ -1037,7 +1091,7 @@ def test_live_bridge_records_content_free_sm01_future_feedback(tmp_path: Path) -
     assert PRIVATE_PREFERENCE not in serialized
 
 
-def test_static_writeback_bridge_requires_native_ledger_and_lifecycle(tmp_path: Path) -> None:
+def test_static_writeback_bridge_requires_native_ledger_not_lifecycle(tmp_path: Path) -> None:
     home = _hermes_home(tmp_path / "home")
     client = FakeCompletionClient({})
     kwargs = {
@@ -1058,12 +1112,13 @@ def test_static_writeback_bridge_requires_native_ledger_and_lifecycle(tmp_path: 
             lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
             **kwargs,
         )
-    with pytest.raises(ValueError, match="requires lifecycle"):
-        HermesPastBenchBridge(
-            home,
-            HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
-            **kwargs,
-        )
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        **kwargs,
+    )
+    assert bridge.lifecycle is None
+    bridge.close()
 
 
 @pytest.mark.parametrize(

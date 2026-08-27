@@ -313,3 +313,69 @@ def test_static_runtime_policy_failure_retains_source_without_mutation(tmp_path)
     assert runtime.receipts.all() == ()
     assert not (tmp_path / "hermes-home" / "memories" / "USER.md").exists()
     runtime.close()
+
+
+def test_completed_snapshot_compiles_once_without_eviction_plan(tmp_path) -> None:
+    snapshot = _lifecycle(tmp_path).snapshot
+    client = _client()
+    runtime = _runtime(tmp_path, client)
+
+    first = runtime.process_completed_snapshot(snapshot)
+    replay = runtime.process_completed_snapshot(snapshot)
+
+    assert first == replay
+    assert len(first) == 1
+    assert first[0].compilation_id.startswith("semantic_compilation_")
+    assert first[0].writeback.logical_exit is True
+    assert len(client.calls) == 2
+    context_exit = first[0].writeback.executions[0].context_exit
+    assert context_exit.physical_rewrite is False
+    assert context_exit.saved_tokens is None
+    runtime.close()
+
+    replay_client = _client()
+    restarted = _runtime(tmp_path, replay_client)
+    restarted_result = restarted.process_completed_snapshot(snapshot)[0]
+    assert restarted_result.duplicate is True
+    assert restarted_result.writeback is None
+    assert restarted_result.receipt == first[0].receipt
+    assert replay_client.calls == ()
+    restarted.close()
+
+
+def test_dry_run_observer_does_not_change_direct_compilation(tmp_path) -> None:
+    snapshot = _lifecycle(tmp_path / "snapshot").snapshot
+    plain_client = _client()
+    observed_client = _client()
+    plain = _runtime(tmp_path / "plain", plain_client)
+    observer = LifecycleLedgerObserver(
+        variant="static-observed",
+        trace_id="trace-observed",
+        output_path=tmp_path / "observed" / "lifecycle.jsonl",
+    )
+    observed = StaticSemanticWritebackRuntime(
+        tmp_path / "observed" / "hermes-home",
+        observed_client,
+        operation_evidence_path=tmp_path / "observed" / "operations.jsonl",
+        mutation_receipt_path=(
+            tmp_path / "observed" / "hermes-home" / "rsimem-receipts.json"
+        ),
+        ingestion_observer=observer,
+    )
+
+    plain_result = plain.process_completed_snapshot(snapshot)[0]
+    observed_result = observed.process_completed_snapshot(snapshot)[0]
+
+    assert plain_client.calls == observed_client.calls
+    assert plain_result.compilation_id == observed_result.compilation_id
+    assert plain_result.writeback is not None
+    assert observed_result.writeback is not None
+    assert plain_result.writeback.ingestion == observed_result.writeback.ingestion
+    assert (
+        tmp_path / "plain" / "hermes-home" / "memories" / "USER.md"
+    ).read_bytes() == (
+        tmp_path / "observed" / "hermes-home" / "memories" / "USER.md"
+    ).read_bytes()
+    assert len([event for event in observer.events if event["kind"] == "memory_ingestion"]) == 1
+    plain.close()
+    observed.close()

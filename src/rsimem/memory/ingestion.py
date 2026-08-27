@@ -11,7 +11,6 @@ from typing import Callable, Mapping, Protocol, Sequence, runtime_checkable
 
 from ..lifecycle import (
     ContextSnapshot,
-    EvaluationTrigger,
     ExitEvidence,
     LIFECYCLE_CONTRACT_SCHEMA_VERSION,
     MemoryScope,
@@ -53,6 +52,12 @@ class ContextExitSemantics(StrEnum):
     NATURAL = "natural"
     LOGICAL = "logical"
     PHYSICAL = "physical"
+
+
+class SemanticCompilationTrigger(StrEnum):
+    """Trusted host boundary allowed to invoke semantic compilation."""
+
+    TASK_COMPLETED = "task_completed"
 
 
 class InternalMemoryAction(StrEnum):
@@ -150,7 +155,7 @@ class FixedMemoryRouter:
 @dataclass(frozen=True, slots=True)
 class IngestionProvenance:
     source: ProvenanceRef
-    plan_id: str
+    compilation_id: str
     base_revision: str
     schema_version: int = INGESTION_CONTRACT_SCHEMA_VERSION
 
@@ -158,10 +163,12 @@ class IngestionProvenance:
         _require_schema(self.schema_version, "ingestion provenance")
         if self.source.schema_version != LIFECYCLE_CONTRACT_SCHEMA_VERSION:
             raise ValueError("ingestion provenance requires lifecycle schema v1")
-        if not self.plan_id.strip() or not self.base_revision.strip():
-            raise ValueError("ingestion provenance requires plan_id and base_revision")
-        if not self.source.segment_ids or not self.source.evaluation_id:
-            raise ValueError("ingestion provenance requires source segments and evaluation")
+        if not self.compilation_id.strip() or not self.base_revision.strip():
+            raise ValueError(
+                "ingestion provenance requires compilation_id and base_revision"
+            )
+        if not self.source.segment_ids:
+            raise ValueError("ingestion provenance requires source segments")
 
 
 def _semantic_request_identity(
@@ -174,7 +181,7 @@ def _semantic_request_identity(
     policy_version: str,
     framework_version: str,
     provenance: IngestionProvenance,
-    trigger: EvaluationTrigger,
+    trigger: SemanticCompilationTrigger,
     schema_version: int,
 ) -> dict[str, object]:
     source = source_experience
@@ -219,8 +226,7 @@ def _semantic_request_identity(
             "snapshot_id": provenance.source.snapshot_id,
             "source_ref": provenance.source.source_ref,
             "segment_ids": provenance.source.segment_ids,
-            "evaluation_id": provenance.source.evaluation_id,
-            "plan_id": provenance.plan_id,
+            "compilation_id": provenance.compilation_id,
             "base_revision": provenance.base_revision,
         },
     }
@@ -237,21 +243,22 @@ class SemanticIngestRequest:
     framework_version: str
     provenance: IngestionProvenance
     idempotency_key: str
-    trigger: EvaluationTrigger
+    trigger: SemanticCompilationTrigger
     schema_version: int = INGESTION_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         _require_schema(self.schema_version, "semantic ingest request")
-        object.__setattr__(self, "trigger", EvaluationTrigger(self.trigger))
+        try:
+            trigger = SemanticCompilationTrigger(self.trigger)
+        except ValueError as exc:
+            raise ValueError("semantic ingestion requires task_completed") from exc
+        object.__setattr__(self, "trigger", trigger)
         object.__setattr__(self, "scope", MemoryScope(self.scope))
         object.__setattr__(self, "validity", TemporalValidity(self.validity))
         if self.fixed_route != HERMES_NATIVE_ROUTES[MemoryKind.SEMANTIC]:
             raise ValueError("semantic ingestion requires the fixed Hermes semantic route")
-        if self.trigger not in {
-            EvaluationTrigger.TASK_COMPLETED,
-            EvaluationTrigger.SESSION_END,
-        }:
-            raise ValueError("semantic ingestion requires a natural lifecycle boundary")
+        if self.trigger != SemanticCompilationTrigger.TASK_COMPLETED:
+            raise ValueError("semantic ingestion requires task_completed")
         if any(not value.strip() for value in (
             self.policy_version,
             self.framework_version,
@@ -296,12 +303,12 @@ class SemanticIngestRequest:
         policy_version: str,
         framework_version: str,
         provenance: IngestionProvenance,
-        trigger: EvaluationTrigger,
+        trigger: SemanticCompilationTrigger,
         schema_version: int = INGESTION_CONTRACT_SCHEMA_VERSION,
     ) -> SemanticIngestRequest:
         normalized_scope = MemoryScope(scope)
         normalized_validity = TemporalValidity(validity)
-        normalized_trigger = EvaluationTrigger(trigger)
+        normalized_trigger = SemanticCompilationTrigger(trigger)
         values = {
             "source_experience": source_experience,
             "fixed_route": fixed_route,
@@ -395,7 +402,83 @@ def build_semantic_ingest_request(
         policy_version=policy_version,
         framework_version=framework_version,
         provenance=provenance,
-        trigger=EvaluationTrigger(snapshot.lifecycle_state),
+        trigger=SemanticCompilationTrigger(snapshot.lifecycle_state),
+    )
+
+
+def build_completed_task_semantic_ingest_request(
+    snapshot: ContextSnapshot,
+    experience: MemoryExperience,
+    *,
+    policy_version: str,
+    framework_version: str,
+    router: FixedMemoryRouter | None = None,
+) -> SemanticIngestRequest:
+    """Build compilation directly from a trusted completed-task snapshot."""
+
+    router = router or FixedMemoryRouter()
+    if snapshot.task_state != TaskLifecycleState.COMPLETED:
+        raise ValueError("semantic compilation requires completed task state")
+    if snapshot.lifecycle_state != SemanticCompilationTrigger.TASK_COMPLETED.value:
+        raise ValueError("semantic compilation requires task_completed boundary")
+    if snapshot.current_turn_id is not None or snapshot.active_segment_ids:
+        raise ValueError("active/current context cannot enter semantic compilation")
+    if any(not segment.completed for segment in snapshot.segments):
+        raise ValueError("unresolved source cannot enter semantic compilation")
+    if any(not closure.closed for closure in snapshot.tool_closures):
+        raise ValueError("open tool closure cannot enter semantic compilation")
+    if experience.session_id != snapshot.session_id or (
+        experience.task_id != snapshot.task_id
+    ):
+        raise ValueError("semantic experience identity must match source snapshot")
+    source_segment_ids = tuple(segment.segment_id for segment in snapshot.segments)
+    compilation_identity = {
+        "schema_version": INGESTION_CONTRACT_SCHEMA_VERSION,
+        "trigger": SemanticCompilationTrigger.TASK_COMPLETED.value,
+        "snapshot_id": snapshot.snapshot_id,
+        "context_revision": snapshot.context_revision,
+        "source_segment_ids": source_segment_ids,
+        "policy_version": policy_version,
+        "framework_version": framework_version,
+    }
+    compilation_id = _stable_id("semantic_compilation", compilation_identity)
+    source = ProvenanceRef(
+        run_id=snapshot.run_id,
+        episode_id=snapshot.episode_id,
+        session_id=snapshot.session_id,
+        task_id=snapshot.task_id,
+        snapshot_id=snapshot.snapshot_id,
+        source_ref=snapshot.provenance.source_ref,
+        segment_ids=source_segment_ids,
+    )
+    evidence = ExitEvidence(
+        completion_status="completed",
+        completion_evidence=("trusted_host_task_completed",),
+        safe_to_evict=False,
+        unresolved_state=None,
+        scope=MemoryScope.USER,
+        temporal_validity=TemporalValidity.DURABLE,
+        provenance=(snapshot.snapshot_id, *source_segment_ids),
+        reusable_facts=(),
+        reusable_procedures=(),
+        update_hints=(),
+        utility_estimate=1.0,
+        confidence=1.0,
+    )
+    return SemanticIngestRequest.create(
+        source_experience=experience,
+        fixed_route=router.semantic,
+        exit_evidence=evidence,
+        scope=MemoryScope.USER,
+        validity=TemporalValidity.DURABLE,
+        policy_version=policy_version,
+        framework_version=framework_version,
+        provenance=IngestionProvenance(
+            source,
+            compilation_id,
+            snapshot.context_revision,
+        ),
+        trigger=SemanticCompilationTrigger.TASK_COMPLETED,
     )
 
 

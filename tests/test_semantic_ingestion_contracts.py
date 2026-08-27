@@ -49,6 +49,7 @@ from rsimem.memory.ingestion import (
     SemanticPolicyDecision,
     SemanticPolicyDescriptor,
     SemanticPolicyRegistry,
+    build_completed_task_semantic_ingest_request,
     build_semantic_ingest_request,
     mem0_flat_policy,
 )
@@ -228,7 +229,7 @@ def test_request_rejects_route_override_hidden_score_and_operation_metadata() ->
                 metadata={"target": "artifact-forged"},
             ),
         )
-    with pytest.raises(ValueError, match="natural lifecycle boundary"):
+    with pytest.raises(ValueError, match="requires task_completed"):
         replace(request, trigger=EvaluationTrigger.TURN_INTERVAL)
 
 
@@ -243,6 +244,13 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
             policy_version="policy-v1",
             framework_version="framework-v1",
         )
+    with pytest.raises(ValueError, match="completed task state"):
+        build_completed_task_semantic_ingest_request(
+            replace(snapshot, task_state=TaskLifecycleState.FAILED),
+            experience,
+            policy_version="policy-v1",
+            framework_version="framework-v1",
+        )
     unresolved_segments = (
         replace(snapshot.segments[0], completed=False),
         *snapshot.segments[1:],
@@ -251,6 +259,21 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
         build_semantic_ingest_request(
             replace(snapshot, segments=unresolved_segments),
             plan,
+            experience,
+            policy_version="policy-v1",
+            framework_version="framework-v1",
+        )
+    with pytest.raises(ValueError, match="unresolved source"):
+        build_completed_task_semantic_ingest_request(
+            replace(snapshot, segments=unresolved_segments),
+            experience,
+            policy_version="policy-v1",
+            framework_version="framework-v1",
+        )
+
+    with pytest.raises(ValueError, match="active/current context"):
+        build_completed_task_semantic_ingest_request(
+            replace(snapshot, current_turn_id=snapshot.segments[0].turn_id),
             experience,
             policy_version="policy-v1",
             framework_version="framework-v1",
@@ -277,6 +300,13 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
         build_semantic_ingest_request(
             open_snapshot,
             plan,
+            experience,
+            policy_version="policy-v1",
+            framework_version="framework-v1",
+        )
+    with pytest.raises(ValueError, match="open tool closure"):
+        build_completed_task_semantic_ingest_request(
+            open_snapshot,
             experience,
             policy_version="policy-v1",
             framework_version="framework-v1",
@@ -554,7 +584,7 @@ def test_request_rejects_missing_versions_noncanonical_identity_and_stale_source
         replace(request, schema_version=2)
     with pytest.raises(ValueError, match="policy, framework"):
         replace(request, framework_version="")
-    with pytest.raises(ValueError, match="plan_id and base_revision"):
+    with pytest.raises(ValueError, match="compilation_id and base_revision"):
         replace(request, provenance=replace(request.provenance, base_revision=""))
     with pytest.raises(ValueError, match="experience_id"):
         replace(

@@ -16,12 +16,14 @@ from .hermes_integration import (
     _materialize_procedural_hits,
     build_configured_hermes_runtime,
 )
-from .ledger import MemoryLedgerObserver
+from .ledger import LifecycleLedgerObserver, MemoryLedgerObserver
 from .lifecycle import (
     EvaluationTrigger,
+    ContextSnapshot,
     HermesLifecycleConfig,
     HermesLifecycleDryRunResult,
     HermesLifecycleDryRunRuntime,
+    HermesStateSnapshotCollector,
     TaskLifecycleState,
 )
 from .memory import MemoryEvent, MemoryEventKind, MemoryKind, MemoryQuery
@@ -287,6 +289,11 @@ class HermesPastBenchBridge:
             raise ValueError("native mode must not construct an RSIMem bridge")
         self.config = config
         self.evidence_path = evidence_path.expanduser().resolve()
+        self._run_id = run_id
+        self._episode_id = episode_id
+        self._session_id = session_id
+        self._task_id = task_id
+        self._snapshot_collector = HermesStateSnapshotCollector()
         self.ledger = MemoryLedgerObserver(
             run_id=run_id,
             variant=experiment_variant,
@@ -306,8 +313,6 @@ class HermesPastBenchBridge:
         )
         self._tool_handlers: dict[str, Callable[..., str]] = {}
         self._agent: object | None = None
-        self._last_task_completed = False
-        self._session_end_emitted = False
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
         self._static_results: list[StaticSemanticBoundaryResult] = []
@@ -315,6 +320,10 @@ class HermesPastBenchBridge:
         self._semantic_futures: list[tuple[SemanticFutureEvidence, str]] = []
         self._semantic_outcomes_recorded = False
         lifecycle_config = lifecycle_config or HermesLifecycleConfig()
+        resolved_lifecycle_evidence_path = (
+            lifecycle_evidence_path
+            or self.evidence_path.with_name("rsimem_lifecycle_events.jsonl")
+        )
         self.lifecycle = (
             HermesLifecycleDryRunRuntime(
                 lifecycle_config,
@@ -328,10 +337,7 @@ class HermesPastBenchBridge:
                     lifecycle_receipt_path
                     or self.evidence_path.with_name("rsimem_lifecycle_receipts.json")
                 ),
-                evidence_path=(
-                    lifecycle_evidence_path
-                    or self.evidence_path.with_name("rsimem_lifecycle_events.jsonl")
-                ),
+                evidence_path=resolved_lifecycle_evidence_path,
                 family_id=family_id,
                 stage=stage,
                 injected_complete=lifecycle_complete,
@@ -345,10 +351,19 @@ class HermesPastBenchBridge:
         if static_writeback_config.enabled:
             if config.mode != HermesExecutionMode.NATIVE_LEDGER:
                 raise ValueError("static semantic writeback requires native+ledger mode")
-            if self.lifecycle is None:
-                raise ValueError("static semantic writeback requires lifecycle evaluation")
             if static_completion_client is None:
                 raise ValueError("static semantic writeback requires a completion client")
+            static_ingestion_observer = (
+                self.lifecycle.observer
+                if self.lifecycle is not None
+                else LifecycleLedgerObserver(
+                    variant=experiment_variant,
+                    trace_id=trace_id,
+                    family_id=family_id,
+                    stage=stage,
+                    output_path=resolved_lifecycle_evidence_path,
+                )
+            )
             adaptive_store = None
             if static_writeback_config.adaptive_enabled:
                 relative_store = Path(
@@ -381,7 +396,7 @@ class HermesPastBenchBridge:
                     or hermes_home / ".rsimem" / "semantic_mutation_receipts.json"
                 ),
                 observer=self.ledger,
-                ingestion_observer=self.lifecycle.observer,
+                ingestion_observer=static_ingestion_observer,
                 utility_gate=(
                     FrozenMem0UtilityGate()
                     if static_writeback_config.utility_enabled
@@ -464,22 +479,49 @@ class HermesPastBenchBridge:
         """Receive the explicit post-conversation task boundary from PAST."""
 
         self._record_semantic_outcomes(result)
-        if self.lifecycle is None or result.get("completed") is not True:
+        if result.get("completed") is not True:
             return
-        self._last_task_completed = True
-        lifecycle = self._process_lifecycle_boundary(
-            EvaluationTrigger.TASK_COMPLETED,
-            TaskLifecycleState.COMPLETED,
-        )
-        if lifecycle is None or self.static_writeback is None:
+        if self.lifecycle is not None:
+            self._process_lifecycle_boundary(
+                EvaluationTrigger.TASK_COMPLETED,
+                TaskLifecycleState.COMPLETED,
+            )
+        if self.static_writeback is None:
             return
         try:
-            self._static_results.extend(self.static_writeback.process(lifecycle))
+            snapshot = self._collect_completed_snapshot()
+            results = self.static_writeback.process_completed_snapshot(snapshot)
+            for compiled in results:
+                if not any(
+                    item.compilation_id == compiled.compilation_id
+                    for item in self._static_results
+                ):
+                    self._static_results.append(compiled)
         except Exception as exc:
             self._static_failures.append((
                 EvaluationTrigger.TASK_COMPLETED.value,
                 type(exc).__name__,
             ))
+
+    def _collect_completed_snapshot(self) -> ContextSnapshot:
+        agent = self._agent
+        if agent is None:
+            raise ValueError("Hermes semantic bridge is not attached")
+        session_db = getattr(agent, "_session_db", None)
+        native_session_id = str(getattr(agent, "session_id", "") or "")
+        if session_db is None or not native_session_id:
+            raise ValueError("semantic compilation requires a persisted native session")
+        rows = session_db.get_messages(native_session_id)
+        return self._snapshot_collector.collect(
+            rows,
+            run_id=self._run_id,
+            episode_id=self._episode_id,
+            session_id=self._session_id,
+            task_id=self._task_id,
+            task_state=TaskLifecycleState.COMPLETED,
+            lifecycle_state=EvaluationTrigger.TASK_COMPLETED.value,
+            source_ref=f"hermes_state:session:{native_session_id}",
+        )
 
     def record_semantic_prompt(self, prompt: str | None, namespace: str) -> None:
         if self.semantic_future_recorder is None or not prompt:
@@ -733,16 +775,6 @@ class HermesPastBenchBridge:
             return
         self._closed = True
         try:
-            if self.lifecycle is not None and not self._session_end_emitted:
-                self._session_end_emitted = True
-                self._process_lifecycle_boundary(
-                    EvaluationTrigger.SESSION_END,
-                    (
-                        TaskLifecycleState.COMPLETED
-                        if self._last_task_completed
-                        else TaskLifecycleState.FAILED
-                    ),
-                )
             from tools.registry import registry
 
             for tool_name, handler in self._tool_handlers.items():
