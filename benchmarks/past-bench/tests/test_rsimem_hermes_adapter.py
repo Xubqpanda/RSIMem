@@ -268,6 +268,7 @@ def test_past_bench_emits_explicit_lifecycle_boundaries(
         "policy_version": "phase1-fixture-v1",
         "compiler_version": "uncompiled-v0",
     }
+    request.model.extra_body["hermes"]["session_search_enabled"] = False
     adapter = HermesAdapter(
         AgentSpec(name="hermes", adapter="hermes"),
         request,
