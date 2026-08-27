@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem ingestor, real writeback mutation, static policy, or adaptive policy is active yet. The active implementation scope is now semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E and Phase 2A-2C are complete. Phase 2D transactional mutation execution, recovery, and context-exit gating are the active milestone; no real RSIMem mutation is enabled yet.
+Phase 1A-1E and Phase 2A-2D are complete. Phase 2E Mem0-style semantic construction and the first SM01 restart/retrieval/injection loop are the active milestone. Real mutation remains disabled outside isolated fixtures.
 
 ## Completed Work
 
@@ -159,22 +159,34 @@ operation tracing is enabled.
 - [x] Keep episodic/procedural mutation disabled and prove every rejected candidate leaves backend mutation count at zero.
 
 Known boundary: target ownership persistence and committed receipts do not exist
-yet. Semantic category and denylist checks enforce the current deterministic
+outside the Phase 2D isolated receipt store. Semantic category and denylist checks enforce the current deterministic
 contract but do not establish model-generated memory quality or comprehensive
 prompt-injection resistance.
 
+### Phase 2D Transaction And Recovery
+
+- [x] Add pending/committed/failed/rolled-back receipts with atomic reservation, CAS transitions, target locking, and durable ownership projection.
+- [x] Execute validated semantic ADD/UPDATE/DELETE/NONE in isolated Hermes backends through apply, reread, verify, and commit.
+- [x] Recover five crash windows deterministically, preserve blocked unknown state, and audit corruption, orphan, revision, digest, and storage evidence.
+- [x] Gate logical exit on verified committed memory at task/session boundaries while keeping physical rewrite disabled.
+
+Known boundary: the JSON/`flock` transaction layer is a single-host fixture
+implementation. It is default-disabled and not connected to PAST-Bench or a
+live Hermes home. Unknown ownership and unsafe compensation remain blocked for
+operator/recovery handling rather than being guessed.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `175 passed`.
+- [x] Pass all RSIMem tests: `210 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `385 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2D Transactional Mutation Executor**
+### **Current: Phase 2E Mem0-Style Semantic Memory And SM01 Loop**
 
-Phase 2C now rejects unsafe or inconsistent framework output before it can reach `MemoryRuntime.mutate()` or a Hermes file. The immediate objective is Phase 2D: reserve one durable pending receipt, apply a validated semantic mutation, reread and verify actual storage, commit or recover deterministically after each crash point, and permit logical context exit only after verified commit.
+Phase 2D now provides a default-disabled isolated transaction/recovery path and proves verified semantic mutation without weakening native read behavior. The immediate objective is Phase 2E: implement the actual Mem0-flat extraction and related-memory operation decision, drive the existing validation/executor through the SM01 learn episode, restart into a fresh Hermes session, and connect retrieval/injection/downstream-use evidence.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -223,7 +235,7 @@ Acceptance criteria:
 - [ ] Attribute failures to extraction, internal decision, mutation, or retrieval subgraphs before updating policy.
 - [x] Keep episodic and procedural policy implementation disabled until their separate research gates select a method and matched baseline.
 - [x] Record ingestion model requests, latency, tokens, internal operations, rejected operations, and stored bytes as lifecycle cost.
-- [ ] Add validation, rollback, and idempotency tests for framework-produced internal operations.
+- [x] Add validation, rollback, and idempotency tests for framework-produced internal operations.
 
 ### Static LightRSI Writeback
 
@@ -264,11 +276,11 @@ Acceptance criteria:
 
 ## Immediate Execution Order
 
-1. Define the Phase 2D pending/committed/failed/rolled-back receipt state machine and atomic reservation.
-2. Implement strict `validate -> reserve -> mutate -> reread -> verify -> commit` execution behind an isolated-fixture flag.
-3. Cover five crash points, restart recovery, revision conflict, orphan detection, and unknown-state target blocking.
-4. Gate logical source exit on reread-verified committed memory while keeping physical rewrite disabled.
-5. Connect model-based Mem0-flat semantic construction and the SM01 loop only after the full transaction/recovery gate passes.
+1. Implement Mem0-flat fact extraction and internal ADD/UPDATE/DELETE/NONE decision using the frozen prompt/completion contracts.
+2. Define bounded related-memory retrieval parameters and bind candidate targets through the committed ownership resolver.
+3. Complete the SM01 learn -> ingest -> validate -> mutate -> restart -> native injection -> downstream-use fixture.
+4. Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
+5. Run static SM01 matched comparisons only after the deterministic end-to-end and audit gates pass.
 
 ## Update Policy
 
