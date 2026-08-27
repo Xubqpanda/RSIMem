@@ -1,6 +1,7 @@
 """Pluggable context lifecycle evaluation for RSIMem."""
 
 from .contracts import (
+    LIFECYCLE_CONTRACT_SCHEMA_VERSION,
     ContextAction,
     CompletionStatus,
     ContextEvaluation,
@@ -96,6 +97,7 @@ __all__ = [
     "EvaluationSignal",
     "EvaluationTrigger",
     "JsonLlmContextEvaluator",
+    "LIFECYCLE_CONTRACT_SCHEMA_VERSION",
     "HermesMessage",
     "HermesLifecycleConfig",
     "HermesLifecycleDryRunResult",

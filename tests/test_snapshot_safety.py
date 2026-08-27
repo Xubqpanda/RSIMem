@@ -194,3 +194,23 @@ def test_persisted_hermes_rows_fail_closed(rows, error: str) -> None:
             lifecycle_state="task_completed",
             source_ref="hermes_state:session:test",
         )
+
+
+def test_lifecycle_contract_schema_mismatch_fails_closed() -> None:
+    from dataclasses import replace
+
+    snapshot = HermesStateSnapshotCollector().collect(
+        ({"id": 1, "role": "user", "content": "Completed input."},),
+        run_id="run",
+        episode_id="episode",
+        session_id="session",
+        task_id="task",
+        task_state=TaskLifecycleState.COMPLETED,
+        lifecycle_state="task_completed",
+        source_ref="hermes_state:session:test",
+    )
+    with pytest.raises(ValueError, match="context snapshot schema version"):
+        replace(snapshot, schema_version=2)
+    request = snapshot_to_evaluation_request(snapshot, evaluation_id="evaluation")
+    with pytest.raises(ValueError, match="evaluation request schema version"):
+        replace(request, schema_version=2)

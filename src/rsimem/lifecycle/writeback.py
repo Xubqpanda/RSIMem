@@ -25,6 +25,8 @@ from .contracts import (
     MemoryScope,
     TemporalValidity,
     WritebackAction,
+    LIFECYCLE_CONTRACT_SCHEMA_VERSION,
+    _require_current_schema,
 )
 from .snapshot import ContextSnapshot, ProvenanceRef
 
@@ -83,8 +85,10 @@ class RawResourceUsage:
     retry_count: int = 0
     duration_ms: int | None = None
     storage_bytes: int = 0
+    schema_version: int = LIFECYCLE_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        _require_current_schema(self.schema_version, "raw resource usage")
         values = (
             self.input_tokens,
             self.output_tokens,
@@ -101,6 +105,7 @@ class RawResourceUsage:
 
     def to_dict(self) -> dict[str, int | None]:
         return {
+            "schema_version": self.schema_version,
             "input_tokens": self.input_tokens,
             "output_tokens": self.output_tokens,
             "cache_read_tokens": self.cache_read_tokens,
@@ -127,8 +132,10 @@ class ExitEvidence:
     reusable_facts: tuple[str, ...]
     reusable_procedures: tuple[str, ...]
     update_hints: tuple[str, ...]
+    schema_version: int = LIFECYCLE_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        _require_current_schema(self.schema_version, "exit evidence")
         if type(self.safe_to_evict) is not bool:
             raise TypeError("safe_to_evict must be bool")
         object.__setattr__(self, "completion_status", CompletionStatus(self.completion_status))
@@ -154,6 +161,7 @@ class ExitEvidence:
         """Canonical evidence that can change compiler-produced memory content."""
 
         return {
+            "schema_version": self.schema_version,
             "completion_status": self.completion_status.value,
             "completion_evidence": self.completion_evidence,
             "unresolved_state": self.unresolved_state,
@@ -276,6 +284,7 @@ class WritebackPlan:
     update_mode: str | None = None
     compiler_version: str = "uncompiled-v0"
     reason_codes: tuple[str, ...] = ()
+    schema_version: int = LIFECYCLE_CONTRACT_SCHEMA_VERSION
 
     @property
     def update_hints(self) -> tuple[str, ...]:
@@ -284,6 +293,12 @@ class WritebackPlan:
         return self.exit_evidence.update_hints
 
     def __post_init__(self) -> None:
+        _require_current_schema(self.schema_version, "writeback plan")
+        if (
+            self.provenance.schema_version != self.schema_version
+            or self.exit_evidence.schema_version != self.schema_version
+        ):
+            raise ValueError("plan contract schema versions must match")
         required = (
             self.plan_id,
             self.base_revision,
@@ -925,6 +940,7 @@ class WritebackCoordinator:
             update_hints=combined(item.update_hints for item in signals),
         )
         key_payload = {
+            "schema_version": LIFECYCLE_CONTRACT_SCHEMA_VERSION,
             "source_segment_ids": source_ids,
             "policy_version": evaluation.policy_version,
             "context_action": context_action.value,

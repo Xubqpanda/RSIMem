@@ -625,6 +625,7 @@ def test_lifecycle_usage_preserves_all_raw_request_buckets() -> None:
         storage_bytes=64,
     )
     assert usage.to_dict() == {
+        "schema_version": 1,
         "input_tokens": 100,
         "output_tokens": 20,
         "cache_read_tokens": 30,
