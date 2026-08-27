@@ -38,6 +38,8 @@ def _exit_evidence() -> ExitEvidence:
         ("Use TSV output.",),
         (),
         (),
+        0.9,
+        0.9,
     )
 
 
@@ -87,6 +89,16 @@ def test_deterministic_feature_extraction_and_shared_target_semantics() -> None:
     assert all(item.disposition == UtilityDisposition.ACCEPT for item in decisions)
     assert all(item.feature_digest == first.digest for item in decisions)
     assert all(item.contributions for item in decisions)
+    inherited = StaticUtilityFeatureExtractor().extract(
+        _exit_evidence(),
+        available_at=10,
+        recency=0.8,
+        reuse_likelihood=0.9,
+        conflict_risk=0.1,
+        recovery_risk=0.1,
+    )
+    assert inherited.get(UtilityFeatureName.PREDICTED_BENEFIT).value == 0.9
+    assert inherited.get(UtilityFeatureName.CONFIDENCE).value == 0.9
 
 
 def test_cost_and_benefit_monotonicity() -> None:

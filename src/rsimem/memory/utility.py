@@ -398,8 +398,8 @@ class StaticUtilityFeatureExtractor:
         reuse_likelihood: float | None,
         conflict_risk: float | None,
         recovery_risk: float | None,
-        predicted_benefit: float | None,
-        confidence: float | None,
+        predicted_benefit: float | None = None,
+        confidence: float | None = None,
         no_history: bool = False,
     ) -> StaticUtilityFeatures:
         def numeric(
@@ -416,6 +416,14 @@ class StaticUtilityFeatureExtractor:
                 missing if value is None else None,
             )
 
+        resolved_benefit = (
+            exit_evidence.utility_estimate
+            if predicted_benefit is None
+            else predicted_benefit
+        )
+        resolved_confidence = (
+            exit_evidence.confidence if confidence is None else confidence
+        )
         return StaticUtilityFeatures((
             FeatureObservation(
                 UtilityFeatureName.COMPLETION_STATUS,
@@ -466,12 +474,12 @@ class StaticUtilityFeatureExtractor:
             ),
             numeric(
                 UtilityFeatureName.PREDICTED_BENEFIT,
-                predicted_benefit,
+                resolved_benefit,
                 FeatureSource.MODEL_PREDICTED,
             ),
             numeric(
                 UtilityFeatureName.CONFIDENCE,
-                confidence,
+                resolved_confidence,
                 FeatureSource.MODEL_PREDICTED,
             ),
         ))

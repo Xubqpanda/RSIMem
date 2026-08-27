@@ -430,6 +430,8 @@ def test_update_idempotency_distinguishes_target_artifacts() -> None:
         {"completion_evidence": ("different completion evidence",)},
         {"scope": "global"},
         {"temporal_validity": "current"},
+        {"utility_estimate": 0.25},
+        {"confidence": 0.25},
     ],
 )
 def test_idempotency_covers_compiler_relevant_exit_evidence(
