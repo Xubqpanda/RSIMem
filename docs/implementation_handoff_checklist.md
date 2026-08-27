@@ -1083,6 +1083,9 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 - √ Manifest schema 记录 config/store digest、唯一 ACTIVE policy/artifact identity、RSIMem commit、PAST-Bench commit/tree 和实际轮换顺序。
 - √ 五方法 launcher 使用 `ADAPTIVE_METHOD_VARIANTS` 的 replicate rotation；direct native、ledger、static 和 adaptive 不通过 shell 隐式共享错误模式。
 - √ adaptive attempt 的 post-run audit 要求 utility evidence 使用 manifest 中的 ACTIVE policy version。
+- √ prior deployment feedback 通过 content-addressed dataset/gate manifest、跨 run time split 和 retrieval-owner-only learner 生成离线 `PROPOSAL -> VALIDATED/REJECTED` store；离线路径不能写 ACTIVE pointer。
+- √ static/proposal held-out validation 使用独立两方法 manifest、validation-only trial store、audited operation graph label 和 raw resource accounting；不读取 official score、grader、answer、expectation 或 final response 原文。
+- √ production activation 只接受完整 matched observation pairs；trial config 不能通过正式 adaptive resolver，accepted decision 才生成带 activation provenance 的 production config。
 - □ 比较 no persistence、native Hermes、native + ledger、static LightRSI 和 adaptive LightRSI。
 - □ 所有 variant 使用 matched model、judge、budget、task order、sandbox 和 persistence isolation。
 - □ 当前依次运行 semantic-relevant memory-ability 和 update-ability families。
@@ -1101,8 +1104,25 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 - Runtime/config：`adaptive_utility` 仅在 explicit `native+ledger`、lifecycle enabled、attempt-local prepared store 且唯一 ACTIVE policy 可绑定时启动；错误在模型调用前拒绝。Direct native 与 static defaults 不变。
 - PAST transport/isolation：单一 strict JSON 同时固定 destination、trusted roots、runtime-owned parameters 和 sibling prepared-store file；host-only source path 不下发到 RSIMem contract 或模型输入。
 - Manifest/launcher：schema v3 把 config/store digest 与 active artifact identity 纳入 experiment identity；`run_luna_adaptive_sm01.sh` 固定五方法 mapping、3+ independent unseeded replicates、clean-tree requirement、failure retention 和 method-specific audit。
-- Commits：`ff669ca`（live runtime gate）、`b79a6e0`（PAST config transport）、`d8c2845`（attempt-local store）、`c2432cc`（manifest active identity）和 `9005999`（five-method launcher）。Full RSIMem `323 passed`；PAST-Bench 从其目录运行 `390 passed, 2 skipped`；compileall、`pip check`、shell syntax、diff check 和 tracked-secret scan 通过。
-- 已知限制：尚无由既有 deployment feedback 独立准备的 production ACTIVE store，也未运行任何五方法 adaptive replicate。因此上面的完成项只关闭 execution-readiness，不关闭 comparison、family、metrics 或 claim gate。禁止从同一 official/test run 现场生成 policy 再评估该 run。
+- Preparation/activation：feedback manifest v2 将完整 content-free gate/audit/report 纳入 identity；`adaptive_preparation` 重验 dataset 后只训练 stable retrieval threshold。`run_luna_adaptive_validation_sm01.sh` 独立运行 rotated static/proposal held-out pair，assembler 只从 audit、operation graph 和 deployment feedback 生成 observation；production store 是 canonical VALIDATED store 的独立副本，只有 matched coordinator 可以切换 ACTIVE。
+- Commits：原 execution plumbing 为 `ff669ca`、`b79a6e0`、`d8c2845`、`c2432cc`、`9005999`；production preparation/activation 链为 `d5663d6`、`78e904a`、`1759bc2`、`0bec9ca`、`f9c567a`、`a4e8c06`、`85d089c`、`e5252f8`、`9065d7e`、`0d6dc93`。Full RSIMem `342 passed`；PAST-Bench 从其目录运行 `390 passed, 2 skipped`；compileall、`pip check`、全部 shell syntax、diff check 和 tracked-secret scan 通过。
+- 已知限制：当前 shell 未配置 provider credential，因此尚无新的 live feedback batch、真实 held-out static/proposal observation、production ACTIVE store 或五方法 adaptive replicate。以上完成项只关闭 execution-readiness，不关闭 comparison、family、metrics 或 claim gate。禁止从同一 official/test run 现场生成 policy 再评估该 run。
+
+2K.1 下一执行顺序（每一步先审计输出再进入下一步）：
+
+```bash
+RSIMEM_STATIC_METHOD_SET=feedback RSIMEM_REPLICATES=3 \
+  RSIMEM_BATCH_ID=<feedback-batch> scripts/run_luna_static_sm01.sh
+
+RSIMEM_OFFLINE_PREPARATION=outputs/feedback_sm01/hermes_luna/<feedback-batch>/prepared/adaptive \
+  RSIMEM_BATCH_ID=<validation-batch> scripts/run_luna_adaptive_validation_sm01.sh
+
+RSIMEM_ADAPTIVE_CONFIG=outputs/adaptive_validation_sm01/hermes_luna/<validation-batch>/activated/adaptive-config.json \
+  RSIMEM_REPLICATES=3 RSIMEM_BATCH_ID=<adaptive-batch> \
+  scripts/run_luna_adaptive_sm01.sh
+```
+
+第二条命令若 matched decision rejected，则不会生成 `adaptive-config.json`，第三条命令不得运行。
 
 ### 2K.2 Metrics 与 Ablation
 
