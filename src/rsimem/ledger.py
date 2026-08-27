@@ -51,6 +51,18 @@ _MEMORY_RUNTIME_ATTRIBUTE_FIELDS = {
     "limit",
     "namespace",
     "surface",
+    "execution_id",
+    "operation_id",
+    "snapshot_id",
+    "mutation_id",
+    "receipt_id",
+}
+_MEMORY_RUNTIME_ID_ATTRIBUTES = {
+    "execution_id",
+    "operation_id",
+    "snapshot_id",
+    "mutation_id",
+    "receipt_id",
 }
 _RSIMEM_EXECUTION_MODES = {"native+ledger", "native+adapter+ledger"}
 _LIFECYCLE_EVENT_KINDS = {
@@ -176,6 +188,15 @@ def _validate_memory_runtime_event(value: dict[str, Any], source_path: Path) -> 
         raise ValueError(f"invalid RSIMem runtime event attributes in {source_path}")
     if "equivalent" in attributes and not isinstance(attributes["equivalent"], bool):
         raise ValueError(f"invalid RSIMem projection result in {source_path}")
+    if any(
+        key in attributes
+        and (
+            not isinstance(attributes[key], str)
+            or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}", attributes[key])
+        )
+        for key in _MEMORY_RUNTIME_ID_ATTRIBUTES
+    ):
+        raise ValueError(f"invalid RSIMem runtime operation identity in {source_path}")
     if value.get("kind") == "projection_check" and (
         not isinstance(attributes.get("surface"), str)
         or not attributes["surface"]

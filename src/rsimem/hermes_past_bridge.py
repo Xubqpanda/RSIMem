@@ -352,6 +352,7 @@ class HermesPastBenchBridge:
                     or hermes_home / ".rsimem" / "semantic_mutation_receipts.json"
                 ),
                 observer=self.ledger,
+                ingestion_observer=self.lifecycle.observer,
             )
         else:
             self.static_writeback = None

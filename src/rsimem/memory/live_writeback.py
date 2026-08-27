@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Mapping
+from typing import Any, Mapping
 
 from ..lifecycle import DryRunStatus, HermesLifecycleDryRunResult, PlanMemoryAction
 from .backends import build_hermes_native_registry
@@ -107,6 +107,7 @@ class StaticSemanticWritebackRuntime:
         operation_evidence_path: Path,
         mutation_receipt_path: Path,
         observer: MemoryObserver | None = None,
+        ingestion_observer: Any | None = None,
     ) -> None:
         self.hermes_home = hermes_home.expanduser().resolve()
         self.registry = build_hermes_native_registry(self.hermes_home)
@@ -143,6 +144,11 @@ class StaticSemanticWritebackRuntime:
             observer=observer,
             operation_recorder=self.operation_recorder,
         )
+        if ingestion_observer is not None and not callable(
+            getattr(ingestion_observer, "record_ingestion", None)
+        ):
+            raise TypeError("ingestion observer must provide record_ingestion")
+        self.ingestion_observer = ingestion_observer
         self._results: list[StaticSemanticBoundaryResult] = []
         self._closed = False
 
@@ -202,6 +208,8 @@ class StaticSemanticWritebackRuntime:
                 request,
                 current_source_revision=snapshot.context_revision,
             )
+            if self.ingestion_observer is not None and writeback.ingestion is not None:
+                self.ingestion_observer.record_ingestion(request, writeback.ingestion)
             result = StaticSemanticBoundaryResult(
                 snapshot.snapshot_id,
                 lifecycle.evaluation.evaluation_id,
