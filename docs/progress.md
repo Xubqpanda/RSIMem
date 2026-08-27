@@ -14,9 +14,9 @@ This document tracks implementation progress, the current experimental boundary,
 
 RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for every exposed model request, derive a privacy-safe lifecycle ledger, audit run completeness, and represent Hermes semantic, episodic, and procedural memory through typed backend contracts.
 
-The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and RSIMem ingestion/writeback is enabled only in isolated deterministic fixtures; no static or adaptive policy is active in the live PAST-Bench/Hermes path. The active implementation scope is semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
+The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default. Static Mem0-flat semantic writeback is now available only through the explicit live experiment configuration; adaptive policy updates remain disabled. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E, Phase 2A-2D, and Phase 2E.1-2E.3 are complete. Phase 2E.4 static SM01 comparison is the active milestone. Real mutation remains disabled outside isolated fixtures.
+Phase 1A-1E, Phase 2A-2D, and Phase 2E are complete. Phase 2H unified static memory policy objective is the active milestone. Live mutation remains opt-in and restricted to the audited static experiment path.
 
 ## Completed Work
 
@@ -183,20 +183,20 @@ operator/recovery handling rather than being guessed.
 - [x] Bind fact-extraction prompt, update-decision prompt, and retrieval parameters to their owned operations without retaining prompt or response text.
 - [x] Add deterministic-first failure attribution, observation cutoffs, exposure eligibility, batch sampling/dedup, and default-disabled budgeted model fallback with separate policy-update usage.
 
-Known boundary: semantic writeback and operation attribution remain isolated deterministic fixtures. Static PAST-Bench execution and matched model replicates are Phase 2E.4; delayed utility labels and adaptive policy updates remain later gates.
+Static PAST-Bench semantic writeback is complete for SM01: 9/9 rotated method attempts passed audit, with 81 unique traces and content-free ingestion/mutation evidence. Admission timing varied across replicates; delayed utility labels and adaptive policy updates remain later gates.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `240 passed`.
-- [x] Pass the vendored PAST-Bench regression suite: `385 passed, 2 skipped`.
+- [x] Pass all RSIMem tests: `248 passed`.
+- [x] Pass the vendored PAST-Bench regression suite: `387 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2E Static SM01 Comparison**
+### **Current: Phase 2H Unified Static Memory Policy Objective**
 
-Phase 2E.1-2E.3 now provide Mem0-flat semantic construction, a deterministic SM01 restart/use loop, a revision-bound operation graph, and deterministic-first failure attribution. The immediate objective is Phase 2E.4: connect static semantic writeback to the opt-in PAST-Bench path and run the frozen no-persistence/native/static comparison only after its isolation, accounting, privacy, and audit preflight passes.
+Phase 2E now provides Mem0-flat semantic construction, validated live writeback, revision-bound operation evidence, deterministic-first failure attribution, and the audited no-persistence/native/static SM01 comparison documented in [`static_sm01_20260827.md`](static_sm01_20260827.md). The immediate objective is Phase 2H: freeze host-observed and model-predicted features, cost semantics, missing-value handling, and a fixed interpretable policy objective before any adaptive update is enabled.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 

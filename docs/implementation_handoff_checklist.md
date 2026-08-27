@@ -816,12 +816,19 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2E.4 Static SM01 Comparison 与闸门
 
-- □ 比较 no persistence、native Hermes 和 static semantic writeback。
-- □ 固定 model、judge、budget、task order、sandbox 和 persistence isolation。
-- □ 报告 task score、persistence gap、usage、ingestion-policy cost、storage、retrieval、injection、retry 和 wall time。
-- □ 每个 variant 完成规定 replicate 并通过 audit。
-- □ 第一条 semantic lifecycle 可复现、可审计、无 leakage。
-- □ 尚未宣称 adaptive self-improvement。
+- √ 比较 no persistence、native Hermes 和 static semantic writeback。
+- √ 固定 model、judge、budget、task order、sandbox 和 persistence isolation。
+- √ 报告 task score、persistence gap、usage、ingestion-policy cost、storage、retrieval、injection、retry 和 wall time。
+- √ 每个 variant 完成规定 replicate 并通过 audit。
+- √ 第一条 semantic lifecycle 可复现、可审计、无 leakage。
+- √ 尚未宣称 adaptive self-improvement。
+
+2E.4 闸门记录：
+
+- Accepted batch：`static_sm01_20260827_v3`，RSIMem commit `f62285a`，PAST tree `145326f`；三种方法各 3 个 rotated、independent unseeded replicates，共 9 completed attempts、81 unique traces，9 个 audit 均 `ok=true`。
+- Static route：`native+ledger` read surface + deterministic completed-boundary lifecycle + Mem0-flat semantic writeback；原生 Hermes `memory` toolset 被禁用但 `skip_memory=False`，因此不存在 native/RSIMem 双写且保留 native prompt injection。
+- Static 每 replicate 固定形成 6 个 ingestion execution、7 个 policy request、1 个 committed ADD 和 5 个 NONE。Replicate 2/3 在 learn A 写入并在 learn B/eval-near/eval-far 注入；replicate 1 的 ADD 晚于 frozen post-learn anchor，作为 admission timing variance 保留。
+- Aggregate 与 cost report：[`static_sm01_20260827.md`](static_sm01_20260827.md)。Static 是已审计 baseline，不据此宣称 adaptive update、delayed utility learning 或 recursive self-improvement。
 
 ## 17. 延后范围 2F：Episodic Memory Research Gate
 
