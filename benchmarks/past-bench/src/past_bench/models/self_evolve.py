@@ -463,6 +463,8 @@ class HermesPersistenceConfig(BaseModel):
     ] = "disabled"
     rsimem_lifecycle_policy_version: str = "phase1-dry-run-v1"
     rsimem_lifecycle_compiler_version: str = "uncompiled-v0"
+    rsimem_lifecycle_timeout_seconds: float = 30.0
+    rsimem_lifecycle_max_output_tokens: int = 4096
 
 
 class SelfEvolveTaskRef(BaseModel):
