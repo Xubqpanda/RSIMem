@@ -241,3 +241,52 @@ def test_dry_run_leaves_hermes_state_and_input_rows_byte_identical(tmp_path) -> 
     assert result.receipts[0].status == DryRunStatus.ACCEPTED
     assert rows == rows_before
     assert {path: path.read_bytes() for path in files} == before
+
+
+@pytest.mark.parametrize(
+    ("response", "error"),
+    [
+        ("{", "invalid JSON"),
+        (json.dumps({"signals": []}), "omitted segment IDs"),
+        (
+            json.dumps({
+                "signals": [{
+                    "segment_id": "unknown-segment",
+                    "context_action": "retain",
+                    "writeback_action": "defer",
+                    "utility_estimate": 0,
+                    "confidence": 1,
+                }],
+            }),
+            "unknown segment_id",
+        ),
+    ],
+)
+def test_invalid_injected_evaluator_output_is_structurally_rejected(
+    tmp_path,
+    response: str,
+    error: str,
+) -> None:
+    runtime = _runtime(
+        tmp_path,
+        HermesLifecycleConfig(evaluator_mode="injected_json"),
+        complete=lambda _: response,
+    )
+    with pytest.raises(ValueError, match=error):
+        runtime.process(
+            _rows(),
+            trigger=EvaluationTrigger.TASK_COMPLETED,
+            task_state=TaskLifecycleState.COMPLETED,
+            source_ref="hermes_state:session:live",
+        )
+
+    events = [
+        json.loads(line)
+        for line in (tmp_path / "lifecycle.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [event["kind"] for event in events] == [
+        "context_snapshot",
+        "evaluation_rejected",
+    ]
+    assert events[-1]["data"]["reasonCodes"][0].startswith("evaluator_")
+    assert not (tmp_path / "receipts.json").exists()
