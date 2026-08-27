@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and RSIMem ingestion/writeback is enabled only in isolated deterministic fixtures; no static or adaptive policy is active in the live PAST-Bench/Hermes path. The active implementation scope is semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E, Phase 2A-2D, and Phase 2E.1-2E.2 are complete. Phase 2E.3 operation-level attribution is the active milestone. Real mutation remains disabled outside isolated fixtures.
+Phase 1A-1E, Phase 2A-2D, and Phase 2E.1-2E.3 are complete. Phase 2E.4 static SM01 comparison is the active milestone. Real mutation remains disabled outside isolated fixtures.
 
 ## Completed Work
 
@@ -175,18 +175,28 @@ implementation. It is default-disabled and not connected to PAST-Bench or a
 live Hermes home. Unknown ownership and unsafe compensation remain blocked for
 operator/recovery handling rather than being guessed.
 
+### Phase 2E Semantic Construction, SM01 Loop, And Attribution
+
+- [x] Implement Mem0-flat durable fact extraction, bounded related-memory retrieval, and internal ADD/UPDATE/DELETE/NONE decisions over fixed Hermes semantic storage.
+- [x] Complete deterministic SM01 learn -> validate -> mutate -> restart -> native prompt injection -> downstream-use with receipt and artifact revision audit.
+- [x] Record the real source/extraction/retrieval/decision/resolution/validation/mutation/verification/future exposure/outcome chain in the content-free atomic operation graph.
+- [x] Bind fact-extraction prompt, update-decision prompt, and retrieval parameters to their owned operations without retaining prompt or response text.
+- [x] Add deterministic-first failure attribution, observation cutoffs, exposure eligibility, batch sampling/dedup, and default-disabled budgeted model fallback with separate policy-update usage.
+
+Known boundary: semantic writeback and operation attribution remain isolated deterministic fixtures. Static PAST-Bench execution and matched model replicates are Phase 2E.4; delayed utility labels and adaptive policy updates remain later gates.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `210 passed`.
+- [x] Pass all RSIMem tests: `240 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `385 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2E Operation-Level Attribution**
+### **Current: Phase 2E Static SM01 Comparison**
 
-Phase 2E.1-2E.2 now provide Mem0-flat extraction and related-memory operation decisions plus a deterministic SM01 learn -> writeback -> restart -> native Hermes injection -> downstream-use fixture. The immediate objective is Phase 2E.3: connect extraction, related retrieval, internal decision, target resolution, validation, mutation, verification, future retrieval, injection, use/non-use, and outcome into the content-free atomic operation graph before running static matched comparisons.
+Phase 2E.1-2E.3 now provide Mem0-flat semantic construction, a deterministic SM01 restart/use loop, a revision-bound operation graph, and deterministic-first failure attribution. The immediate objective is Phase 2E.4: connect static semantic writeback to the opt-in PAST-Bench path and run the frozen no-persistence/native/static comparison only after its isolation, accounting, privacy, and audit preflight passes.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -232,7 +242,7 @@ Acceptance criteria:
 - [x] Locally reimplement Mem0 flat fact extraction, related-memory comparison, and internal ADD/UPDATE/DELETE/NONE policy from the pinned MemBase source.
 - [x] Keep MemBase datasets, runners, evaluation code, graph store, and runtime imports outside RSIMem.
 - [x] Add a bounded MemTrace-inspired, content-free atomic operation graph without importing MemTrace/smartcomment runtime or tracing arbitrary calls.
-- [ ] Attribute failures to extraction, internal decision, mutation, or retrieval subgraphs before updating policy.
+- [x] Attribute failures to extraction, internal decision, mutation, or retrieval subgraphs before updating policy.
 - [x] Keep episodic and procedural policy implementation disabled until their separate research gates select a method and matched baseline.
 - [x] Record ingestion model requests, latency, tokens, internal operations, rejected operations, and stored bytes as lifecycle cost.
 - [x] Add validation, rollback, and idempotency tests for framework-produced internal operations.
@@ -242,7 +252,7 @@ Acceptance criteria:
 - [ ] Invoke the Hermes semantic route at the same task/session boundary used by its control policy.
 - [ ] Expose only ingest/add externally; let the semantic policy produce ADD, UPDATE, DELETE, or NONE.
 - [ ] Define one fixed future-utility-per-cost objective for evaluating semantic construction/update and retrieval behavior.
-- [ ] Link source context, ingestion execution, internal operation, stored artifact, retrieval, injection, downstream execution, and outcome through stable lifecycle IDs.
+- [x] Link source context, ingestion execution, internal operation, stored artifact, retrieval, injection, downstream execution, and outcome through stable lifecycle IDs.
 - [ ] Compare no persistence, native memory, and static LightRSI under matched settings.
 - [ ] Verify that quality gains are reported together with ingestion-policy, storage, retrieval, injection, and recovery costs.
 
@@ -279,7 +289,7 @@ Acceptance criteria:
 1. [x] Implement Mem0-flat fact extraction and internal ADD/UPDATE/DELETE/NONE decision using the frozen prompt/completion contracts.
 2. [x] Define bounded related-memory retrieval parameters and bind candidate targets through the committed ownership resolver.
 3. [x] Complete the SM01 learn -> ingest -> validate -> mutate -> restart -> native injection -> downstream-use fixture.
-4. [ ] Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
+4. [x] Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
 5. [ ] Run static SM01 matched comparisons only after the deterministic end-to-end and audit gates pass.
 
 ## Update Policy

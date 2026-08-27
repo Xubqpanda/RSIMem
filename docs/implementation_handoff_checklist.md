@@ -789,22 +789,30 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2E.3 Operation-Level Attribution
 
-- □ 将 Mem0-style ingestion 拆为 extraction、related-memory retrieval、internal decision、target resolution、validation、mutation 和 reread verification operation。
-- □ 将未来 semantic query、candidate retrieval、injection、use/non-use 和 task outcome 接回同一 artifact revision。
-- □ 为每个 optimizable operation 标注 policy parameter/prompt field ownership，至少区分 fact-extraction prompt、update-decision prompt 和 retrieval parameters。
-- □ Attribution 输出只引用 operation/artifact/policy ID 和 failure category，不包含原始 memory 或模型响应。
-- □ 同一失败可以归因到一个或多个 candidate operation，但必须记录 attribution method、confidence、evidence window 和 version。
-- □ Attribution 采用分层策略：先使用 contract violation、receipt、retrieval/use 和 outcome evidence 做 deterministic attribution；只有失败样本无法定位且明确启用时，才允许调用预算受限的 LLM attribution。
-- □ Successful、NONE、未曝光和 censored 样本不默认触发 LLM attribution；批量 attribution 必须采样、去重并设置 calls/tokens/wall-time 上限。
-- □ Attribution model 的请求、token、重试、延迟和费用单独计入 policy-update cost，不能算作免费离线处理。
+- √ 将 Mem0-style ingestion 拆为 extraction、related-memory retrieval、internal decision、target resolution、validation、mutation 和 reread verification operation。
+- √ 将未来 semantic query、candidate retrieval、injection、use/non-use 和 task outcome 接回同一 artifact revision。
+- √ 为每个 optimizable operation 标注 policy parameter/prompt field ownership，至少区分 fact-extraction prompt、update-decision prompt 和 retrieval parameters。
+- √ Attribution 输出只引用 operation/artifact/policy ID 和 failure category，不包含原始 memory 或模型响应。
+- √ 同一失败可以归因到一个或多个 candidate operation，但必须记录 attribution method、confidence、evidence window 和 version。
+- √ Attribution 采用分层策略：先使用 contract violation、receipt、retrieval/use 和 outcome evidence 做 deterministic attribution；只有失败样本无法定位且明确启用时，才允许调用预算受限的 LLM attribution。
+- √ Successful、NONE、未曝光和 censored 样本不默认触发 LLM attribution；批量 attribution 必须采样、去重并设置 calls/tokens/wall-time 上限。
+- √ Attribution model 的请求、token、重试、延迟和费用单独计入 policy-update cost，不能算作免费离线处理。
 
 验收需求：
 
-- □ Extraction 漏事实、错误 UPDATE target、重复 ADD、retrieval miss 和 retrieved-but-unused 分别落到不同 operation/failure category。
-- □ 最终 task failure 不会无条件归因给最后一次回答或全部历史 memory operation。
-- □ Attribution 只能使用失败发生时已可观测 evidence，不能读取 grader answer、未来 episode 或 held-out outcome。
-- □ 关闭 attribution 不改变 ingestion、retrieval 和任务结果。
-- □ Deterministic attribution 足够时不会发出 attribution model request；预算耗尽时保留 unresolved attribution，不使用全轨迹统一归因兜底。
+- √ Extraction 漏事实、错误 UPDATE target、重复 ADD、retrieval miss 和 retrieved-but-unused 分别落到不同 operation/failure category。
+- √ 最终 task failure 不会无条件归因给最后一次回答或全部历史 memory operation。
+- √ Attribution 只能使用失败发生时已可观测 evidence，不能读取 grader answer、未来 episode 或 held-out outcome。
+- √ 关闭 attribution 不改变 ingestion、retrieval 和任务结果。
+- √ Deterministic attribution 足够时不会发出 attribution model request；预算耗尽时保留 unresolved attribution，不使用全轨迹统一归因兜底。
+
+2E.3 闸门记录：
+
+- Contract：`ATTRIBUTION_SCHEMA_VERSION=1`。真实 Mem0-flat/transaction/future fixture 记录 source、extraction、related retrieval、decision、target resolution、validation、mutation、verification、future query/retrieval/injection/use/outcome；policy ownership 通过 content-free `POLICY_PARAMETER` artifact edge 表示。Attribution 使用显式 cutoff/window/version，仅输出稳定 ID、category、method、confidence、reason 和 raw model usage。
+- Commits：`af602d4`（semantic operation lifecycle、verified artifact revision 与 future exposure graph）和 `73916b0`（deterministic-first attribution、exposure eligibility、batch sampling/dedup、model budget/accounting 与反向 fixtures）。
+- Focused evidence：真实 SM01 fixture 形成 13 类顺序 operation 并把同一 committed artifact ID/revision 接回 restart retrieval/injection/use/outcome；真实 policy rejection 和 ADD ownership race 分别归入 wrong target 与 duplicate ADD。独立 fixtures 区分 extraction miss、retrieval miss、retrieved-not-injected、not-exposed、retrieved-but-unused、censored 和 unresolved task failure。
+- Full acceptance：RSIMem `240 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
+- 已知限制：本阶段没有调用 attribution model；model fallback 只有显式启用、存在成功 injection、证据仍 unresolved 且预算允许时才可调用。当前 deterministic categories 是冻结 reason/operation contract，不是因果效果估计；future use/outcome 来自 deployment-visible fixture evidence，不使用 official grader score。Delayed utility label、exposure propensity 和跨 episode dataset 属于 2I，不在本阶段宣称完成。
 
 ### 2E.4 Static SM01 Comparison 与闸门
 
