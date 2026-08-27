@@ -10,6 +10,7 @@ from rsimem.memory.adaptive_matched_validation import (
 )
 from rsimem.memory.adaptive_mem0_binding import (
     ActiveAdaptiveMem0Binder,
+    TrustedAdaptiveMem0Parameter,
     audit_adaptive_mem0_loop,
 )
 from rsimem.memory.adaptive_policy import AdaptiveParameterName
@@ -19,6 +20,22 @@ from rsimem.memory.utility import UtilityTarget
 from rsimem.memory_systems.mem0_flat import FrozenMem0UtilityGate
 from test_adaptive_matched_validation import _observations, _offline_validated
 from test_mem0_flat_policy import _operation_response, _setup
+
+
+TRUSTED_RETRIEVAL = TrustedAdaptiveMem0Parameter(
+    parameter_id="parameter.fact",
+    name=AdaptiveParameterName.RETRIEVAL_ACCEPT_THRESHOLD,
+    prompt_ref="mem0-flat.retrieval",
+    baseline_value=0.35,
+)
+
+
+def _bind(store, parent_policy_version, base=None):
+    return ActiveAdaptiveMem0Binder((TRUSTED_RETRIEVAL,)).bind(
+        store,
+        base or FrozenMem0UtilityGate(),
+        expected_parent_policy_version=parent_policy_version,
+    )
 
 
 def _active(tmp_path):
@@ -56,7 +73,7 @@ def test_binder_preserves_static_default_without_active_policy(tmp_path) -> None
         trusted_root_policy_versions=(dataset.config.policy_version,),
     )
     base = FrozenMem0UtilityGate()
-    binding = ActiveAdaptiveMem0Binder().bind(inactive, base)
+    binding = _bind(inactive, dataset.config.policy_version, base)
     assert binding.adaptive is False
     assert binding.gate is base
     assert binding.gate.digest == FrozenMem0UtilityGate().digest
@@ -67,7 +84,7 @@ def test_binder_preserves_static_default_without_active_policy(tmp_path) -> None
 def test_active_artifact_changes_retrieval_and_records_actual_version(tmp_path) -> None:
     _, artifact, store, offline_decision, matched_decision = _active(tmp_path)
     base = FrozenMem0UtilityGate()
-    binding = ActiveAdaptiveMem0Binder().bind(store, base)
+    binding = _bind(store, artifact.parent_policy_version, base)
     assert binding.adaptive is True
     assert binding.actual_policy_version == artifact.policy_version
     assert binding.artifact_id == artifact.artifact_id
@@ -121,7 +138,7 @@ def test_active_artifact_changes_retrieval_and_records_actual_version(tmp_path) 
 
 def test_active_gate_preserves_prompt_cadence_and_versions_all_decisions(tmp_path) -> None:
     _, artifact, store, _, _ = _active(tmp_path)
-    binding = ActiveAdaptiveMem0Binder().bind(store)
+    binding = _bind(store, artifact.parent_policy_version)
     setup = _setup(
         tmp_path / "adaptive-ingest",
         operation=_operation_response(
