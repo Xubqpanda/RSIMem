@@ -140,7 +140,7 @@ establish a nondeterminism tolerance.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `95 passed`.
+- [x] Pass all RSIMem tests: `108 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `384 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
@@ -151,14 +151,16 @@ establish a nondeterminism tolerance.
 
 The Phase 1C live matched gate passed on three order-rotated, independently unseeded replicates per mode. The dated report is [`matched_phase1c_20260827.md`](matched_phase1c_20260827.md). The immediate objective is Phase 1D: wire snapshot collection, lifecycle evaluation, and validated dry-run plans into explicit real Hermes task-completion and session-end events without memory mutation or context eviction.
 
+The deterministic Phase 1D path is now wired behind the default-disabled lifecycle configuration. A real PAST-Bench `HermesAdapter.step()` fixture emits explicit task-completed and session-end boundaries, projects persisted `state.db` rows into stable snapshots, binds evaluation to a host-selected policy identity, and reserves content-free dry-run plans with persistent receipts. Evaluator failure/retry and coordinator restart are covered without compiler or backend mutation. Phase 1D remains open until the injected evaluator has enforced timeout and request accounting, pre-snapshot host failures have persistent rejection evidence, and the final live three-mode acceptance is recorded.
+
 - [x] Define an experiment configuration that selects one backend for each memory kind and defaults to native Hermes behavior.
 - [x] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
-- [ ] Construct context snapshots at task completion and configured context-pressure boundaries.
-- [ ] Add an opt-in lifecycle evaluator configuration with an injected model client and deterministic baseline.
+- [x] Construct context snapshots at explicit task-completion and session-end boundaries; context-pressure remains unavailable until Hermes exposes trusted usage and threshold inputs.
+- [x] Add default-disabled deterministic and injected-JSON lifecycle evaluator modes; live model-client accounting and enforced timeout remain open.
 - [x] Identify and exercise the Hermes semantic prompt, episodic search, and skill read interception points in an isolated execution fixture; mutation interception remains gated on compiler validation.
 - [x] Add an opt-in adapter execution path while retaining the direct native path as the control.
 - [x] Forward runtime lifecycle events into the existing ledger through stable run, episode, session, and artifact identifiers.
-- [ ] Add host-neutral validation hooks before allowing compiler-generated content to mutate Hermes files.
+- [x] Add host-neutral snapshot, evaluation, plan, revision, safety, and persistent-idempotency validation before allowing compiler-generated content to mutate Hermes files.
 - [x] Define explicit fail-closed and native-bypass behavior for deterministic execution surfaces and the PAST-Bench runner.
 - [x] Add an explicit SM01 live-run launcher that fixes the three execution modes, paired persistence control, failure policy, raw ledger/audit output, and replicate count.
 - [x] Record that the current model runtime does not expose a controllable provider seed instead of labeling independent replicates as seeded runs.
@@ -180,7 +182,7 @@ Acceptance criteria:
 - [x] Invoke real Hermes memory prompt construction, `session_search`, `skills_list`, and `skill_view` in matched deterministic fixtures.
 - [x] Verify deterministic restart persistence and explicit adapter failure bypass.
 - [x] Complete and audit one live unseeded infrastructure replicate on the earlier hybrid adapter path; record the provider-failed attempt separately.
-- [ ] Run at least three matched independent `SM01_preference_adoption` replicates with fixed model, prompt, task order, sandbox, and budget.
+- [x] Run at least three matched independent `SM01_preference_adoption` replicates with fixed model, prompt, task order, sandbox, and budget; see `matched_phase1c_20260827.md`.
 - [ ] Compare task score, pass rate, model requests, token buckets, tool calls, stored bytes, injected characters, and wall time.
 - [ ] Establish an explicit tolerance for nondeterministic model variation and require zero unexplained accounting drift.
 - [ ] Treat adapter instrumentation as behaviorally neutral only after the matched comparison passes.

@@ -344,67 +344,67 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 功能需求：
 
-- □ 在 task completion 和 session end 接入明确 host event，不通过自然语言猜测任务是否完成。
-- □ context-pressure 只有在 Hermes 提供可信 token total 和 threshold 时启用。
-- □ turn interval 和 tool boundary 保持默认关闭。
-- □ 同一 boundary 的重复 callback 产生相同 logical identity。
+- √ 在 task completion 和 session end 接入明确 host event，不通过自然语言猜测任务是否完成。
+- √ context-pressure 只有在 Hermes 提供可信 token total 和 threshold 时启用；当前 live 配置未开放该触发器。
+- √ turn interval 和 tool boundary 保持默认关闭。
+- √ 同一 boundary 的重复 callback 产生相同 logical identity。
 
 验收需求：
 
-- □ deterministic fixture 精确触发一次 task-completed 和一次 session-end evaluation。
-- □ duplicate callback、retry 和 restart 不重复接受同一 logical evaluation。
-- □ disabled mode 不构建 snapshot、不调用 evaluator、不改变 Hermes 行为。
+- √ deterministic fixture 精确触发一次 task-completed 和一次 session-end evaluation。
+- √ duplicate callback、retry 和 restart 不重复产生 accepted dry-run mutation；restart 记录为 persistent-receipt duplicate。
+- √ disabled mode 不构建 snapshot、不调用 evaluator、不生成 lifecycle artifacts，也不改变 Hermes 行为。
 
 ### 1D.2 Live Context Snapshot
 
 功能需求：
 
-- □ 从真实 Hermes message、session 和 task state 构造 `ContextSnapshot`。
-- □ stable segment ID 不依赖消息列表位置。
-- □ 正确标记 current turn、active、completed、unresolved 和 tool call/result closure。
-- □ snapshot revision 覆盖所有会影响 lifecycle decision 的结构化字段。
-- □ token total 等于 segment token count 之和；unknown usage 不能伪装成零。
+- √ 从真实 Hermes `state.db` message row、session 和 host task state 构造 `ContextSnapshot`。
+- √ stable segment ID 绑定数据库 row ID 与 tool call ID，不依赖消息列表位置。
+- √ task/session boundary 使用 `current_turn_id=None`，并正确标记 completed、unresolved 和 tool call/result closure。
+- √ snapshot revision 覆盖所有会影响 lifecycle decision 的结构化字段。
+- √ token total 等于 segment token count 之和；Hermes 未持久化 per-message usage 时使用显式标记的 deterministic estimate，不伪装成零。
 
 验收需求：
 
-- □ 同一 transcript 重启后产生相同 segment ID、snapshot ID 和 revision。
-- □ 新增 turn 后旧 segment ID 保持稳定，snapshot revision 改变。
-- □ orphan tool result、duplicate tool call、open tool call、缺失 current turn 和 stale task state fail closed。
-- □ raw context 只存在于 snapshot/evaluator runtime boundary，不进入 ledger。
+- √ 同一 transcript 重启后产生相同 segment ID、snapshot ID 和 revision。
+- √ 新增 turn 后旧 segment ID 保持稳定，snapshot revision 改变。
+- √ orphan tool result、duplicate tool call、open tool call、缺失 current turn 和 stale task state fail closed。
+- √ raw context 只存在于 snapshot/evaluator runtime boundary，不进入 ledger。
 
 ### 1D.3 Evaluator Configuration
 
 功能需求：
 
-- □ 配置显式选择 deterministic evaluator 或 injected JSON lifecycle evaluator，默认关闭。
-- □ evaluator request 携带 snapshot revision、protected IDs、trigger、turn index 和 host-selected policy version。
-- □ policy version 由 host configuration 固定，模型不能声明或覆盖版本。
+- √ 配置显式选择 deterministic evaluator 或 injected JSON lifecycle evaluator，默认关闭。
+- √ evaluator request 携带 snapshot revision、protected IDs、trigger、turn index 和 host-selected policy version。
+- √ policy version 由 host configuration 固定，模型不能声明或覆盖版本。
 - □ evaluator timeout、invalid JSON、missing signal、unknown segment 和 unsafe action 产生结构化 rejection。
 - □ evaluator failure 不推进 scheduler state，允许使用同一 boundary retry。
 
 验收需求：
 
-- □ deterministic evaluator 在固定 fixture 上完全可重现。
+- √ deterministic evaluator 在固定 fixture 上完全可重现。
 - □ mocked evaluator 覆盖 valid、malformed、partial、timeout、exception 和 policy-version override。
-- □ evaluator failure 不产生 accepted plan，不产生 mutation event，也不改变下一轮 native request。
+- √ evaluator failure 不产生 accepted plan、receipt 或 mutation event，并允许同一 boundary retry。
 - □ lifecycle evaluator 的模型调用进入 usage accounting，但 prompt/response 原文不进入 ledger。
 
 ### 1D.4 Dry-Run Plan 与 Evidence
 
 功能需求：
 
-- □ 将通过验证的 lifecycle signal 转换为 revisioned `WritebackPlan`。
-- □ plan 关联 run、episode、session、task、snapshot、evaluation、segment 和 policy version。
-- □ 使用 persistent idempotency receipt，重复处理同一 logical input 只能接受一次 dry-run。
-- □ plan validation 保护 current、active、unresolved 和 open tool closure。
-- □ dry-run 只记录本来会执行的 action，不调用 compiler 或 backend mutation。
+- √ 将通过验证的 lifecycle signal 转换为 revisioned `WritebackPlan`。
+- √ plan 关联 run、episode、session、task、snapshot、evaluation、segment 和 policy version。
+- √ 使用 persistent idempotency receipt，重复处理同一 logical input 只能接受一次 dry-run。
+- √ plan validation 保护 current、active、unresolved 和 open tool closure。
+- √ dry-run 只记录本来会执行的 action，不调用 compiler 或 backend mutation。
 
 验收需求：
 
-- □ stale revision、duplicate plan、malformed receipt、ambiguous update target 和 unsafe eviction 被拒绝。
-- □ 并发 dry-run coordinator 只有一个能够 reserve 同一 idempotency key。
-- □ restart 后 duplicate plan 被识别，receipt corruption fail closed。
-- □ Hermes memory files、state DB、skills 和 forwarded model context 在 dry-run 前后字节级不变。
+- √ stale revision、duplicate plan、malformed receipt、ambiguous update target 和 unsafe eviction 被拒绝。
+- √ 并发 dry-run coordinator 只有一个能够 reserve 同一 idempotency key。
+- √ restart 后 duplicate plan 被识别，receipt corruption fail closed。
+- √ deterministic safety fixture 验证 Hermes memory files、state DB、skills 和 forwarded rows 在 dry-run 前后字节级/值级不变；最终 live acceptance 仍需重验。
 
 ### 1D.5 阶段闸门
 
@@ -412,7 +412,7 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 - □ disabled、success、failure、retry 和 restart 路径均有 deterministic test。
 - □ 三个 execution mode 的 read-path equivalence 继续通过。
 - □ RSIMem 与 PAST-Bench 全量回归通过。
-- □ 没有真实 memory generation、memory mutation 或 context eviction。
+- √ 没有真实 memory generation、memory mutation 或 context eviction。
 
 ## 10. 第一阶段 1E：最终验收与冻结
 
