@@ -2023,6 +2023,15 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
             sequence.hermes.rsimem_adaptive_config = (
                 RSIMemAdaptiveWritebackConfig.model_validate_json(serialized)
             )
+            source = (
+                path.parent
+                / sequence.hermes.rsimem_adaptive_config.prepared_policy_store_file
+            ).resolve()
+            if not source.is_file() or not source.is_relative_to(path.parent):
+                raise ValueError(
+                    "prepared adaptive policy store is missing or escapes config directory"
+                )
+            sequence.hermes.rsimem_adaptive_policy_source_path = str(source)
         except (OSError, ValueError) as exc:
             raise SystemExit(f"invalid RSIMem adaptive config: {exc}") from exc
     adaptive_selected = (
@@ -2289,6 +2298,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         sequence.hermes.rsimem_semantic_writeback_max_output_tokens
                     ),
                     rsimem_adaptive_config=sequence.hermes.rsimem_adaptive_config,
+                    rsimem_adaptive_policy_source_path=(
+                        sequence.hermes.rsimem_adaptive_policy_source_path
+                    ),
                 )
 
             print(
