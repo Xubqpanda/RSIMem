@@ -5,6 +5,7 @@ from .hermes_native import (
     HermesProceduralBackend,
     HermesSemanticBackend,
     build_hermes_native_registry,
+    semantic_artifact_id,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "HermesProceduralBackend",
     "HermesSemanticBackend",
     "build_hermes_native_registry",
+    "semantic_artifact_id",
 ]

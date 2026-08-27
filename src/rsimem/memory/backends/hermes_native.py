@@ -49,6 +49,12 @@ def _opaque_id(prefix: str, value: str) -> str:
     return f"{prefix}:{digest}"
 
 
+def semantic_artifact_id(namespace: str, content: str) -> str:
+    """Return the stable identity used by the Hermes semantic projection."""
+
+    return _opaque_id("hermes-semantic", f"{namespace}\0{content}")
+
+
 def _atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
@@ -111,7 +117,7 @@ class HermesSemanticBackend:
         )
 
     def _artifact(self, namespace: str, index: int, content: str) -> MemoryArtifact:
-        artifact_id = _opaque_id("hermes-semantic", f"{namespace}\0{content}")
+        artifact_id = semantic_artifact_id(namespace, content)
         return MemoryArtifact(
             artifact_id=artifact_id,
             kind=MemoryKind.SEMANTIC,

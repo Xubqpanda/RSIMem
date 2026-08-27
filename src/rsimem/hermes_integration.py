@@ -25,6 +25,7 @@ from .memory import (
     MemoryRuntime,
     build_hermes_native_registry,
 )
+from .memory.backends import semantic_artifact_id
 
 
 _ENTRY_DELIMITER = "\n\u00a7\n"
@@ -520,7 +521,10 @@ def _fixed_hermes_clock():
             hermes_time.now = previous
 
 
-def _build_real_hermes_system_prompt(store: object) -> str:
+def _build_real_hermes_system_prompt(
+    store: object,
+    base_system_message: str = "Matched fixture system message",
+) -> str:
     """Invoke Hermes' real prompt assembly without constructing a model client."""
 
     from run_agent import AIAgent
@@ -541,7 +545,7 @@ def _build_real_hermes_system_prompt(store: object) -> str:
         platform="",
     )
     with _fixed_hermes_clock():
-        return AIAgent._build_system_prompt(agent, "Matched fixture system message")
+        return AIAgent._build_system_prompt(agent, base_system_message)
 
 
 def _record_native_prompt_memory(
@@ -554,7 +558,7 @@ def _record_native_prompt_memory(
     )
     for namespace, entries in snapshots:
         artifact_ids = tuple(
-            f"native-semantic:{namespace}:{index}" for index in range(len(entries))
+            semantic_artifact_id(namespace, entry) for entry in entries
         )
         content_chars = sum(len(entry) for entry in entries)
         observer.record(MemoryEvent(
@@ -575,8 +579,7 @@ def _record_native_prompt_memory(
     for namespace, entries in snapshots:
         if entries:
             artifact_ids = tuple(
-                f"native-semantic:{namespace}:{index}"
-                for index in range(len(entries))
+                semantic_artifact_id(namespace, entry) for entry in entries
             )
             observer.record(MemoryEvent(
                 MemoryEventKind.INJECTED,
@@ -600,6 +603,28 @@ def _capture_native_system_prompt(
         )
         store.load_from_disk()
     prompt = _build_real_hermes_system_prompt(store)
+    if observer is not None:
+        _record_native_prompt_memory(store, observer)
+    return prompt
+
+
+def capture_native_hermes_system_prompt(
+    home: Path,
+    *,
+    base_system_message: str = "RSIMem semantic restart fixture",
+    observer: MemoryObserver | None = None,
+) -> str:
+    """Load native Hermes files and invoke its real system-prompt builder."""
+
+    if not base_system_message.strip():
+        raise ValueError("base_system_message must not be empty")
+    with _bound_hermes_memory_dir(home) as memory_tool:
+        store = memory_tool.MemoryStore(
+            memory_char_limit=_SEMANTIC_LIMITS["memory"],
+            user_char_limit=_SEMANTIC_LIMITS["user"],
+        )
+        store.load_from_disk()
+    prompt = _build_real_hermes_system_prompt(store, base_system_message)
     if observer is not None:
         _record_native_prompt_memory(store, observer)
     return prompt
