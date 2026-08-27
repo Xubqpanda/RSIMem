@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem ingestor, real writeback mutation, static policy, or adaptive policy is active yet. The active implementation scope is now semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E are complete and the lifecycle contract is frozen at schema v1. Phase 2A fixed semantic routing and ingestion contracts are the active milestone; no compiler or real RSIMem mutation is enabled yet.
+Phase 1A-1E and Phase 2A are complete. Phase 2B versioned prompt and ingestion infrastructure is the active milestone; no compiler or real RSIMem mutation is enabled yet.
 
 ## Completed Work
 
@@ -140,16 +140,16 @@ establish a nondeterminism tolerance.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `116 passed`.
+- [x] Pass all RSIMem tests: `127 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `385 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2A Fixed Semantic Ingestion Contract**
+### **Current: Phase 2B Prompt And Ingestion Infrastructure**
 
-The Phase 1C live matched gate passed on three order-rotated, independently unseeded replicates per mode. Phase 1D/1E lifecycle acceptance passed on the frozen v1 contract; the dated report is [`phase1_acceptance_20260827.md`](phase1_acceptance_20260827.md). The immediate objective is Phase 2A: freeze a semantic-only external `ingest(experience)` boundary and policy registry without invoking a compiler or backend mutation.
+The Phase 1C live matched gate and Phase 1 lifecycle acceptance passed on the frozen v1 contract. Phase 2A now fixes all three Hermes native routes while enabling policy only on semantic ingestion, exposes an operation-free external request, and binds internal proposals through a host-neutral policy registry and trusted candidate reader. The immediate objective is Phase 2B: version prompt artifacts and ingestion results without writing Hermes memory.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
