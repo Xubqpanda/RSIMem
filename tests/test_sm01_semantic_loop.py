@@ -10,6 +10,13 @@ from rsimem.memory import MemoryExperience, MemoryKind, MemoryMessage, MemoryQue
 from rsimem.memory.backends import build_hermes_native_registry
 from rsimem.memory.executor import MutationExecutionStatus, TransactionalMutationExecutor
 from rsimem.memory.future_trace import SemanticFutureTraceRecorder
+from rsimem.memory.feedback_dataset import (
+    DelayedFeedbackConfig,
+    DelayedFeedbackDatasetBuilder,
+    FeedbackLabel,
+    FeedbackObservationWindow,
+    audit_feedback_dataset,
+)
 from rsimem.memory.attribution import DeterministicFirstAttributor
 from rsimem.memory.ingestion import (
     InternalMemoryAction,
@@ -317,6 +324,32 @@ def test_sm01_learn_mutate_restart_native_inject_and_use(tmp_path) -> None:
     successful_attribution = DeterministicFirstAttributor().attribute(graph)
     assert successful_attribution.records == ()
     assert successful_attribution.model_call_count == 0
+    feedback_window = FeedbackObservationWindow.create(
+        graph,
+        complete=True,
+    )
+    feedback = DelayedFeedbackDatasetBuilder(DelayedFeedbackConfig(
+        learn_context.policy_version,
+        policy.descriptor.feature_schema_version,
+    )).build(
+        graph,
+        feedback_window,
+        attribution_reports=(successful_attribution,),
+    )
+    assert len(feedback.examples) == 1
+    feedback_example = feedback.examples[0]
+    assert feedback_example.label == FeedbackLabel.POSITIVE
+    assert feedback_example.memory_artifact_id == artifact.artifact_id
+    assert feedback_example.memory_revision == artifact.revision
+    assert feedback_example.mutation_operation_id in feedback_example.operation_ids
+    assert future.retrieval_operation_id in feedback_example.retrieval_operation_ids
+    assert future.injection_operation_id in feedback_example.injection_operation_ids
+    assert downstream.use_operation_id in feedback_example.use_operation_ids
+    assert downstream.outcome_operation_id in feedback_example.outcome_operation_ids
+    assert audit_feedback_dataset(feedback, graph).ok is True
+    serialized_feedback = json.dumps(feedback.payload(), sort_keys=True)
+    assert PREFERENCE not in serialized_feedback
+    assert base_message not in serialized_feedback
     assert audit_operation_evidence(
         operation_log.events,
         forbidden_values=(PREFERENCE, base_message),
