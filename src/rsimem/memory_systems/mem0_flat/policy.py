@@ -51,6 +51,7 @@ from .prompts import (
     POLICY_INTERNAL_OPERATION_PROMPT,
     PromptTemplate,
 )
+from .utility_gate import FrozenMem0UtilityGate
 
 
 MEM0_FLAT_POLICY_SCHEMA_VERSION = 1
@@ -352,6 +353,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         framework_version: str = "mem0-flat-framework-v1",
         feature_schema_version: str = "semantic-fact-features-v1",
         operation_recorder: AtomicOperationRecorder | None = None,
+        utility_gate: FrozenMem0UtilityGate | None = None,
     ) -> None:
         if fact_prompt.artifact.policy_version != operation_prompt.artifact.policy_version:
             raise ValueError("Mem0 prompt policy versions must match")
@@ -360,8 +362,13 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         self.fact_prompt = fact_prompt
         self.operation_prompt = operation_prompt
         self.operation_recorder = operation_recorder
+        self.utility_gate = utility_gate
         base_policy_version = policy_version or fact_prompt.artifact.policy_version
         bound_policy_version = f"{base_policy_version}.{retrieval.digest[:16]}"
+        if utility_gate is not None:
+            bound_policy_version = (
+                f"{bound_policy_version}.utility.{utility_gate.digest[:16]}"
+            )
         self._descriptor = SemanticPolicyDescriptor(
             provider="mem0_flat",
             policy_version=bound_policy_version,
@@ -371,7 +378,11 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 f"{fact_prompt.artifact.template_digest[:8]}."
                 f"{operation_prompt.artifact.template_digest[:8]}"
             ),
-            feature_schema_version=feature_schema_version,
+            feature_schema_version=(
+                utility_gate.feature_schema
+                if utility_gate is not None
+                else feature_schema_version
+            ),
             capability=PolicyCapability(
                 frozenset(InternalMemoryAction),
                 add_time_update=True,
@@ -565,6 +576,8 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 (),
                 reason_codes=("invalid_candidate_reader",),
             )
+        if self.utility_gate is not None:
+            self.utility_gate.begin_request(request.idempotency_key)
         trace_state = self._begin_trace(request)
         self._store_trace(request, trace_state)
         extraction_spec = trace_state[3] if trace_state is not None else None
@@ -676,6 +689,12 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 usage=extraction_result.usage,
             )
 
+        generation_utility = (
+            self.utility_gate.generation_decisions(request, len(facts))
+            if self.utility_gate is not None
+            else ()
+        )
+
         related_by_fact: dict[int, tuple[RelatedMemoryView, ...]] = {}
         flattened: dict[str, RelatedMemoryView] = {}
         related_operation_ids: list[str] = []
@@ -706,6 +725,8 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             )
             with related_scope as related_operation:
                 views = candidates.search(request, fact.content)
+                if self.utility_gate is not None:
+                    views = self.utility_gate.rank_related(request, views)
                 output_ids = []
                 if self.operation_recorder is not None:
                     for view in views:
@@ -802,6 +823,12 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                         facts,
                         flattened,
                     )
+                    if self.utility_gate is not None:
+                        operations = self.utility_gate.apply_operations(
+                            request,
+                            operations,
+                            generation_utility,
+                        )
                 except _RejectedDecision as exc:
                     if decision_operation is not None:
                         decision_operation.complete(

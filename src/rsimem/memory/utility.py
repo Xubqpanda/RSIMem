@@ -327,6 +327,21 @@ class StaticUtilityPolicy:
         if any(cap <= 0 for _, cap in self.cost_caps):
             raise ValueError("static utility policy cost caps must be positive")
 
+    @property
+    def digest(self) -> str:
+        return _digest({
+            "policy_version": self.policy_version,
+            "accept_threshold": self.accept_threshold,
+            "minimum_confidence": self.minimum_confidence,
+            "conflict_reject_threshold": self.conflict_reject_threshold,
+            "benefit_weights": list(self.benefit_weights),
+            "risk_weights": list(self.risk_weights),
+            "cost_caps": [
+                (name.value, value) for name, value in self.cost_caps
+            ],
+            "cost_weight": self.cost_weight,
+        })
+
 
 @dataclass(frozen=True, slots=True)
 class UtilityDecision:
@@ -384,6 +399,25 @@ class UtilityDecision:
             for reason in self.reason_codes
         ):
             raise ValueError("utility decision requires machine-readable reasons")
+
+    def observer_evidence(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "target": self.target.value,
+            "disposition": self.disposition.value,
+            "score": self.score,
+            "predicted_benefit": self.predicted_benefit,
+            "lifecycle_cost": self.lifecycle_cost,
+            "risk": self.risk,
+            "contributions": dict(self.contributions),
+            "reason_codes": list(self.reason_codes),
+            "feature_digest": self.feature_digest,
+            "cost_digest": self.cost_digest,
+            "feature_schema": self.feature_schema,
+            "cost_schema": self.cost_schema,
+            "policy_version": self.policy_version,
+            "cutoff": self.cutoff,
+        }
 
 
 class StaticUtilityFeatureExtractor:
