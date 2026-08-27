@@ -1975,6 +1975,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
     semantic_mode = getattr(args, "rsimem_semantic_writeback_mode", None)
     semantic_timeout = getattr(args, "rsimem_semantic_writeback_timeout_seconds", None)
     semantic_max_tokens = getattr(args, "rsimem_semantic_writeback_max_output_tokens", None)
+    adaptive_config_path = getattr(args, "rsimem_adaptive_config", None)
     if all(value is None for value in (
         mode,
         failure_policy,
@@ -1986,6 +1987,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         semantic_mode,
         semantic_timeout,
         semantic_max_tokens,
+        adaptive_config_path,
     )) and not verify_projection:
         return
     if not str(args.agent).startswith("hermes"):
@@ -2012,6 +2014,24 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         sequence.hermes.rsimem_semantic_writeback_timeout_seconds = semantic_timeout
     if semantic_max_tokens is not None:
         sequence.hermes.rsimem_semantic_writeback_max_output_tokens = semantic_max_tokens
+    if adaptive_config_path is not None:
+        from .models.self_evolve import RSIMemAdaptiveWritebackConfig
+
+        path = Path(adaptive_config_path).expanduser().resolve()
+        try:
+            serialized = path.read_text(encoding="utf-8")
+            sequence.hermes.rsimem_adaptive_config = (
+                RSIMemAdaptiveWritebackConfig.model_validate_json(serialized)
+            )
+        except (OSError, ValueError) as exc:
+            raise SystemExit(f"invalid RSIMem adaptive config: {exc}") from exc
+    adaptive_selected = (
+        sequence.hermes.rsimem_semantic_writeback_mode == "adaptive_utility"
+    )
+    if adaptive_selected and sequence.hermes.rsimem_adaptive_config is None:
+        raise SystemExit("adaptive semantic writeback requires adaptive config")
+    if not adaptive_selected and sequence.hermes.rsimem_adaptive_config is not None:
+        raise SystemExit("adaptive config requires adaptive_utility mode")
 
 
 def _print_episode_result_summary(result: dict) -> None:
@@ -2268,6 +2288,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     rsimem_semantic_writeback_max_output_tokens=(
                         sequence.hermes.rsimem_semantic_writeback_max_output_tokens
                     ),
+                    rsimem_adaptive_config=sequence.hermes.rsimem_adaptive_config,
                 )
 
             print(
@@ -3477,7 +3498,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_evolve.add_argument(
         "--rsimem-semantic-writeback-mode",
-        choices=["disabled", "static", "static_utility"],
+        choices=["disabled", "static", "static_utility", "adaptive_utility"],
         default=None,
     )
     p_evolve.add_argument(
@@ -3489,6 +3510,11 @@ def main(argv: list[str] | None = None) -> None:
         "--rsimem-semantic-writeback-max-output-tokens",
         type=int,
         default=None,
+    )
+    p_evolve.add_argument(
+        "--rsimem-adaptive-config",
+        default=None,
+        help="Strict JSON config for an attempt-local ACTIVE adaptive policy store",
     )
 
     # cleanup
