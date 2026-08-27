@@ -25,7 +25,7 @@ from .memory.adaptive_matched_validation import (
     MatchedPolicyObservation,
     MatchedPolicyVariant,
 )
-from .memory.adaptive_policy import AdaptivePolicyState
+from .memory.adaptive_policy import AdaptivePolicyArtifact, AdaptivePolicyState
 from .memory.adaptive_policy_store import JsonAdaptivePolicyStore
 from .memory.utility import MEM0_UTILITY_PARAMETER_IDS, UtilityTarget
 
@@ -235,6 +235,31 @@ def _copy_validated_store(
     return target
 
 
+def build_adaptive_runtime_config(
+    artifact: AdaptivePolicyArtifact,
+) -> dict[str, Any]:
+    retrieval_parameter = MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.RETRIEVAL]
+    if (
+        len(artifact.parameters) != 1
+        or len(artifact.prompt_refs) != 1
+        or artifact.parameters[0].parameter_id != retrieval_parameter
+    ):
+        raise ValueError("adaptive runtime only supports the retrieval threshold")
+    update = artifact.parameters[0]
+    return {
+        "schema_version": 1,
+        "prepared_policy_store_file": ADAPTIVE_POLICY_STORE_FILE,
+        "adaptive_policy_store_path": ".rsimem/adaptive-policies.json",
+        "adaptive_trusted_roots": [artifact.parent_policy_version],
+        "adaptive_parameters": [{
+            "parameter_id": update.parameter_id,
+            "name": update.name.value,
+            "prompt_ref": artifact.prompt_refs[0],
+            "baseline_value": update.baseline_value,
+        }],
+    }
+
+
 def activate_adaptive_policy(
     offline_preparation_root: Path,
     observation_batch_path: Path,
@@ -290,33 +315,10 @@ def activate_adaptive_policy(
     )
     config_path = output_root / ADAPTIVE_CONFIG_FILE
     config_digest = None
-    profile = None
     if resulting_state == AdaptivePolicyState.ACTIVE:
-        update = preparation.artifact.parameters[0]
-        retrieval_parameter = MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.RETRIEVAL]
-        if update.parameter_id != retrieval_parameter:
-            raise ValueError("ACTIVE policy does not own the retrieval threshold")
-        config = {
-            "schema_version": 1,
-            "prepared_policy_store_file": ADAPTIVE_POLICY_STORE_FILE,
-            "adaptive_policy_store_path": ".rsimem/adaptive-policies.json",
-            "adaptive_trusted_roots": [
-                preparation.artifact.parent_policy_version
-            ],
-            "adaptive_parameters": [{
-                "parameter_id": update.parameter_id,
-                "name": update.name.value,
-                "prompt_ref": preparation.artifact.prompt_refs[0],
-                "baseline_value": update.baseline_value,
-            }],
-        }
+        config = build_adaptive_runtime_config(preparation.artifact)
         _write_json(config_path, config)
         config_digest = _digest(config)
-        from .experiment_manifest import resolved_adaptive_policy_profile
-
-        profile = resolved_adaptive_policy_profile(config_path)
-        if profile["activePolicyVersion"] != preparation.artifact.policy_version:
-            raise ValueError("generated adaptive config binds another policy")
     elif config_path.exists():
         raise ValueError("rejected adaptive output unexpectedly has a config")
 
@@ -359,9 +361,14 @@ def activate_adaptive_policy(
         "reasonCodes": list(decision.reason_codes),
         "matchedExampleCount": decision.matched_example_count,
         "resolvedExampleCount": decision.resolved_example_count,
-        "activeProfile": profile,
     }
     _write_json(output_root / ADAPTIVE_ACTIVATION_MANIFEST_FILE, report)
+    if resulting_state == AdaptivePolicyState.ACTIVE:
+        from .experiment_manifest import resolved_adaptive_policy_profile
+
+        profile = resolved_adaptive_policy_profile(config_path)
+        if profile["activePolicyVersion"] != preparation.artifact.policy_version:
+            raise ValueError("generated adaptive config binds another policy")
     return report
 
 

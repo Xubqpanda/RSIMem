@@ -32,6 +32,10 @@ ADAPTIVE_METHOD_VARIANTS = (
     "static-rsimem",
     "adaptive-rsimem",
 )
+ADAPTIVE_VALIDATION_METHOD_VARIANTS = (
+    "static-rsimem",
+    "proposal-rsimem",
+)
 _ADAPTIVE_METHOD_EXECUTION = {
     "no-persistence": {
         "persistenceVariant": "without_persistence",
@@ -74,12 +78,20 @@ _ADAPTIVE_METHOD_EXECUTION = {
         "adaptiveConfigRequired": True,
     },
 }
+_ADAPTIVE_VALIDATION_METHOD_EXECUTION = {
+    "static-rsimem": _ADAPTIVE_METHOD_EXECUTION["static-rsimem"],
+    "proposal-rsimem": {
+        **_ADAPTIVE_METHOD_EXECUTION["adaptive-rsimem"],
+        "validationOnly": True,
+    },
+}
 _KNOWN_MODES = frozenset((
     *EXECUTION_MODES,
     *STATIC_METHOD_VARIANTS,
     *STATIC_UTILITY_METHOD_VARIANTS,
     *FEEDBACK_METHOD_VARIANTS,
     *ADAPTIVE_METHOD_VARIANTS,
+    *ADAPTIVE_VALIDATION_METHOD_VARIANTS,
 ))
 _ATTEMPT_STATUSES = {"running", "completed", "failed"}
 _REQUIRED_CONFIGURATION = {
@@ -129,6 +141,14 @@ def adaptive_method_execution_profile(method: str) -> dict[str, object]:
     if method not in ADAPTIVE_METHOD_VARIANTS:
         raise ValueError("unknown adaptive experiment method")
     return dict(_ADAPTIVE_METHOD_EXECUTION[method])
+
+
+def adaptive_validation_method_execution_profile(method: str) -> dict[str, object]:
+    """Return the non-official static/proposal held-out execution contract."""
+
+    if method not in ADAPTIVE_VALIDATION_METHOD_VARIANTS:
+        raise ValueError("unknown adaptive validation method")
+    return dict(_ADAPTIVE_VALIDATION_METHOD_EXECUTION[method])
 
 
 def _canonical_digest(value: Any) -> str:
@@ -209,6 +229,104 @@ def resolved_adaptive_policy_profile(config_path: Path) -> dict[str, Any]:
     )
     if not binding.adaptive or binding.artifact_id != snapshot.active.artifact_id:
         raise ValueError("prepared adaptive policy does not bind to Mem0 runtime")
+    activation_path = resolved_config.parent / "adaptive-activation-manifest.json"
+    try:
+        activation = json.loads(activation_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("adaptive policy activation manifest cannot be read") from exc
+    activation_fields = {
+        "schemaVersion",
+        "sourceAdaptivePreparationId",
+        "observationBatchId",
+        "criteriaDigest",
+        "artifactId",
+        "artifactDigest",
+        "policyVersion",
+        "matchedDecisionId",
+        "matchedDecisionDigest",
+        "matchedDecisionAccepted",
+        "resultingState",
+        "activePolicyVersion",
+        "policyStoreDigest",
+        "matchedDecisionFileDigest",
+        "adaptiveConfigFile",
+        "adaptiveConfigDigest",
+        "activationId",
+        "reasonCodes",
+        "matchedExampleCount",
+        "resolvedExampleCount",
+    }
+    if not isinstance(activation, dict) or set(activation) != activation_fields:
+        raise ValueError("adaptive policy activation manifest is malformed")
+    activation_identity_fields = (
+        "schemaVersion",
+        "sourceAdaptivePreparationId",
+        "observationBatchId",
+        "criteriaDigest",
+        "artifactId",
+        "artifactDigest",
+        "policyVersion",
+        "matchedDecisionId",
+        "matchedDecisionDigest",
+        "matchedDecisionAccepted",
+        "resultingState",
+        "activePolicyVersion",
+        "policyStoreDigest",
+        "matchedDecisionFileDigest",
+        "adaptiveConfigFile",
+        "adaptiveConfigDigest",
+    )
+    activation_identity = {
+        field: activation[field] for field in activation_identity_fields
+    }
+    expected_activation_id = (
+        f"adaptive-activation.{_canonical_digest(activation_identity)[:40]}"
+    )
+    store_file_digest = hashlib.sha256(source_store.read_bytes()).hexdigest()
+    if (
+        activation["schemaVersion"] != 1
+        or activation["activationId"] != expected_activation_id
+        or activation["matchedDecisionAccepted"] is not True
+        or activation["resultingState"] != "active"
+        or activation["activePolicyVersion"] != snapshot.active.policy_version
+        or activation["policyVersion"] != snapshot.active.policy_version
+        or activation["artifactId"] != snapshot.active.artifact_id
+        or activation["artifactDigest"] != snapshot.active.content_digest
+        or activation["policyStoreDigest"] != store_file_digest
+        or activation["adaptiveConfigFile"] != resolved_config.name
+        or activation["adaptiveConfigDigest"] != _canonical_digest(config)
+    ):
+        raise ValueError("adaptive policy activation identity mismatch")
+    from .memory.adaptive_matched_validation import (
+        JsonMatchedValidationDecisionStore,
+    )
+
+    decision_store = JsonMatchedValidationDecisionStore(
+        resolved_config.parent / "matched-validation-decisions"
+    )
+    decision = decision_store.get(activation["matchedDecisionId"])
+    decision_path = (
+        resolved_config.parent
+        / "matched-validation-decisions"
+        / f"{activation['matchedDecisionId']}.json"
+    )
+    try:
+        decision_file_digest = hashlib.sha256(decision_path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise ValueError("adaptive matched decision cannot be read") from exc
+    if (
+        decision is None
+        or not decision.accepted
+        or decision.policy_version != snapshot.active.policy_version
+        or decision.artifact_id != snapshot.active.artifact_id
+        or decision.content_digest != activation["matchedDecisionDigest"]
+        or decision.criteria_digest != activation["criteriaDigest"]
+        or decision.reason_codes != tuple(activation["reasonCodes"])
+        or decision.matched_example_count != activation["matchedExampleCount"]
+        or decision.resolved_example_count != activation["resolvedExampleCount"]
+        or activation["matchedDecisionFileDigest"] != decision_file_digest
+    ):
+        raise ValueError("adaptive matched activation decision mismatch")
     runtime_identity = {
         key: value
         for key, value in config.items()
@@ -531,10 +649,14 @@ def validate_manifest(value: Any) -> dict[str, Any]:
     feedback_contract = configuration.get("semanticFeedbackContract")
     if feedback_contract not in {"disabled", "sm01_tsv_v1"}:
         raise ValueError("manifest semantic feedback contract is invalid")
-    if "adaptive-rsimem" in modes and feedback_contract != "sm01_tsv_v1":
+    adaptive_execution = "adaptive-rsimem" in modes
+    proposal_validation = "proposal-rsimem" in modes
+    if adaptive_execution and proposal_validation:
+        raise ValueError("official adaptive and proposal validation modes cannot mix")
+    if (adaptive_execution or proposal_validation) and feedback_contract != "sm01_tsv_v1":
         raise ValueError("adaptive manifest requires the frozen feedback contract")
     adaptive_policy = configuration.get("adaptivePolicy")
-    if "adaptive-rsimem" in modes:
+    if adaptive_execution or proposal_validation:
         adaptive_policy = _validate_non_empty_object(
             adaptive_policy,
             "adaptive policy profile",
@@ -549,11 +671,15 @@ def validate_manifest(value: Any) -> dict[str, Any]:
             "activeArtifactDigest",
             "preparation",
         }, "adaptive policy profile")
+        expected_preparation = (
+            "external_audited_active_store"
+            if adaptive_execution
+            else "matched_validation_trial_store"
+        )
         if (
             adaptive_policy.get("configSchemaVersion") != 1
             or adaptive_policy.get("storeSchemaVersion") != 1
-            or adaptive_policy.get("preparation")
-            != "external_audited_active_store"
+            or adaptive_policy.get("preparation") != expected_preparation
         ):
             raise ValueError("manifest adaptive policy schema is invalid")
         _require_non_empty_strings(adaptive_policy, (
