@@ -397,6 +397,22 @@ class DelayedFeedbackExample:
             self.propensity_source == PropensitySource.MISSING
         ) != (self.selection_propensity is None):
             raise ValueError("feedback propensity source is inconsistent")
+        if self.selection_propensity is not None:
+            object.__setattr__(
+                self,
+                "selection_propensity",
+                float(self.selection_propensity),
+            )
+        if self.propensity_source == PropensitySource.DETERMINISTIC:
+            expected_propensity = (
+                1.0
+                if self.candidate_disposition == CandidateDisposition.INCLUDED
+                else 0.0
+                if self.candidate_disposition == CandidateDisposition.FILTERED
+                else None
+            )
+            if self.selection_propensity != expected_propensity:
+                raise ValueError("deterministic propensity is inconsistent")
         if not self.proposal_operation_ids or not self.label_reason_codes:
             raise ValueError("feedback example requires proposal and label evidence")
         if any(not _REASON_CODE.fullmatch(value) for value in self.label_reason_codes):

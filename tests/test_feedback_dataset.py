@@ -711,6 +711,13 @@ def test_feedback_report_surfaces_exposure_and_censoring_counts() -> None:
             },
             "exposure_bias_evidence_mismatch",
         ),
+        (
+            {
+                "selection_propensity": 0.5,
+                "propensity_source": PropensitySource.LOGGED,
+            },
+            "exposure_bias_evidence_mismatch",
+        ),
     ),
 )
 def test_exposure_bias_contract_and_audit_reject_tampering(changes, error) -> None:
