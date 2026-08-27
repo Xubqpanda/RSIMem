@@ -37,6 +37,12 @@ from rsimem.memory import (
     MemoryQuery,
     MemoryResource,
 )
+from rsimem.memory.live_writeback import StaticSemanticWritebackConfig
+from rsimem.memory_systems.mem0_flat import (
+    FakeCompletionClient,
+    POLICY_FACT_EXTRACTION_PROMPT,
+    POLICY_INTERNAL_OPERATION_PROMPT,
+)
 
 
 PRIVATE_PREFERENCE = "Use TSV with owner, priority, task, and due_date."
@@ -821,3 +827,110 @@ def test_live_bridge_persists_pre_snapshot_failure_without_failing_task(tmp_path
     ]
     assert all(event["snapshotId"] is None for event in events)
     assert PRIVATE_PREFERENCE not in json.dumps(events, ensure_ascii=True)
+
+
+def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Path) -> None:
+    from hermes_state import SessionDB
+
+    home = _hermes_home(tmp_path / "home")
+    db = SessionDB(home / "state.db")
+    session_id = "session-static-live"
+    db.create_session(session_id, "past_bench", model="fixture-model")
+    db.append_message(session_id, "user", "Always use pipe-delimited output.")
+    db.append_message(session_id, "assistant", "Understood.")
+    artifacts = tmp_path / "artifacts"
+    client = FakeCompletionClient({
+        POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id: json.dumps({
+            "facts": ["Use pipe-delimited output for future tables."],
+        }),
+        POLICY_INTERNAL_OPERATION_PROMPT.artifact.prompt_id: json.dumps({
+            "operations": [{
+                "fact_index": 0,
+                "action": "add",
+                "candidate_id": None,
+            }],
+        }),
+    })
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=artifacts / "memory.jsonl",
+        run_id="run-static-live",
+        trace_id="trace-static-live",
+        episode_id="episode-static-live",
+        session_id=session_id,
+        task_id="SM01-static-live",
+        experiment_variant="static-rsimem",
+        lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
+        lifecycle_evidence_path=artifacts / "lifecycle.jsonl",
+        lifecycle_receipt_path=artifacts / "lifecycle-receipts.json",
+        static_writeback_config=StaticSemanticWritebackConfig(mode="static"),
+        static_completion_client=client,
+    )
+    bridge.attach(SimpleNamespace(
+        _memory_store=None,
+        _session_db=db,
+        session_id=session_id,
+    ))
+
+    bridge.on_task_completed({"completed": True})
+    assert len(bridge.static_results) == 1
+    assert bridge.static_results[0].writeback.logical_exit is True
+    assert bridge.static_failures == ()
+    bridge.close()
+
+    assert len(bridge.lifecycle_results) == 2
+    assert len(bridge.static_results) == 1
+    assert len(client.calls) == 2
+    serialized = (artifacts / "memory.jsonl").read_text(encoding="utf-8")
+    assert '"kind": "mutation_requested"' in serialized
+    assert '"kind": "mutation_committed"' in serialized
+    assert "pipe-delimited" not in serialized
+    operations = (artifacts / "rsimem_semantic_operations.jsonl").read_text(
+        encoding="utf-8"
+    )
+    assert "pipe-delimited" not in operations
+    assert (home / ".rsimem" / "semantic_mutation_receipts.json").exists()
+
+    restarted = build_configured_hermes_runtime(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+    )
+    hits = restarted.query(MemoryQuery(
+        MemoryKind.SEMANTIC,
+        "",
+        namespace="user",
+        limit=100,
+    ))
+    assert any("pipe-delimited" in hit.artifact.content for hit in hits)
+    restarted.close()
+    db.close()
+
+
+def test_static_writeback_bridge_requires_native_ledger_and_lifecycle(tmp_path: Path) -> None:
+    home = _hermes_home(tmp_path / "home")
+    client = FakeCompletionClient({})
+    kwargs = {
+        "evidence_path": tmp_path / "artifacts" / "events.jsonl",
+        "run_id": "run-static-contract",
+        "trace_id": "trace-static-contract",
+        "episode_id": "episode-static-contract",
+        "session_id": "session-static-contract",
+        "task_id": "task-static-contract",
+        "experiment_variant": "static-rsimem",
+        "static_writeback_config": StaticSemanticWritebackConfig(mode="static"),
+        "static_completion_client": client,
+    }
+    with pytest.raises(ValueError, match=r"native\+ledger"):
+        HermesPastBenchBridge(
+            home,
+            HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+            lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
+            **kwargs,
+        )
+    with pytest.raises(ValueError, match="requires lifecycle"):
+        HermesPastBenchBridge(
+            home,
+            HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+            **kwargs,
+        )

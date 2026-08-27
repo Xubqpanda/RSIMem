@@ -25,6 +25,12 @@ from .lifecycle import (
     TaskLifecycleState,
 )
 from .memory import MemoryEvent, MemoryEventKind, MemoryKind, MemoryQuery
+from .memory.live_writeback import (
+    StaticSemanticBoundaryResult,
+    StaticSemanticWritebackConfig,
+    StaticSemanticWritebackRuntime,
+)
+from .memory_systems.mem0_flat import CompletionClient
 
 
 class _PromptMemoryStore:
@@ -263,6 +269,10 @@ class HermesPastBenchBridge:
         lifecycle_evidence_path: Path | None = None,
         lifecycle_receipt_path: Path | None = None,
         lifecycle_complete: Callable[[str], str] | None = None,
+        static_writeback_config: StaticSemanticWritebackConfig | None = None,
+        static_completion_client: CompletionClient | None = None,
+        static_operation_evidence_path: Path | None = None,
+        static_mutation_receipt_path: Path | None = None,
     ) -> None:
         if config.mode == HermesExecutionMode.NATIVE:
             raise ValueError("native mode must not construct an RSIMem bridge")
@@ -291,6 +301,8 @@ class HermesPastBenchBridge:
         self._session_end_emitted = False
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
+        self._static_results: list[StaticSemanticBoundaryResult] = []
+        self._static_failures: list[tuple[str, str]] = []
         lifecycle_config = lifecycle_config or HermesLifecycleConfig()
         self.lifecycle = (
             HermesLifecycleDryRunRuntime(
@@ -316,6 +328,33 @@ class HermesPastBenchBridge:
             if lifecycle_config.enabled
             else None
         )
+        static_writeback_config = (
+            static_writeback_config or StaticSemanticWritebackConfig()
+        )
+        if static_writeback_config.enabled:
+            if config.mode != HermesExecutionMode.NATIVE_LEDGER:
+                raise ValueError("static semantic writeback requires native+ledger mode")
+            if self.lifecycle is None:
+                raise ValueError("static semantic writeback requires lifecycle evaluation")
+            if static_completion_client is None:
+                raise ValueError("static semantic writeback requires a completion client")
+            self.static_writeback = StaticSemanticWritebackRuntime(
+                hermes_home,
+                static_completion_client,
+                operation_evidence_path=(
+                    static_operation_evidence_path
+                    or self.evidence_path.with_name(
+                        "rsimem_semantic_operations.jsonl"
+                    )
+                ),
+                mutation_receipt_path=(
+                    static_mutation_receipt_path
+                    or hermes_home / ".rsimem" / "semantic_mutation_receipts.json"
+                ),
+                observer=self.ledger,
+            )
+        else:
+            self.static_writeback = None
         self._closed = False
 
     @property
@@ -344,22 +383,39 @@ class HermesPastBenchBridge:
     def lifecycle_failures(self) -> tuple[tuple[str, str], ...]:
         return tuple(self._lifecycle_failures)
 
+    @property
+    def static_results(self) -> tuple[StaticSemanticBoundaryResult, ...]:
+        return tuple(self._static_results)
+
+    @property
+    def static_failures(self) -> tuple[tuple[str, str], ...]:
+        return tuple(self._static_failures)
+
     def on_task_completed(self, result: Mapping[str, Any]) -> None:
         """Receive the explicit post-conversation task boundary from PAST."""
 
         if self.lifecycle is None or result.get("completed") is not True:
             return
         self._last_task_completed = True
-        self._process_lifecycle_boundary(
+        lifecycle = self._process_lifecycle_boundary(
             EvaluationTrigger.TASK_COMPLETED,
             TaskLifecycleState.COMPLETED,
         )
+        if lifecycle is None or self.static_writeback is None:
+            return
+        try:
+            self._static_results.extend(self.static_writeback.process(lifecycle))
+        except Exception as exc:
+            self._static_failures.append((
+                EvaluationTrigger.TASK_COMPLETED.value,
+                type(exc).__name__,
+            ))
 
     def _process_lifecycle_boundary(
         self,
         trigger: EvaluationTrigger,
         task_state: TaskLifecycleState,
-    ) -> None:
+    ) -> HermesLifecycleDryRunResult | None:
         assert self.lifecycle is not None
         evidence_count = len(self.lifecycle.observer.events)
         try:
@@ -381,12 +437,13 @@ class HermesPastBenchBridge:
             if len(self.lifecycle.observer.events) == evidence_count:
                 self.lifecycle.record_boundary_rejection(trigger, exc)
             self._lifecycle_failures.append((trigger.value, type(exc).__name__))
-            return
+            return None
         if not any(
             item.evaluation.evaluation_id == result.evaluation.evaluation_id
             for item in self._lifecycle_results
         ):
             self._lifecycle_results.append(result)
+        return result
 
     def adapter_call(
         self,
@@ -594,4 +651,8 @@ class HermesPastBenchBridge:
             self._tool_handlers.clear()
         finally:
             self._agent = None
-            self.runtime.close()
+            try:
+                if self.static_writeback is not None:
+                    self.static_writeback.close()
+            finally:
+                self.runtime.close()
