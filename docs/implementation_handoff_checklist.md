@@ -404,13 +404,13 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 - √ stale revision、duplicate plan、malformed receipt、ambiguous update target 和 unsafe eviction 被拒绝。
 - √ 并发 dry-run coordinator 只有一个能够 reserve 同一 idempotency key。
 - √ restart 后 duplicate plan 被识别，receipt corruption fail closed。
-- √ deterministic safety fixture 验证 Hermes memory files、state DB、skills 和 forwarded rows 在 dry-run 前后字节级/值级不变；最终 live acceptance 仍需重验。
+- √ deterministic safety fixture 验证 Hermes memory files、state DB、skills 和 forwarded rows 在 dry-run 前后字节级/值级不变；accepted live run 验证 RSIMem 只产生 dry-run evidence。
 
 ### 1D.5 阶段闸门
 
-- □ 真实 Hermes loop 能产出 snapshot、evaluation、validated dry-run plan 和完整 content-free evidence。
+- √ 真实 Hermes loop 能产出 snapshot、evaluation、validated dry-run plan 和完整 content-free evidence。
 - √ disabled、success、failure、retry 和 restart 路径均有 deterministic test。
-- √ 三个 execution mode 的 deterministic read-path equivalence 与 Phase 1C accepted live baseline 继续通过；当前 revision 的 lifecycle-enabled live acceptance 尚未运行。
+- √ 三个 execution mode 的 deterministic read-path equivalence、Phase 1C live baseline 和当前 revision lifecycle-enabled acceptance 均通过。
 - √ RSIMem 与 PAST-Bench 全量回归通过。
 - √ 没有真实 memory generation、memory mutation 或 context eviction。
 
@@ -424,54 +424,54 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 功能需求：
 
-- □ 从 clean temporary HOME 启动 PAST-Bench Hermes。
-- □ 加载固定 experiment manifest。
-- □ 完成 selected task sequence、typed memory reads、snapshot、evaluation、dry-run plan、ledger 和 audit。
-- □ 模拟一次 evaluator failure 和一次 restart，并完成可审计恢复。
+- √ 从 clean temporary HOME 启动 PAST-Bench Hermes。
+- √ 加载固定 family/task manifest、model profile、budget 和显式 lifecycle override。
+- √ 完成 selected task sequence、typed memory reads、snapshot、evaluation、dry-run plan、ledger 和 audit。
+- √ deterministic acceptance 模拟 evaluator failure 和 restart，并完成可审计恢复。
 
 验收需求：
 
-- □ direct native 行为保持不变。
-- □ adapter mode 的 model-visible memory 与 native 等价。
-- □ 所有 physical model requests、tool calls、memory reads 和 dry-run lifecycle events 可重建且不重不漏。
-- □ 所有 observer-facing evidence 通过 privacy audit。
-- □ Hermes memory 与 active context 没有被第一阶段代码修改。
+- √ direct native 行为保持不变且仍为默认配置。
+- √ adapter mode 的 model-visible memory 与 native 等价。
+- √ 所有 physical model requests、tool calls、memory reads 和 dry-run lifecycle events 可重建且不重不漏。
+- √ 所有 observer-facing evidence 通过 privacy audit。
+- √ RSIMem 第一阶段不修改 Hermes memory 或 active context；native Hermes 自身的 control writes 单独保留并计量。
 
 ### 1E.2 第二阶段输入契约冻结
 
 功能需求：
 
-- □ 冻结 `ContextSnapshot`、lifecycle evaluation、`WritebackPlan`、provenance、revision、idempotency 和 usage schema 的第一阶段版本。
-- □ 记录第二阶段可以依赖的 API、版本、fixture 和 evidence path。
-- □ 列出所有已知限制，但不在第一阶段提前实现第二阶段功能。
+- √ 冻结 `ContextSnapshot`、lifecycle evaluation、`WritebackPlan`、provenance、revision、idempotency 和 usage schema 为 `LIFECYCLE_CONTRACT_SCHEMA_VERSION=1`。
+- √ 在 `phase1_acceptance_20260827.md` 记录第二阶段可以依赖的 API、版本、fixture 和 evidence path。
+- √ 列出所有已知限制，第一阶段未实现 compiler、真实 mutation、static/adaptive policy 或 physical rewrite。
 
 验收需求：
 
-- □ 第二阶段可以从一个 validated plan 获得 route-specific ingestor 所需 source reference 和 structured exit evidence。
-- □ schema version mismatch、unknown required field 和 stale revision 有明确拒绝语义。
-- □ 第一阶段 report 不包含任何 memory quality 或 recursive improvement claim。
+- √ 第二阶段可以从一个 validated plan 获得 route-specific ingestor 所需 source reference 和 structured exit evidence。
+- √ schema version mismatch、unknown required field 和 stale revision 有明确拒绝语义。
+- √ 第一阶段 report 不包含任何 memory quality 或 recursive improvement claim。
 
 ### 1E.3 第一阶段完成条件
 
 只有以下条件全部成立，才能将第一阶段标记为完成：
 
-- □ 1A-1E 所有子任务均已勾选并有对应 commit。
-- □ 最终 RSIMem 与 PAST-Bench 全量测试通过。
-- □ live matched read-path validation 通过。
-- □ 真实 Hermes lifecycle dry-run acceptance 通过。
-- □ ledger、audit、restart、failure 和 privacy evidence 完整。
-- □ 第一阶段没有执行任何真实 memory generation、mutation 或 context eviction。
+- √ 1A-1E 所有子任务均已勾选并有对应 commit。
+- √ 最终 RSIMem 与 PAST-Bench 全量测试通过。
+- √ live matched read-path validation 通过。
+- √ 真实 Hermes lifecycle dry-run acceptance 通过。
+- √ ledger、audit、restart、failure 和 privacy evidence 完整。
+- √ 第一阶段没有执行任何 RSIMem memory generation、mutation 或 context eviction。
 
 ## 11. 第二阶段前置条件
 
 第二阶段实现真实 memory generation 与 self-improvement。开始前必须满足：
 
-- □ 1A-1E 全部完成。
-- □ Live matched read-path validation 通过，未发现 adapter-caused model-visible divergence。
-- □ 真实 Hermes lifecycle dry-run 已接通 snapshot、evaluation、validated plan、ledger 和 audit。
-- □ `ContextSnapshot`、`WritebackPlan`、provenance、revision、idempotency 和 usage schema 已冻结版本。
-- □ Direct native 仍是默认路径，第二阶段功能全部通过显式配置启用。
-- □ RSIMem 与 PAST-Bench 全量回归保持通过。
+- √ 1A-1E 全部完成。
+- √ Live matched read-path validation 通过，未发现 adapter-caused model-visible divergence。
+- √ 真实 Hermes lifecycle dry-run 已接通 snapshot、evaluation、validated plan、ledger 和 audit。
+- √ `ContextSnapshot`、`WritebackPlan`、provenance、revision、idempotency 和 usage schema 已冻结 v1。
+- √ Direct native 仍是默认路径，第二阶段功能全部通过显式配置启用。
+- √ RSIMem 与 PAST-Bench 全量回归保持通过。
 
 任一前置条件未满足时，不开始 ingestor/generator、backend mutation 或 policy update。
 
