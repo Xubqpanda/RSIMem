@@ -14,9 +14,9 @@ This document tracks implementation progress, the current experimental boundary,
 
 RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for every exposed model request, derive a privacy-safe lifecycle ledger, audit run completeness, and represent Hermes semantic, episodic, and procedural memory through typed backend contracts.
 
-The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default. Static Mem0-flat semantic writeback is now available only through the explicit live experiment configuration; adaptive policy updates remain disabled. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
+The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default. Static Mem0-flat semantic writeback is available only through the explicit live experiment configuration; active-artifact binding is implemented, but the adaptive PAST-Bench variant remains disabled until Phase 2K. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E, Phase 2A-2E, Phase 2H, Phase 2I, and Phase 2J.1-2J.2 are complete. Phase 2J.3 adaptive end-to-end stage gate is the active milestone. Live mutation remains opt-in and restricted to the audited static experiment path; adaptive policy application remains disabled until an active artifact drives real semantic decisions and the 2J.3 gate passes.
+Phase 1A-1E, Phase 2A-2E, Phase 2H, Phase 2I, and Phase 2J are complete. Phase 2K.1 matched adaptive PAST-Bench variants are the active milestone. Live mutation remains opt-in and restricted to audited experiment paths; direct native remains the default.
 
 ## Completed Work
 
@@ -191,22 +191,22 @@ The delayed-feedback lifecycle join, exposure-bias contracts, and deterministic 
 
 The 2J.1 learner now produces deterministic, content-addressed semantic parameter proposals from frozen delayed feedback. Parameter ownership and negative updates are bound to attributed failure subgraphs, while low sample, missing evidence, and propensity-distribution gaps fall back to the parent value. A crash-safe store preserves immutable artifacts, explicit lifecycle states, idempotent transition history, and one verifiable active pointer; no proposal is eligible for live activation until 2J.2 adds held-out validation decisions.
 
-Phase 2J.2 now separates offline pre-screening from final matched activation. Time-ordered splits, frozen criteria, replayable static/proposal held-out pairs, immutable decisions, atomic activation, actual-version evidence, and operator/automatic rollback are implemented and restart-audited. These are deterministic implementation fixtures; no PAST-Bench adaptive improvement is claimed before 2J.3 connects the active artifact to real semantic policy decisions.
+Phase 2J is complete at the deterministic implementation gate. Time-ordered splits, offline screening, matched held-out activation, rollback, active-artifact binding, actual-version evidence, and one replayable N -> feedback -> N+1 -> changed future memory decision loop are implemented. This does not establish PAST-Bench adaptive quality, repeated recursive improvement, or cross-family generalization; those claims remain gated on Phase 2K experiments.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `314 passed`.
+- [x] Pass all RSIMem tests: `317 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `387 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2J.3 Adaptive End-To-End Stage Gate**
+### **Current: Phase 2K.1 PAST-Bench Adaptive Variants**
 
 Phase 2H freezes one interpretable future-utility-per-cost objective across semantic generation admission, internal operation admission, and retrieval filtering/ranking without changing route or invocation scheduling. Deterministic matched fixtures and the audited live SM01 batch establish fixed policy identity, content-free evidence, raw-cost accounting, and explicit limitations.
 
-Phase 2I constructs, independently rebuilds, and audits a versioned delayed-feedback dataset from the atomic operation graph. Phase 2J.1 trains a deterministic, conservative semantic-policy proposal; Phase 2J.2 gates activation on auditable offline and matched held-out evidence. The immediate objective is 2J.3: adapt the real fixed-route Mem0-flat semantic parameters from the active artifact, record the actual version on every downstream decision, and replay one complete N -> feedback -> N+1 -> changed future-decision loop before entering PAST-Bench experiments.
+Phase 2I constructs, independently rebuilds, and audits a versioned delayed-feedback dataset from the atomic operation graph. Phase 2J now trains, validates, activates, binds, audits, and rolls back a deterministic adaptive Mem0-flat policy while preserving the fixed route and invocation cadence. The immediate objective is 2K.1: add the adaptive variant to the existing matched PAST-Bench manifest and launcher, freeze semantic-family order and evidence contracts, then run audited independent replicates without placing raw logs or credentials in tracked files.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
