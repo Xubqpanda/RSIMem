@@ -262,4 +262,29 @@ elif utility.get("events") != 0:
   done
 done
 
+if [[ "${METHOD_SET}" == "feedback" ]]; then
+  feedback_complete="$(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
+import sys
+from pathlib import Path
+from rsimem.experiment_manifest import FEEDBACK_METHOD_VARIANTS, load_manifest
+manifest = load_manifest(Path(sys.argv[1]))
+completed = {
+    (item["replicate"], item["mode"])
+    for item in manifest["attempts"]
+    if item["status"] == "completed"
+}
+expected = {
+    (replicate, FEEDBACK_METHOD_VARIANTS[0])
+    for replicate in range(1, manifest["replicates"] + 1)
+}
+print("true" if completed == expected else "false")
+' "${manifest_path}")"
+  if [[ "${feedback_complete}" == "true" ]]; then
+    PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.feedback_preparation \
+      "${batch_root}" --output "${batch_root}/prepared"
+  else
+    echo "Feedback batch is partial; preparation assembly deferred."
+  fi
+fi
+
 echo "Static SM01 batch complete: ${batch_root}"
