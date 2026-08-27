@@ -696,6 +696,7 @@ def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) ->
         ),
     ))
     assert usage_observer.events[0]["data"]["resources"] == {
+        "schemaVersion": 1,
         "inputTokens": 100,
         "outputTokens": 20,
         "cacheReadTokens": 30,

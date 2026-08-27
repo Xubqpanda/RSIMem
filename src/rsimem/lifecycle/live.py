@@ -20,6 +20,7 @@ from .contracts import (
     MemoryScope,
     TemporalValidity,
     WritebackAction,
+    LIFECYCLE_CONTRACT_SCHEMA_VERSION,
 )
 from .controller import LifecycleController
 from .evaluators import JsonLlmContextEvaluator
@@ -311,6 +312,7 @@ class HermesLifecycleDryRunRuntime:
         evaluation_id = _stable_hash(
             "evaluation",
             {
+                "schema_version": LIFECYCLE_CONTRACT_SCHEMA_VERSION,
                 "snapshot_id": snapshot.snapshot_id,
                 "context_revision": snapshot.context_revision,
                 "trigger": trigger.value,

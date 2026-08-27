@@ -7,6 +7,8 @@ from enum import StrEnum
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from .contracts import LIFECYCLE_CONTRACT_SCHEMA_VERSION, _require_current_schema
+
 
 def _frozen_metadata(value: Mapping[str, Any] | None) -> Mapping[str, Any]:
     return MappingProxyType(dict(value or {}))
@@ -38,8 +40,10 @@ class ProvenanceRef:
     segment_ids: tuple[str, ...] = ()
     evaluation_id: str | None = None
     mutation_id: str | None = None
+    schema_version: int = LIFECYCLE_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        _require_current_schema(self.schema_version, "provenance")
         required = (
             self.run_id,
             self.episode_id,
@@ -133,8 +137,12 @@ class ContextSnapshot:
     tool_closures: tuple[ToolClosure, ...]
     total_token_count: int
     provenance: ProvenanceRef
+    schema_version: int = LIFECYCLE_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        _require_current_schema(self.schema_version, "context snapshot")
+        if self.provenance.schema_version != self.schema_version:
+            raise ValueError("snapshot and provenance schema versions must match")
         required = (
             self.run_id,
             self.episode_id,

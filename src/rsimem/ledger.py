@@ -105,6 +105,7 @@ _LIFECYCLE_PLAN_DATA_FIELDS = {
     "resources",
 }
 _LIFECYCLE_RESOURCE_FIELDS = {
+    "schemaVersion",
     "inputTokens",
     "outputTokens",
     "cacheReadTokens",
@@ -562,6 +563,7 @@ class LifecycleLedgerObserver:
                 "status": event.status,
                 "reasonCodes": list(event.reason_codes),
                 "resources": {
+                    "schemaVersion": resources.schema_version,
                     "inputTokens": resources.input_tokens,
                     "outputTokens": resources.output_tokens,
                     "cacheReadTokens": resources.cache_read_tokens,

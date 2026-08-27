@@ -14,6 +14,13 @@ from typing import Any, Mapping, Protocol, runtime_checkable
 
 from ..memory.contracts import MemoryKind
 
+LIFECYCLE_CONTRACT_SCHEMA_VERSION = 1
+
+
+def _require_current_schema(version: int, contract: str) -> None:
+    if type(version) is not int or version != LIFECYCLE_CONTRACT_SCHEMA_VERSION:
+        raise ValueError(f"unsupported {contract} schema version")
+
 
 class EvaluationTrigger(StrEnum):
     TASK_COMPLETED = "task_completed"
@@ -97,8 +104,10 @@ class ContextEvaluationRequest:
     active_segment_ids: tuple[str, ...] = ()
     context_tokens: int | None = None
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    schema_version: int = LIFECYCLE_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        _require_current_schema(self.schema_version, "context evaluation request")
         if not self.evaluation_id.strip() or not self.session_id.strip():
             raise ValueError("evaluation_id and session_id must not be empty")
         if not self.segments:
@@ -223,8 +232,10 @@ class ContextEvaluation:
     signals: tuple[EvaluationSignal, ...]
     policy_version: str = "initial"
     input_chars: int = 0
+    schema_version: int = LIFECYCLE_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        _require_current_schema(self.schema_version, "context evaluation")
         if not self.evaluation_id.strip() or not self.evaluator.strip():
             raise ValueError("evaluation_id and evaluator must not be empty")
         if self.input_chars < 0:

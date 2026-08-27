@@ -20,6 +20,7 @@ from .contracts import (
     MemoryScope,
     TemporalValidity,
     WritebackAction,
+    LIFECYCLE_CONTRACT_SCHEMA_VERSION,
 )
 from .snapshot import (
     ContextSnapshot,
@@ -124,6 +125,7 @@ class HermesSnapshotCollector:
         closures = self._build_tool_closures(messages, source_to_segment, session_id)
         active_segment_ids = tuple(source_to_segment[item] for item in active_message_ids)
         revision_payload = {
+            "schema_version": LIFECYCLE_CONTRACT_SCHEMA_VERSION,
             "segments": [
                 {
                     "segment_id": segment.segment_id,
@@ -151,6 +153,7 @@ class HermesSnapshotCollector:
         snapshot_id = _canonical_hash(
             "snapshot",
             {
+                "schema_version": LIFECYCLE_CONTRACT_SCHEMA_VERSION,
                 "run_id": run_id,
                 "episode_id": episode_id,
                 "session_id": session_id,
