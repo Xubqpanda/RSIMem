@@ -551,6 +551,10 @@ class HermesPersistenceConfig(BaseModel):
     ] = "disabled"
     rsimem_semantic_writeback_timeout_seconds: float = 30.0
     rsimem_semantic_writeback_max_output_tokens: int = 4096
+    rsimem_semantic_feedback_contract: Literal[
+        "disabled",
+        "sm01_tsv_v1",
+    ] = "disabled"
     rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | None = None
     rsimem_adaptive_policy_source_path: str = Field(default="", exclude=True)
 

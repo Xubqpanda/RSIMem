@@ -138,12 +138,16 @@ def test_adaptive_method_execution_profiles_freeze_only_intended_differences() -
         "rsimemMode": "native",
         "lifecycleEvaluatorMode": "disabled",
         "semanticWritebackMode": "disabled",
+        "semanticFeedbackContract": "disabled",
         "adaptiveConfigRequired": False,
     }
     assert profiles["native-hermes"]["rsimemMode"] == "native"
     assert profiles["native-ledger"]["rsimemMode"] == "native+ledger"
     assert profiles["static-rsimem"]["semanticWritebackMode"] == (
         "static_utility"
+    )
+    assert profiles["static-rsimem"]["semanticFeedbackContract"] == (
+        "sm01_tsv_v1"
     )
     assert profiles["adaptive-rsimem"]["semanticWritebackMode"] == (
         "adaptive_utility"
@@ -241,12 +245,16 @@ def test_manifest_schedules_static_method_variants(tmp_path: Path) -> None:
         **_manifest_kwargs(),
         execution_modes=ADAPTIVE_METHOD_VARIANTS,
         adaptive_policy=_adaptive_profile(),
+        semantic_feedback_contract="sm01_tsv_v1",
     )
     adaptive = load_manifest(adaptive_path)
     assert adaptive["configuration"]["executionModes"] == list(
         ADAPTIVE_METHOD_VARIANTS
     )
     assert adaptive["configuration"]["adaptivePolicy"] == _adaptive_profile()
+    assert adaptive["configuration"]["semanticFeedbackContract"] == (
+        "sm01_tsv_v1"
+    )
     assert adaptive["executionOrderByReplicate"]["2"] == [
         "native-hermes",
         "native-ledger",
@@ -260,6 +268,7 @@ def test_manifest_schedules_static_method_variants(tmp_path: Path) -> None:
             tmp_path / "adaptive-missing-policy.json",
             **_manifest_kwargs(),
             execution_modes=ADAPTIVE_METHOD_VARIANTS,
+            semantic_feedback_contract="sm01_tsv_v1",
         )
 
 

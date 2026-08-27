@@ -151,6 +151,7 @@ def test_build_hermes_extra_body_contains_persistence_overrides(tmp_path: Path):
             "mode": "disabled",
             "timeout_seconds": 30.0,
             "max_output_tokens": 4096,
+            "feedback_contract": "disabled",
         },
     }
 
@@ -218,6 +219,7 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
         "rsimem_mode": "native+ledger",
         "rsimem_lifecycle_evaluator_mode": "deterministic",
         "rsimem_semantic_writeback_mode": "adaptive_utility",
+        "rsimem_semantic_feedback_contract": "sm01_tsv_v1",
     }
     source_store = tmp_path / "adaptive-policy-store.json"
     source_store.write_text('{"active": true}\n', encoding="utf-8")
@@ -238,6 +240,7 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
     ]
     assert "schema_version" not in writeback
     assert "prepared_policy_store_file" not in writeback
+    assert writeback["feedback_contract"] == "sm01_tsv_v1"
     assert "memory" not in enabled["enabled_toolsets"]
     copied_store = tmp_path / "home" / ".rsimem" / "adaptive-policies.json"
     assert copied_store.read_bytes() == source_store.read_bytes()
@@ -253,6 +256,7 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
         "mode": "disabled",
         "timeout_seconds": 30.0,
         "max_output_tokens": 4096,
+        "feedback_contract": "disabled",
     }
     assert not (disabled_home / ".rsimem" / "adaptive-policies.json").exists()
 
@@ -268,6 +272,15 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
 
     with pytest.raises(ValueError, match="requires adaptive config"):
         build_hermes_extra_body(persistence_enabled=True, **common)
+    with pytest.raises(ValueError, match="requires writeback mode"):
+        build_hermes_extra_body(
+            persistence_enabled=True,
+            **{
+                **common,
+                "rsimem_semantic_writeback_mode": "disabled",
+                "rsimem_semantic_feedback_contract": "sm01_tsv_v1",
+            },
+        )
     with pytest.raises(ValueError, match=r"native\+ledger"):
         build_hermes_extra_body(
             persistence_enabled=True,
@@ -391,6 +404,7 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
         rsimem_semantic_writeback_mode="adaptive_utility",
         rsimem_semantic_writeback_timeout_seconds=20.0,
         rsimem_semantic_writeback_max_output_tokens=1024,
+        rsimem_semantic_feedback_contract="sm01_tsv_v1",
         rsimem_adaptive_config=str(adaptive_config),
     ))
 
@@ -405,6 +419,7 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
     assert sequence.hermes.rsimem_semantic_writeback_mode == "adaptive_utility"
     assert sequence.hermes.rsimem_semantic_writeback_timeout_seconds == 20.0
     assert sequence.hermes.rsimem_semantic_writeback_max_output_tokens == 1024
+    assert sequence.hermes.rsimem_semantic_feedback_contract == "sm01_tsv_v1"
     assert sequence.hermes.rsimem_adaptive_config is not None
     assert sequence.hermes.rsimem_adaptive_config.adaptive_policy_store_path == (
         ".rsimem/adaptive-policies.json"

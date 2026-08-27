@@ -49,6 +49,7 @@ def build_hermes_extra_body(
     rsimem_semantic_writeback_mode: str = "disabled",
     rsimem_semantic_writeback_timeout_seconds: float = 30.0,
     rsimem_semantic_writeback_max_output_tokens: int = 4096,
+    rsimem_semantic_feedback_contract: str = "disabled",
     rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | dict | None = None,
     rsimem_adaptive_policy_source_path: str = "",
 ) -> dict[str, Any]:
@@ -67,6 +68,11 @@ def build_hermes_extra_body(
         "mode": semantic_writeback_mode,
         "timeout_seconds": rsimem_semantic_writeback_timeout_seconds,
         "max_output_tokens": rsimem_semantic_writeback_max_output_tokens,
+        "feedback_contract": (
+            rsimem_semantic_feedback_contract
+            if semantic_writeback_mode != "disabled"
+            else "disabled"
+        ),
     }
     if semantic_writeback_mode in {"static", "static_utility", "adaptive_utility"}:
         if rsimem_mode != "native+ledger":
@@ -108,6 +114,8 @@ def build_hermes_extra_body(
         enabled_toolsets = [
             toolset for toolset in enabled_toolsets if toolset != "memory"
         ]
+    elif rsimem_semantic_feedback_contract != "disabled" and persistence_enabled:
+        raise ValueError("semantic feedback contract requires writeback mode")
 
     return {
         "hermes": {
@@ -577,6 +585,9 @@ class HermesPersistenceBackend(PersistenceBackend):
             ),
             rsimem_semantic_writeback_max_output_tokens=(
                 sequence.hermes.rsimem_semantic_writeback_max_output_tokens
+            ),
+            rsimem_semantic_feedback_contract=(
+                sequence.hermes.rsimem_semantic_feedback_contract
             ),
             rsimem_adaptive_config=sequence.hermes.rsimem_adaptive_config,
             rsimem_adaptive_policy_source_path=(

@@ -37,6 +37,7 @@ _ADAPTIVE_METHOD_EXECUTION = {
         "rsimemMode": "native",
         "lifecycleEvaluatorMode": "disabled",
         "semanticWritebackMode": "disabled",
+        "semanticFeedbackContract": "disabled",
         "adaptiveConfigRequired": False,
     },
     "native-hermes": {
@@ -44,6 +45,7 @@ _ADAPTIVE_METHOD_EXECUTION = {
         "rsimemMode": "native",
         "lifecycleEvaluatorMode": "disabled",
         "semanticWritebackMode": "disabled",
+        "semanticFeedbackContract": "disabled",
         "adaptiveConfigRequired": False,
     },
     "native-ledger": {
@@ -51,6 +53,7 @@ _ADAPTIVE_METHOD_EXECUTION = {
         "rsimemMode": "native+ledger",
         "lifecycleEvaluatorMode": "deterministic",
         "semanticWritebackMode": "disabled",
+        "semanticFeedbackContract": "disabled",
         "adaptiveConfigRequired": False,
     },
     "static-rsimem": {
@@ -58,6 +61,7 @@ _ADAPTIVE_METHOD_EXECUTION = {
         "rsimemMode": "native+ledger",
         "lifecycleEvaluatorMode": "deterministic",
         "semanticWritebackMode": "static_utility",
+        "semanticFeedbackContract": "sm01_tsv_v1",
         "adaptiveConfigRequired": False,
     },
     "adaptive-rsimem": {
@@ -65,6 +69,7 @@ _ADAPTIVE_METHOD_EXECUTION = {
         "rsimemMode": "native+ledger",
         "lifecycleEvaluatorMode": "deterministic",
         "semanticWritebackMode": "adaptive_utility",
+        "semanticFeedbackContract": "sm01_tsv_v1",
         "adaptiveConfigRequired": True,
     },
 }
@@ -89,6 +94,7 @@ _REQUIRED_CONFIGURATION = {
     "adapterProjectionVerification",
     "seedControl",
     "adaptivePolicy",
+    "semanticFeedbackContract",
 }
 _REQUIRED_REVISIONS = {
     "rsimemCommit",
@@ -520,6 +526,11 @@ def validate_manifest(value: Any) -> dict[str, Any]:
         raise ValueError("manifest contains an unknown execution mode")
     if len(set(modes)) != len(modes):
         raise ValueError("manifest contains duplicate execution modes")
+    feedback_contract = configuration.get("semanticFeedbackContract")
+    if feedback_contract not in {"disabled", "sm01_tsv_v1"}:
+        raise ValueError("manifest semantic feedback contract is invalid")
+    if "adaptive-rsimem" in modes and feedback_contract != "sm01_tsv_v1":
+        raise ValueError("adaptive manifest requires the frozen feedback contract")
     adaptive_policy = configuration.get("adaptivePolicy")
     if "adaptive-rsimem" in modes:
         adaptive_policy = _validate_non_empty_object(
@@ -614,6 +625,7 @@ def initialize_batch_manifest(
     past_bench_dirty: bool,
     execution_modes: tuple[str, ...] = EXECUTION_MODES,
     adaptive_policy: dict[str, Any] | None = None,
+    semantic_feedback_contract: str = "disabled",
 ) -> str:
     if replicates < 1:
         raise ValueError("replicates must be positive")
@@ -633,6 +645,7 @@ def initialize_batch_manifest(
         "adapterProjectionVerification": adapter_projection_verification,
         "seedControl": "independent_unseeded_replicates",
         "adaptivePolicy": adaptive_policy,
+        "semanticFeedbackContract": semantic_feedback_contract,
     }
     revisions = {
         "rsimemCommit": rsimem_commit,
