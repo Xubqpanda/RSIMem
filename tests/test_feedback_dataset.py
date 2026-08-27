@@ -567,6 +567,9 @@ def test_positive_negative_unresolved_and_censored_labels_are_distinct() -> None
         "op.use",
     )
     assert negative.attributed_operation_ids == negative.failure_subgraph_operation_ids
+    assert len(negative.attribution_record_ids) == 1
+    assert negative.attribution_methods[0].value == "deterministic_exposure"
+    assert negative.failure_categories[0].value == "retrieved_but_unused"
 
     unresolved_graph = _graph("retrieved_not_injected")
     unresolved = _dataset(unresolved_graph).examples[0]
@@ -690,6 +693,20 @@ def test_integrity_audit_detects_orphan_revision_duplicate_and_future_leakage() 
     revision_dataset = replace(dataset, examples=(wrong_revision,))
     revision = audit_feedback_dataset(revision_dataset, graph)
     assert "revision_mismatch" in revision.issues
+
+    wrong_label = replace(
+        example,
+        label=FeedbackLabel.POSITIVE,
+        exposure_state=ExposureState.USED,
+    )
+    wrong_label_dataset = replace(dataset, examples=(wrong_label,))
+    label_audit = audit_feedback_dataset(wrong_label_dataset, graph)
+    assert "label_evidence_mismatch" in label_audit.issues
+
+    wrong_kind = replace(example, source_operation_ids=("op.query",))
+    wrong_kind_dataset = replace(dataset, examples=(wrong_kind,))
+    kind_audit = audit_feedback_dataset(wrong_kind_dataset, graph)
+    assert "operation_kind_mismatch" in kind_audit.issues
 
     duplicate_dataset = replace(dataset, examples=(example, example))
     duplicate = audit_feedback_dataset(duplicate_dataset, graph)
