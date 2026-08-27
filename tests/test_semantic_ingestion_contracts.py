@@ -321,6 +321,8 @@ def test_update_and_delete_targets_are_bound_by_trusted_candidate_reader() -> No
         "revision-7",
     ]
     assert result.operations[0].old_content_digest == _sha("old fact")
+    assert all(item.transaction_required for item in result.operations)
+    assert all(item.recovery_receipt_required for item in result.operations)
 
 
 def test_unknown_stale_duplicate_and_unsupported_operations_fail_closed() -> None:
@@ -390,6 +392,8 @@ def test_none_failure_idempotency_and_disabled_mode_have_distinct_semantics() ->
     assert calls == 1
     assert first is not None and first.status == MemoryIngestStatus.SUCCESS
     assert first.operations[0].action == InternalMemoryAction.NONE
+    assert first.operations[0].transaction_required is False
+    assert first.operations[0].recovery_receipt_required is False
 
     failed_policy = BoundSemanticPolicy(
         _descriptor(provider="failed_semantic"),
