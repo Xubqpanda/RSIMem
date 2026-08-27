@@ -11,7 +11,10 @@ from rsimem.experiment_manifest import (
     initialize_batch_manifest,
     record_attempt,
 )
-from rsimem.feedback_preparation import assemble_feedback_batch
+from rsimem.feedback_preparation import (
+    assemble_feedback_batch,
+    load_prepared_feedback_dataset,
+)
 from rsimem.memory.feedback_dataset import JsonDelayedFeedbackDatasetStore
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
@@ -143,6 +146,33 @@ def test_feedback_preparation_assembles_content_free_replayable_dataset(
     serialized = (output / "preparation_manifest.json").read_text(encoding="utf-8")
     for forbidden in ('"content"', '"prompt"', '"response"', '"score"', '"grader"'):
         assert forbidden not in serialized
+
+    loaded, gate, loaded_manifest = load_prepared_feedback_dataset(output)
+    assert loaded == dataset
+    assert gate.ok is True
+    assert loaded_manifest == report
+
+
+def test_feedback_preparation_loader_rejects_manifest_and_dataset_tampering(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "prepared"
+    report = assemble_feedback_batch(_batch(tmp_path), output_root=output)
+    manifest_path = output / "preparation_manifest.json"
+    original_manifest = manifest_path.read_text(encoding="utf-8")
+    manifest = json.loads(original_manifest)
+    manifest["stageGate"]["ok"] = False
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    with pytest.raises(ValueError, match="stage gate mismatch"):
+        load_prepared_feedback_dataset(output)
+
+    manifest_path.write_text(original_manifest, encoding="utf-8")
+    dataset_path = output / report["datasetPath"]
+    dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
+    dataset["source_operation_count"] += 1
+    dataset_path.write_text(json.dumps(dataset), encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed|identity|canonical"):
+        load_prepared_feedback_dataset(output)
 
 
 def test_feedback_preparation_rejects_unresolved_or_incomplete_batches(
