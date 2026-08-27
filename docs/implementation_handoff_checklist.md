@@ -485,57 +485,57 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 功能需求：
 
-- □ 固定 semantic、episodic、procedural 三条 Hermes native route，不增加统一 memory-form classifier；当前只启用 semantic policy implementation。
-- □ 固定 semantic route 的 invocation boundary、输入投影和输出 surface，所有 semantic policy version 使用相同触发条件。
-- □ Semantic route 对外只接受 `ingest(experience)`；episodic/procedural contract 保持可构造但不启用 policy implementation。
-- □ 不在 RSIMem 外层预测 ADD、UPDATE、DELETE 或 NONE。
-- □ 明确 natural session exit、logical context exit 和 physical context rewrite；第一版使用 natural boundary。
+- √ 固定 semantic、episodic、procedural 三条 Hermes native route，不增加统一 memory-form classifier；当前只启用 semantic policy implementation。
+- √ 固定 semantic route 的 task-completed/session-end natural invocation boundary、输入投影和 eager output surface，所有 semantic policy version 使用相同触发条件。
+- √ Semantic route 对外只接受 `ingest(experience)`；episodic/procedural route contract 保持可构造但 `policy_enabled=false`。
+- √ 外部 request 不携带 ADD、UPDATE、DELETE 或 NONE；Phase 1 plan action 在 trusted projection 中被丢弃。
+- √ `ContextExitSemantics` 明确 natural、logical 和 physical；Phase 2A 只接受 natural boundary。
 
 验收需求：
 
-- □ 相同 semantic experience 在所有 policy variant 中进入相同 route 和 invocation boundary。
-- □ Semantic input 不会被外层改路由为 episodic 或 procedural。
-- □ Disabled mode 完全恢复 Hermes native routing 与 invocation。
-- □ Open tool closure、active turn 和 unresolved task 不能进入 completed-experience ingestion。
+- √ 相同 semantic experience 在所有 policy variant 中进入相同 fixed route 和 natural invocation boundary。
+- √ Semantic request 构造时拒绝 episodic/procedural route override。
+- √ Disabled coordinator 在解析 provider 或调用 policy 前返回 native path。
+- √ Trusted builder 拒绝 open tool closure、active/current context、active task 和 unresolved source。
 
 ### 2A.2 Add-Only External Contract
 
 功能需求：
 
-- □ 外部 ingestion contract 只包含 source experience、fixed route、policy version、provenance 和 idempotency identity。
-- □ 定义 host-neutral `SemanticMemoryPolicy` interface：接收 ingestion request 与受控的 existing-memory candidate reader，返回 `MemoryIngestResult`；接口不暴露 Hermes file path、Mem0/Qdrant object 或 provider-native payload。
-- □ 第一个 registered policy provider 命名为 `mem0_flat`；registry 显式绑定 policy/framework version 和 capability，unknown provider fail closed。
-- □ Memory framework 内部允许产生 `ADD`、`UPDATE`、`DELETE` 或 `NONE` operation。
-- □ Internal operation、target、old/new digest、cost 和 reason code 作为 ingestion outcome 记录。
-- □ RSIMem 不重复实现一套独立 ADD-versus-UPDATE predictor。
+- √ 外部 ingestion contract 只包含 source experience、fixed route、policy version、provenance、natural trigger 和 idempotency identity。
+- √ 定义 host-neutral `SemanticMemoryPolicy` interface：接收 request 与受控 candidate reader，返回 policy decision；coordinator 生成 `MemoryIngestResult`，接口不暴露 native payload/path/object。
+- √ `mem0_flat_policy` provider shell 与显式 registry 绑定 policy/framework/prompt/feature version 和 capability；unknown provider fail closed。
+- √ Framework 内部 proposal 支持 `ADD`、`UPDATE`、`DELETE` 或 `NONE`。
+- √ Resolved operation/result 记录 target、expected revision、old/new digest、usage、reason code、transaction/recovery requirement 和 stable IDs。
+- √ RSIMem 外层只验证/绑定 framework proposal，不实现独立 ADD-versus-UPDATE predictor。
 
 验收需求：
 
-- □ 同一 ingestion retry 不重复应用内部 operation。
-- □ Internal UPDATE/DELETE 仍受 revision、validation、transaction 和 recovery 约束。
-- □ `NONE` 与 framework failure 可明确区分。
-- □ Framework 若不支持 add-time update，capability 中必须明确声明，不能假装支持。
-- □ Fake semantic policy 与 `mem0_flat` 可以在不改 coordinator/executor 的前提下替换，证明 policy interface 与具体算法解耦。
+- √ 同一 idempotency request 返回同一 result，不重复调用 policy；跨 coordinator 逻辑 execution/operation ID 稳定。
+- √ UPDATE/DELETE target/revision 由 trusted reader 绑定，并强制 transaction/recovery receipt requirement；Phase 2A 尚不执行 mutation。
+- √ Successful `NONE` operation 与 `FAILED`/`REJECTED` framework result 明确区分。
+- √ `PolicyCapability.add_time_update` 与 operation allowlist 显式声明；unsupported proposal fail closed。
+- √ Fake policy 与 `mem0_flat` provider shell 可在不改 coordinator 的前提下替换。
 
 ### 2A.3 Policy Ownership
 
 功能需求：
 
-- □ Policy、framework、prompt 和 feature schema version 由 runtime 绑定。
-- □ Internal model output 可以建议 operation，但不拥有 revision、policy identity 或 activation 权限。
-- □ Target resolution、revision binding、validation 和 safety decision 保持 deterministic/trusted。
+- √ Policy descriptor 由 runtime 绑定 policy、framework、prompt 和 feature schema version。
+- √ Proposal 只能携带 action、candidate ID、content digest 和 reason；不拥有 backend、artifact、revision、policy identity 或 activation 权限。
+- √ Coordinator 使用 fixed router、trusted candidate reader 和 capability contract deterministic 绑定 target/revision 并验证安全要求。
 
 验收需求：
 
-- □ Model 尝试伪造 version、backend、artifact ID 或 revision 时 fail closed 或被严格忽略。
-- □ 同一 policy 与 deterministic input 产生相同 logical plan identity。
-- □ Policy version 变化时 decision provenance 改变，source snapshot identity 不改变。
+- √ Request metadata 与 proposal schema 拒绝 version/backend/target/artifact/revision 注入。
+- √ 同一 policy binding 与 deterministic request 跨 coordinator 产生相同 execution/operation identity。
+- √ Policy version 变化时 ingestion execution identity 改变，source snapshot identity 不改变。
 
 ### 2A.4 阶段闸门
 
-- □ Fixed routing、add-only ingestion、internal operation 和 ownership semantics 形成设计记录。
-- □ Contract 正反向测试全部通过。
-- □ 尚未调用 compiler 或执行 backend mutation。
+- √ `memory_adapters.md` 记录 fixed routing、external add-only、internal operation 与 trusted ownership semantics。
+- √ `test_semantic_ingestion_contracts.py` 正反向 contract 测试通过。
+- √ 2A coordinator 只生成结果，不调用 compiler、`MemoryRuntime.mutate()` 或 backend mutation。
 
 ## 13. 第二阶段 2B：Prompt 与 Memory Ingestion 基础设施
 

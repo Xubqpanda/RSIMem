@@ -59,6 +59,8 @@ Events contain backend names, opaque artifact IDs, character counts, operation t
 
 ## Current Boundary
 
+Phase 2A fixes the three Hermes native routes in `rsimem.memory.ingestion`; only semantic has `policy_enabled=true`. External callers submit a completed experience, fixed route, runtime policy version, provenance, natural trigger, and idempotency identity. They never submit ADD/UPDATE/DELETE/NONE or a target. `SemanticMemoryPolicy` returns internal proposals, while the coordinator binds policy/framework/prompt/feature versions and resolves UPDATE/DELETE candidates to trusted artifact IDs and revisions. Mutating outcomes declare transaction and recovery-receipt requirements but are not executed in 2A. Disabled mode returns before policy resolution, preserving native routing and invocation.
+
 The adapter API is now available through an opt-in PAST-Bench Hermes bridge; direct native remains the default. Storage-boundary deterministic equivalence is complete for semantic rendering, episodic FTS views, and procedural resources. A second deterministic fixture invokes Hermes' real `AIAgent._build_system_prompt`, `session_search`, `skills_list`, and `skill_view` paths across `native`, `native+ledger`, and `native+adapter+ledger`. The session-search fixture replaces only the external summarizer with a deterministic function. It also verifies restart-stable artifact identity and explicit fail-closed or native-bypass behavior.
 
 This establishes deterministic execution-surface equivalence, not matched
