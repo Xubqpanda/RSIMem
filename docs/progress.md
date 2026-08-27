@@ -16,7 +16,11 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind explicit opt-in modes. Direct native remains the default. Static and adaptive Mem0-flat semantic writeback are available only through live experiment configuration; adaptive startup additionally requires a prepared, attempt-local store with one ACTIVE artifact that binds to the trusted runtime parameters. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E, Phase 2A-2E, Phase 2H, Phase 2I, and Phase 2J are complete. Phase 2K.1 matched adaptive PAST-Bench variants are the active milestone. Live mutation remains opt-in and restricted to audited experiment paths; direct native remains the default.
+The Hermes, static semantic writeback, operation graph, feedback store, and
+activation/rollback foundations are complete. The former Phase 2J/2K work is
+complete only as legacy retrieval-threshold infrastructure; extraction-prompt
+adaptation is pending. Stage 1 of the extraction-prompt handoff checklist is
+the active milestone. No new adaptive live batch runs before Stage 1 closes.
 
 ## Completed Work
 
@@ -187,15 +191,15 @@ Static PAST-Bench semantic writeback is complete for SM01: 9/9 rotated method at
 
 The frozen static utility gate is also complete for SM01. The accepted 3-replicate static/static-utility batch has 6/6 completed scheduled slots, 54 unique traces, exact utility/ingestion joins, and one stable gate/policy/schema identity across utility replicates. Results and limitations are recorded in [`static_utility_sm01_20260827.md`](static_utility_sm01_20260827.md); no quality-superiority or adaptive-policy claim is made.
 
-The delayed-feedback lifecycle join, exposure-bias contracts, and deterministic stage gate are complete. Versioned content-free datasets preserve artifact-specific future evidence, observation cutoffs, four-state labels, attribution provenance, exposure opportunity, candidate/filter disposition, propensity availability, raw resource usage, integrity audit results, aggregate censoring reports, and frozen config identity. Adaptive policy learning remains disabled until the 2J validation and activation gates pass.
+The delayed-feedback lifecycle join, exposure-bias contracts, and deterministic stage gate are complete. Versioned content-free datasets preserve artifact-specific future evidence, observation cutoffs, four-state labels, attribution provenance, exposure opportunity, candidate/filter disposition, propensity availability, raw resource usage, integrity audit results, aggregate censoring reports, and frozen config identity. These contracts are being rebuilt around source-, extraction-set-, and fact-level prompt feedback before extraction adaptation is enabled.
 
-The 2J.1 learner now produces deterministic, content-addressed semantic parameter proposals from frozen delayed feedback. Parameter ownership and negative updates are bound to attributed failure subgraphs, while low sample, missing evidence, and propensity-distribution gaps fall back to the parent value. A crash-safe store preserves immutable artifacts, explicit lifecycle states, idempotent transition history, and one verifiable active pointer; no proposal is eligible for live activation until 2J.2 adds held-out validation decisions.
+The former 2J.1 learner produces deterministic retrieval-threshold proposals and retains value as a legacy plumbing fixture. Its artifacts are explicitly marked `legacy_threshold_experiment` and cannot be loaded by the extraction-prompt runtime. The crash-safe artifact lifecycle store remains reusable infrastructure.
 
-Phase 2J is complete at the deterministic implementation gate. Time-ordered splits, offline screening, matched held-out activation, rollback, active-artifact binding, actual-version evidence, and one replayable N -> feedback -> N+1 -> changed future memory decision loop are implemented. This does not establish PAST-Bench adaptive quality, repeated recursive improvement, or cross-family generalization; those claims remain gated on Phase 2K experiments.
+Former Phase 2J threshold infrastructure is complete at its deterministic implementation gate: time-ordered splits, offline screening, matched activation, rollback, active-artifact binding, and replay are implemented. It does not implement extraction prompt N -> N+1 and is not evidence of the current paper method.
 
-Phase 2K.1 execution plumbing now covers the complete production preparation boundary. A live feedback batch is content-addressed and reloaded before a run-qualified time split trains only the stable retrieval threshold. Offline screening stops at `VALIDATED/REJECTED`; a separate static/proposal held-out launcher derives labels and costs only from audited operation/deployment evidence, and only an accepted matched decision can create a production ACTIVE store and config. Validation-only trial configs are rejected by the official five-method resolver. No new live feedback, held-out validation, or adaptive five-method replicate has run because the current shell has no provider credential.
+Former Phase 2K.1 execution plumbing covers the legacy threshold preparation boundary. Offline screening and matched activation no longer use resource cost, but the resulting threshold artifact is not a production extraction artifact. Its launchers remain disabled infrastructure until extraction-specific manifests replace them.
 
-Phase 2K.2 analysis plumbing is execution-ready. The five-method launcher now rebuilds raw quality, usage, storage, retrieval/injection/use, mutation/recovery, and policy evidence after a complete batch, reports replicate-paired static/adaptive deltas, leaves provider pricing unset, and emits fail-closed claim eligibility. A single SM01 batch cannot unlock recursive iteration, cross-family generalization, or statistical superiority. Ablations apply only to components present in the final ACTIVE artifact; the current retrieval-only learner has no generation-policy update to ablate.
+Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment infrastructure. Extraction-specific launchers and analysis are pending; raw request, token, storage, injection, and timing vectors remain accounting outputs and do not enter learning or activation.
 
 ### Verification Baseline
 
@@ -206,11 +210,14 @@ Phase 2K.2 analysis plumbing is execution-ready. The five-method launcher now re
 
 ## Next Milestone
 
-### **Current: Phase 2K.1 PAST-Bench Adaptive Variants**
+### **Current: Extraction-Prompt Stage 1**
 
-Phase 2H freezes one interpretable future-utility-per-cost objective across semantic generation admission, internal operation admission, and retrieval filtering/ranking without changing route or invocation scheduling. Deterministic matched fixtures and the audited live SM01 batch establish fixed policy identity, content-free evidence, raw-cost accounting, and explicit limitations.
+The first optimized component is the semantic fact-extraction prompt. Delayed
+deployment evidence may update prompt body N to N+1 while the operation prompt,
+retrieval configuration, route, invocation boundary, backend, and model profile
+remain frozen. Raw resources are reported separately from the method decision.
 
-Phase 2I constructs, independently rebuilds, and audits a versioned delayed-feedback dataset from the atomic operation graph. Phase 2J trains, validates, activates, binds, audits, and rolls back a deterministic adaptive Mem0-flat policy while preserving the fixed route and invocation cadence. Phase 2K.1 now has both the production preparation/activation chain and the isolated five-method launcher. The immediate objective is to run the predeclared three-replicate feedback collector, inspect its offline decision, run the separate held-out static/proposal validation, and only after an accepted activation run the first three-replicate five-method SM01 batch. Raw outputs and credentials remain outside tracked files.
+The immediate objective is to close Stage 1A-1H of the handoff checklist: reset the legacy boundary, decouple compilation from eviction, freeze the extraction source projection, introduce prompt component identities, rebuild feedback and validation semantics, and add extraction-specific experiment contracts. Adaptive live runs remain blocked until those gates pass.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -265,7 +272,7 @@ Acceptance criteria:
 
 - [x] Invoke the Hermes semantic route at the same task/session boundary used by its control policy.
 - [x] Expose only ingest/add externally; let the semantic policy produce ADD, UPDATE, DELETE, or NONE.
-- [x] Define one fixed future-utility-per-cost objective for evaluating semantic construction/update and retrieval behavior.
+- [x] Preserve the former static utility objective as a superseded infrastructure experiment; it is not the current adaptive method.
 - [x] Link source context, ingestion execution, internal operation, stored artifact, retrieval, injection, downstream execution, and outcome through stable lifecycle IDs.
 - [x] Compare no persistence, native memory, and static LightRSI under matched settings.
 - [ ] Verify that quality gains are reported together with ingestion-policy, storage, retrieval, injection, and recovery costs.
@@ -274,7 +281,7 @@ Acceptance criteria:
 
 - [x] Collect deployment-observable delayed feedback from retrieval, injection, task completion, tool behavior, retries, supersession, and non-use.
 - [x] Estimate realized future utility without reading hidden task scores into the policy update path.
-- [x] Version semantic extraction, operation/consolidation, and retrieval policies without changing routing or invocation frequency.
+- [ ] Version and deploy semantic extraction prompt N+1 while freezing operation, retrieval, routing, and invocation components.
 - [x] Validate proposed policy updates against held-out deployment evidence.
 - [x] Support acceptance, rejection, rollback, and reproducible replay of every policy update.
 - [ ] Compare static and adaptive LightRSI on the cost-quality frontier.
@@ -305,10 +312,10 @@ Acceptance criteria:
 3. [x] Complete the SM01 learn -> ingest -> validate -> mutate -> restart -> native injection -> downstream-use fixture.
 4. [x] Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
 5. [x] Run and audit the static SM01 matched comparison.
-6. [ ] Run the three-replicate `feedback` collector and audit the prepared dataset/offline decision.
-7. [ ] Run the separate static/proposal held-out validation and require a matched accepted activation.
-8. [ ] Run the three-replicate five-method adaptive SM01 batch using only the production activation config.
-9. [ ] Produce dated reports for the feedback, activation, and five-method batches before closing 2K metrics or claims.
+6. [ ] Complete extraction-prompt Stage 1A-1H without an adaptive live run.
+7. [ ] Implement the extraction prompt artifact, optimizer, held-out validation, activation, and rollback path.
+8. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
+9. [ ] Produce dated extraction-method reports before making adaptation claims.
 
 ## Update Policy
 

@@ -2,11 +2,14 @@
 
 ## Research Question
 
-Can an agent recursively improve its future behavior through memory while ensuring that retained experience repays its full lifecycle cost?
+Can delayed deployment feedback improve a semantic memory extraction prompt
+from version N to N+1 and thereby improve future task behavior?
 
 The primary claim is not that LightRSI creates fewer memories.
 
-The claim is that LightRSI improves the cost--quality frontier of existing memory backends through delayed retrieval and execution feedback.
+The first claim is that RSIMem improves extraction behavior through delayed
+observable opportunity, use, and outcome feedback while the rest of the memory
+pipeline remains frozen. Resource usage is reported separately.
 
 ## Controlled Setting
 
@@ -30,13 +33,17 @@ PAST-Bench expectations, answer keys, and grading rubrics remain evaluation-only
 | Native backend | Establish the original memory backend baseline. |
 | Native backend + ledger | Verify that instrumentation is behaviorally neutral. |
 | Static LightRSI | Test a fixed semantic construction/update/retrieval policy without recursive updates. |
-| Adaptive LightRSI | Test operation-attributed delayed-feedback updates to the same fixed semantic policy. |
+| Adaptive RSIMem | Test delayed-feedback updates to the semantic extraction prompt only. |
 
 The first implementation stops at these five variants.
 
 Additional component ablations are added only after the end-to-end result is stable.
 
-The first production learner updates only the runtime-owned retrieval acceptance threshold because the currently frozen delayed feedback is attributable to future retrieval, injection, use, and outcome. Generation-policy or consolidation-policy ablations are not applicable to that artifact. An ablation is added only when the final ACTIVE artifact actually changes the named component, and every ablation must differ from the full method by exactly one component while preserving backend, model, budget, task order, invocation boundary, and persistence isolation.
+The first production learner updates only the deployable semantic extraction
+prompt body. The update prompt, retrieval configuration, backend, route,
+invocation boundary, model profile, and writer remain frozen. The existing
+retrieval-threshold learner is a legacy infrastructure experiment and cannot
+produce an extraction runtime artifact.
 
 ## Metrics
 
@@ -44,11 +51,16 @@ Task quality uses the native PAST-Bench task score, persistence gap, and mechani
 
 Raw resource accounting records model input and output tokens, cache usage, model calls, tool calls, retries, wall time, memory operations, stored records and bytes, retrieved records, injected tokens, and controller overhead.
 
-Derived metrics include total cost, cost per successful episode, future utility per lifecycle cost, and the cost--quality frontier.
+No heterogeneous lifecycle-cost scalar enters learning or activation. Reports
+retain the raw resource vector and may present each resource dimension beside
+quality without combining unlike units.
 
 Raw resource quantities are retained separately from provider prices so that monetary results can be recomputed.
 
-The five-method adaptive report uses `adaptive-future-utility-raw-cost-v1`. It retains every replicate value and computes static-to-adaptive deltas within the same rotated replicate. Configured budget equality is reported separately from realized request, token, storage, and lifecycle-cost differences. Provider pricing remains absent from the canonical analysis artifact.
+The former five-method threshold report is legacy infrastructure. The
+extraction-specific report will retain every replicate value, compute matched
+static-to-adaptive deltas, and keep configured budgets separate from realized
+request, token, storage, injection, and timing vectors.
 
 Claim eligibility is fail-closed. One audited SM01 batch can provide implementation evidence for the fixed semantic route, unified objective, and operation-attributed update, but it cannot by itself establish statistical quality superiority, a second recursive policy iteration, or cross-family generalization.
 
@@ -94,15 +106,21 @@ The stage passes when every semantic ingestion can be linked through an atomic o
 
 ### Stage 3: Close the Recursive Loop
 
-Aggregate deployment-observable feedback from later retrieval, injection, tool execution, retries, completion, and lifecycle cost.
+Aggregate extraction-owned feedback from later exposure opportunity, explicit
+memory-specific use, supersession/conflict, and observable task outcomes.
 
-Use operation-attributed feedback to propose versioned updates to semantic extraction, conflict-resolution, consolidation, and retrieval policies while keeping route selection and invocation boundaries fixed.
+Use bounded, operation-attributed feedback to propose a versioned semantic
+extraction prompt N+1 while keeping update, retrieval, route, invocation,
+backend, and model components fixed.
 
 Validate, accept, or roll back each proposal without using hidden benchmark grading information.
 
 The stage passes when policy versions are reproducible and adaptive LightRSI can be compared against the static policy.
 
-The deterministic learner, validation, activation, rollback, and runtime binding gates are complete. The PAST-Bench execution layer now consumes only a separately prepared ACTIVE store through a strict versioned config, copies it into each isolated attempt home, and records config/store/artifact identity in the matched manifest. Live adaptive comparison remains unproven until the preparation dataset cutoff is frozen and the predeclared replicates finish audit.
+Threshold-oriented learner, validation, activation, rollback, and runtime
+binding gates are retained as legacy infrastructure. Extraction artifacts,
+prompt-oriented validation, runtime binding, and matched live comparison remain
+pending.
 
 ### Stage 4: Expand Task Coverage
 

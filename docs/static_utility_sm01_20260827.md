@@ -1,5 +1,10 @@
 # Static Utility SM01 Gate - 2026-08-27
 
+> Superseded-method note: this report preserves a historical static utility
+> infrastructure experiment. Its utility/cost objective and retrieval-threshold
+> path do not define the current RSIMem method, which optimizes only the semantic
+> extraction prompt from N to N+1 using delayed extraction evidence.
+
 ## Scope
 
 This report closes Phase 2H.3 for the frozen semantic policy objective. It
