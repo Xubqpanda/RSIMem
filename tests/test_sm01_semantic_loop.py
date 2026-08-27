@@ -9,6 +9,8 @@ from rsimem.lifecycle import RawResourceUsage
 from rsimem.memory import MemoryExperience, MemoryKind, MemoryMessage, MemoryQuery
 from rsimem.memory.backends import build_hermes_native_registry
 from rsimem.memory.executor import MutationExecutionStatus, TransactionalMutationExecutor
+from rsimem.memory.future_trace import SemanticFutureTraceRecorder
+from rsimem.memory.attribution import DeterministicFirstAttributor
 from rsimem.memory.ingestion import (
     InternalMemoryAction,
     SemanticIngestionCoordinator,
@@ -16,6 +18,15 @@ from rsimem.memory.ingestion import (
     build_semantic_ingest_request,
 )
 from rsimem.memory.operation_graph import OperationContext
+from rsimem.memory.operation_graph import (
+    AppendOnlyOperationEvidenceLog,
+    ArtifactKind,
+    AtomicOperationRecorder,
+    OperationKind,
+    OperationStatus,
+    audit_operation_evidence,
+    materialize_operation_graph,
+)
 from rsimem.memory.receipt_audit import audit_mutation_receipts
 from rsimem.memory.receipts import JsonMutationReceiptStore, MutationReceiptStatus
 from rsimem.memory.runtime import MemoryBackendRegistry
@@ -84,6 +95,8 @@ def _loop_environment(tmp_path, *, enabled=True, fact_response=None):
         enabled=enabled,
         isolated_fixture=enabled,
     )
+    operation_log = AppendOnlyOperationEvidenceLog(tmp_path / "sm01-operations.jsonl")
+    operation_recorder = AtomicOperationRecorder(operation_log)
     observer = MemoryLedgerObserver(
         run_id="run-sm01",
         variant="static-rsimem",
@@ -103,8 +116,18 @@ def _loop_environment(tmp_path, *, enabled=True, fact_response=None):
         candidates,
         executor,
         observer=observer,
+        operation_recorder=operation_recorder,
     )
-    return home, registry, receipt_store, client, policy, loop, observer
+    return (
+        home,
+        registry,
+        receipt_store,
+        client,
+        policy,
+        loop,
+        observer,
+        operation_log,
+    )
 
 
 def _sm01_request(policy):
@@ -138,7 +161,9 @@ def _future_task_model(system_prompt: str) -> str:
 
 def test_sm01_learn_mutate_restart_native_inject_and_use(tmp_path) -> None:
     assert SEMANTIC_LOOP_SCHEMA_VERSION == 1
-    home, registry, store, client, policy, loop, observer = _loop_environment(tmp_path)
+    home, registry, store, client, policy, loop, observer, operation_log = (
+        _loop_environment(tmp_path)
+    )
     snapshot, request = _sm01_request(policy)
     OperationContext(
         run_id="run-sm01",
@@ -189,6 +214,39 @@ def test_sm01_learn_mutate_restart_native_inject_and_use(tmp_path) -> None:
     assert _future_task_model(system_prompt) == "tsv_preference_used"
     assert audit_mutation_receipts(store, restarted_registry).ok is True
 
+    ingestion_graph = materialize_operation_graph(operation_log.events)
+    verification = next(
+        operation
+        for operation in ingestion_graph.operations
+        if operation.kind == OperationKind.REREAD_VERIFICATION
+    )
+    learn_context = policy.operation_trace(request.idempotency_key).context
+    future_context = OperationContext(
+        learn_context.run_id,
+        "episode-sm01-future",
+        "session-sm01-future",
+        "task-sm01-future",
+        learn_context.policy_version,
+        learn_context.prompt_version,
+        learn_context.framework_version,
+    )
+    future_recorder = SemanticFutureTraceRecorder(
+        loop.operation_recorder,
+        future_context,
+    )
+    future = future_recorder.record_prompt_injection(
+        restarted_registry,
+        system_prompt,
+        namespace="user",
+        parent_operation_ids=(verification.operation_id,),
+    )
+    downstream = future_recorder.record_use_and_outcome(
+        future,
+        used_artifact_ids=(artifact.artifact_id,),
+        outcome_status=OperationStatus.SUCCESS,
+    )
+    assert downstream.used_artifact_ids == (artifact.artifact_id,)
+
     evidence = json.dumps(result.observer_evidence(), sort_keys=True)
     assert PREFERENCE not in evidence
     assert "Future task" not in evidence
@@ -212,11 +270,62 @@ def test_sm01_learn_mutate_restart_native_inject_and_use(tmp_path) -> None:
     serialized_ledger = (tmp_path / "sm01-ledger.jsonl").read_text(encoding="utf-8")
     assert PREFERENCE not in serialized_ledger
     assert base_message not in serialized_ledger
+    graph = materialize_operation_graph(operation_log.events)
+    assert [operation.kind for operation in graph.operations] == [
+        OperationKind.SOURCE_OBSERVATION,
+        OperationKind.FACT_EXTRACTION,
+        OperationKind.RELATED_MEMORY_RETRIEVAL,
+        OperationKind.INTERNAL_OPERATION_DECISION,
+        OperationKind.TARGET_RESOLUTION,
+        OperationKind.VALIDATION,
+        OperationKind.MUTATION,
+        OperationKind.REREAD_VERIFICATION,
+        OperationKind.FUTURE_QUERY,
+        OperationKind.RETRIEVAL,
+        OperationKind.INJECTION,
+        OperationKind.USE,
+        OperationKind.DOWNSTREAM_OUTCOME,
+    ]
+    memory_nodes = [
+        item for item in graph.artifacts if item.artifact_id == artifact.artifact_id
+    ]
+    assert len(memory_nodes) == 1
+    assert memory_nodes[0].revision == artifact.revision
+    assert graph.operations[-1].input_artifact_ids
+    parameters = {
+        item.artifact_id: item
+        for item in graph.artifacts
+        if item.kind == ArtifactKind.POLICY_PARAMETER
+    }
+    owned_parameters = {
+        operation.kind: tuple(
+            parameters[artifact_id].provenance_ref
+            for artifact_id in operation.input_artifact_ids
+            if artifact_id in parameters
+        )
+        for operation in graph.operations
+    }
+    assert owned_parameters[OperationKind.FACT_EXTRACTION] == (
+        "mem0-flat.fact-extraction",
+    )
+    assert owned_parameters[OperationKind.RELATED_MEMORY_RETRIEVAL] == (
+        "flat-retrieval-v1",
+    )
+    assert owned_parameters[OperationKind.INTERNAL_OPERATION_DECISION] == (
+        "mem0-flat.internal-operation",
+    )
+    successful_attribution = DeterministicFirstAttributor().attribute(graph)
+    assert successful_attribution.records == ()
+    assert successful_attribution.model_call_count == 0
+    assert audit_operation_evidence(
+        operation_log.events,
+        forbidden_values=(PREFERENCE, base_message),
+    ) == ()
     restarted_registry.close()
 
 
 def test_disabled_loop_restores_direct_native_no_write_behavior(tmp_path) -> None:
-    home, registry, store, _, policy, loop, _ = _loop_environment(
+    home, registry, store, _, policy, loop, _, _ = _loop_environment(
         tmp_path,
         enabled=False,
     )
@@ -240,7 +349,7 @@ def test_disabled_loop_restores_direct_native_no_write_behavior(tmp_path) -> Non
 
 
 def test_ingestion_failure_retains_source_and_never_creates_receipt(tmp_path) -> None:
-    home, registry, store, _, policy, loop, _ = _loop_environment(
+    home, registry, store, _, policy, loop, _, _ = _loop_environment(
         tmp_path,
         fact_response="not json",
     )
@@ -260,7 +369,7 @@ def test_ingestion_failure_retains_source_and_never_creates_receipt(tmp_path) ->
 
 
 def test_stale_source_is_rejected_before_model_or_mutation(tmp_path) -> None:
-    _, registry, store, client, policy, loop, _ = _loop_environment(tmp_path)
+    _, registry, store, client, policy, loop, _, _ = _loop_environment(tmp_path)
     _, request = _sm01_request(policy)
     try:
         loop.run(request, current_source_revision="rev-newer")
