@@ -15,6 +15,7 @@ from .memory.feedback_dataset import (
     DelayedFeedbackConfig,
     DelayedFeedbackDatasetBuilder,
     FeedbackLabel,
+    FeedbackDatasetStageGate,
     FeedbackObservationWindow,
     JsonDelayedFeedbackDatasetStore,
     evaluate_feedback_dataset_stage_gate,
@@ -33,7 +34,7 @@ from .memory_systems.mem0_flat import FrozenMem0UtilityGate
 from .memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
 
 
-FEEDBACK_PREPARATION_SCHEMA_VERSION = 1
+FEEDBACK_PREPARATION_SCHEMA_VERSION = 2
 _REQUIRED_FUTURE_KINDS = {
     OperationKind.FUTURE_QUERY,
     OperationKind.RETRIEVAL,
@@ -59,6 +60,42 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def _stage_gate_payload(gate: FeedbackDatasetStageGate) -> dict[str, Any]:
+    return {
+        "ok": gate.ok,
+        "issues": list(gate.issues),
+        "datasetId": gate.dataset_id,
+        "datasetPayloadDigest": gate.dataset_payload_digest,
+        "replayDatasetId": gate.replay_dataset_id,
+        "expectedConfigDigest": gate.expected_config_digest,
+        "actualConfigDigest": gate.actual_config_digest,
+        "audit": {
+            "ok": gate.audit.ok,
+            "issues": list(gate.audit.issues),
+            "exampleCount": gate.audit.example_count,
+            "labelCounts": {
+                label.value: count for label, count in gate.audit.label_counts
+            },
+        },
+        "report": {
+            "observationCount": gate.report.observation_count,
+            "opportunityCount": gate.report.opportunity_count,
+            "candidateCount": gate.report.candidate_count,
+            "filteredCount": gate.report.filtered_count,
+            "missingPropensityCount": gate.report.missing_propensity_count,
+            "censoredCount": gate.report.censored_count,
+            "censoringRate": gate.report.censoring_rate,
+            "labelCounts": {
+                label.value: count for label, count in gate.report.label_counts
+            },
+            "exposureCounts": {
+                exposure.value: count
+                for exposure, count in gate.report.exposure_counts
+            },
+        },
+    }
 
 
 def _completed_feedback_attempts(manifest: dict[str, Any]) -> tuple[dict[str, Any], ...]:
@@ -177,6 +214,7 @@ def assemble_feedback_batch(
         "sourceLogs": source_logs,
         "exampleIds": [example.example_id for example in dataset.examples],
         "runtimeOwnedParameterIds": [retrieval_parameter],
+        "stageGate": _stage_gate_payload(gate),
     }
     report = {
         **identity,
@@ -194,11 +232,6 @@ def assemble_feedback_batch(
         "resolvedExampleCount": resolved_count,
         "censoredExampleCount": labels[FeedbackLabel.CENSORED],
         "datasetPath": dataset_path.relative_to(output_root).as_posix(),
-        "stageGate": {
-            "ok": gate.ok,
-            "issues": list(gate.issues),
-            "replayDatasetId": gate.replay_dataset_id,
-        },
     }
     _write_json(output_root / "preparation_manifest.json", report)
     return report
