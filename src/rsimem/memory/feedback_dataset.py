@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -111,6 +112,25 @@ class ExposureState(StrEnum):
     USED = "used"
     SUPERSEDED = "superseded"
     CENSORED = "censored"
+
+
+class CandidateDisposition(StrEnum):
+    INCLUDED = "included"
+    FILTERED = "filtered"
+    NOT_ELIGIBLE = "not_eligible"
+    UNKNOWN = "unknown"
+
+
+class PropensitySource(StrEnum):
+    DETERMINISTIC = "deterministic"
+    LOGGED = "logged"
+    MISSING = "missing"
+
+
+class FeedbackEstimator(StrEnum):
+    DIRECT = "direct"
+    INVERSE_PROPENSITY_WEIGHTED = "inverse_propensity_weighted"
+    DOUBLY_ROBUST = "doubly_robust"
 
 
 @dataclass(frozen=True, slots=True)
@@ -267,6 +287,11 @@ class DelayedFeedbackExample:
     attributed_operation_ids: tuple[str, ...]
     failure_subgraph_operation_ids: tuple[str, ...]
     policy_parameter_ids: tuple[str, ...]
+    exposure_opportunity: bool
+    entered_candidate_set: bool
+    candidate_disposition: CandidateDisposition
+    selection_propensity: float | None
+    propensity_source: PropensitySource
     exposure_state: ExposureState
     label: FeedbackLabel
     label_reason_codes: tuple[str, ...]
@@ -281,6 +306,16 @@ class DelayedFeedbackExample:
         object.__setattr__(self, "mutation_action", InternalMemoryAction(self.mutation_action))
         object.__setattr__(self, "exposure_state", ExposureState(self.exposure_state))
         object.__setattr__(self, "label", FeedbackLabel(self.label))
+        object.__setattr__(
+            self,
+            "candidate_disposition",
+            CandidateDisposition(self.candidate_disposition),
+        )
+        object.__setattr__(
+            self,
+            "propensity_source",
+            PropensitySource(self.propensity_source),
+        )
         object.__setattr__(
             self,
             "attribution_methods",
@@ -337,6 +372,31 @@ class DelayedFeedbackExample:
             == len(self.failure_categories)
         ):
             raise ValueError("feedback attribution references must align")
+        if type(self.exposure_opportunity) is not bool or type(
+            self.entered_candidate_set
+        ) is not bool:
+            raise TypeError("feedback exposure opportunity fields must be bool")
+        if self.entered_candidate_set and not self.exposure_opportunity:
+            raise ValueError("candidate entry requires an exposure opportunity")
+        if (
+            self.candidate_disposition == CandidateDisposition.INCLUDED
+        ) != self.entered_candidate_set:
+            raise ValueError("candidate inclusion disposition is inconsistent")
+        if (
+            self.candidate_disposition == CandidateDisposition.NOT_ELIGIBLE
+        ) != (not self.exposure_opportunity):
+            raise ValueError("candidate eligibility disposition is inconsistent")
+        if self.selection_propensity is not None and (
+            not isinstance(self.selection_propensity, (int, float))
+            or isinstance(self.selection_propensity, bool)
+            or not math.isfinite(float(self.selection_propensity))
+            or not 0.0 <= float(self.selection_propensity) <= 1.0
+        ):
+            raise ValueError("feedback propensity must be finite in [0,1]")
+        if (
+            self.propensity_source == PropensitySource.MISSING
+        ) != (self.selection_propensity is None):
+            raise ValueError("feedback propensity source is inconsistent")
         if not self.proposal_operation_ids or not self.label_reason_codes:
             raise ValueError("feedback example requires proposal and label evidence")
         if any(not _REASON_CODE.fullmatch(value) for value in self.label_reason_codes):
@@ -408,6 +468,11 @@ class DelayedFeedbackExample:
                 self.failure_subgraph_operation_ids
             ),
             "policy_parameter_ids": list(self.policy_parameter_ids),
+            "exposure_opportunity": self.exposure_opportunity,
+            "entered_candidate_set": self.entered_candidate_set,
+            "candidate_disposition": self.candidate_disposition.value,
+            "selection_propensity": self.selection_propensity,
+            "propensity_source": self.propensity_source.value,
             "exposure_state": self.exposure_state.value,
             "label": self.label.value,
             "label_reason_codes": list(self.label_reason_codes),
@@ -477,6 +542,119 @@ class FeedbackDatasetAudit:
     issues: tuple[str, ...]
     example_count: int
     label_counts: tuple[tuple[FeedbackLabel, int], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FeedbackDatasetReport:
+    observation_count: int
+    opportunity_count: int
+    candidate_count: int
+    filtered_count: int
+    missing_propensity_count: int
+    censored_count: int
+    censoring_rate: float
+    label_counts: tuple[tuple[FeedbackLabel, int], ...]
+    exposure_counts: tuple[tuple[ExposureState, int], ...]
+
+
+def build_feedback_dataset_report(
+    dataset: DelayedFeedbackDataset,
+) -> FeedbackDatasetReport:
+    observations = len(dataset.examples)
+    label_counts = {label: 0 for label in FeedbackLabel}
+    exposure_counts = {exposure: 0 for exposure in ExposureState}
+    for example in dataset.examples:
+        label_counts[example.label] += 1
+        exposure_counts[example.exposure_state] += 1
+    censored = label_counts[FeedbackLabel.CENSORED]
+    return FeedbackDatasetReport(
+        observation_count=observations,
+        opportunity_count=sum(
+            example.exposure_opportunity for example in dataset.examples
+        ),
+        candidate_count=sum(
+            example.entered_candidate_set for example in dataset.examples
+        ),
+        filtered_count=sum(
+            example.candidate_disposition == CandidateDisposition.FILTERED
+            for example in dataset.examples
+        ),
+        missing_propensity_count=sum(
+            example.selection_propensity is None for example in dataset.examples
+        ),
+        censored_count=censored,
+        censoring_rate=censored / observations if observations else 0.0,
+        label_counts=tuple((label, label_counts[label]) for label in FeedbackLabel),
+        exposure_counts=tuple(
+            (exposure, exposure_counts[exposure]) for exposure in ExposureState
+        ),
+    )
+
+
+def validate_feedback_estimator(
+    dataset: DelayedFeedbackDataset,
+    estimator: FeedbackEstimator,
+) -> None:
+    estimator = FeedbackEstimator(estimator)
+    if estimator == FeedbackEstimator.DIRECT:
+        return
+    if any(example.selection_propensity is None for example in dataset.examples):
+        raise ValueError(f"{estimator.value} requires propensity for every observation")
+    if any(
+        example.selection_propensity == 0.0 for example in dataset.examples
+    ):
+        raise ValueError(f"{estimator.value} requires strictly positive propensity")
+
+
+def _resolve_exposure_bias(
+    *,
+    target: str,
+    queries: Sequence[OperationRecord],
+    retrievals: Sequence[OperationRecord],
+) -> tuple[bool, bool, CandidateDisposition, float | None, PropensitySource]:
+    retrieved = any(
+        operation.status == OperationStatus.SUCCESS
+        and target in operation.input_artifact_ids
+        for operation in retrievals
+    )
+    explicitly_filtered = any(
+        operation.status == OperationStatus.NONE
+        and operation.reason_code == "policy_filtered"
+        and target in operation.input_artifact_ids
+        for operation in retrievals
+    )
+    opportunity = bool(queries)
+    if retrieved:
+        return (
+            opportunity,
+            True,
+            CandidateDisposition.INCLUDED,
+            1.0,
+            PropensitySource.DETERMINISTIC,
+        )
+    if explicitly_filtered:
+        return (
+            opportunity,
+            False,
+            CandidateDisposition.FILTERED,
+            0.0,
+            PropensitySource.DETERMINISTIC,
+        )
+    if not opportunity:
+        return (
+            False,
+            False,
+            CandidateDisposition.NOT_ELIGIBLE,
+            None,
+            PropensitySource.MISSING,
+        )
+    return (
+        True,
+        False,
+        CandidateDisposition.UNKNOWN,
+        None,
+        PropensitySource.MISSING,
+    )
 
 
 def _ordered_ids(
@@ -637,6 +815,7 @@ class DelayedFeedbackDatasetBuilder:
                 return tuple(item for item in related_operations if item.kind == kind)
 
             retrievals = matching(OperationKind.RETRIEVAL)
+            queries = matching(OperationKind.FUTURE_QUERY)
             injections = matching(OperationKind.INJECTION)
             uses = matching(OperationKind.USE)
             outcomes = matching(OperationKind.DOWNSTREAM_OUTCOME)
@@ -665,6 +844,17 @@ class DelayedFeedbackDatasetBuilder:
                 item.status == OperationStatus.SUCCESS
                 and target in item.input_artifact_ids
                 for item in supersessions
+            )
+            (
+                exposure_opportunity,
+                entered_candidate_set,
+                candidate_disposition,
+                selection_propensity,
+                propensity_source,
+            ) = _resolve_exposure_bias(
+                target=target,
+                queries=queries,
+                retrievals=retrievals,
             )
             successful_outcome = any(
                 item.status == OperationStatus.SUCCESS for item in outcomes
@@ -785,6 +975,11 @@ class DelayedFeedbackDatasetBuilder:
                 tuple(dict.fromkeys(attributed)),
                 tuple(dict.fromkeys(failure_subgraph)),
                 tuple(dict.fromkeys(policy_parameters)),
+                exposure_opportunity,
+                entered_candidate_set,
+                candidate_disposition,
+                selection_propensity,
+                propensity_source,
                 exposure,
                 label,
                 reasons,
@@ -997,6 +1192,11 @@ def audit_feedback_dataset(
             for operation_id in example.retrieval_operation_ids
             if operation_id in operations
         )
+        queries = tuple(
+            operations[operation_id]
+            for operation_id in example.query_operation_ids
+            if operation_id in operations
+        )
         injections = tuple(
             operations[operation_id]
             for operation_id in example.injection_operation_ids
@@ -1033,6 +1233,20 @@ def audit_feedback_dataset(
             and target in item.input_artifact_ids
             for item in retrievals
         )
+        expected_exposure_bias = _resolve_exposure_bias(
+            target=target,
+            queries=queries,
+            retrievals=retrievals,
+        )
+        actual_exposure_bias = (
+            example.exposure_opportunity,
+            example.entered_candidate_set,
+            example.candidate_disposition,
+            example.selection_propensity,
+            example.propensity_source,
+        )
+        if actual_exposure_bias != expected_exposure_bias:
+            issues.add("exposure_bias_evidence_mismatch")
         superseded = any(
             item.status == OperationStatus.SUCCESS
             and target in item.input_artifact_ids

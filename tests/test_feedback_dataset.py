@@ -9,13 +9,18 @@ import pytest
 from rsimem.lifecycle import RawResourceUsage
 from rsimem.memory.attribution import DeterministicFirstAttributor
 from rsimem.memory.feedback_dataset import (
+    CandidateDisposition,
     DelayedFeedbackConfig,
     DelayedFeedbackDatasetBuilder,
     ExposureState,
+    FeedbackEstimator,
     FeedbackLabel,
     FeedbackObservationWindow,
     JsonDelayedFeedbackDatasetStore,
+    PropensitySource,
     audit_feedback_dataset,
+    build_feedback_dataset_report,
+    validate_feedback_estimator,
 )
 from rsimem.memory.ingestion import InternalMemoryAction
 from rsimem.memory.operation_graph import (
@@ -236,8 +241,15 @@ def _graph(
     )
     retrieval_status = (
         OperationStatus.NONE
-        if exposure == "not_retrieved"
+        if exposure in {"not_retrieved", "policy_filtered"}
         else OperationStatus.SUCCESS
+    )
+    retrieval_inputs = (
+        (memory,)
+        if exposure == "policy_filtered"
+        else ()
+        if retrieval_status == OperationStatus.NONE
+        else (memory,)
     )
     retrieval = _operation(
         recorder,
@@ -245,12 +257,18 @@ def _graph(
         OperationKind.RETRIEVAL,
         future,
         parents=(query,),
-        inputs=(() if retrieval_status == OperationStatus.NONE else (memory,)),
+        inputs=retrieval_inputs,
         outputs=(
             () if retrieval_status == OperationStatus.NONE else (retrieval_result,)
         ),
         status=retrieval_status,
-        reason_code=("retrieval_miss" if retrieval_status == OperationStatus.NONE else None),
+        reason_code=(
+            "policy_filtered"
+            if exposure == "policy_filtered"
+            else "retrieval_miss"
+            if retrieval_status == OperationStatus.NONE
+            else None
+        ),
     )
     retrieval_parent = retrieval
     if second_retrieval:
@@ -376,9 +394,11 @@ def _dataset(
     complete: bool = True,
     reports=(),
     window_version: str = "semantic-observation-window-v1",
+    cutoff_operation_id: str | None = None,
 ):
     window = FeedbackObservationWindow.create(
         graph,
+        cutoff_operation_id=cutoff_operation_id,
         complete=complete,
         censor_reason=None if complete else "observation_window_closed",
         version=window_version,
@@ -556,6 +576,11 @@ def test_positive_negative_unresolved_and_censored_labels_are_distinct() -> None
     assert positive.memory_revision == "revision-1"
     assert positive.observation_cutoff_operation_id == "op.recovery"
     assert positive.resources.retry_count == 1
+    assert positive.exposure_opportunity is True
+    assert positive.entered_candidate_set is True
+    assert positive.candidate_disposition == CandidateDisposition.INCLUDED
+    assert positive.selection_propensity == 1.0
+    assert positive.propensity_source == PropensitySource.DETERMINISTIC
 
     negative_graph = _graph("injected_not_used")
     report = DeterministicFirstAttributor().attribute(negative_graph)
@@ -593,6 +618,111 @@ def test_unexposed_memory_is_not_mislabeled_negative(exposure, state) -> None:
     example = _dataset(_graph(exposure)).examples[0]
     assert example.label == FeedbackLabel.UNRESOLVED
     assert example.exposure_state == state
+
+
+def test_exposure_bias_distinguishes_miss_filter_and_no_opportunity() -> None:
+    miss = _dataset(_graph("not_retrieved")).examples[0]
+    assert miss.exposure_opportunity is True
+    assert miss.entered_candidate_set is False
+    assert miss.candidate_disposition == CandidateDisposition.UNKNOWN
+    assert miss.selection_propensity is None
+    assert miss.propensity_source == PropensitySource.MISSING
+
+    filtered = _dataset(_graph("policy_filtered")).examples[0]
+    assert filtered.exposure_opportunity is True
+    assert filtered.entered_candidate_set is False
+    assert filtered.candidate_disposition == CandidateDisposition.FILTERED
+    assert filtered.selection_propensity == 0.0
+    assert filtered.propensity_source == PropensitySource.DETERMINISTIC
+
+    no_opportunity = _dataset(
+        _graph("not_retrieved"),
+        cutoff_operation_id="op.verification",
+    ).examples[0]
+    assert no_opportunity.exposure_opportunity is False
+    assert no_opportunity.entered_candidate_set is False
+    assert no_opportunity.candidate_disposition == CandidateDisposition.NOT_ELIGIBLE
+    assert no_opportunity.selection_propensity is None
+    assert no_opportunity.propensity_source == PropensitySource.MISSING
+
+
+def test_propensity_estimators_fail_closed_and_direct_estimator_accepts_missing() -> None:
+    missing = _dataset(_graph("not_retrieved"))
+    validate_feedback_estimator(missing, FeedbackEstimator.DIRECT)
+    for estimator in (
+        FeedbackEstimator.INVERSE_PROPENSITY_WEIGHTED,
+        FeedbackEstimator.DOUBLY_ROBUST,
+    ):
+        with pytest.raises(ValueError, match="requires propensity"):
+            validate_feedback_estimator(missing, estimator)
+
+    zero = _dataset(_graph("policy_filtered"))
+    for estimator in (
+        FeedbackEstimator.INVERSE_PROPENSITY_WEIGHTED,
+        FeedbackEstimator.DOUBLY_ROBUST,
+    ):
+        with pytest.raises(ValueError, match="strictly positive"):
+            validate_feedback_estimator(zero, estimator)
+
+    validate_feedback_estimator(
+        _dataset(_graph("used")),
+        FeedbackEstimator.INVERSE_PROPENSITY_WEIGHTED,
+    )
+
+
+def test_feedback_report_surfaces_exposure_and_censoring_counts() -> None:
+    datasets = (
+        _dataset(_graph("used")),
+        _dataset(_graph("policy_filtered")),
+        _dataset(_graph("censored"), complete=False),
+    )
+    combined = replace(
+        datasets[0],
+        examples=tuple(dataset.examples[0] for dataset in datasets),
+    )
+    report = build_feedback_dataset_report(combined)
+
+    assert report.observation_count == 3
+    assert report.opportunity_count == 3
+    assert report.candidate_count == 2
+    assert report.filtered_count == 1
+    assert report.missing_propensity_count == 0
+    assert report.censored_count == 1
+    assert report.censoring_rate == pytest.approx(1 / 3)
+    assert dict(report.label_counts) == {
+        FeedbackLabel.POSITIVE: 1,
+        FeedbackLabel.NEGATIVE: 0,
+        FeedbackLabel.UNRESOLVED: 1,
+        FeedbackLabel.CENSORED: 1,
+    }
+    assert dict(report.exposure_counts)[ExposureState.CENSORED] == 1
+
+
+@pytest.mark.parametrize(
+    ("changes", "error"),
+    (
+        ({"exposure_opportunity": False}, "exposure opportunity"),
+        ({"entered_candidate_set": False}, "candidate inclusion"),
+        (
+            {
+                "candidate_disposition": CandidateDisposition.FILTERED,
+                "entered_candidate_set": False,
+                "selection_propensity": 0.0,
+            },
+            "exposure_bias_evidence_mismatch",
+        ),
+    ),
+)
+def test_exposure_bias_contract_and_audit_reject_tampering(changes, error) -> None:
+    graph = _graph("used")
+    dataset = _dataset(graph)
+    try:
+        tampered = replace(dataset.examples[0], **changes)
+    except (TypeError, ValueError) as exc:
+        assert error in str(exc)
+        return
+    audit = audit_feedback_dataset(replace(dataset, examples=(tampered,)), graph)
+    assert error in audit.issues
 
 
 def test_used_memory_with_unattributed_failure_remains_unresolved() -> None:
