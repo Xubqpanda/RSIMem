@@ -109,11 +109,32 @@ def test_feedback_preparation_assembles_content_free_replayable_dataset(
     assert report["attemptCount"] == 1
     assert report["resolvedExampleCount"] == 1
     assert report["labelCounts"]["positive"] == 1
-    assert report["stageGate"] == {
+    assert report["stageGate"]["ok"] is True
+    assert report["stageGate"]["issues"] == []
+    assert report["stageGate"]["datasetId"] == report["datasetId"]
+    assert report["stageGate"]["datasetPayloadDigest"] == (
+        report["datasetPayloadDigest"]
+    )
+    assert report["stageGate"]["replayDatasetId"] == report["datasetId"]
+    assert report["stageGate"]["expectedConfigDigest"] == (
+        report["datasetConfigDigest"]
+    )
+    assert report["stageGate"]["actualConfigDigest"] == (
+        report["datasetConfigDigest"]
+    )
+    assert report["stageGate"]["audit"] == {
         "ok": True,
         "issues": [],
-        "replayDatasetId": report["datasetId"],
+        "exampleCount": 1,
+        "labelCounts": {
+            "positive": 1,
+            "negative": 0,
+            "unresolved": 0,
+            "censored": 0,
+        },
     }
+    assert report["stageGate"]["report"]["observationCount"] == 1
+    assert report["stageGate"]["report"]["labelCounts"]["positive"] == 1
     dataset = JsonDelayedFeedbackDatasetStore(output / "datasets").get(
         report["datasetId"]
     )
