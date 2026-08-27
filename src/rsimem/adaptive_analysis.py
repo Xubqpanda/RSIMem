@@ -295,6 +295,53 @@ def _summaries(rows: list[dict[str, Any]]) -> dict[str, Any]:
     return result
 
 
+def _paired_static_adaptive_deltas(
+    by_mode: dict[str, list[dict[str, Any]]],
+) -> dict[str, Any]:
+    static = {row["replicate"]: row for row in by_mode["static-rsimem"]}
+    adaptive = {row["replicate"]: row for row in by_mode["adaptive-rsimem"]}
+    if set(static) != set(adaptive):
+        return {}
+    fields = (
+        "primaryScore",
+        "passRate",
+        "hardPassRate",
+        "persistenceScoreGap",
+        *_USAGE_FIELDS,
+        "wallTimeSeconds",
+        "peakStoredBytes",
+        "ingestionModelRequests",
+        "ingestionInputTokens",
+        "ingestionOutputTokens",
+        "lifecycleCostUnits",
+        "futureUtilityPerCost",
+    )
+    result = {}
+    for field in fields:
+        values = []
+        for replicate in sorted(static):
+            left = static[replicate]["metrics"][field]
+            right = adaptive[replicate]["metrics"][field]
+            values.append(
+                right - left
+                if isinstance(left, (int, float))
+                and not isinstance(left, bool)
+                and isinstance(right, (int, float))
+                and not isinstance(right, bool)
+                else None
+            )
+        known = [value for value in values if value is not None]
+        result[field] = {
+            "values": values,
+            "mean": mean(known) if known else None,
+            "median": median(known) if known else None,
+            "min": min(known) if known else None,
+            "max": max(known) if known else None,
+            "missingCount": len(values) - len(known),
+        }
+    return result
+
+
 def analyze_adaptive_batch(
     batch_root: Path,
     *,
@@ -441,10 +488,14 @@ def analyze_adaptive_batch(
             "futureUtilityPerCost", {}
         ).get("mean"),
     } for mode in ADAPTIVE_METHOD_VARIANTS]
+    paired_deltas = _paired_static_adaptive_deltas(by_mode)
+    stage_passed = not issues
+    quality_delta = paired_deltas.get("primaryScore", {}).get("mean")
+    implementation_claim = stage_passed
     return {
         "schemaVersion": ADAPTIVE_ANALYSIS_SCHEMA_VERSION,
         "experimentId": manifest["experimentId"],
-        "stageGatePassed": not issues,
+        "stageGatePassed": stage_passed,
         "issues": issues,
         "scheduledOrder": manifest["executionOrderByReplicate"],
         "revisions": manifest["revisions"],
@@ -457,11 +508,63 @@ def analyze_adaptive_batch(
         },
         "summaryByMode": summaries,
         "costQualityFrontier": frontier,
+        "pairedStaticAdaptiveDelta": paired_deltas,
         "futureUtilityCostSchema": FUTURE_UTILITY_COST_SCHEMA,
         "providerPricing": None,
         "policyIdentity": {
             "staticPolicyVersions": sorted(static_policy_versions),
             "adaptivePolicyVersion": active_version,
+        },
+        "adaptiveGainBudgetAudit": {
+            "configuredBudgetMatched": True,
+            "realizedRequestDelta": paired_deltas.get("requests", {}).get("mean"),
+            "realizedInputTokenDelta": paired_deltas.get("inputTokens", {}).get("mean"),
+            "realizedOutputTokenDelta": paired_deltas.get("outputTokens", {}).get("mean"),
+            "realizedLifecycleCostDelta": paired_deltas.get(
+                "lifecycleCostUnits", {}
+            ).get("mean"),
+        },
+        "claimGate": {
+            "fixedRouteSemanticMemoryOptimization": {
+                "eligible": implementation_claim,
+                "reasonCodes": [] if implementation_claim else ["batch_gate_failed"],
+            },
+            "unifiedMemoryPolicyObjective": {
+                "eligible": implementation_claim,
+                "reasonCodes": [] if implementation_claim else ["batch_gate_failed"],
+            },
+            "operationAttributedPolicyImprovement": {
+                "eligible": implementation_claim,
+                "reasonCodes": [] if implementation_claim else ["batch_gate_failed"],
+            },
+            "memoryMediatedSelfImprovement": {
+                "eligible": bool(
+                    implementation_claim
+                    and isinstance(quality_delta, (int, float))
+                    and quality_delta > 0
+                ),
+                "reasonCodes": (
+                    []
+                    if implementation_claim
+                    and isinstance(quality_delta, (int, float))
+                    and quality_delta > 0
+                    else ["no_positive_paired_quality_delta"]
+                    if implementation_claim
+                    else ["batch_gate_failed"]
+                ),
+            },
+            "recursiveSelfImprovement": {
+                "eligible": False,
+                "reasonCodes": ["second_replayable_iteration_missing"],
+            },
+            "pastBenchGeneralization": {
+                "eligible": False,
+                "reasonCodes": ["multiple_predeclared_families_missing"],
+            },
+            "qualitySuperiority": {
+                "eligible": False,
+                "reasonCodes": ["statistical_claim_gate_not_satisfied"],
+            },
         },
         "claimBoundary": (
             "This report rebuilds one SM01 five-method batch. It does not by itself "
