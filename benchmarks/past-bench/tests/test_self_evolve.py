@@ -124,7 +124,58 @@ def test_build_hermes_extra_body_contains_persistence_overrides(tmp_path: Path):
             "timeout_seconds": 30.0,
             "max_output_tokens": 4096,
         },
+        "semantic_writeback": {
+            "mode": "disabled",
+            "timeout_seconds": 30.0,
+            "max_output_tokens": 4096,
+        },
     }
+
+
+def test_static_semantic_writeback_isolated_from_native_and_no_persistence(
+    tmp_path: Path,
+) -> None:
+    common = {
+        "home_dir": tmp_path / "home",
+        "artifacts_dir": tmp_path / "artifacts",
+        "memory_enabled": True,
+        "user_profile_enabled": True,
+        "skills_enabled": True,
+        "session_search_enabled": True,
+        "memory_nudge_interval": 1,
+        "memory_flush_min_turns": 1,
+        "skill_creation_nudge_interval": 1,
+        "background_review_wait_s": 0.0,
+        "rsimem_mode": "native+ledger",
+        "rsimem_lifecycle_evaluator_mode": "deterministic",
+        "rsimem_semantic_writeback_mode": "static",
+    }
+    enabled = build_hermes_extra_body(persistence_enabled=True, **common)["hermes"]
+    assert "memory" not in enabled["enabled_toolsets"]
+    assert enabled["config_overrides"]["memory"] == {
+        "memory_enabled": True,
+        "user_profile_enabled": True,
+        "nudge_interval": 1,
+        "flush_min_turns": 1,
+    }
+    assert enabled["rsimem"]["semantic_writeback"]["mode"] == "static"
+
+    disabled = build_hermes_extra_body(
+        persistence_enabled=False,
+        **common,
+    )["hermes"]
+    assert disabled["rsimem"]["semantic_writeback"]["mode"] == "disabled"
+
+    with pytest.raises(ValueError, match=r"native\+ledger"):
+        build_hermes_extra_body(
+            persistence_enabled=True,
+            **{**common, "rsimem_mode": "native+adapter+ledger"},
+        )
+    with pytest.raises(ValueError, match="requires lifecycle"):
+        build_hermes_extra_body(
+            persistence_enabled=True,
+            **{**common, "rsimem_lifecycle_evaluator_mode": "disabled"},
+        )
 
 
 def test_sequence_validates_rsimem_execution_config(tmp_path: Path):
@@ -186,6 +237,9 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
         rsimem_lifecycle_compiler_version="uncompiled-v0",
         rsimem_lifecycle_timeout_seconds=15.0,
         rsimem_lifecycle_max_output_tokens=2048,
+        rsimem_semantic_writeback_mode="static",
+        rsimem_semantic_writeback_timeout_seconds=20.0,
+        rsimem_semantic_writeback_max_output_tokens=1024,
     ))
 
     assert sequence.hermes.rsimem_mode == "native+adapter+ledger"
@@ -196,6 +250,9 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
     assert sequence.hermes.rsimem_lifecycle_compiler_version == "uncompiled-v0"
     assert sequence.hermes.rsimem_lifecycle_timeout_seconds == 15.0
     assert sequence.hermes.rsimem_lifecycle_max_output_tokens == 2048
+    assert sequence.hermes.rsimem_semantic_writeback_mode == "static"
+    assert sequence.hermes.rsimem_semantic_writeback_timeout_seconds == 20.0
+    assert sequence.hermes.rsimem_semantic_writeback_max_output_tokens == 1024
 
     with pytest.raises(SystemExit, match="Hermes agent"):
         _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
