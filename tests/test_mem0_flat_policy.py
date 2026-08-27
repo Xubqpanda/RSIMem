@@ -275,6 +275,7 @@ def test_frozen_utility_gate_defers_low_utility_without_skipping_prompts(tmp_pat
     )
     low_request = SemanticIngestRequest.create(
         source_experience=request.source_experience,
+        source_projection=request.source_projection,
         fixed_route=request.fixed_route,
         exit_evidence=low_evidence,
         scope=request.scope,
@@ -554,6 +555,7 @@ def test_temporary_and_unresolved_sources_are_rejected_without_mutation(tmp_path
     evidence = replace(request.exit_evidence, unresolved_state="pending_confirmation")
     unresolved_request = SemanticIngestRequest.create(
         source_experience=request.source_experience,
+        source_projection=request.source_projection,
         fixed_route=request.fixed_route,
         exit_evidence=evidence,
         scope=request.scope,

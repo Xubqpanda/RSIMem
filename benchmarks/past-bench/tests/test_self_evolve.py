@@ -771,6 +771,7 @@ def test_static_completion_uses_hermes_accounting_and_raw_usage(
     )
     prompt = POLICY_FACT_EXTRACTION_PROMPT.render({
         "source_messages": [],
+        "source_projection_digest": "0" * 64,
         "exit_evidence": {},
     })
     result = client.complete(prompt)

@@ -53,6 +53,7 @@ from rsimem.memory.ingestion import (
     build_semantic_ingest_request,
     mem0_flat_policy,
 )
+from rsimem.memory.extraction_source import ExtractionSourceProjector
 
 
 def _sha(value: str) -> str:
@@ -73,16 +74,7 @@ class _Candidates:
 
 def _experience(snapshot=None) -> MemoryExperience:
     snapshot = snapshot or _ingestion_fixture()[0]
-    return MemoryExperience(
-        experience_id="experience-sm01",
-        session_id=snapshot.session_id,
-        task_id=snapshot.task_id,
-        outcome="completed",
-        messages=(
-            MemoryMessage("user", "Always use TSV with four columns."),
-            MemoryMessage("assistant", "The task is complete."),
-        ),
-    )
+    return ExtractionSourceProjector().project(snapshot).to_experience(snapshot)
 
 
 def _ingestion_fixture():
@@ -184,6 +176,7 @@ def test_external_contract_has_fixed_route_and_no_operation_or_target_fields() -
     assert request.trigger == EvaluationTrigger.TASK_COMPLETED
     assert set(request.__dataclass_fields__) == {
         "source_experience",
+        "source_projection",
         "fixed_route",
         "exit_evidence",
         "scope",
@@ -236,7 +229,7 @@ def test_request_rejects_route_override_hidden_score_and_operation_metadata() ->
 def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> None:
     snapshot, plan = _ingestion_fixture()
     experience = _experience(snapshot)
-    with pytest.raises(ValueError, match="completed task state"):
+    with pytest.raises(ValueError, match="requires completed task"):
         build_semantic_ingest_request(
             replace(snapshot, task_state=TaskLifecycleState.ACTIVE),
             plan,
@@ -244,10 +237,9 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
             policy_version="policy-v1",
             framework_version="framework-v1",
         )
-    with pytest.raises(ValueError, match="completed task state"):
+    with pytest.raises(ValueError, match="requires completed task"):
         build_completed_task_semantic_ingest_request(
             replace(snapshot, task_state=TaskLifecycleState.FAILED),
-            experience,
             policy_version="policy-v1",
             framework_version="framework-v1",
         )
@@ -255,7 +247,7 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
         replace(snapshot.segments[0], completed=False),
         *snapshot.segments[1:],
     )
-    with pytest.raises(ValueError, match="unresolved source"):
+    with pytest.raises(ValueError, match="unresolved"):
         build_semantic_ingest_request(
             replace(snapshot, segments=unresolved_segments),
             plan,
@@ -263,10 +255,9 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
             policy_version="policy-v1",
             framework_version="framework-v1",
         )
-    with pytest.raises(ValueError, match="unresolved source"):
+    with pytest.raises(ValueError, match="unresolved"):
         build_completed_task_semantic_ingest_request(
             replace(snapshot, segments=unresolved_segments),
-            experience,
             policy_version="policy-v1",
             framework_version="framework-v1",
         )
@@ -274,7 +265,6 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
     with pytest.raises(ValueError, match="active/current context"):
         build_completed_task_semantic_ingest_request(
             replace(snapshot, current_turn_id=snapshot.segments[0].turn_id),
-            experience,
             policy_version="policy-v1",
             framework_version="framework-v1",
         )
@@ -307,7 +297,6 @@ def test_trusted_builder_rejects_active_unresolved_and_open_tool_context() -> No
     with pytest.raises(ValueError, match="open tool closure"):
         build_completed_task_semantic_ingest_request(
             open_snapshot,
-            experience,
             policy_version="policy-v1",
             framework_version="framework-v1",
         )
@@ -554,7 +543,7 @@ def test_request_identity_is_order_stable_and_covers_framework_evidence() -> Non
         second_experience,
         metadata={"fixture": {"a": 1, "z": 3}},
     ))
-    assert changed_source.idempotency_key != first.idempotency_key
+    assert changed_source.idempotency_key == first.idempotency_key
 
     changed_evidence = replace(
         first.exit_evidence,
@@ -562,6 +551,7 @@ def test_request_identity_is_order_stable_and_covers_framework_evidence() -> Non
     )
     rebound = SemanticIngestRequest.create(
         source_experience=first.source_experience,
+        source_projection=first.source_projection,
         fixed_route=first.fixed_route,
         exit_evidence=changed_evidence,
         scope=first.scope,

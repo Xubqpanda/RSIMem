@@ -23,7 +23,11 @@ from rsimem.memory.live_writeback import (
 from rsimem.memory.adaptive_mem0_binding import TrustedAdaptiveMem0Parameter
 from rsimem.memory.adaptive_policy import AdaptiveParameterName
 from rsimem.memory.adaptive_policy_store import JsonAdaptivePolicyStore
-from rsimem.memory.operation_graph import audit_operation_evidence
+from rsimem.memory.operation_graph import (
+    ArtifactKind,
+    audit_operation_evidence,
+    materialize_operation_graph,
+)
 from rsimem.memory.receipts import MutationReceiptStatus
 from rsimem.memory_systems.mem0_flat import (
     FakeCompletionClient,
@@ -327,6 +331,17 @@ def test_completed_snapshot_compiles_once_without_eviction_plan(tmp_path) -> Non
     assert len(first) == 1
     assert first[0].compilation_id.startswith("semantic_compilation_")
     assert first[0].writeback.logical_exit is True
+    assert first[0].receipt is not None
+    assert first[0].writeback.ingestion is not None
+    projection_digest = first[0].receipt.source_projection_digest
+    assert first[0].writeback.ingestion.source_digest == projection_digest
+    graph = materialize_operation_graph(runtime.operation_log.events)
+    source_artifacts = tuple(
+        artifact for artifact in graph.artifacts
+        if artifact.kind == ArtifactKind.SOURCE_OBSERVATION
+    )
+    assert len(source_artifacts) == 1
+    assert source_artifacts[0].content_digest == projection_digest
     assert len(client.calls) == 2
     context_exit = first[0].writeback.executions[0].context_exit
     assert context_exit.physical_rewrite is False
