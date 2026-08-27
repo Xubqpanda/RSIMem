@@ -513,6 +513,7 @@ def _resource_cost(dataset: DelayedFeedbackDataset, ids: set[str], cap: float) -
             "cache_read_tokens",
             "cache_write_tokens",
             "reasoning_tokens",
+            "duration_ms",
         ):
             value = getattr(usage, name)
             if value is None:
@@ -522,7 +523,6 @@ def _resource_cost(dataset: DelayedFeedbackDataset, ids: set[str], cap: float) -
         total += (
             usage.model_requests
             + usage.retry_count
-            + usage.duration_ms
             + usage.storage_bytes
         )
     return min(1.0, total / cap), missing
@@ -883,6 +883,124 @@ class AdaptiveRuntimePolicyBinding:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class MatchedActivationReceipt:
+    receipt_id: str
+    validation_decision_id: str
+    artifact_id: str
+    parent_policy_version: str
+    proposal_policy_version: str
+    task_group_ids: tuple[str, ...]
+    static_trace_ids: tuple[str, ...]
+    proposal_trace_ids: tuple[str, ...]
+    budget_id: str
+    matched_audit_id: str
+    accepted: bool
+    reason_codes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        for value in (
+            self.receipt_id,
+            self.validation_decision_id,
+            self.artifact_id,
+            self.parent_policy_version,
+            self.proposal_policy_version,
+            self.budget_id,
+            self.matched_audit_id,
+        ):
+            _require_identifier(value, "matched activation identity")
+        for values in (
+            self.task_group_ids,
+            self.static_trace_ids,
+            self.proposal_trace_ids,
+        ):
+            _require_ids(values, "matched activation evidence")
+        if not (
+            len(self.task_group_ids)
+            == len(self.static_trace_ids)
+            == len(self.proposal_trace_ids)
+        ):
+            raise ValueError("matched activation evidence must align")
+        if type(self.accepted) is not bool:
+            raise TypeError("matched activation acceptance must be bool")
+        if not self.reason_codes or any(
+            _REASON_CODE.fullmatch(value) is None for value in self.reason_codes
+        ):
+            raise ValueError("matched activation requires reason codes")
+        if self.accepted != (self.reason_codes == ("matched_execution_passed",)):
+            raise ValueError("matched activation reasons are inconsistent")
+        digest = _digest(self.identity_payload())
+        if self.receipt_id != f"matched-activation.{digest[:40]}":
+            raise ValueError("matched activation receipt identity mismatch")
+
+    @classmethod
+    def create(cls, **values) -> "MatchedActivationReceipt":
+        prototype = cls.__new__(cls)
+        for key, value in values.items():
+            object.__setattr__(prototype, key, value)
+        identity = prototype.identity_payload()
+        return cls(
+            receipt_id=f"matched-activation.{_digest(identity)[:40]}",
+            **values,
+        )
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "validation_decision_id": self.validation_decision_id,
+            "artifact_id": self.artifact_id,
+            "parent_policy_version": self.parent_policy_version,
+            "proposal_policy_version": self.proposal_policy_version,
+            "task_group_ids": list(self.task_group_ids),
+            "static_trace_ids": list(self.static_trace_ids),
+            "proposal_trace_ids": list(self.proposal_trace_ids),
+            "budget_id": self.budget_id,
+            "matched_audit_id": self.matched_audit_id,
+            "accepted": self.accepted,
+            "reason_codes": list(self.reason_codes),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class AdaptiveRollbackReceipt:
+    receipt_id: str
+    policy_version: str
+    automatic: bool
+    evidence_ids: tuple[str, ...]
+    reason_code: str
+
+    def __post_init__(self) -> None:
+        _require_identifier(self.receipt_id, "adaptive rollback receipt")
+        _require_identifier(self.policy_version, "adaptive rollback policy")
+        _require_ids(self.evidence_ids, "adaptive rollback evidence")
+        if type(self.automatic) is not bool:
+            raise TypeError("adaptive rollback automatic flag must be bool")
+        if _REASON_CODE.fullmatch(self.reason_code) is None:
+            raise ValueError("adaptive rollback reason must be machine-readable")
+        expected = "safety_regression" if self.automatic else "operator_requested"
+        if self.reason_code != expected:
+            raise ValueError("adaptive rollback reason conflicts with trigger")
+        if self.receipt_id != f"rollback-receipt.{_digest(self.identity_payload())[:40]}":
+            raise ValueError("adaptive rollback receipt identity mismatch")
+
+    @classmethod
+    def create(cls, **values) -> "AdaptiveRollbackReceipt":
+        prototype = cls.__new__(cls)
+        for key, value in values.items():
+            object.__setattr__(prototype, key, value)
+        return cls(
+            receipt_id=f"rollback-receipt.{_digest(prototype.identity_payload())[:40]}",
+            **values,
+        )
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "policy_version": self.policy_version,
+            "automatic": self.automatic,
+            "evidence_ids": list(self.evidence_ids),
+            "reason_code": self.reason_code,
+        }
+
+
 class AdaptivePolicyLifecycleCoordinator:
     """Apply deterministic offline screening; matched validation owns activation."""
 
@@ -930,16 +1048,42 @@ class AdaptivePolicyLifecycleCoordinator:
 
     def rollback(
         self,
-        policy_version: str,
-        *,
-        rollback_id: str,
-        automatic: bool,
+        receipt: AdaptiveRollbackReceipt,
     ) -> AdaptivePolicyLifecycleRecord:
         record, _ = self.policy_store.transition(
-            policy_version,
+            receipt.policy_version,
             to_state=AdaptivePolicyState.ROLLED_BACK,
-            transition_id=rollback_id,
-            reason_code=("automatic_safety_rollback" if automatic else "operator_rollback"),
+            transition_id=f"{receipt.receipt_id}.rolled-back",
+            reason_code=(
+                "automatic_safety_rollback"
+                if receipt.automatic
+                else "operator_rollback"
+            ),
+        )
+        return record
+
+    def activate(
+        self,
+        artifact: AdaptivePolicyArtifact,
+        decision: AdaptiveValidationDecision,
+        receipt: MatchedActivationReceipt,
+    ) -> AdaptivePolicyLifecycleRecord:
+        persisted = self.decision_store.get(decision.decision_id)
+        if persisted != decision or not decision.accepted:
+            raise ValueError("adaptive activation requires accepted persisted validation")
+        if (
+            receipt.validation_decision_id != decision.decision_id
+            or receipt.artifact_id != artifact.artifact_id
+            or receipt.parent_policy_version != artifact.parent_policy_version
+            or receipt.proposal_policy_version != artifact.policy_version
+            or not receipt.accepted
+        ):
+            raise ValueError("matched activation receipt and policy differ")
+        record, _ = self.policy_store.transition(
+            artifact.policy_version,
+            to_state=AdaptivePolicyState.ACTIVE,
+            transition_id=f"{receipt.receipt_id}.activated",
+            reason_code="matched_execution_passed",
         )
         return record
 
