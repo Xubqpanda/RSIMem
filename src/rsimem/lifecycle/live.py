@@ -249,6 +249,14 @@ class HermesLifecycleDryRunRuntime:
             EvaluationTrigger.SESSION_END,
         }:
             raise ValueError("live Hermes dry-run only accepts explicit host boundaries")
+        task_state = TaskLifecycleState(task_state)
+        if (
+            trigger == EvaluationTrigger.TASK_COMPLETED
+            and task_state != TaskLifecycleState.COMPLETED
+        ):
+            raise ValueError("task_completed boundary requires completed host task state")
+        if trigger == EvaluationTrigger.SESSION_END and task_state == TaskLifecycleState.ACTIVE:
+            raise ValueError("session_end boundary cannot carry active host task state")
         snapshot = self._collector.collect(
             rows,
             run_id=self.run_id,

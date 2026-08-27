@@ -196,6 +196,10 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
         assert PRIVATE_MEMORY not in serialized
         assert "task table is ready" not in serialized.lower()
     assert '"kind": "projection_check"' in evidence["native+adapter+ledger"]
+    assert not any(
+        (tmp_path / mode.replace("+", "_") / "rsimem_lifecycle_events.jsonl").exists()
+        for mode in ("native+ledger", "native+adapter+ledger")
+    )
 
 
 def test_past_bench_emits_explicit_lifecycle_boundaries(
