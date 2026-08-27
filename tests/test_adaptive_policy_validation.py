@@ -238,7 +238,7 @@ def test_quality_regression_is_rejected_and_remains_inactive(tmp_path) -> None:
     assert policy_store.snapshot().active is None
 
 
-def test_atomic_activation_restart_runtime_binding_and_rollbacks(tmp_path) -> None:
+def test_offline_screening_stops_at_validated_and_runtime_uses_parent(tmp_path) -> None:
     dataset, gate = _multi_dataset(training_negative=True)
     split = TimeOrderedAdaptiveSplitter().split(dataset, gate)
     artifact = _proposal(dataset, gate, split)
@@ -260,91 +260,24 @@ def test_atomic_activation_restart_runtime_binding_and_rollbacks(tmp_path) -> No
     active = coordinator.apply(artifact, decision)
     duplicate = coordinator.apply(artifact, decision)
     assert active == duplicate
-    assert active.state == AdaptivePolicyState.ACTIVE
+    assert active.state == AdaptivePolicyState.VALIDATED
     restarted = JsonAdaptivePolicyStore(
         policy_path,
         trusted_root_policy_versions=(dataset.config.policy_version,),
     )
-    assert restarted.snapshot().active == artifact
+    assert restarted.snapshot().active is None
     binding = coordinator.bind_runtime_decision(
         "runtime-decision.first",
         fallback_policy_version=dataset.config.policy_version,
     )
-    assert binding.actual_policy_version == artifact.policy_version
-    assert binding.adaptive is True
-
-    rolled = coordinator.rollback(
-        artifact.policy_version,
-        rollback_id="policy-transition.operator-rollback",
-        automatic=False,
-    )
-    replay_rollback = coordinator.rollback(
-        artifact.policy_version,
-        rollback_id="policy-transition.operator-rollback",
-        automatic=False,
-    )
-    assert rolled == replay_rollback
-    assert rolled.state == AdaptivePolicyState.ROLLED_BACK
-    fallback = coordinator.bind_runtime_decision(
-        "runtime-decision.after-rollback",
-        fallback_policy_version=dataset.config.policy_version,
-    )
-    assert fallback.actual_policy_version == dataset.config.policy_version
-    assert fallback.adaptive is False
-
-    second_dataset, second_gate = _multi_dataset(training_negative=True)
-    second_split = TimeOrderedAdaptiveSplitter().split(second_dataset, second_gate)
-    second = _proposal(second_dataset, second_gate, second_split)
-    second_decision = AdaptivePolicyValidator().evaluate(
-        second,
-        second_dataset,
-        second_gate,
-        second_split,
-        AdaptiveAcceptanceCriteria(),
-    )
-    # A different seed creates a second logical proposal for safety rollback coverage.
-    second = replace(second, content_digest=second.content_digest)
-    if second.policy_version == artifact.policy_version:
-        second_config = AdaptiveTrainingConfig(
-            parent_policy_version=second_dataset.config.policy_version,
-            seed=24,
-            parameters=(AdaptiveParameterSpec(
-                parameter_id="parameter.fact",
-                name=AdaptiveParameterName.RETRIEVAL_ACCEPT_THRESHOLD,
-                baseline_value=0.35,
-                prompt_ref="mem0-flat.retrieval",
-            ),),
-            training_example_ids=second_split.training_example_ids,
-            minimum_resolved_examples=1,
-            maximum_missing_propensity_rate=1.0,
-        )
-        second = DeterministicAdaptivePolicyLearner().learn(
-            second_dataset,
-            second_gate,
-            second_config,
-        )
-        second_decision = AdaptivePolicyValidator().evaluate(
-            second,
-            second_dataset,
-            second_gate,
-            second_split,
-            AdaptiveAcceptanceCriteria(),
-        )
-    coordinator.apply(second, second_decision)
-    automatic = coordinator.rollback(
-        second.policy_version,
-        rollback_id="policy-transition.automatic-rollback",
-        automatic=True,
-    )
-    assert automatic.state == AdaptivePolicyState.ROLLED_BACK
-    reasons = {
-        transition.reason_code
-        for transition in policy_store.snapshot().transitions
-    }
-    assert {"operator_rollback", "automatic_safety_rollback"} <= reasons
+    assert binding.actual_policy_version == dataset.config.policy_version
+    assert binding.adaptive is False
 
 
-def test_activation_crash_leaves_validated_not_dual_active(tmp_path, monkeypatch) -> None:
+def test_offline_validation_crash_leaves_proposal_and_retry_is_stable(
+    tmp_path,
+    monkeypatch,
+) -> None:
     dataset, gate = _multi_dataset(training_negative=True)
     split = TimeOrderedAdaptiveSplitter().split(dataset, gate)
     artifact = _proposal(dataset, gate, split)
@@ -371,24 +304,21 @@ def test_activation_crash_leaves_validated_not_dual_active(tmp_path, monkeypatch
     def fail_activation(payload):
         nonlocal calls
         calls += 1
-        if calls == 2:
-            raise RuntimeError("simulated activation crash")
+        if calls == 1:
+            raise RuntimeError("simulated validation crash")
         return original_write(payload)
 
     monkeypatch.setattr(store, "_write_unlocked", fail_activation)
-    with pytest.raises(RuntimeError, match="activation crash"):
+    with pytest.raises(RuntimeError, match="validation crash"):
         coordinator.apply(artifact, decision)
     crashed = JsonAdaptivePolicyStore(
         path,
         trusted_root_policy_versions=(dataset.config.policy_version,),
     ).snapshot()
     assert crashed.active is None
-    assert len([
-        record for record in crashed.records
-        if record.state == AdaptivePolicyState.ACTIVE
-    ]) == 0
+    assert crashed.records[0].state == AdaptivePolicyState.PROPOSAL
 
     monkeypatch.setattr(store, "_write_unlocked", original_write)
     recovered = coordinator.apply(artifact, decision)
-    assert recovered.state == AdaptivePolicyState.ACTIVE
-    assert store.snapshot().active_policy_version == artifact.policy_version
+    assert recovered.state == AdaptivePolicyState.VALIDATED
+    assert store.snapshot().active_policy_version is None
