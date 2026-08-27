@@ -805,14 +805,41 @@ def test_replay_window_versions_and_irrelevant_operations_are_deterministic(
     assert first_path == replay_path
     assert versioned_path != first_path
     assert first_path.exists() and versioned_path.exists()
+    assert store.get(first.dataset_id) == first
+    assert store.get("feedback-dataset.missing") is None
 
     with_irrelevant = _dataset(_graph("used", irrelevant=True))
     assert with_irrelevant.examples[0].label == first.examples[0].label
     assert "op.irrelevant" not in with_irrelevant.examples[0].operation_ids
 
     first_path.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed"):
+        store.get(first.dataset_id)
     with pytest.raises(ValueError, match="conflicts"):
         store.put(first)
+
+
+def test_feedback_dataset_reload_rejects_unknown_fields_and_identity_tampering(
+    tmp_path,
+) -> None:
+    dataset = _dataset(_graph("used"))
+    store = JsonDelayedFeedbackDatasetStore(tmp_path / "datasets")
+    path, _ = store.put(dataset)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["unknown"] = True
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed"):
+        store.get(dataset.dataset_id)
+
+    payload = dataset.payload()
+    payload["examples"][0]["example_id"] = "feedback-example.tampered"
+    path.write_text(
+        json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="malformed"):
+        store.get(dataset.dataset_id)
 
 
 def test_integrity_audit_detects_orphan_revision_duplicate_and_future_leakage() -> None:

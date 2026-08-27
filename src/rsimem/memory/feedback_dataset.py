@@ -81,6 +81,16 @@ def _require_ids(values: tuple[str, ...], name: str) -> None:
         raise ValueError(f"{name} must be unique stable identifiers")
 
 
+def _strict_payload(
+    value: object,
+    fields: set[str],
+    name: str,
+) -> Mapping[str, object]:
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise ValueError(f"malformed {name}")
+    return value
+
+
 def _is_delayed_deterministic_failure(
     *,
     method: AttributionMethod,
@@ -216,6 +226,35 @@ class FeedbackObservationWindow:
             "censor_reason": self.censor_reason,
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "FeedbackObservationWindow":
+        payload = _strict_payload(value, {
+            "schema_version",
+            "window_id",
+            "version",
+            "cutoff_operation_id",
+            "visible_operation_ids",
+            "complete",
+            "censor_reason",
+        }, "feedback observation window")
+        try:
+            window = cls(
+                window_id=payload["window_id"],
+                version=payload["version"],
+                cutoff_operation_id=payload["cutoff_operation_id"],
+                visible_operation_ids=tuple(payload["visible_operation_ids"]),
+                complete=payload["complete"],
+                censor_reason=payload["censor_reason"],
+                schema_version=payload["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed feedback observation window") from exc
+        identity = window.payload()
+        identity.pop("window_id")
+        if window.window_id != _stable_id("feedback-window", identity):
+            raise ValueError("feedback observation window identity mismatch")
+        return window
+
 
 @dataclass(frozen=True, slots=True)
 class DelayedFeedbackConfig:
@@ -251,6 +290,21 @@ class DelayedFeedbackConfig:
             "label_schema": self.label_schema,
             "window_version": self.window_version,
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "DelayedFeedbackConfig":
+        payload = _strict_payload(value, {
+            "schema_version",
+            "policy_version",
+            "feature_schema",
+            "dataset_version",
+            "label_schema",
+            "window_version",
+        }, "delayed feedback config")
+        try:
+            return cls(**payload)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed delayed feedback config") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -498,6 +552,62 @@ class DelayedFeedbackExample:
             "resources": self.resources.to_dict(),
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "DelayedFeedbackExample":
+        payload = _strict_payload(
+            value,
+            set(cls.__dataclass_fields__),
+            "delayed feedback example",
+        )
+        tuple_fields = {
+            "observation_episode_ids",
+            "session_ids",
+            "task_ids",
+            "proposal_operation_ids",
+            "source_operation_ids",
+            "extraction_operation_ids",
+            "related_retrieval_operation_ids",
+            "decision_operation_ids",
+            "target_resolution_operation_ids",
+            "validation_operation_ids",
+            "verification_operation_ids",
+            "query_operation_ids",
+            "retrieval_operation_ids",
+            "injection_operation_ids",
+            "use_operation_ids",
+            "outcome_operation_ids",
+            "tool_operation_ids",
+            "supersession_operation_ids",
+            "recovery_operation_ids",
+            "attribution_record_ids",
+            "attribution_methods",
+            "failure_categories",
+            "attributed_operation_ids",
+            "failure_subgraph_operation_ids",
+            "policy_parameter_ids",
+            "label_reason_codes",
+        }
+        try:
+            parsed = dict(payload)
+            for field in tuple_fields:
+                if not isinstance(parsed[field], list):
+                    raise ValueError("feedback tuple field must be a list")
+                parsed[field] = tuple(parsed[field])
+            resources = _strict_payload(
+                parsed["resources"],
+                set(RawResourceUsage.__dataclass_fields__),
+                "feedback resource usage",
+            )
+            parsed["resources"] = RawResourceUsage(**resources)
+            example = cls(**parsed)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed delayed feedback example") from exc
+        identity = example.payload()
+        identity.pop("example_id")
+        if example.example_id != _stable_id("feedback-example", identity):
+            raise ValueError("delayed feedback example identity mismatch")
+        return example
+
 
 @dataclass(frozen=True, slots=True)
 class DelayedFeedbackDataset:
@@ -527,6 +637,38 @@ class DelayedFeedbackDataset:
             "source_operation_count": self.source_operation_count,
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "DelayedFeedbackDataset":
+        payload = _strict_payload(value, {
+            "schema_version",
+            "dataset_id",
+            "config",
+            "window",
+            "examples",
+            "source_operation_count",
+        }, "delayed feedback dataset")
+        if not isinstance(payload["examples"], list):
+            raise ValueError("malformed delayed feedback dataset examples")
+        try:
+            dataset = cls(
+                dataset_id=payload["dataset_id"],
+                config=DelayedFeedbackConfig.from_payload(payload["config"]),
+                window=FeedbackObservationWindow.from_payload(payload["window"]),
+                examples=tuple(
+                    DelayedFeedbackExample.from_payload(example)
+                    for example in payload["examples"]
+                ),
+                source_operation_count=payload["source_operation_count"],
+                schema_version=payload["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed delayed feedback dataset") from exc
+        identity = dataset.payload()
+        identity.pop("dataset_id")
+        if dataset.dataset_id != _stable_id("feedback-dataset", identity):
+            raise ValueError("delayed feedback dataset identity mismatch")
+        return dataset
+
 
 class JsonDelayedFeedbackDatasetStore:
     """Persist immutable content-addressed datasets without replacement."""
@@ -551,6 +693,21 @@ class JsonDelayedFeedbackDatasetStore:
         temporary.write_text(canonical, encoding="utf-8")
         temporary.replace(path)
         return path, True
+
+    def get(self, dataset_id: str) -> DelayedFeedbackDataset | None:
+        _require_identifier(dataset_id, "delayed feedback dataset identity")
+        path = self.root / f"{dataset_id}.json"
+        if not path.exists():
+            return None
+        try:
+            serialized = path.read_text(encoding="utf-8")
+            raw = json.loads(serialized)
+            dataset = DelayedFeedbackDataset.from_payload(raw)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise ValueError("stored delayed feedback dataset is malformed") from exc
+        if dataset.dataset_id != dataset_id or serialized != _canonical(dataset.payload()) + "\n":
+            raise ValueError("stored delayed feedback dataset conflicts with its identity")
+        return dataset
 
 
 @dataclass(frozen=True, slots=True)
