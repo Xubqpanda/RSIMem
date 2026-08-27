@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import pytest
+
 from rsimem.lifecycle import RawResourceUsage
 from rsimem.memory.attribution import DeterministicFirstAttributor, FailureCategory
 from rsimem.memory.backends import build_hermes_native_registry
-from rsimem.memory.future_trace import SemanticFutureTraceRecorder
+from rsimem.memory.future_trace import (
+    SemanticFeedbackContract,
+    SemanticFeedbackResolver,
+    SemanticFutureEvidence,
+    SemanticFutureTraceRecorder,
+)
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     AtomicOperationRecorder,
@@ -72,6 +79,92 @@ def test_future_retrieval_miss_is_distinct_from_unexposed_use(tmp_path) -> None:
         FailureCategory.RETRIEVAL_MISS,
     ]
     registry.close()
+
+
+def test_sm01_feedback_contract_uses_only_predeclared_deployment_signal() -> None:
+    future = SemanticFutureEvidence(
+        "op.query",
+        "op.retrieval",
+        "op.injection",
+        ("memory.one",),
+        ("revision.one",),
+        "artifact.injection",
+    )
+    resolver = SemanticFeedbackResolver(
+        SemanticFeedbackContract.SM01_TSV_V1,
+        family_id="SM01_preference_adoption",
+        stage="eval_near",
+    )
+    positive = resolver.resolve(future, {
+        "completed": True,
+        "final_response": (
+            "owner\tpriority\ttask\tdue_date\n"
+            "Iris Chen\tHigh\tFix drift\t2026/04/28"
+        ),
+        "task_score": 0.0,
+    })
+    assert positive.used_artifact_ids == ("memory.one",)
+    assert positive.outcome_status == OperationStatus.SUCCESS
+    assert positive.outcome_reason_code is None
+    assert positive.reuse_signal_observed is True
+
+    negative = resolver.resolve(future, {
+        "completed": True,
+        "final_response": "- Iris Chen: Fix drift",
+        "task_score": 1.0,
+    })
+    assert negative.used_artifact_ids == ()
+    assert negative.outcome_status == OperationStatus.FAILED
+    assert negative.outcome_reason_code == "reuse_signal_absent"
+    assert negative.reuse_signal_observed is False
+
+
+def test_sm01_feedback_contract_censors_ineligible_or_ambiguous_evidence() -> None:
+    ineligible = SemanticFeedbackResolver(
+        SemanticFeedbackContract.SM01_TSV_V1,
+        family_id="SM01_preference_adoption",
+        stage="learn_a",
+    )
+    future = SemanticFutureEvidence(
+        "op.query",
+        "op.retrieval",
+        "op.injection",
+        ("memory.one",),
+        ("revision.one",),
+        "artifact.injection",
+    )
+    censored = ineligible.resolve(future, {
+        "completed": True,
+        "final_response": "owner\tpriority\ttask\tdue_date\na\tb\tc\td",
+    })
+    assert censored.eligible is False
+    assert censored.outcome_status == OperationStatus.NONE
+    assert censored.outcome_reason_code == "observation_censored"
+
+    ambiguous = SemanticFeedbackResolver(
+        SemanticFeedbackContract.SM01_TSV_V1,
+        family_id="SM01_preference_adoption",
+        stage="eval_far",
+    ).resolve(SemanticFutureEvidence(
+        "op.query",
+        "op.retrieval",
+        "op.injection",
+        ("memory.one", "memory.two"),
+        ("revision.one", "revision.two"),
+        "artifact.injection",
+    ), {
+        "completed": True,
+        "final_response": "owner\tpriority\ttask\tdue_date\na\tb\tc\td",
+    })
+    assert ambiguous.eligible is False
+    assert ambiguous.outcome_status == OperationStatus.NONE
+
+    with pytest.raises(ValueError, match="requires the SM01 family"):
+        SemanticFeedbackResolver(
+            SemanticFeedbackContract.SM01_TSV_V1,
+            family_id="SM02_constraint_retention",
+            stage="eval_near",
+        )
 
 
 def test_retrieved_not_injected_does_not_become_retrieved_unused(tmp_path) -> None:
