@@ -61,6 +61,7 @@ class MutationReceipt:
     action: InternalMemoryAction
     kind: MemoryKind
     provenance: ValidationProvenance
+    pre_artifact_ids: tuple[str, ...] = ()
     status: MutationReceiptStatus = MutationReceiptStatus.PENDING
     phase: MutationReceiptPhase = MutationReceiptPhase.RESERVED
     applied_artifact_id: str | None = None
@@ -98,6 +99,11 @@ class MutationReceipt:
         ):
             if value is not None and not _identifier(value):
                 raise ValueError("mutation receipt target identity is invalid")
+        if (
+            len(self.pre_artifact_ids) != len(set(self.pre_artifact_ids))
+            or any(not _identifier(value) for value in self.pre_artifact_ids)
+        ):
+            raise ValueError("mutation receipt pre_artifact_ids must be unique identifiers")
         for value in (
             self.pre_content_digest,
             self.mutation_digest,
@@ -204,6 +210,7 @@ class MutationReceipt:
             "action": self.action.value,
             "kind": self.kind.value,
             "provenance": _provenance_payload(self.provenance),
+            "pre_artifact_ids": list(self.pre_artifact_ids),
         }
 
     def to_dict(self) -> dict[str, object]:
@@ -246,6 +253,7 @@ class MutationReceipt:
                 action=value["action"],
                 kind=value["kind"],
                 provenance=_provenance_from_payload(provenance),
+                pre_artifact_ids=tuple(value["pre_artifact_ids"]),
                 status=value["status"],
                 phase=value["phase"],
                 applied_artifact_id=value["applied_artifact_id"],

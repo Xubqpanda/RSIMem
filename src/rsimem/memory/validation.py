@@ -380,6 +380,12 @@ def _candidate_fingerprint(
     return _sha(_canonical_json(identity)), content_digest, content_bytes, metadata_bytes, resource_bytes
 
 
+def fingerprint_memory_candidate(candidate: UntrustedMemoryCandidate) -> str:
+    """Return the canonical digest used to bind validation and recovery."""
+
+    return _candidate_fingerprint(candidate)[0]
+
+
 def _semantic_signature(content: str) -> tuple[tuple[str, ...], bool]:
     tokens = re.findall(r"[a-z0-9]+", content.casefold())
     negative_words = {"not", "never", "no", "avoid", "dislike", "dislikes", "cannot"}
