@@ -78,6 +78,7 @@ def test_positive_feedback_produces_deterministic_bounded_artifact() -> None:
     assert first.regularization == config.l2_regularization
     assert first.training_config_digest == config.digest
     assert first.prompt_refs == ("mem0-flat.retrieval",)
+    assert first.training_example_ids == (dataset.examples[0].example_id,)
     update = first.parameters[0]
     assert update.positive_count == 1
     assert update.negative_count == 0
@@ -139,6 +140,12 @@ def test_training_contract_rejects_scope_gate_and_content_tampering() -> None:
             dataset,
             replace(gate, dataset_payload_digest="0" * 64),
             config,
+        )
+    with pytest.raises(ValueError, match="training membership"):
+        learner.learn(
+            dataset,
+            gate,
+            replace(config, training_example_ids=("feedback-example.unknown",)),
         )
     with pytest.raises(ValueError, match="parent policy is unknown"):
         learner.learn(
