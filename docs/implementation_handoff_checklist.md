@@ -1077,6 +1077,12 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2K.1 Variants 与 Family 顺序
 
+- √ 冻结五方法 execution profile：no persistence、direct native Hermes、native + ledger、static RSIMem 和 adaptive RSIMem；只有 adaptive 方法读取 adaptive config。
+- √ 增加版本化 strict JSON transport；store source 与 destination 都必须是受限相对路径，缺失、逃逸、模式错配和未知字段 fail closed。
+- √ 每次 persistence attempt 在隔离 Hermes home 内复制 prepared store；无持久化不复制，已有冲突内容不覆盖。
+- √ Manifest schema 记录 config/store digest、唯一 ACTIVE policy/artifact identity、RSIMem commit、PAST-Bench commit/tree 和实际轮换顺序。
+- √ 五方法 launcher 使用 `ADAPTIVE_METHOD_VARIANTS` 的 replicate rotation；direct native、ledger、static 和 adaptive 不通过 shell 隐式共享错误模式。
+- √ adaptive attempt 的 post-run audit 要求 utility evidence 使用 manifest 中的 ACTIVE policy version。
 - □ 比较 no persistence、native Hermes、native + ledger、static LightRSI 和 adaptive LightRSI。
 - □ 所有 variant 使用 matched model、judge、budget、task order、sandbox 和 persistence isolation。
 - □ 当前依次运行 semantic-relevant memory-ability 和 update-ability families。
@@ -1089,6 +1095,14 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 - □ 每个 variant 完成预先规定的 independent replicate。
 - □ 所有 run 通过 usage、privacy、identity 和 lifecycle audit。
 - □ Failed run 与 provider failure 单独报告，不删除。
+
+2K.1 execution-readiness 验收记录（2026-08-28）：
+
+- Runtime/config：`adaptive_utility` 仅在 explicit `native+ledger`、lifecycle enabled、attempt-local prepared store 且唯一 ACTIVE policy 可绑定时启动；错误在模型调用前拒绝。Direct native 与 static defaults 不变。
+- PAST transport/isolation：单一 strict JSON 同时固定 destination、trusted roots、runtime-owned parameters 和 sibling prepared-store file；host-only source path 不下发到 RSIMem contract 或模型输入。
+- Manifest/launcher：schema v3 把 config/store digest 与 active artifact identity 纳入 experiment identity；`run_luna_adaptive_sm01.sh` 固定五方法 mapping、3+ independent unseeded replicates、clean-tree requirement、failure retention 和 method-specific audit。
+- Commits：`ff669ca`（live runtime gate）、`b79a6e0`（PAST config transport）、`d8c2845`（attempt-local store）、`c2432cc`（manifest active identity）和 `9005999`（five-method launcher）。Full RSIMem `323 passed`；PAST-Bench 从其目录运行 `390 passed, 2 skipped`；compileall、`pip check`、shell syntax、diff check 和 tracked-secret scan 通过。
+- 已知限制：尚无由既有 deployment feedback 独立准备的 production ACTIVE store，也未运行任何五方法 adaptive replicate。因此上面的完成项只关闭 execution-readiness，不关闭 comparison、family、metrics 或 claim gate。禁止从同一 official/test run 现场生成 policy 再评估该 run。
 
 ### 2K.2 Metrics 与 Ablation
 

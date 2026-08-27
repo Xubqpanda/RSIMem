@@ -1,6 +1,6 @@
 # RSIMem Progress
 
-Last updated: 2026-08-27
+Last updated: 2026-08-28
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
@@ -14,7 +14,7 @@ This document tracks implementation progress, the current experimental boundary,
 
 RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for every exposed model request, derive a privacy-safe lifecycle ledger, audit run completeness, and represent Hermes semantic, episodic, and procedural memory through typed backend contracts.
 
-The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default. Static Mem0-flat semantic writeback is available only through the explicit live experiment configuration; active-artifact binding is implemented, but the adaptive PAST-Bench variant remains disabled until Phase 2K. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
+The typed memory runtime is connected to the PAST-Bench Hermes execution path behind explicit opt-in modes. Direct native remains the default. Static and adaptive Mem0-flat semantic writeback are available only through live experiment configuration; adaptive startup additionally requires a prepared, attempt-local store with one ACTIVE artifact that binds to the trusted runtime parameters. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
 Phase 1A-1E, Phase 2A-2E, Phase 2H, Phase 2I, and Phase 2J are complete. Phase 2K.1 matched adaptive PAST-Bench variants are the active milestone. Live mutation remains opt-in and restricted to audited experiment paths; direct native remains the default.
 
@@ -193,10 +193,12 @@ The 2J.1 learner now produces deterministic, content-addressed semantic paramete
 
 Phase 2J is complete at the deterministic implementation gate. Time-ordered splits, offline screening, matched held-out activation, rollback, active-artifact binding, actual-version evidence, and one replayable N -> feedback -> N+1 -> changed future memory decision loop are implemented. This does not establish PAST-Bench adaptive quality, repeated recursive improvement, or cross-family generalization; those claims remain gated on Phase 2K experiments.
 
+Phase 2K.1 execution plumbing is complete. A strict adaptive JSON contract, attempt-local prepared-store materialization, ACTIVE policy manifest identity, frozen five-method execution profiles, rotated scheduling, and an SM01 launcher now fail closed before model use. No live adaptive replicate has run: the next prerequisite is an independently prepared ACTIVE store derived from prior deployment feedback, not from the official/test run it will evaluate.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `317 passed`.
-- [x] Pass the vendored PAST-Bench regression suite: `387 passed, 2 skipped`.
+- [x] Pass all RSIMem tests: `323 passed`.
+- [x] Pass the vendored PAST-Bench regression suite: `390 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
@@ -206,7 +208,7 @@ Phase 2J is complete at the deterministic implementation gate. Time-ordered spli
 
 Phase 2H freezes one interpretable future-utility-per-cost objective across semantic generation admission, internal operation admission, and retrieval filtering/ranking without changing route or invocation scheduling. Deterministic matched fixtures and the audited live SM01 batch establish fixed policy identity, content-free evidence, raw-cost accounting, and explicit limitations.
 
-Phase 2I constructs, independently rebuilds, and audits a versioned delayed-feedback dataset from the atomic operation graph. Phase 2J now trains, validates, activates, binds, audits, and rolls back a deterministic adaptive Mem0-flat policy while preserving the fixed route and invocation cadence. The immediate objective is 2K.1: add the adaptive variant to the existing matched PAST-Bench manifest and launcher, freeze semantic-family order and evidence contracts, then run audited independent replicates without placing raw logs or credentials in tracked files.
+Phase 2I constructs, independently rebuilds, and audits a versioned delayed-feedback dataset from the atomic operation graph. Phase 2J trains, validates, activates, binds, audits, and rolls back a deterministic adaptive Mem0-flat policy while preserving the fixed route and invocation cadence. Phase 2K.1 now transports that ACTIVE policy into isolated PAST-Bench attempts and freezes the five-method launcher and manifest identity. The immediate objective is to implement and audit the production preparation path from prior deployment feedback, freeze its train/validation membership and cutoff, then run the first three-replicate SM01 batch. Raw outputs and credentials remain outside tracked files.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -268,11 +270,11 @@ Acceptance criteria:
 
 ### Adaptive LightRSI Loop
 
-- [ ] Collect deployment-observable delayed feedback from retrieval, injection, task completion, tool behavior, retries, supersession, and non-use.
-- [ ] Estimate realized future utility without reading hidden task scores into the policy update path.
-- [ ] Version semantic extraction, operation/consolidation, and retrieval policies without changing routing or invocation frequency.
-- [ ] Validate proposed policy updates against held-out deployment evidence.
-- [ ] Support acceptance, rejection, rollback, and reproducible replay of every policy update.
+- [x] Collect deployment-observable delayed feedback from retrieval, injection, task completion, tool behavior, retries, supersession, and non-use.
+- [x] Estimate realized future utility without reading hidden task scores into the policy update path.
+- [x] Version semantic extraction, operation/consolidation, and retrieval policies without changing routing or invocation frequency.
+- [x] Validate proposed policy updates against held-out deployment evidence.
+- [x] Support acceptance, rejection, rollback, and reproducible replay of every policy update.
 - [ ] Compare static and adaptive LightRSI on the cost-quality frontier.
 
 ### PAST-Bench Task-Family Expansion
