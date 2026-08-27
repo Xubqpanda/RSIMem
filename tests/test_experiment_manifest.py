@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from rsimem.experiment_manifest import (
+    ADAPTIVE_METHOD_VARIANTS,
     STATIC_METHOD_VARIANTS,
     STATIC_UTILITY_METHOD_VARIANTS,
     execution_order,
@@ -179,6 +180,24 @@ def test_manifest_schedules_static_method_variants(tmp_path: Path) -> None:
     assert utility["executionOrderByReplicate"]["2"] == [
         "static-utility-rsimem",
         "static-rsimem",
+    ]
+
+    adaptive_path = tmp_path / "adaptive-methods.json"
+    initialize_batch_manifest(
+        adaptive_path,
+        **_manifest_kwargs(),
+        execution_modes=ADAPTIVE_METHOD_VARIANTS,
+    )
+    adaptive = load_manifest(adaptive_path)
+    assert adaptive["configuration"]["executionModes"] == list(
+        ADAPTIVE_METHOD_VARIANTS
+    )
+    assert adaptive["executionOrderByReplicate"]["2"] == [
+        "native-hermes",
+        "native-ledger",
+        "static-rsimem",
+        "adaptive-rsimem",
+        "no-persistence",
     ]
 
 

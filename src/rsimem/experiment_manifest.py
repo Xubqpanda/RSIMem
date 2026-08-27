@@ -24,10 +24,18 @@ STATIC_UTILITY_METHOD_VARIANTS = (
     "static-rsimem",
     "static-utility-rsimem",
 )
+ADAPTIVE_METHOD_VARIANTS = (
+    "no-persistence",
+    "native-hermes",
+    "native-ledger",
+    "static-rsimem",
+    "adaptive-rsimem",
+)
 _KNOWN_MODES = frozenset((
     *EXECUTION_MODES,
     *STATIC_METHOD_VARIANTS,
     *STATIC_UTILITY_METHOD_VARIANTS,
+    *ADAPTIVE_METHOD_VARIANTS,
 ))
 _ATTEMPT_STATUSES = {"running", "completed", "failed"}
 _REQUIRED_CONFIGURATION = {
