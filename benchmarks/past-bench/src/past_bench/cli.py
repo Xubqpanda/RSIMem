@@ -1975,6 +1975,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
     semantic_mode = getattr(args, "rsimem_semantic_writeback_mode", None)
     semantic_timeout = getattr(args, "rsimem_semantic_writeback_timeout_seconds", None)
     semantic_max_tokens = getattr(args, "rsimem_semantic_writeback_max_output_tokens", None)
+    semantic_feedback = getattr(args, "rsimem_semantic_feedback_contract", None)
     adaptive_config_path = getattr(args, "rsimem_adaptive_config", None)
     if all(value is None for value in (
         mode,
@@ -1987,6 +1988,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         semantic_mode,
         semantic_timeout,
         semantic_max_tokens,
+        semantic_feedback,
         adaptive_config_path,
     )) and not verify_projection:
         return
@@ -2014,6 +2016,8 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         sequence.hermes.rsimem_semantic_writeback_timeout_seconds = semantic_timeout
     if semantic_max_tokens is not None:
         sequence.hermes.rsimem_semantic_writeback_max_output_tokens = semantic_max_tokens
+    if semantic_feedback is not None:
+        sequence.hermes.rsimem_semantic_feedback_contract = semantic_feedback
     if adaptive_config_path is not None:
         from .models.self_evolve import RSIMemAdaptiveWritebackConfig
 
@@ -2296,6 +2300,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     ),
                     rsimem_semantic_writeback_max_output_tokens=(
                         sequence.hermes.rsimem_semantic_writeback_max_output_tokens
+                    ),
+                    rsimem_semantic_feedback_contract=(
+                        sequence.hermes.rsimem_semantic_feedback_contract
                     ),
                     rsimem_adaptive_config=sequence.hermes.rsimem_adaptive_config,
                     rsimem_adaptive_policy_source_path=(
@@ -3522,6 +3529,12 @@ def main(argv: list[str] | None = None) -> None:
         "--rsimem-semantic-writeback-max-output-tokens",
         type=int,
         default=None,
+    )
+    p_evolve.add_argument(
+        "--rsimem-semantic-feedback-contract",
+        choices=["disabled", "sm01_tsv_v1"],
+        default=None,
+        help="Pre-registered deployment signal contract for semantic feedback",
     )
     p_evolve.add_argument(
         "--rsimem-adaptive-config",

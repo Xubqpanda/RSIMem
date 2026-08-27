@@ -102,6 +102,7 @@ initialize_batch_manifest(
     past_bench_dirty=False,
     execution_modes=ADAPTIVE_METHOD_VARIANTS,
     adaptive_policy=resolved_adaptive_policy_profile(Path(sys.argv[10])),
+    semantic_feedback_contract="sm01_tsv_v1",
 )
 ' "${manifest_path}" "${REPLICATES}" "${TASK_FAMILY}" \
   "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" \
@@ -144,12 +145,12 @@ print("\n".join(execution_order(int(sys.argv[1]), ADAPTIVE_METHOD_VARIANTS)))
   ordinal=0
   for method in "${methods[@]}"; do
     ordinal=$((ordinal + 1))
-    IFS=$'\t' read -r persistence_variant rsimem_mode lifecycle_mode semantic_mode adaptive_required < <(
+    IFS=$'\t' read -r persistence_variant rsimem_mode lifecycle_mode semantic_mode feedback_contract adaptive_required < <(
       PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
 import sys
 from rsimem.experiment_manifest import adaptive_method_execution_profile
 p = adaptive_method_execution_profile(sys.argv[1])
-print("\t".join((p["persistenceVariant"], p["rsimemMode"], p["lifecycleEvaluatorMode"], p["semanticWritebackMode"], str(p["adaptiveConfigRequired"]).lower())))
+print("\t".join((p["persistenceVariant"], p["rsimemMode"], p["lifecycleEvaluatorMode"], p["semanticWritebackMode"], p["semanticFeedbackContract"], str(p["adaptiveConfigRequired"]).lower())))
 ' "${method}"
     )
     base_name="${batch_id}_r$(printf '%02d' "${replicate}")_${method//-/_}"
@@ -178,6 +179,7 @@ print("\t".join((p["persistenceVariant"], p["rsimemMode"], p["lifecycleEvaluator
       --rsimem-lifecycle-policy-version adaptive-sm01-lifecycle-v1 \
       --rsimem-lifecycle-compiler-version uncompiled-v0 \
       --rsimem-semantic-writeback-mode "${semantic_mode}" \
+      --rsimem-semantic-feedback-contract "${feedback_contract}" \
       "${adaptive_args[@]}" \
       "${proxy_args[@]}"; then
       manifest_call record "${replicate}" "${ordinal}" "${method}" "${run_name}" failed past_bench
