@@ -295,36 +295,44 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 功能需求：
 
-- □ 使用同一 model profile、judge profile、task manifest、budget、sandbox 和 provider 配置运行三个 execution mode。
-- □ 每个 mode 至少完成 3 个 independent replicate。
-- □ replicate 之间轮换 mode order，不能始终让同一 mode 最先执行。
-- □ 记录每个 attempt 的 scheduled order、actual order、failure stage 和 output directory。
+- √ 使用同一 model profile、judge profile、task manifest、budget、sandbox 和 provider 配置运行三个 execution mode。
+- √ 每个 mode 至少完成 3 个 independent replicate。
+- √ replicate 之间轮换 mode order，不能始终让同一 mode 最先执行。
+- √ 记录每个 attempt 的 scheduled order、actual order、failure stage 和 output directory。
 
 验收需求：
 
-- □ 所有成功 run 通过 `rsimem-audit`，usage reconciliation 和 physical request deduplication 为零漂移。
-- □ 三种模式不存在未解释的 task input、task order、storage state 或 budget 差异。
-- □ adapter mode 不存在静默 bypass、静默空召回或 evidence 丢失。
-- □ failed provider attempt 与 successful run 分开保存，不能删除失败 evidence。
+- √ 所有成功 run 通过 `rsimem-audit`，usage reconciliation 和 physical request deduplication 为零漂移。
+- √ 三种模式不存在未解释的 task input、task order、storage state 或 budget 差异。
+- √ adapter mode 不存在静默 bypass、静默空召回或 evidence 丢失。
+- √ failed provider attempt 与 successful run 分开保存，不能删除失败 evidence。
 
 ### 1C.2 Nondeterminism Boundary
 
 功能需求：
 
-- □ 比较 task score、pass rate、model requests、各 token bucket、tool calls、retries、stored bytes、injected chars 和 wall time。
-- □ 对逐 episode 差异进行 attribution，区分模型随机性、provider failure 和 adapter-caused divergence。
-- □ 在观察结果前定义统计汇总方式，不能根据结果临时选择有利指标。
+- √ 比较 task score、pass rate、model requests、各 token bucket、tool calls、retries、stored bytes、injected chars 和 wall time。
+- √ 对逐 episode 差异进行 attribution，区分模型随机性、provider failure 和 adapter-caused divergence。
+- √ 在观察结果前定义统计汇总方式，不能根据结果临时选择有利指标。
 
 验收需求：
 
-- □ adapter-caused model-visible input difference 必须为零。
-- □ accounting drift 必须为零。
-- □ 不用一次 run 或任意拍脑袋阈值宣称“完全等价”。
-- □ 形成 dated report，明确样本量、失败 attempt、限制和是否通过阶段闸门。
+- √ adapter-caused model-visible input difference 必须为零。
+- √ accounting drift 必须为零。
+- √ 不用一次 run 或任意拍脑袋阈值宣称“完全等价”。
+- √ 形成 dated report，明确样本量、失败 attempt、限制和是否通过阶段闸门。
 
 ### 1C.3 阶段闸门
 
 只有 deterministic equivalence 继续通过、live runs 全部可审计且没有 adapter-caused divergence 时，才能进入 1D。provider instability 导致 replicate 不完整时，本工作块保持未完成，不提前开发后续接线。
+
+1C 验收记录（2026-08-27）：
+
+- Accepted batch：`outputs/matched/hermes_luna_sm01/20260827_073620`；RSIMem `24def06`；每 mode 3 个 order-rotated independent unseeded replicate。
+- Machine analysis：`stageGatePassed=true`、`issues=[]`；9 个 audit 全部通过，所有 run 17 traces，0 retry，0 accounting/privacy issue。
+- Adapter：每 replicate 28 个 same-call native-shadow projection check，共 84 个；0 mismatch、0 bypass、0 unresolved injection。
+- Quality：所有 mode/replicate 的 with-persistence evaluation `1.0/100%`，without-persistence `0.4/0%`；逐 episode score 与 pass 完全一致。
+- Dated report：`docs/matched_phase1c_20260827.md`。排除的开发批次和 live semantic-only 限制在报告中单列，未并入 accepted aggregate。
 
 ## 9. 第一阶段 1D：真实 Hermes Lifecycle Dry-Run 接线
 

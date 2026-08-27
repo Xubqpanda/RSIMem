@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem ingestor, real writeback mutation, static policy, or adaptive policy is active yet. The active implementation scope is now semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A environment/configuration freeze and Phase 1B deterministic read-path equivalence are complete. Phase 1C live matched read-path validation is the active gate; lifecycle dry-run integration and all Phase 2 implementation remain blocked until it passes.
+Phase 1A environment/configuration freeze, Phase 1B deterministic read-path equivalence, and Phase 1C live matched SM01 read-path validation are complete. Phase 1D real Hermes lifecycle dry-run integration is the active gate; all Phase 2 implementation remains blocked until Phase 1 is frozen.
 
 ## Completed Work
 
@@ -140,16 +140,16 @@ establish a nondeterminism tolerance.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `90 passed`.
+- [x] Pass all RSIMem tests: `95 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `384 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Live Matched Runtime Validation**
+### **Current: Real Hermes Lifecycle Dry-Run Wiring**
 
-The immediate objective is to complete at least three order-rotated, independently unseeded replicates per mode on the current full semantic/episodic/procedural projection path, audit every successful run, preserve failed attempts, and publish a dated Phase 1C report. Phase 1D snapshot/evaluator/dry-run wiring does not begin until this gate passes.
+The Phase 1C live matched gate passed on three order-rotated, independently unseeded replicates per mode. The dated report is [`matched_phase1c_20260827.md`](matched_phase1c_20260827.md). The immediate objective is Phase 1D: wire snapshot collection, lifecycle evaluation, and validated dry-run plans into explicit real Hermes task-completion and session-end events without memory mutation or context eviction.
 
 - [x] Define an experiment configuration that selects one backend for each memory kind and defaults to native Hermes behavior.
 - [x] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
