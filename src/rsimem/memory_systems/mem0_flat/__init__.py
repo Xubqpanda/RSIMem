@@ -30,6 +30,11 @@ from .policy import (
     RelatedMemoryView,
     build_validation_candidate,
 )
+from .utility_gate import (
+    FROZEN_MEM0_UTILITY_GATE_VERSION,
+    FrozenMem0UtilityConfig,
+    FrozenMem0UtilityGate,
+)
 
 __all__ = [
     "CompletionResult",
@@ -58,4 +63,7 @@ __all__ = [
     "Mem0FlatSemanticPolicy",
     "RelatedMemoryView",
     "build_validation_candidate",
+    "FROZEN_MEM0_UTILITY_GATE_VERSION",
+    "FrozenMem0UtilityConfig",
+    "FrozenMem0UtilityGate",
 ]
