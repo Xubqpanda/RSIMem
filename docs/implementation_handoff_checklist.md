@@ -689,47 +689,55 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2D.1 Receipt State Machine
 
-- □ 定义 `pending`、`committed`、`failed` 和 `rolled_back`。
-- □ Pending receipt 记录 idempotency key、attempt、backend、target、pre-revision、mutation digest 和 provenance。
-- □ Receipt 原子写入并加锁，同一 logical mutation 只能有一个 active executor。
-- □ Unknown、malformed、digest conflict 和 target conflict fail closed。
+- √ 定义 `pending`、`committed`、`failed` 和 `rolled_back`。
+- √ Pending receipt 记录 idempotency key、attempt、backend、target、pre-revision、mutation digest 和 provenance。
+- √ Receipt 原子写入并加锁，同一 logical mutation 只能有一个 active executor。
+- √ Unknown、malformed、digest conflict 和 target conflict fail closed。
 
 验收需求：
 
-- □ 两个并发 executor 只有一个 reserve 成功。
-- □ Duplicate retry 不重复 ADD 或 UPDATE。
-- □ Receipt corruption 与 orphan artifact 被 audit 发现。
+- √ 两个并发 executor 只有一个 reserve 成功。
+- √ Duplicate retry 不重复 ADD 或 UPDATE。
+- √ Receipt corruption 与 orphan artifact 被 audit 发现。
 
 ### 2D.2 Apply、Verify 与 Recovery
 
-- □ 严格执行 `validate -> reserve pending -> mutate -> reread -> verify -> commit receipt`。
-- □ ADD 验证实际 artifact ID、kind、digest、resources 和 revision。
-- □ UPDATE 使用 expected revision CAS，storage bytes 从实际结果计算。
-- □ Backend accepted 但 reread 不一致时不能 commit。
-- □ 覆盖 reserve 后、backend call 前、backend write 后、verification 前和 receipt commit 前五个 crash point。
-- □ Restart 后区分未执行、已执行未 commit、失败和状态未知。
-- □ 可证明安全时 commit/rollback；状态不明时阻止同目标后续 mutation。
+- √ 严格执行 `validate -> reserve pending -> mutate -> reread -> verify -> commit receipt`。
+- √ ADD 验证实际 artifact ID、kind、digest、resources 和 revision。
+- √ UPDATE 使用 expected revision CAS，storage bytes 从实际结果计算。
+- √ Backend accepted 但 reread 不一致时不能 commit。
+- √ 覆盖 reserve 后、backend call 前、backend write 后、verification 前和 receipt commit 前五个 crash point。
+- √ Restart 后区分未执行、已执行未 commit、失败和状态未知。
+- √ 可证明安全时 commit/rollback；状态不明时阻止同目标后续 mutation。
 
 验收需求：
 
-- □ Semantic ADD、UPDATE、DELETE 和 NONE 成功路径通过。
-- □ Revision conflict、permission error、disk failure、partial write 和 reread mismatch 不产生 committed receipt。
-- □ 五个 crash fixture 均有确定、幂等的恢复结果。
-- □ 外部 actor 修改 revision 时停止自动 rollback。
+- √ Semantic ADD、UPDATE、DELETE 和 NONE 成功路径通过。
+- √ Revision conflict、permission error、disk failure、partial write 和 reread mismatch 不产生 committed receipt。
+- √ 五个 crash fixture 均有确定、幂等的恢复结果。
+- √ 外部 actor 修改 revision 时停止自动 rollback。
 
 ### 2D.3 Context Exit Gate
 
-- □ 只有 committed 且 reread-verified 的 memory 才允许 source logical exit。
-- □ 任一 failure 保留 source context/reference。
-- □ 第一版只在 natural task/session boundary 执行 logical exit。
-- □ Physical rewrite 保持关闭，直到 host contract 能证明 revision、tool closure 和 rollback。
-- □ Report 区分 natural exit、logical exit 和 physical rewrite。
+- √ 只有 committed 且 reread-verified 的 memory 才允许 source logical exit。
+- √ 任一 failure 保留 source context/reference。
+- √ 第一版只在 natural task/session boundary 执行 logical exit。
+- √ Physical rewrite 保持关闭，直到 host contract 能证明 revision、tool closure 和 rollback。
+- √ Report 区分 natural exit、logical exit 和 physical rewrite。
 
 ### 2D.4 阶段闸门
 
-- □ Transaction、idempotency、recovery 和 audit 全部通过。
-- □ 真实 mutation 默认关闭，只在 isolated fixture 显式启用。
-- □ Direct native 和第一阶段 read-path regression 继续通过。
+- √ Transaction、idempotency、recovery 和 audit 全部通过。
+- √ 真实 mutation 默认关闭，只在 isolated fixture 显式启用。
+- √ Direct native 和第一阶段 read-path regression 继续通过。
+
+### 2D 验收记录（2026-08-27）
+
+- Contract：`MUTATION_RECEIPT_SCHEMA_VERSION=1` 与 `MUTATION_EXECUTOR_SCHEMA_VERSION=1`。Receipt core identity 不可变，transition 使用 `store_revision` CAS；committed receipt 同时实现 durable target ownership resolver。Executor 默认 disabled，只有 `enabled=true, isolated_fixture=true` 才允许调用 backend。
+- Commits：`f9303e2`（durable receipt state/CAS/reservation/ownership）、`aaad37c`（transaction executor、reread verification、recovery、audit、context exit 与 real operation evidence）、`c158cee`（真实 crash window 与 ADD ownership race）、`246ca33`（并发 executor、terminal failure restart、session boundary 与显式 fail-closed hardening）。
+- Focused evidence：`test_mutation_receipts.py` 与 `test_transactional_executor.py` 覆盖两 executor concurrency、ADD/UPDATE/DELETE/NONE、duplicate retry、real UPDATE CAS、permission/disk/partial write/reread mismatch、五 crash point、restart commit、safe rollback、external revision、ownership race、receipt corruption/orphan audit、operation graph 和 natural/logical/physical exit report。
+- Full acceptance：RSIMem `210 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
+- 已知限制：JSON receipt store 和 `flock` 当前只用于单机 isolated fixture，不宣称 distributed transaction。Recovery 只在可由 pre/desired digest 和 revision 证明时继续或标记 rollback；DELETE 后缺失、partial write、外部修改或 ownership 不明时保持 pending+blocked，不自动认领或执行补偿性逆 mutation。Context exit 当前是 host-neutral gate/report，没有执行 Hermes physical context rewrite。真实 mutation尚未接入 PAST-Bench/live runner；本阶段没有 provider 调用或真实实验结果。
 
 ## 16. 第二阶段 2E：Mem0-Style Semantic Memory 与 SM01 闭环
 
