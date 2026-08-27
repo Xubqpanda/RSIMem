@@ -22,15 +22,20 @@ complete only as legacy retrieval-threshold infrastructure; extraction-prompt
 adaptation is pending. Stage 1 of the extraction-prompt handoff checklist is
 the active milestone. No new adaptive live batch runs before Stage 1 closes.
 
-Extraction-prompt Stage 1A through 1C are complete. Legacy threshold artifacts now
+Extraction-prompt Stage 1A through 1D are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
 semantic compilation runs directly from a trusted completed-task snapshot,
 independent of keep/evict evaluation; session end creates no second attempt,
 and a persistent content-free compilation receipt prevents replayed model
 calls. A versioned canonical source projection now binds the exact prompt
 messages, stable IDs, tool closures, deterministic truncation, request and
-receipt identity, operation artifact, and prompt input digest. Component-level
-prompt identity and host-neutral prompt adapters are the next milestone.
+receipt identity, operation artifact, and prompt input digest. A host-neutral
+prompt slot and the real Mem0-flat adapter bind the extraction artifact at the
+completion boundary. Composite and matched manifests freeze update, retrieval,
+route, boundary, backend, framework, and model profile. Plain static extraction
+is the explicit parent; native writers and background review are disabled, and
+run-scoped receipt audit rejects unowned semantic drift. Feedback label
+semantics in Stage 1E are the next milestone.
 
 ## Completed Work
 
@@ -211,9 +216,19 @@ Former Phase 2K.1 execution plumbing covers the legacy threshold preparation bou
 
 Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment infrastructure. Extraction-specific launchers and analysis are pending; raw request, token, storage, injection, and timing vectors remain accounting outputs and do not enter learning or activation.
 
+### Extraction-Prompt Stage 1D Component Boundary
+
+- [x] Give extraction, update, and retrieval independent component identities and combine them in one semantic policy manifest.
+- [x] Register and bind the host-neutral `mem0-flat.semantic.extraction` slot at the real policy factory; rendered completion evidence carries the binding fingerprint.
+- [x] Define `static-extraction-parent-v1` as the no-utility/no-cost parent while retaining utility modes only as legacy regression identities.
+- [x] Reject matched parent/candidate drift in update, retrieval, route, task boundary, backend, framework, or model profile.
+- [x] Remove the Hermes native memory tool for unset, empty, and non-empty toolset configurations while retaining native semantic prompt reads.
+- [x] Disable memory/skill background review requests for RSIMem-managed semantic runs.
+- [x] Distinguish RSIMem executor and operator-recovery writers in mutation receipts and reject native or disallowed writer contamination against a run-scoped storage baseline.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `353 passed`.
+- [x] Pass all RSIMem tests: `371 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `390 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
@@ -227,7 +242,7 @@ deployment evidence may update prompt body N to N+1 while the operation prompt,
 retrieval configuration, route, invocation boundary, backend, and model profile
 remain frozen. Raw resources are reported separately from the method decision.
 
-The immediate objective is to close Stage 1A-1H of the handoff checklist: reset the legacy boundary, decouple compilation from eviction, freeze the extraction source projection, introduce prompt component identities, rebuild feedback and validation semantics, and add extraction-specific experiment contracts. Adaptive live runs remain blocked until those gates pass.
+The immediate objective is Stage 1E: rebuild source-, extraction-set-, and attributable fact-level feedback around preregistered opportunity, use, and outcome contracts. Stages 1F-1H remain after it. Adaptive live runs remain blocked until all Stage 1 gates pass.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 

@@ -35,7 +35,7 @@ Each layer has one responsibility:
 - **Extraction source projection** freezes allowed roles, stable source IDs, tool-closure atomicity, metadata allowlisting, ordering, content bounds, and deterministic truncation.
 - **Semantic ingestor** consumes exactly that projection and locally reimplements Mem0 flat extraction and internal operation selection over the fixed Hermes semantic route.
 - **Memory runtime and backend** validate and apply mutations while preserving each backend's native storage and retrieval behavior.
-- **Feedback collector** joins retrieval, injection, task, tool, retry, and cost evidence for later policy updates.
+- **Feedback collector** joins deployment-observable opportunity, explicit use, and outcome evidence for later policy updates. Raw resource usage remains a separate accounting join.
 
 ## Evaluation Cadence
 
@@ -113,6 +113,11 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Add pending/committed receipt states and crash recovery around real backend mutations; dry-run reservation alone is not an exactly-once guarantee.
 - [x] Account for ingestor model calls, tokens, latency, storage bytes, and rejected mutations.
 - [x] Record content-free atomic operations for extraction, related-memory retrieval, internal decision, target resolution, validation, mutation, verification, future retrieval, injection, use, and outcome.
+- [x] Bind a host-neutral extraction prompt slot at the real Mem0-flat policy factory and carry its binding fingerprint into the completion request.
+- [x] Freeze update, retrieval, route, task boundary, backend, framework, and model profile in extraction-only matched policy manifests.
+- [x] Keep plain static extraction free of the legacy utility gate and lifecycle-evaluator dependency.
+- [x] Remove the native Hermes memory writer and background review surfaces while preserving semantic prompt reads.
+- [x] Identify executor/recovery mutation writers and reject semantic state changes not explained by allowed committed receipts.
 
 Stage 5 is complete for the isolated deterministic path. Live PAST-Bench activation and matched static evaluation remain Stage 6 work; physical context rewrite remains disabled.
 
@@ -168,4 +173,4 @@ Acceptance requires native behavior to remain unchanged, the memory artifact to 
 
 ## Current Boundary
 
-The scheduler, evaluator protocol, lifecycle controller, snapshot/writeback contracts, Hermes execution-surface baselines, transactional semantic mutation, Mem0-flat construction, delayed feedback, and threshold-oriented activation/rollback infrastructure are implemented. Semantic compilation is now independent of context eviction and runs once at trusted task completion with restart-safe compilation receipts; physical context rewrite remains disabled. Extraction source projection and prompt artifacts remain pending. No PAST-Bench task definition, official score, answer key, hidden grading contract, or resource-cost scalar may enter prompt optimization.
+The scheduler, evaluator protocol, lifecycle controller, snapshot/writeback contracts, Hermes execution-surface baselines, transactional semantic mutation, Mem0-flat construction, delayed-feedback foundation, and legacy threshold activation/rollback infrastructure are implemented. Semantic compilation is independent of context eviction and runs once at trusted task completion with restart-safe compilation receipts; physical context rewrite remains disabled. The canonical extraction source projection, host-neutral extraction slot, Mem0-flat binding, composite component identity, plain static parent, native-writer isolation, and semantic mutation audit are complete. Source/set/fact feedback semantics and prompt-oriented validation remain pending. No PAST-Bench task definition, official score, answer key, hidden grading contract, or resource-cost scalar may enter prompt optimization.

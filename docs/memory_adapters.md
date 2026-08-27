@@ -72,4 +72,4 @@ final output across the three modes without making a model API call. Episode
 runtime evidence is automatically joined into the ledger through comparison
 identity validation.
 
-The context lifecycle control plane lives in [`lifecycle_controller.md`](lifecycle_controller.md). It decides when to evaluate a context snapshot and validates a joint context/memory signal; the isolated semantic path now consumes that signal end to end, while the live host still does not route RSIMem mutations. The next milestone is the Phase 2E.4 static SM01 matched comparison and its accounting/privacy audit gate.
+The context lifecycle control plane lives in [`lifecycle_controller.md`](lifecycle_controller.md). It remains an optional context-management observer and does not control semantic compilation. The opt-in live host routes plain static semantic compilation directly from trusted task completion, with native writer isolation, committed receipts, and run-scoped storage audit. Extraction-prompt Stage 1E feedback semantics are the next implementation milestone; adaptive live runs remain blocked until Stage 1 closes.
