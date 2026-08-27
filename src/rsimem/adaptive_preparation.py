@@ -5,13 +5,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from .feedback_preparation import load_prepared_feedback_dataset
 from .memory.adaptive_policy import (
     AdaptiveParameterName,
     AdaptiveParameterSpec,
+    AdaptivePolicyArtifact,
     AdaptivePolicyState,
     AdaptiveTrainingConfig,
     DeterministicAdaptivePolicyLearner,
@@ -21,6 +23,8 @@ from .memory.adaptive_policy_validation import (
     AdaptiveAcceptanceCriteria,
     AdaptivePolicyLifecycleCoordinator,
     AdaptivePolicyValidator,
+    AdaptiveValidationDecision,
+    AdaptiveValidationSplit,
     AdaptiveSplitConfig,
     JsonAdaptiveValidationDecisionStore,
     TimeOrderedAdaptiveSplitter,
@@ -40,6 +44,35 @@ ADAPTIVE_SPLIT_FILE = "validation-split.json"
 ADAPTIVE_TRAINING_CONFIG_FILE = "training-config.json"
 ADAPTIVE_CRITERIA_FILE = "acceptance-criteria.json"
 ADAPTIVE_PREPARATION_MANIFEST_FILE = "adaptive-preparation-manifest.json"
+_ADAPTIVE_PREPARATION_IDENTITY_FIELDS = (
+    "schemaVersion",
+    "sourceFeedbackPreparationId",
+    "datasetId",
+    "datasetPayloadDigest",
+    "parentPolicyVersion",
+    "runtimeOwnedParameterIds",
+    "splitId",
+    "splitDigest",
+    "trainingConfigDigest",
+    "criteriaDigest",
+    "artifactId",
+    "artifactDigest",
+    "policyVersion",
+    "decisionId",
+    "decisionDigest",
+    "resultingState",
+    "activePolicyVersion",
+    "files",
+)
+_ADAPTIVE_PREPARATION_SUMMARY_FIELDS = (
+    "adaptivePreparationId",
+    "trainingExampleCount",
+    "validationExampleCount",
+    "proposalReplayAuditOk",
+    "offlineValidationAccepted",
+    "reasonCodes",
+    "parameterUpdates",
+)
 
 
 def _canonical(value: object) -> str:
@@ -60,6 +93,177 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(serialized, encoding="utf-8")
     temporary.replace(path)
+
+
+def _strict_mapping(
+    value: object,
+    fields: set[str],
+    name: str,
+) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise ValueError(f"malformed {name}")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class LoadedAdaptivePreparation:
+    root: Path
+    manifest: dict[str, Any]
+    artifact: AdaptivePolicyArtifact
+    split: AdaptiveValidationSplit
+    decision: AdaptiveValidationDecision
+
+
+def load_offline_adaptive_preparation(
+    output_root: Path,
+) -> LoadedAdaptivePreparation:
+    """Verify an immutable offline preparation before matched validation."""
+
+    output_root = output_root.expanduser().resolve()
+    manifest_path = output_root / ADAPTIVE_PREPARATION_MANIFEST_FILE
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("adaptive preparation manifest cannot be read") from exc
+    expected = set((
+        *_ADAPTIVE_PREPARATION_IDENTITY_FIELDS,
+        *_ADAPTIVE_PREPARATION_SUMMARY_FIELDS,
+    ))
+    manifest = dict(_strict_mapping(raw, expected, "adaptive preparation manifest"))
+    if manifest["schemaVersion"] != ADAPTIVE_PREPARATION_SCHEMA_VERSION:
+        raise ValueError("unsupported adaptive preparation schema")
+    identity = {
+        field: manifest[field]
+        for field in _ADAPTIVE_PREPARATION_IDENTITY_FIELDS
+    }
+    if manifest["adaptivePreparationId"] != (
+        f"adaptive-preparation.{_digest(identity)[:40]}"
+    ):
+        raise ValueError("adaptive preparation identity mismatch")
+    files = manifest["files"]
+    expected_decision_file = (
+        f"{ADAPTIVE_DECISION_DIRECTORY}/{manifest['decisionId']}.json"
+    )
+    expected_files = {
+        ADAPTIVE_POLICY_STORE_FILE,
+        ADAPTIVE_SPLIT_FILE,
+        ADAPTIVE_TRAINING_CONFIG_FILE,
+        ADAPTIVE_CRITERIA_FILE,
+        expected_decision_file,
+    }
+    files = _strict_mapping(files, expected_files, "adaptive preparation files")
+    for relative_name, expected_digest in files.items():
+        relative = Path(relative_name)
+        path = (output_root / relative).resolve()
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or not path.is_relative_to(output_root)
+            or not isinstance(expected_digest, str)
+        ):
+            raise ValueError("adaptive preparation file path is invalid")
+        try:
+            actual_digest = _file_digest(path)
+        except OSError as exc:
+            raise ValueError("adaptive preparation file cannot be read") from exc
+        if actual_digest != expected_digest:
+            raise ValueError("adaptive preparation file digest mismatch")
+
+    try:
+        split = AdaptiveValidationSplit.from_payload(json.loads(
+            (output_root / ADAPTIVE_SPLIT_FILE).read_text(encoding="utf-8")
+        ))
+        training_payload = json.loads(
+            (output_root / ADAPTIVE_TRAINING_CONFIG_FILE).read_text(encoding="utf-8")
+        )
+        criteria_payload = json.loads(
+            (output_root / ADAPTIVE_CRITERIA_FILE).read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        raise ValueError("adaptive preparation metadata is malformed") from exc
+    if (
+        split.split_id != manifest["splitId"]
+        or split.split_digest != manifest["splitDigest"]
+        or split.dataset_id != manifest["datasetId"]
+        or split.dataset_payload_digest != manifest["datasetPayloadDigest"]
+        or _digest(training_payload) != manifest["trainingConfigDigest"]
+        or _digest(criteria_payload) != manifest["criteriaDigest"]
+        or len(split.training_example_ids) != manifest["trainingExampleCount"]
+        or len(split.validation_example_ids) != manifest["validationExampleCount"]
+    ):
+        raise ValueError("adaptive preparation metadata identity mismatch")
+
+    store = JsonAdaptivePolicyStore(
+        output_root / ADAPTIVE_POLICY_STORE_FILE,
+        trusted_root_policy_versions=(manifest["parentPolicyVersion"],),
+    )
+    snapshot = store.snapshot()
+    if (
+        snapshot.active_policy_version is not None
+        or len(snapshot.artifacts) != 1
+        or len(snapshot.records) != 1
+    ):
+        raise ValueError("offline adaptive preparation store is not isolated")
+    artifact = snapshot.artifacts[0]
+    record = snapshot.records[0]
+    expected_state = AdaptivePolicyState(manifest["resultingState"])
+    retrieval_parameter = MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.RETRIEVAL]
+    if (
+        artifact.artifact_id != manifest["artifactId"]
+        or artifact.content_digest != manifest["artifactDigest"]
+        or artifact.policy_version != manifest["policyVersion"]
+        or artifact.parent_policy_version != manifest["parentPolicyVersion"]
+        or artifact.dataset_id != manifest["datasetId"]
+        or artifact.dataset_payload_digest != manifest["datasetPayloadDigest"]
+        or artifact.training_config_digest != manifest["trainingConfigDigest"]
+        or artifact.training_example_ids != split.training_example_ids
+        or record.artifact_id != artifact.artifact_id
+        or record.state != expected_state
+        or expected_state not in {
+            AdaptivePolicyState.VALIDATED,
+            AdaptivePolicyState.REJECTED,
+        }
+        or manifest["activePolicyVersion"] is not None
+        or manifest["runtimeOwnedParameterIds"] != [retrieval_parameter]
+        or tuple(update.parameter_id for update in artifact.parameters)
+        != (retrieval_parameter,)
+    ):
+        raise ValueError("adaptive preparation policy identity mismatch")
+
+    decision_store = JsonAdaptiveValidationDecisionStore(
+        output_root / ADAPTIVE_DECISION_DIRECTORY
+    )
+    decision = decision_store.get(manifest["decisionId"])
+    expected_updates = [{
+        "parameterId": update.parameter_id,
+        "name": update.name.value,
+        "baselineValue": update.baseline_value,
+        "proposedValue": update.proposed_value,
+        "delta": update.delta,
+        "fallbackReason": update.fallback_reason.value,
+        "positiveCount": update.positive_count,
+        "negativeCount": update.negative_count,
+    } for update in artifact.parameters]
+    if (
+        decision is None
+        or decision.artifact_id != artifact.artifact_id
+        or decision.content_digest != manifest["decisionDigest"]
+        or decision.resulting_state != expected_state
+        or decision.accepted != manifest["offlineValidationAccepted"]
+        or decision.reason_codes != tuple(manifest["reasonCodes"])
+        or decision.criteria_digest != manifest["criteriaDigest"]
+        or decision.split_id != split.split_id
+        or manifest["proposalReplayAuditOk"] is not True
+        or manifest["parameterUpdates"] != expected_updates
+    ):
+        raise ValueError("adaptive preparation decision identity mismatch")
+    return LoadedAdaptivePreparation(
+        root=output_root,
+        manifest=manifest,
+        artifact=artifact,
+        split=split,
+        decision=decision,
+    )
 
 
 def prepare_adaptive_policy(

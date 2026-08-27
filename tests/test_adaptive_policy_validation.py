@@ -122,6 +122,7 @@ def test_time_ordered_split_is_deterministic_complete_and_auditable() -> None:
 
     assert first == replay
     assert first.payload() == replay.payload()
+    assert type(first).from_payload(first.payload()) == first
     assert first.training_example_ids == (dataset.examples[0].example_id,)
     assert first.validation_example_ids == (dataset.examples[1].example_id,)
     assert first.validation_membership == ((
@@ -137,6 +138,10 @@ def test_time_ordered_split_is_deterministic_complete_and_auditable() -> None:
 
     with pytest.raises(ValueError, match="examples overlap"):
         replace(first, validation_example_ids=first.training_example_ids)
+    malformed = first.payload()
+    malformed["unknown"] = True
+    with pytest.raises(ValueError, match="malformed adaptive validation split"):
+        type(first).from_payload(malformed)
     single_graph = _graph("used")
     single = _dataset(single_graph)
     single_gate = evaluate_feedback_dataset_stage_gate(
