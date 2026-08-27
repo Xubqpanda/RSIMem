@@ -883,21 +883,28 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2H.1 Feature 与 Utility Contract
 
-- □ 定义 completion、unresolved、scope、validity、recency、reuse、conflict、storage/retrieval/injection cost 和 recovery risk。
-- □ 区分 host-observed、model-predicted 和 delayed feature。
-- □ Feature schema 版本化并定义 missing-value semantics。
-- □ Hidden benchmark score 不属于 policy feature。
-- □ 定义 predicted benefit、full lifecycle cost 和 uncertainty/risk。
-- □ Generation/update quality 与 retrieval ranking 使用相同 future-utility semantics。
-- □ 第一版使用固定规则或可解释非参数化 scorer。
+- √ 定义 completion、unresolved、scope、validity、recency、reuse、conflict、storage/retrieval/injection cost 和 recovery risk。
+- √ 区分 host-observed、model-predicted 和 delayed feature。
+- √ Feature schema 版本化并定义 missing-value semantics。
+- √ Hidden benchmark score 不属于 policy feature。
+- √ 定义 predicted benefit、full lifecycle cost 和 uncertainty/risk。
+- √ Generation/update quality 与 retrieval ranking 使用相同 future-utility semantics。
+- √ 第一版使用固定规则或可解释非参数化 scorer。
 
 验收需求：
 
-- □ Feature extraction deterministic fixture 通过。
-- □ Missing、unknown、out-of-range 和 future-dated feature 有明确处理。
-- □ 成本升高且 utility 不变时，policy score 不应提高。
-- □ Utility 升高且成本不变时，policy score 不应下降。
-- □ Unknown cost、no history、low confidence 和 conflict 使用 conservative fallback。
+- √ Feature extraction deterministic fixture 通过。
+- √ Missing、unknown、out-of-range 和 future-dated feature 有明确处理。
+- √ 成本升高且 utility 不变时，policy score 不应提高。
+- √ Utility 升高且成本不变时，policy score 不应下降。
+- √ Unknown cost、no history、low confidence 和 conflict 使用 conservative fallback。
+
+2H.1 验收记录：
+
+- Contract：`semantic-static-utility-features-v1`、`semantic-lifecycle-cost-v1` 和 `semantic-static-utility-policy-v1`。固定 observation 集合没有 grader/score 或自由 metadata；deterministic safety 字段只能来自 host-observed evidence，delayed/future-dated evidence 不能进入 static decision。
+- Scorer：generation、internal operation 和 retrieval target 共用同一 monotone benefit-risk-full-lifecycle-cost objective，并输出 feature/cost digest、policy/schema version、cutoff、contribution 和 machine-readable conservative reason。
+- Commit：`addd3b6`。Focused `5 passed`；full RSIMem `253 passed`；PAST-Bench `387 passed, 2 skipped`；compileall 和 diff check 通过。
+- 已知限制：本闸门只冻结 contract、extractor 和 interpretable scorer，尚未改变 Mem0-flat live generation/internal operation/retrieval output；该接线属于 2H.2。
 
 ### 2H.2 Fixed Invocation 下的 Static Policy
 

@@ -187,16 +187,16 @@ Static PAST-Bench semantic writeback is complete for SM01: 9/9 rotated method at
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `248 passed`.
+- [x] Pass all RSIMem tests: `253 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `387 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2H Unified Static Memory Policy Objective**
+### **Current: Phase 2H.2 Fixed-Invocation Static Policy**
 
-Phase 2E now provides Mem0-flat semantic construction, validated live writeback, revision-bound operation evidence, deterministic-first failure attribution, and the audited no-persistence/native/static SM01 comparison documented in [`static_sm01_20260827.md`](static_sm01_20260827.md). The immediate objective is Phase 2H: freeze host-observed and model-predicted features, cost semantics, missing-value handling, and a fixed interpretable policy objective before any adaptive update is enabled.
+Phase 2E provides Mem0-flat semantic construction, validated live writeback, revision-bound operation evidence, deterministic-first failure attribution, and the audited no-persistence/native/static SM01 comparison documented in [`static_sm01_20260827.md`](static_sm01_20260827.md). Phase 2H.1 now freezes host-observed/model-predicted/delayed feature sources, explicit missing values, full lifecycle cost buckets, and one interpretable monotone scorer shared by generation, internal operation, and retrieval targets. The immediate objective is 2H.2: connect that frozen objective to the fixed Mem0-flat route without changing invocation count or learning from the current run.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
