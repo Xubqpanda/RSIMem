@@ -801,3 +801,33 @@ def test_dataset_payload_is_content_free_and_has_no_hidden_score_surface() -> No
         assert forbidden not in serialized
     assert dataset.examples[0].resources.model_requests == 2
     assert dataset.examples[0].resources.storage_bytes == 64
+
+
+def test_immediate_failure_attribution_cannot_determine_delayed_label() -> None:
+    graph = _graph("used")
+    operations = tuple(
+        replace(
+            operation,
+            status=OperationStatus.NONE,
+            reason_code="extraction_miss",
+        )
+        if operation.operation_id == "op.extraction"
+        else operation
+        for operation in graph.operations
+    )
+    inconsistent_fixture = OperationGraph(
+        graph.artifacts,
+        operations,
+        graph.mutations,
+    )
+    report = DeterministicFirstAttributor().attribute(inconsistent_fixture)
+    example = _dataset(
+        inconsistent_fixture,
+        reports=(report,),
+    ).examples[0]
+
+    assert example.attributed_operation_ids == ("op.extraction",)
+    assert example.label == FeedbackLabel.POSITIVE
+    assert example.label_reason_codes == ("used_with_successful_outcome",)
+    dataset = _dataset(inconsistent_fixture, reports=(report,))
+    assert audit_feedback_dataset(dataset, inconsistent_fixture).ok
