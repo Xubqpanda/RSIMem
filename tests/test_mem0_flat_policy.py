@@ -540,15 +540,26 @@ def test_unknown_owner_and_hallucinated_target_are_rejected(tmp_path, operation,
 
 
 def test_temporary_and_unresolved_sources_are_rejected_without_mutation(tmp_path) -> None:
+    operation_log = AppendOnlyOperationEvidenceLog()
     temporary = _setup(
         tmp_path / "temporary",
         facts='{"facts": ["For this task, use TSV temporarily."]}',
         operation=_operation_response(InternalMemoryAction.ADD, use_candidate=False),
+        operation_recorder=AtomicOperationRecorder(operation_log),
     )
     result = temporary[-1].ingest(temporary[5], temporary[6])
     assert result is not None and result.status == MemoryIngestStatus.REJECTED
     assert result.reason_codes == ("non_durable_fact",)
     assert len(temporary[3].calls) == 1
+    trace = temporary[4].operation_trace(temporary[5].idempotency_key)
+    assert trace is not None
+    assert len(trace.fact_extractions) == 1
+    assert trace.fact_extractions[0].accepted is False
+    assert trace.fact_extractions[0].reason_code == "non_durable_fact"
+    assert trace.fact_extractions[0].content_digest == hashlib.sha256(
+        b"For this task, use TSV temporarily."
+    ).hexdigest()
+    assert "For this task" not in repr(trace)
 
     unresolved = _setup(
         tmp_path / "unresolved",
