@@ -213,6 +213,7 @@ class LifecycleLedgerObserver:
         trace_id: str,
         family_id: str | None = None,
         stage: str | None = None,
+        output_path: Path | None = None,
     ) -> None:
         if not variant.strip() or not trace_id.strip():
             raise ValueError("lifecycle ledger variant and trace_id must not be empty")
@@ -220,12 +221,55 @@ class LifecycleLedgerObserver:
         self.trace_id = trace_id
         self.family_id = family_id
         self.stage = stage
+        self.output_path = output_path.expanduser().resolve() if output_path else None
         self._events: list[dict[str, Any]] = []
         self._events_by_id: dict[str, str] = {}
+        self._lock = threading.RLock()
+        if self.output_path is not None:
+            self.output_path.parent.mkdir(parents=True, exist_ok=True)
+            self._load_existing()
 
     @property
     def events(self) -> tuple[dict[str, Any], ...]:
-        return tuple(self._events)
+        with self._lock:
+            return tuple(self._events)
+
+    def _load_existing(self) -> None:
+        assert self.output_path is not None
+        if not self.output_path.exists():
+            return
+        for line_number, line in enumerate(
+            self.output_path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"malformed lifecycle ledger event at line {line_number}"
+                ) from exc
+            if not isinstance(event, dict):
+                raise ValueError(
+                    f"malformed lifecycle ledger event at line {line_number}"
+                )
+            event_id = event.get("eventId")
+            if not isinstance(event_id, str) or not event_id.strip():
+                raise ValueError(
+                    f"lifecycle ledger event has no eventId at line {line_number}"
+                )
+            canonical = json.dumps(
+                event,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            existing = self._events_by_id.get(event_id)
+            if existing is not None:
+                if existing != canonical:
+                    raise ValueError(f"conflicting lifecycle ledger event: {event_id}")
+                continue
+            self._events_by_id[event_id] = canonical
+            self._events.append(event)
 
     def _append(
         self,
@@ -238,43 +282,54 @@ class LifecycleLedgerObserver:
         snapshot_id: str,
         data: dict[str, Any],
     ) -> None:
-        identity = {
-            "runId": run_id,
-            "variant": self.variant,
-            "traceId": self.trace_id,
-            "snapshotId": snapshot_id,
-            "kind": kind,
-            "evaluationId": data.get("evaluationId"),
-            "planId": data.get("planId"),
-            "mutationId": data.get("mutationId"),
-            "status": data.get("status"),
-            "reasonCodes": data.get("reasonCodes"),
-        }
-        event_id = f"evt_{_json_hash(identity)}"
-        event = {
-            "schemaVersion": SCHEMA_VERSION,
-            "eventId": event_id,
-            "runId": run_id,
-            "variant": self.variant,
-            "traceId": self.trace_id,
-            "episodeId": episode_id,
-            "sessionId": session_id,
-            "taskId": task_id,
-            "familyId": self.family_id,
-            "stage": self.stage,
-            "snapshotId": snapshot_id,
-            "kind": kind,
-            "source": {"type": "rsimem_lifecycle_contract"},
-            "data": data,
-        }
-        canonical = json.dumps(event, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-        existing = self._events_by_id.get(event_id)
-        if existing is not None:
-            if existing != canonical:
-                raise ValueError(f"conflicting lifecycle ledger event: {event_id}")
-            return
-        self._events_by_id[event_id] = canonical
-        self._events.append(event)
+        with self._lock:
+            identity = {
+                "runId": run_id,
+                "variant": self.variant,
+                "traceId": self.trace_id,
+                "snapshotId": snapshot_id,
+                "kind": kind,
+                "evaluationId": data.get("evaluationId"),
+                "planId": data.get("planId"),
+                "mutationId": data.get("mutationId"),
+                "status": data.get("status"),
+                "reasonCodes": data.get("reasonCodes"),
+            }
+            event_id = f"evt_{_json_hash(identity)}"
+            event = {
+                "schemaVersion": SCHEMA_VERSION,
+                "eventId": event_id,
+                "runId": run_id,
+                "variant": self.variant,
+                "traceId": self.trace_id,
+                "episodeId": episode_id,
+                "sessionId": session_id,
+                "taskId": task_id,
+                "familyId": self.family_id,
+                "stage": self.stage,
+                "snapshotId": snapshot_id,
+                "kind": kind,
+                "source": {"type": "rsimem_lifecycle_contract"},
+                "data": data,
+            }
+            canonical = json.dumps(
+                event,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            existing = self._events_by_id.get(event_id)
+            if existing is not None:
+                if existing != canonical:
+                    raise ValueError(f"conflicting lifecycle ledger event: {event_id}")
+                return
+            if self.output_path is not None:
+                with self.output_path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+            self._events_by_id[event_id] = canonical
+            self._events.append(event)
 
     def record_snapshot(self, snapshot: ContextSnapshot) -> None:
         self._append(
@@ -341,14 +396,15 @@ class LifecycleLedgerObserver:
         )
 
     def write(self, output_path: Path) -> None:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(
-            "".join(
-                json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n"
-                for event in self._events
-            ),
-            encoding="utf-8",
-        )
+        with self._lock:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text(
+                "".join(
+                    json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n"
+                    for event in self._events
+                ),
+                encoding="utf-8",
+            )
 
 
 class MemoryLedgerObserver:

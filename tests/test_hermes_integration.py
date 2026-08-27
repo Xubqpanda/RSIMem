@@ -708,3 +708,40 @@ def test_lifecycle_events_join_ledger_without_context_content(tmp_path: Path) ->
     assert PRIVATE_PREFERENCE not in serialized
     assert "current task is complete" not in serialized
     assert "/mnt/" not in serialized
+
+
+def test_lifecycle_ledger_appends_incrementally_and_resumes(tmp_path: Path) -> None:
+    fixture = run_sm01_preference_fixture()
+    output = tmp_path / "lifecycle.jsonl"
+
+    first = LifecycleLedgerObserver(
+        variant="native+adapter+ledger",
+        trace_id="trace-sm01-fixture",
+        family_id="SM01",
+        stage="learn",
+        output_path=output,
+    )
+    first.record_snapshot(fixture.snapshot)
+    first.record(fixture.events[0])
+    assert len(output.read_text(encoding="utf-8").splitlines()) == 2
+
+    resumed = LifecycleLedgerObserver(
+        variant="native+adapter+ledger",
+        trace_id="trace-sm01-fixture",
+        family_id="SM01",
+        stage="learn",
+        output_path=output,
+    )
+    assert resumed.events == first.events
+    resumed.record(fixture.events[0])
+    assert len(output.read_text(encoding="utf-8").splitlines()) == 2
+    resumed.record(fixture.events[1])
+    assert len(output.read_text(encoding="utf-8").splitlines()) == 3
+
+    output.write_text(output.read_text(encoding="utf-8") + "not-json\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed lifecycle ledger event"):
+        LifecycleLedgerObserver(
+            variant="native+adapter+ledger",
+            trace_id="trace-sm01-fixture",
+            output_path=output,
+        )
