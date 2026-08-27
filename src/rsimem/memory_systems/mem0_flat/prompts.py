@@ -169,6 +169,7 @@ class RenderedPrompt:
     render_id: str
     input_digest: str
     text: str = field(repr=False)
+    input_references: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         if not _IDENTIFIER.fullmatch(self.render_id):
@@ -177,6 +178,11 @@ class RenderedPrompt:
             raise ValueError("rendered prompt input_digest must be sha256")
         if not self.text.strip():
             raise ValueError("rendered prompt text must not be empty")
+        if tuple(sorted(self.input_references)) != self.input_references or any(
+            not key.endswith("_digest") or not _DIGEST.fullmatch(value)
+            for key, value in self.input_references
+        ):
+            raise ValueError("rendered prompt input references are invalid")
 
     def observer_evidence(self) -> dict[str, object]:
         return {
@@ -187,6 +193,7 @@ class RenderedPrompt:
             "policy_version": self.artifact.policy_version,
             "render_id": self.render_id,
             "input_digest": self.input_digest,
+            "input_references": dict(self.input_references),
         }
 
 
@@ -223,7 +230,20 @@ class PromptTemplate:
             'input_digest': input_digest,
         }
         render_id = f"render.{_digest_value(render_identity)[:40]}"
-        return RenderedPrompt(self.artifact, render_id, input_digest, text)
+        input_references = tuple(sorted(
+            (key, value)
+            for key, value in values.items()
+            if key.endswith("_digest")
+            and isinstance(value, str)
+            and _DIGEST.fullmatch(value)
+        ))
+        return RenderedPrompt(
+            self.artifact,
+            render_id,
+            input_digest,
+            text,
+            input_references,
+        )
 
 
 @dataclass(frozen=True, slots=True)

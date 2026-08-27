@@ -110,6 +110,9 @@ def test_projection_is_stable_bounded_and_exactly_matches_prompt_input() -> None
         "exit_evidence": request.exit_evidence.compiler_input_payload(),
     })
     assert projection.projection_digest in rendered.text
+    assert rendered.observer_evidence()["input_references"] == {
+        "source_projection_digest": projection.projection_digest,
+    }
     assert "SENTINEL_HIDDEN_GRADER" not in rendered.text
 
 
