@@ -3477,7 +3477,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_evolve.add_argument(
         "--rsimem-semantic-writeback-mode",
-        choices=["disabled", "static"],
+        choices=["disabled", "static", "static_utility"],
         default=None,
     )
     p_evolve.add_argument(

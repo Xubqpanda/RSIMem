@@ -152,7 +152,7 @@ def test_static_semantic_writeback_isolated_from_native_and_no_persistence(
         "background_review_wait_s": 0.0,
         "rsimem_mode": "native+ledger",
         "rsimem_lifecycle_evaluator_mode": "deterministic",
-        "rsimem_semantic_writeback_mode": "static",
+        "rsimem_semantic_writeback_mode": "static_utility",
     }
     enabled = build_hermes_extra_body(persistence_enabled=True, **common)["hermes"]
     assert "memory" not in enabled["enabled_toolsets"]
@@ -162,7 +162,7 @@ def test_static_semantic_writeback_isolated_from_native_and_no_persistence(
         "nudge_interval": 1,
         "flush_min_turns": 1,
     }
-    assert enabled["rsimem"]["semantic_writeback"]["mode"] == "static"
+    assert enabled["rsimem"]["semantic_writeback"]["mode"] == "static_utility"
 
     disabled = build_hermes_extra_body(
         persistence_enabled=False,
@@ -241,7 +241,7 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
         rsimem_lifecycle_compiler_version="uncompiled-v0",
         rsimem_lifecycle_timeout_seconds=15.0,
         rsimem_lifecycle_max_output_tokens=2048,
-        rsimem_semantic_writeback_mode="static",
+        rsimem_semantic_writeback_mode="static_utility",
         rsimem_semantic_writeback_timeout_seconds=20.0,
         rsimem_semantic_writeback_max_output_tokens=1024,
     ))
@@ -254,7 +254,7 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
     assert sequence.hermes.rsimem_lifecycle_compiler_version == "uncompiled-v0"
     assert sequence.hermes.rsimem_lifecycle_timeout_seconds == 15.0
     assert sequence.hermes.rsimem_lifecycle_max_output_tokens == 2048
-    assert sequence.hermes.rsimem_semantic_writeback_mode == "static"
+    assert sequence.hermes.rsimem_semantic_writeback_mode == "static_utility"
     assert sequence.hermes.rsimem_semantic_writeback_timeout_seconds == 20.0
     assert sequence.hermes.rsimem_semantic_writeback_max_output_tokens == 1024
 
