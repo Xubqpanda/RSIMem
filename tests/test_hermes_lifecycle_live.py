@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 
 import pytest
 
@@ -191,3 +192,48 @@ def test_evaluator_failure_is_audited_and_same_boundary_can_retry(tmp_path) -> N
     serialized = json.dumps(events, ensure_ascii=True)
     assert "private response text" not in serialized
     assert not (tmp_path / "receipts.json").exists()
+
+
+def test_live_runtime_rejects_stale_host_task_state(tmp_path) -> None:
+    runtime = _runtime(tmp_path)
+    with pytest.raises(ValueError, match="requires completed host task state"):
+        runtime.process(
+            _rows(),
+            trigger=EvaluationTrigger.TASK_COMPLETED,
+            task_state=TaskLifecycleState.ACTIVE,
+            source_ref="hermes_state:session:live",
+        )
+    with pytest.raises(ValueError, match="cannot carry active host task state"):
+        runtime.process(
+            _rows(),
+            trigger=EvaluationTrigger.SESSION_END,
+            task_state=TaskLifecycleState.ACTIVE,
+            source_ref="hermes_state:session:live",
+        )
+
+
+def test_dry_run_leaves_hermes_state_and_input_rows_byte_identical(tmp_path) -> None:
+    hermes_home = tmp_path / "hermes-home"
+    files = {
+        hermes_home / "state.db": b"fixture-state-db-bytes",
+        hermes_home / "memories" / "MEMORY.md": b"private semantic memory\n",
+        hermes_home / "memories" / "USER.md": b"private user profile\n",
+        hermes_home / "skills" / "fixture" / "SKILL.md": b"fixture procedure\n",
+    }
+    for path, content in files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    before = {path: path.read_bytes() for path in files}
+    rows = [dict(row) for row in _rows()]
+    rows_before = deepcopy(rows)
+
+    result = _runtime(tmp_path / "control-plane").process(
+        rows,
+        trigger=EvaluationTrigger.TASK_COMPLETED,
+        task_state=TaskLifecycleState.COMPLETED,
+        source_ref="hermes_state:session:live",
+    )
+
+    assert result.receipts[0].status == DryRunStatus.ACCEPTED
+    assert rows == rows_before
+    assert {path: path.read_bytes() for path in files} == before
