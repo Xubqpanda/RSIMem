@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default. Static Mem0-flat semantic writeback is now available only through the explicit live experiment configuration; adaptive policy updates remain disabled. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E, Phase 2A-2E, and Phase 2H are complete. Phase 2I delayed feedback dataset is the active milestone. Live mutation remains opt-in and restricted to the audited static experiment path; adaptive policy updates remain disabled.
+Phase 1A-1E, Phase 2A-2E, Phase 2H, and Phase 2I.1-2I.2 are complete. Phase 2I.3 delayed-feedback stage gate is the active milestone. Live mutation remains opt-in and restricted to the audited static experiment path; adaptive policy updates remain disabled.
 
 ## Completed Work
 
@@ -187,20 +187,22 @@ Static PAST-Bench semantic writeback is complete for SM01: 9/9 rotated method at
 
 The frozen static utility gate is also complete for SM01. The accepted 3-replicate static/static-utility batch has 6/6 completed scheduled slots, 54 unique traces, exact utility/ingestion joins, and one stable gate/policy/schema identity across utility replicates. Results and limitations are recorded in [`static_utility_sm01_20260827.md`](static_utility_sm01_20260827.md); no quality-superiority or adaptive-policy claim is made.
 
+The delayed-feedback lifecycle join and exposure-bias contracts are complete. Versioned content-free datasets now preserve artifact-specific future evidence, observation cutoffs, four-state labels, attribution provenance, exposure opportunity, candidate/filter disposition, propensity availability, raw resource usage, integrity audit results, and aggregate censoring reports. Adaptive policy learning remains disabled until the 2I.3 gate is closed.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `266 passed`.
+- [x] Pass all RSIMem tests: `282 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `387 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2I.1 Lifecycle Join And Delayed Utility Labels**
+### **Current: Phase 2I.3 Delayed Feedback Stage Gate**
 
 Phase 2H freezes one interpretable future-utility-per-cost objective across semantic generation admission, internal operation admission, and retrieval filtering/ranking without changing route or invocation scheduling. Deterministic matched fixtures and the audited live SM01 batch establish fixed policy identity, content-free evidence, raw-cost accounting, and explicit limitations.
 
-The immediate objective is 2I.1: construct a versioned delayed-feedback dataset from the existing atomic operation graph and lifecycle evidence. Labels must use only deployment-observable future evidence, preserve exact attributed operation IDs and observation cutoffs, represent positive/negative/unresolved/censored outcomes, and keep official benchmark scores and raw memory/prompt/response content out of learner input.
+Phase 2I.1 and 2I.2 now construct a versioned delayed-feedback dataset from the atomic operation graph, keep official scores and raw content outside learner input, and distinguish utility evidence from exposure eligibility. The immediate objective is 2I.3: independently rebuild and audit the dataset, verify frozen static-policy/feature/label identities, and close the no-leakage stage gate before implementing any adaptive learner.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
