@@ -64,6 +64,9 @@ from ..memory_systems.mem0_flat.utility_gate import FrozenMem0UtilityGate
 
 STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION = 1
 SEMANTIC_COMPILATION_RECEIPT_SCHEMA_VERSION = 1
+STATIC_EXTRACTION_PARENT_ID = "static-extraction-parent-v1"
+LEGACY_STATIC_UTILITY_ID = "legacy-static-utility-v1"
+LEGACY_ADAPTIVE_UTILITY_ID = "legacy-adaptive-utility-v1"
 
 
 class StaticSemanticWritebackMode(StrEnum):
@@ -306,6 +309,19 @@ class StaticSemanticWritebackConfig:
     def adaptive_enabled(self) -> bool:
         return self.mode == StaticSemanticWritebackMode.ADAPTIVE_UTILITY
 
+    @property
+    def plain_extraction_parent(self) -> bool:
+        return self.mode == StaticSemanticWritebackMode.STATIC
+
+    @property
+    def method_identity(self) -> str | None:
+        return {
+            StaticSemanticWritebackMode.DISABLED: None,
+            StaticSemanticWritebackMode.STATIC: STATIC_EXTRACTION_PARENT_ID,
+            StaticSemanticWritebackMode.STATIC_UTILITY: LEGACY_STATIC_UTILITY_ID,
+            StaticSemanticWritebackMode.ADAPTIVE_UTILITY: LEGACY_ADAPTIVE_UTILITY_ID,
+        }[self.mode]
+
     @classmethod
     def from_mapping(
         cls,
@@ -486,6 +502,11 @@ class StaticSemanticWritebackRuntime:
                 if self.adaptive_binding.adaptive
                 else base_policy
             )
+        self.static_parent_identity = (
+            STATIC_EXTRACTION_PARENT_ID
+            if self.utility_gate is None and self.adaptive_binding is None
+            else None
+        )
         self.candidates = FlatSemanticCandidateReader(
             self.registry,
             ownership=self.receipts,
