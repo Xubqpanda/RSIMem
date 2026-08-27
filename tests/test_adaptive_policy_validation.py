@@ -153,6 +153,50 @@ def test_time_ordered_split_is_deterministic_complete_and_auditable() -> None:
         splitter.split(single, single_gate, AdaptiveSplitConfig())
 
 
+def test_time_ordered_split_qualifies_replicated_episode_ids_by_run() -> None:
+    dataset, gate = _multi_dataset(training_negative=True)
+    examples = []
+    for ordinal, example in enumerate(dataset.examples, 1):
+        rebound = replace(
+            example,
+            example_id="feedback-example.placeholder",
+            run_id=f"replicate-{ordinal}",
+            source_episode_id="learn",
+        )
+        payload = rebound.payload()
+        payload.pop("example_id")
+        examples.append(replace(
+            rebound,
+            example_id=_stable_id("feedback-example", payload),
+        ))
+    replicated = replace(
+        dataset,
+        dataset_id="feedback-dataset.placeholder",
+        examples=tuple(examples),
+    )
+    payload = replicated.payload()
+    payload.pop("dataset_id")
+    replicated = replace(
+        replicated,
+        dataset_id=_stable_id("feedback-dataset", payload),
+    )
+    replicated_gate = replace(
+        gate,
+        dataset_id=replicated.dataset_id,
+        dataset_payload_digest=_payload_digest(replicated.payload()),
+        replay_dataset_id=replicated.dataset_id,
+    )
+
+    split = TimeOrderedAdaptiveSplitter().split(replicated, replicated_gate)
+
+    assert split.training_episode_ids == ("replicate-1:learn",)
+    assert split.validation_episode_ids == ("replicate-2:learn",)
+    assert split.validation_membership == ((
+        replicated.examples[1].example_id,
+        "replicate-2:learn",
+    ),)
+
+
 def test_validation_acceptance_is_replayable_and_uses_same_heldout_evidence() -> None:
     dataset, gate = _multi_dataset(training_negative=True)
     split = TimeOrderedAdaptiveSplitter().split(dataset, gate)
