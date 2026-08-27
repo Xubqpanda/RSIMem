@@ -50,13 +50,17 @@ def _sha(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def _context(episode: str, task: str) -> OperationContext:
+def _context(
+    episode: str,
+    task: str,
+    policy_version: str = POLICY_VERSION,
+) -> OperationContext:
     return OperationContext(
         "run-feedback",
         episode,
         f"session-{episode}",
         task,
-        POLICY_VERSION,
+        policy_version,
         "prompt-v1",
         "framework-v1",
     )
@@ -130,11 +134,12 @@ def _graph(
     irrelevant: bool = False,
     second_retrieval: bool = False,
     used_failure: bool = False,
+    policy_version: str = POLICY_VERSION,
 ) -> OperationGraph:
     log = AppendOnlyOperationEvidenceLog()
     recorder = AtomicOperationRecorder(log)
-    learn = _context("learn", "task-learn")
-    future = _context("future", "task-future")
+    learn = _context("learn", "task-learn", policy_version)
+    future = _context("future", "task-future", policy_version)
     parameter = _artifact(recorder, "parameter.fact", ArtifactKind.POLICY_PARAMETER)
     fact = _artifact(recorder, "artifact.fact", ArtifactKind.EXTRACTED_FACT)
     memory = _artifact(
@@ -407,7 +412,7 @@ def _dataset(
         version=window_version,
     )
     config = DelayedFeedbackConfig(
-        POLICY_VERSION,
+        graph.operations[0].context.policy_version,
         FEATURE_SCHEMA,
         window_version=window_version,
     )
