@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import PurePosixPath
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol, runtime_checkable
 
 from ..lifecycle import MemoryScope, TemporalValidity
 from .contracts import MemoryKind, MemoryQuery
@@ -194,6 +194,28 @@ class TrustedTargetBinding:
             raise ValueError("trusted target content_digest must be sha256")
 
 
+@runtime_checkable
+class TargetOwnershipResolver(Protocol):
+    def resolve(self, backend: str, artifact_id: str) -> TrustedTargetBinding | None: ...
+
+
+class InMemoryTargetOwnershipRegistry:
+    """Fixture registry; Phase 2D will back this contract with durable receipts."""
+
+    def __init__(self) -> None:
+        self._bindings: dict[tuple[str, str], TrustedTargetBinding] = {}
+
+    def register(self, binding: TrustedTargetBinding) -> None:
+        key = (binding.backend, binding.artifact_id)
+        existing = self._bindings.get(key)
+        if existing is not None and existing != binding:
+            raise ValueError("conflicting trusted target ownership binding")
+        self._bindings[key] = binding
+
+    def resolve(self, backend: str, artifact_id: str) -> TrustedTargetBinding | None:
+        return self._bindings.get((backend, artifact_id))
+
+
 @dataclass(frozen=True, slots=True)
 class SemanticValidationPolicy:
     max_entry_chars: int = 2_000
@@ -360,9 +382,11 @@ class MutationValidator:
         registry: MemoryBackendRegistry,
         *,
         policy: SemanticValidationPolicy = SemanticValidationPolicy(),
+        target_resolver: TargetOwnershipResolver | None = None,
     ) -> None:
         self.registry = registry
         self.policy = policy
+        self.target_resolver = target_resolver
 
     def validate(
         self,
@@ -371,7 +395,6 @@ class MutationValidator:
         *,
         current_source_digest: str,
         trusted_context: TrustedValidationContext,
-        target: TrustedTargetBinding | None = None,
     ) -> ValidationResult:
         reasons: list[str] = []
         (
@@ -478,6 +501,19 @@ class MutationValidator:
 
         actual_target = None
         if action in {InternalMemoryAction.UPDATE, InternalMemoryAction.DELETE}:
+            target = None
+            if (
+                self.target_resolver is not None
+                and isinstance(candidate.backend, str)
+                and isinstance(candidate.target_artifact_id, str)
+            ):
+                try:
+                    target = self.target_resolver.resolve(
+                        candidate.backend,
+                        candidate.target_artifact_id,
+                    )
+                except Exception:
+                    _append_reason(reasons, "target_ownership_lookup_failed")
             if target is None:
                 _append_reason(reasons, "missing_trusted_target")
             if backend is not None and isinstance(candidate.target_artifact_id, str):
@@ -497,9 +533,6 @@ class MutationValidator:
                     actual_target,
                     reasons,
                 )
-        elif target is not None:
-            _append_reason(reasons, "unexpected_trusted_target")
-
         if kind == MemoryKind.SEMANTIC and action is not None:
             self._validate_semantic(
                 candidate,
@@ -740,8 +773,15 @@ class MutationValidator:
                 _append_reason(reasons, "conflicting_semantic_entry")
         if actual_target is not None:
             existing_chars -= len(actual_target.content)
-        projected_chars = existing_chars + len(content)
-        if hits:
-            projected_chars += len(_SEMANTIC_ENTRY_DELIMITER) * len(hits)
+        final_entry_count = (
+            len(hits) + 1
+            if action == InternalMemoryAction.ADD
+            else len(hits)
+        )
+        projected_chars = (
+            existing_chars
+            + len(content)
+            + len(_SEMANTIC_ENTRY_DELIMITER) * max(0, final_entry_count - 1)
+        )
         if projected_chars > _SEMANTIC_NAMESPACE_LIMITS[namespace]:
             _append_reason(reasons, "semantic_namespace_budget_exceeded")

@@ -27,6 +27,7 @@ from rsimem.memory.ingestion import (
 from rsimem.memory.runtime import MemoryBackendRegistry
 from rsimem.memory.validation import (
     VALIDATION_CONTRACT_SCHEMA_VERSION,
+    InMemoryTargetOwnershipRegistry,
     MutationValidator,
     SemanticMemoryCategory,
     SemanticValidationPolicy,
@@ -109,6 +110,7 @@ def _runtime(
     validator = MutationValidator(
         registry,
         policy=policy or SemanticValidationPolicy(),
+        target_resolver=InMemoryTargetOwnershipRegistry(),
     )
     return backend, validator
 
@@ -255,12 +257,15 @@ def _validate_candidate(
             scope,
             TemporalValidity.DURABLE,
         )
+    if target is not None:
+        resolver = InMemoryTargetOwnershipRegistry()
+        resolver.register(target)
+        validator.target_resolver = resolver
     return validator.validate(
         candidate,
         result,
         current_source_digest=current_source_digest,
         trusted_context=trusted_context,
-        target=target,
     )
 
 
@@ -738,6 +743,86 @@ def test_backend_read_failure_is_structured_and_never_mutates(tmp_path, monkeypa
     assert "backend_read_failed" in validation.reason_codes
     assert "fabricated_target" in validation.reason_codes
     assert "SENTINEL" not in repr(validation)
+    assert backend.mutate_calls == 0
+
+
+def test_target_ownership_lookup_failure_and_binding_conflict_fail_closed(tmp_path) -> None:
+    old = "Always use CSV."
+    backend, validator = _runtime(tmp_path, user_entries=(old,))
+    artifact = backend.native.query(MemoryQuery(
+        MemoryKind.SEMANTIC,
+        "",
+        namespace="user",
+    ))[0].artifact
+    result = _result(
+        InternalMemoryAction.DELETE,
+        target_artifact_id=artifact.artifact_id,
+        expected_revision=artifact.revision,
+        old_content=old,
+    )
+    candidate = _candidate(
+        result,
+        action=InternalMemoryAction.DELETE,
+        content=None,
+        target_artifact_id=artifact.artifact_id,
+        expected_revision=artifact.revision,
+    )
+
+    class _FailingResolver:
+        def resolve(self, backend_name, artifact_id):
+            raise OSError("SENTINEL_PRIVATE_OWNERSHIP_FAILURE")
+
+    validator.target_resolver = _FailingResolver()
+    validation = _validate_candidate(validator, candidate, result)
+    assert "target_ownership_lookup_failed" in validation.reason_codes
+    assert "missing_trusted_target" in validation.reason_codes
+    assert "SENTINEL" not in repr(validation)
+
+    registry = InMemoryTargetOwnershipRegistry()
+    registry.register(_binding(backend, artifact))
+    with pytest.raises(ValueError, match="conflicting trusted target"):
+        registry.register(_binding(backend, artifact, owner_run_id="run-other"))
+    assert backend.mutate_calls == 0
+
+
+def test_update_budget_matches_exact_hermes_join_semantics(tmp_path) -> None:
+    old = "o" * 2_190
+    policy = SemanticValidationPolicy(max_entry_chars=2_200)
+    backend, validator = _runtime(
+        tmp_path,
+        memory_entries=(old,),
+        policy=policy,
+    )
+    artifact = backend.native.query(MemoryQuery(
+        MemoryKind.SEMANTIC,
+        "",
+        namespace="memory",
+    ))[0].artifact
+    updated = "x" * 2_200
+    result = _result(
+        InternalMemoryAction.UPDATE,
+        content=updated,
+        target_artifact_id=artifact.artifact_id,
+        expected_revision=artifact.revision,
+        old_content=old,
+    )
+    candidate = _candidate(
+        result,
+        action=InternalMemoryAction.UPDATE,
+        content=updated,
+        namespace="memory",
+        target_artifact_id=artifact.artifact_id,
+        expected_revision=artifact.revision,
+        category=SemanticMemoryCategory.FACT,
+        scope=MemoryScope.GLOBAL,
+    )
+    validation = _validate_candidate(
+        validator,
+        candidate,
+        result,
+        target=_binding(backend, artifact),
+    )
+    assert validation.accepted is True
     assert backend.mutate_calls == 0
 
 
