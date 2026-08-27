@@ -118,6 +118,8 @@ class FrozenMem0UtilityGate:
 
     config: FrozenMem0UtilityConfig = FrozenMem0UtilityConfig()
     policy: StaticUtilityPolicy = StaticUtilityPolicy()
+    target_policies: tuple[tuple[UtilityTarget, StaticUtilityPolicy], ...] = ()
+    update_policy: StaticUtilityPolicy | None = None
     _decisions: dict[str, list[UtilityDecision]] = field(
         default_factory=dict,
         init=False,
@@ -125,12 +127,37 @@ class FrozenMem0UtilityGate:
         compare=False,
     )
 
+    def __post_init__(self) -> None:
+        normalized = tuple(
+            (UtilityTarget(target), policy)
+            for target, policy in self.target_policies
+        )
+        object.__setattr__(self, "target_policies", normalized)
+        targets = tuple(target for target, _ in normalized)
+        if len(targets) != len(set(targets)) or any(
+            target not in {
+                UtilityTarget.GENERATION,
+                UtilityTarget.INTERNAL_OPERATION,
+                UtilityTarget.RETRIEVAL,
+            }
+            for target in targets
+        ):
+            raise ValueError("Mem0 utility target policy overrides are invalid")
+
     @property
     def digest(self) -> str:
-        return _digest({
+        identity = {
             "gate": self.config.digest,
             "policy": self.policy.digest,
-        })
+        }
+        if self.target_policies:
+            identity["target_policies"] = [
+                (target.value, policy.digest)
+                for target, policy in self.target_policies
+            ]
+        if self.update_policy is not None:
+            identity["update_policy"] = self.update_policy.digest
+        return _digest(identity)
 
     @property
     def feature_schema(self) -> str:
@@ -150,12 +177,32 @@ class FrozenMem0UtilityGate:
             "gate_version": self.config.version,
             "gate_digest": self.digest,
             "feature_schema": self.feature_schema,
+            "bound_policy_versions": sorted({
+                self.policy.policy_version,
+                *(policy.policy_version for _, policy in self.target_policies),
+                *(
+                    ()
+                    if self.update_policy is None
+                    else (self.update_policy.policy_version,)
+                ),
+            }),
             "request_id": request_id,
             "decisions": [
                 decision.observer_evidence()
                 for decision in self.decisions(request_id)
             ],
         }
+
+    def policy_for(self, target: UtilityTarget) -> StaticUtilityPolicy:
+        target = UtilityTarget(target)
+        return next(
+            (
+                policy
+                for candidate, policy in self.target_policies
+                if candidate == target
+            ),
+            self.policy,
+        )
 
     def _score(
         self,
@@ -167,6 +214,7 @@ class FrozenMem0UtilityGate:
         recovery_risk: float,
         predicted_benefit: float | None,
         costs: tuple[tuple[LifecycleCostName, float], ...],
+        policy_override: StaticUtilityPolicy | None = None,
     ) -> UtilityDecision:
         features = StaticUtilityFeatureExtractor().extract(
             request.exit_evidence,
@@ -177,7 +225,9 @@ class FrozenMem0UtilityGate:
             recovery_risk=recovery_risk,
             predicted_benefit=predicted_benefit,
         )
-        decision = InterpretableStaticUtilityScorer(self.policy).score(
+        decision = InterpretableStaticUtilityScorer(
+            policy_override or self.policy_for(target)
+        ).score(
             features,
             known_lifecycle_costs(available_at=0, values=dict(costs)),
             target=target,
@@ -262,6 +312,12 @@ class FrozenMem0UtilityGate:
                 recovery_risk=recovery,
                 predicted_benefit=None,
                 costs=self.config.operation_costs,
+                policy_override=(
+                    self.update_policy
+                    if proposal.action == InternalMemoryAction.UPDATE
+                    and self.update_policy is not None
+                    else None
+                ),
             )
             if (
                 generation_decision.disposition == UtilityDisposition.ACCEPT
