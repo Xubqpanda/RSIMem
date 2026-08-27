@@ -1001,3 +1001,34 @@ def default_feedback_contract_registry() -> FeedbackContractRegistry:
         contract = _notes_contract(family_id, keys, parser)
         registry.register(_NotesFamilyResolver(contract, parser))
     return registry
+
+
+def detect_current_input_semantic_keys(
+    family_id: str,
+    current_input: str,
+) -> tuple[str, ...]:
+    """Conservatively detect a complete local restatement of registered rules."""
+
+    value = current_input.casefold()
+    keys = []
+    if family_id in {"SM01_preference_adoption", "SM05_weak_trigger_preference_adoption"}:
+        if (
+            ("tsv" in value or "tab-separated" in value)
+            and all(field in value for field in ("owner", "priority", "task", "due_date"))
+        ):
+            keys.append("preference.summary.tsv")
+    if family_id == "SM05_weak_trigger_preference_adoption":
+        if "priorit" in value and any(word in value for word in ("normalize", "normalise")):
+            keys.append("preference.priority.normalized")
+        if "yyyy/mm/dd" in value or "yyyy-mm-dd" in value:
+            keys.append("preference.date.yyyy_mm_dd")
+    if family_id == "SM02_constraint_retention" and (
+        "ava chen" in value or "ava_chen" in value
+    ) and any(phrase in value for phrase in (
+        "do not share",
+        "don't share",
+        "exclude",
+        "never share",
+    )):
+        keys.append("constraint.share.exclude_ava_chen")
+    return tuple(keys)

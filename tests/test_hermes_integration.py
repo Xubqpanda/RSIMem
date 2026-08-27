@@ -1051,6 +1051,30 @@ def test_live_bridge_records_content_free_sm01_future_feedback(tmp_path: Path) -
             "owner\tpriority\ttask\tdue_date\n"
             "Iris Chen\tHigh\tFix drift\t2026/04/28"
         ),
+        "messages": [
+            {
+                "role": "user",
+                "content": "Extract today's action items and share the source note.",
+            },
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-share",
+                    "function": {
+                        "name": "notes_share",
+                        "arguments": json.dumps({
+                            "note_id": "note-1",
+                            "recipients": ["Iris Chen"],
+                        }),
+                    },
+                }],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-share",
+                "content": json.dumps({"success": True}),
+            },
+        ],
     })
     bridge.close()
     db.close()
