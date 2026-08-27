@@ -125,6 +125,46 @@ class MatchedPolicyObservation:
             "budget_id": self.budget_id,
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "MatchedPolicyObservation":
+        expected = {
+            "observation_id",
+            "split_id",
+            "example_id",
+            "episode_id",
+            "variant",
+            "policy_version",
+            "label",
+            "lifecycle_cost",
+            "stability_failure",
+            "uncertainty",
+            "evidence_id",
+            "evidence_cutoff",
+            "task_input_digest",
+            "budget_id",
+        }
+        if not isinstance(value, Mapping) or set(value) != expected:
+            raise ValueError("malformed matched policy observation")
+        try:
+            return cls(
+                observation_id=value["observation_id"],
+                split_id=value["split_id"],
+                example_id=value["example_id"],
+                episode_id=value["episode_id"],
+                variant=MatchedPolicyVariant(value["variant"]),
+                policy_version=value["policy_version"],
+                label=FeedbackLabel(value["label"]),
+                lifecycle_cost=value["lifecycle_cost"],
+                stability_failure=value["stability_failure"],
+                uncertainty=value["uncertainty"],
+                evidence_id=value["evidence_id"],
+                evidence_cutoff=value["evidence_cutoff"],
+                task_input_digest=value["task_input_digest"],
+                budget_id=value["budget_id"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed matched policy observation") from exc
+
 
 @dataclass(frozen=True, slots=True)
 class MatchedAcceptanceCriteria:
