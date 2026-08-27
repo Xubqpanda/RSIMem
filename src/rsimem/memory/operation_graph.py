@@ -24,7 +24,7 @@ from .ingestion import InternalMemoryAction
 OPERATION_GRAPH_SCHEMA_VERSION = 1
 _MAX_EDGE_IDS = 64
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
-_IDENTIFIER = re.compile(r"^[A-Za-z][A-Za-z0-9_.:-]{0,255}$")
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _REASON_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _FORBIDDEN_PAYLOAD_FIELDS = {
     "content",

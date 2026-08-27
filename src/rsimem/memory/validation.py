@@ -155,8 +155,8 @@ class UntrustedMemoryCandidate:
     backend: object
     namespace: object
     content: object
-    metadata: Mapping[object, object] = field(default_factory=dict)
-    resources: tuple[UntrustedMemoryResource, ...] = ()
+    metadata: object = field(default_factory=dict)
+    resources: tuple[object, ...] = ()
     target_artifact_id: object = None
     expected_revision: object = None
     category: object = None
@@ -165,7 +165,8 @@ class UntrustedMemoryCandidate:
     provenance: ValidationProvenance | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        if isinstance(self.metadata, Mapping):
+            object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
         object.__setattr__(self, "resources", tuple(self.resources))
 
 
@@ -295,7 +296,14 @@ class ValidationResult:
         }
 
 
-def _resource_fingerprint(resource: UntrustedMemoryResource) -> dict[str, object]:
+def _resource_fingerprint(resource: object) -> dict[str, object]:
+    if not isinstance(resource, UntrustedMemoryResource):
+        return {
+            "path": type(resource).__name__,
+            "content_digest": _sha(type(resource).__name__),
+            "content_bytes": 0,
+            "media_type": type(resource).__name__,
+        }
     content = resource.content
     return {
         "path": resource.path if isinstance(resource.path, str) else type(resource.path).__name__,
@@ -309,7 +317,10 @@ def _resource_fingerprint(resource: UntrustedMemoryResource) -> dict[str, object
     }
 
 
-def _metadata_fingerprint(metadata: Mapping[object, object]) -> tuple[str, int, bool]:
+def _metadata_fingerprint(metadata: object) -> tuple[str, int, bool]:
+    if not isinstance(metadata, Mapping):
+        encoded = _canonical_json({"type": type(metadata).__name__}).encode("utf-8")
+        return _sha(encoded), len(encoded), False
     try:
         plain = {str(key): value for key, value in metadata.items()}
         encoded = _canonical_json(plain).encode("utf-8")
@@ -358,8 +369,12 @@ def _candidate_fingerprint(
                 "operation_id": candidate.provenance.operation_id,
                 "source_digest": candidate.provenance.source_digest,
             }
-            if candidate.provenance is not None
-            else None
+            if isinstance(candidate.provenance, ValidationProvenance)
+            else (
+                None
+                if candidate.provenance is None
+                else {"type": type(candidate.provenance).__name__}
+            )
         ),
     }
     return _sha(_canonical_json(identity)), content_digest, content_bytes, metadata_bytes, resource_bytes
@@ -431,6 +446,8 @@ class MutationValidator:
             _append_reason(reasons, "invalid_current_source_digest")
         if provenance is None:
             _append_reason(reasons, "missing_provenance")
+        elif not isinstance(provenance, ValidationProvenance):
+            _append_reason(reasons, "invalid_provenance")
         else:
             if provenance != trusted_provenance:
                 _append_reason(reasons, "provenance_mismatch")
@@ -569,13 +586,18 @@ class MutationValidator:
         paths: list[str] = []
         total = 0
         for resource in candidate.resources:
+            if not isinstance(resource, UntrustedMemoryResource):
+                _append_reason(reasons, "invalid_resource")
+                continue
             if not isinstance(resource.path, str) or not resource.path:
                 _append_reason(reasons, "invalid_resource_path")
             else:
-                paths.append(resource.path)
                 path = PurePosixPath(resource.path)
-                if path.is_absolute():
+                paths.append(str(path))
+                if path.is_absolute() or re.match(r"^[A-Za-z]:[\\/]", resource.path):
                     _append_reason(reasons, "absolute_resource_path")
+                if "\\" in resource.path:
+                    _append_reason(reasons, "invalid_resource_path")
                 if ".." in path.parts:
                     _append_reason(reasons, "resource_path_traversal")
                 if str(path) in {".", "SKILL.md"}:
@@ -666,8 +688,9 @@ class MutationValidator:
             _append_reason(reasons, "invalid_semantic_namespace")
         if candidate.resources:
             _append_reason(reasons, "semantic_resources_forbidden")
+        metadata = candidate.metadata if isinstance(candidate.metadata, Mapping) else {}
         if action in {InternalMemoryAction.DELETE, InternalMemoryAction.NONE}:
-            if candidate.metadata:
+            if metadata:
                 _append_reason(reasons, "semantic_metadata_forbidden")
             if candidate.category is not None or candidate.scope is not None or candidate.temporal_validity is not None:
                 _append_reason(reasons, "semantic_classification_forbidden")
@@ -696,7 +719,7 @@ class MutationValidator:
             _append_reason(reasons, "semantic_validity_mismatch")
         if trusted_context.temporal_validity != TemporalValidity.DURABLE:
             _append_reason(reasons, "semantic_not_durable")
-        if set(str(key) for key in candidate.metadata) - _SEMANTIC_METADATA_FIELDS:
+        if set(str(key) for key in metadata) - _SEMANTIC_METADATA_FIELDS:
             _append_reason(reasons, "semantic_metadata_not_allowed")
         expected_metadata = {
             "category": category.value if category is not None else None,
@@ -704,11 +727,11 @@ class MutationValidator:
             "temporal_validity": validity.value if validity is not None else None,
             "source_execution_id": ingest_result.execution_id,
             "source_operation_id": (
-                candidate.provenance.operation_id if candidate.provenance is not None else None
+                trusted_context.provenance.operation_id
             ),
         }
         for key, value in expected_metadata.items():
-            if candidate.metadata.get(key) != value:
+            if metadata.get(key) != value:
                 _append_reason(reasons, "semantic_metadata_mismatch")
                 break
 
@@ -733,7 +756,7 @@ class MutationValidator:
         if any(pattern.search(content) for pattern in _MACHINE_PATH_PATTERNS):
             _append_reason(reasons, "semantic_machine_path")
 
-        for value in candidate.metadata.values():
+        for value in metadata.values():
             if isinstance(value, str):
                 if any(pattern.search(value) for pattern in _CREDENTIAL_PATTERNS):
                     _append_reason(reasons, "semantic_credential")

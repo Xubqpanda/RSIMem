@@ -862,8 +862,14 @@ def test_disabled_kinds_capability_mismatch_and_invalid_contract_are_rejected(tm
         unsupported,
         action="forged",
         candidate_id="",
-        provenance=None,
-        metadata={"invalid": object()},
+        provenance="forged-provenance",
+        metadata="not-a-mapping",
+        resources=(
+            object(),
+            UntrustedMemoryResource("C:\\Users\\fixture\\secret", b"x"),
+            UntrustedMemoryResource("scripts//same", b"x"),
+            UntrustedMemoryResource("scripts/same", b"x"),
+        ),
     )
     validation = _validate_candidate(
         validator,
@@ -874,10 +880,14 @@ def test_disabled_kinds_capability_mismatch_and_invalid_contract_are_rejected(tm
     assert {
         "invalid_action",
         "invalid_candidate_id",
-            "missing_provenance",
+            "invalid_provenance",
             "invalid_metadata",
             "invalid_current_source_digest",
             "changed_source",
+            "invalid_resource",
+            "absolute_resource_path",
+            "invalid_resource_path",
+            "duplicate_resource_path",
         }.issubset(validation.reason_codes)
     assert backend.mutate_calls == 0
 

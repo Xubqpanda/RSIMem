@@ -686,6 +686,17 @@ def test_rejected_proposal_failed_mutation_and_none_are_not_merged() -> None:
 def test_contract_rejects_raw_path_identity_and_invalid_mutation_shapes() -> None:
     context = _context()
     assert OPERATION_GRAPH_SCHEMA_VERSION == 1
+    numeric_revision = ArtifactNode(
+        "artifact.numeric-revision",
+        ArtifactKind.MEMORY_ARTIFACT,
+        "artifact-v1",
+        _sha("value"),
+        5,
+        1,
+        "1abc2345",
+        "prov.numeric-revision",
+    )
+    assert numeric_revision.revision == "1abc2345"
     with pytest.raises(ValueError, match="unsupported artifact evidence schema"):
         ArtifactNode(
             "artifact.invalid-schema",
