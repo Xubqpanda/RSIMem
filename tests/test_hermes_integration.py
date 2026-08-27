@@ -38,6 +38,8 @@ from rsimem.memory import (
     MemoryResource,
 )
 from rsimem.memory.live_writeback import StaticSemanticWritebackConfig
+from rsimem.memory.adaptive_policy import AdaptiveParameterName
+from rsimem.memory.adaptive_mem0_binding import TrustedAdaptiveMem0Parameter
 from rsimem.memory_systems.mem0_flat import (
     FakeCompletionClient,
     POLICY_FACT_EXTRACTION_PROMPT,
@@ -957,3 +959,83 @@ def test_static_writeback_bridge_requires_native_ledger_and_lifecycle(tmp_path: 
             HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
             **kwargs,
         )
+
+
+@pytest.mark.parametrize(
+    "store_path",
+    ("/tmp/adaptive-policies.json", "../adaptive-policies.json"),
+)
+def test_adaptive_writeback_bridge_rejects_store_outside_hermes_home(
+    tmp_path: Path,
+    store_path: str,
+) -> None:
+    home = _hermes_home(tmp_path / "home")
+    client = FakeCompletionClient({})
+    config = StaticSemanticWritebackConfig(
+        mode="adaptive_utility",
+        adaptive_policy_store_path=store_path,
+        adaptive_trusted_roots=("mem0-flat.parent-v1",),
+        adaptive_parameters=(TrustedAdaptiveMem0Parameter(
+            parameter_id="parameter.retrieval",
+            name=AdaptiveParameterName.RETRIEVAL_ACCEPT_THRESHOLD,
+            prompt_ref="mem0-flat.retrieval",
+            baseline_value=0.35,
+        ),),
+    )
+
+    with pytest.raises(ValueError, match="adaptive policy store"):
+        HermesPastBenchBridge(
+            home,
+            HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+            evidence_path=tmp_path / "artifacts" / "events.jsonl",
+            run_id="run-adaptive-path",
+            trace_id="trace-adaptive-path",
+            episode_id="episode-adaptive-path",
+            session_id="session-adaptive-path",
+            task_id="task-adaptive-path",
+            experiment_variant="adaptive-rsimem",
+            lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
+            static_writeback_config=config,
+            static_completion_client=client,
+        )
+    assert client.calls == ()
+
+
+def test_adaptive_writeback_bridge_requires_active_attempt_local_policy(
+    tmp_path: Path,
+) -> None:
+    home = _hermes_home(tmp_path / "home")
+    client = FakeCompletionClient({})
+    relative_store = Path(".rsimem/adaptive-policies.json")
+    config = StaticSemanticWritebackConfig(
+        mode="adaptive_utility",
+        adaptive_policy_store_path=str(relative_store),
+        adaptive_trusted_roots=("mem0-flat.parent-v1",),
+        adaptive_parameters=(TrustedAdaptiveMem0Parameter(
+            parameter_id="parameter.retrieval",
+            name=AdaptiveParameterName.RETRIEVAL_ACCEPT_THRESHOLD,
+            prompt_ref="mem0-flat.retrieval",
+            baseline_value=0.35,
+        ),),
+    )
+
+    with pytest.raises(ValueError, match="requires an active policy"):
+        HermesPastBenchBridge(
+            home,
+            HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+            evidence_path=tmp_path / "artifacts" / "events.jsonl",
+            run_id="run-adaptive-empty",
+            trace_id="trace-adaptive-empty",
+            episode_id="episode-adaptive-empty",
+            session_id="session-adaptive-empty",
+            task_id="task-adaptive-empty",
+            experiment_variant="adaptive-rsimem",
+            lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
+            static_writeback_config=config,
+            static_completion_client=client,
+        )
+    store_path = home / relative_store
+    assert store_path.parent.is_dir()
+    assert store_path.with_suffix(".json.lock").exists()
+    assert not store_path.exists()
+    assert client.calls == ()

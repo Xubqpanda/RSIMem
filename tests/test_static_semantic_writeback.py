@@ -20,6 +20,9 @@ from rsimem.memory.live_writeback import (
     StaticSemanticWritebackMode,
     StaticSemanticWritebackRuntime,
 )
+from rsimem.memory.adaptive_mem0_binding import TrustedAdaptiveMem0Parameter
+from rsimem.memory.adaptive_policy import AdaptiveParameterName
+from rsimem.memory.adaptive_policy_store import JsonAdaptivePolicyStore
 from rsimem.memory.operation_graph import audit_operation_evidence
 from rsimem.memory.receipts import MutationReceiptStatus
 from rsimem.memory_systems.mem0_flat import (
@@ -97,8 +100,55 @@ def test_static_config_is_default_disabled_and_strict() -> None:
     })
     assert utility.enabled is True
     assert utility.utility_enabled is True
+    adaptive = StaticSemanticWritebackConfig.from_mapping({
+        "mode": "adaptive_utility",
+        "adaptive_policy_store_path": ".rsimem/adaptive-policies.json",
+        "adaptive_trusted_roots": ["mem0-flat.parent-v1"],
+        "adaptive_parameters": [{
+            "parameter_id": "parameter.retrieval",
+            "name": "retrieval_accept_threshold",
+            "prompt_ref": "mem0-flat.retrieval",
+            "baseline_value": 0.35,
+        }],
+    })
+    assert adaptive.adaptive_enabled is True
+    assert adaptive.utility_enabled is True
+    with pytest.raises(ValueError, match="configuration is incomplete"):
+        StaticSemanticWritebackConfig.from_mapping({"mode": "adaptive_utility"})
+    with pytest.raises(ValueError, match="require adaptive_utility"):
+        StaticSemanticWritebackConfig.from_mapping({
+            "mode": "static_utility",
+            "adaptive_policy_store_path": "policy.json",
+        })
     with pytest.raises(ValueError, match="unknown static semantic"):
         StaticSemanticWritebackConfig.from_mapping({"provider_seed": 7})
+
+
+def test_explicit_adaptive_runtime_rejects_empty_store_before_model_call(
+    tmp_path,
+) -> None:
+    client = _client()
+    store = JsonAdaptivePolicyStore(
+        tmp_path / "adaptive-policies.json",
+        trusted_root_policy_versions=("mem0-flat.parent-v1",),
+    )
+    parameter = TrustedAdaptiveMem0Parameter(
+        parameter_id="parameter.retrieval",
+        name=AdaptiveParameterName.RETRIEVAL_ACCEPT_THRESHOLD,
+        prompt_ref="mem0-flat.retrieval",
+        baseline_value=0.35,
+    )
+    with pytest.raises(ValueError, match="requires an active policy"):
+        StaticSemanticWritebackRuntime(
+            tmp_path / "hermes-home",
+            client,
+            operation_evidence_path=tmp_path / "episode" / "operations.jsonl",
+            mutation_receipt_path=tmp_path / "hermes-home" / "receipts.json",
+            adaptive_policy_store=store,
+            adaptive_parameters=(parameter,),
+            require_adaptive_policy=True,
+        )
+    assert client.calls == ()
 
 
 def test_static_utility_runtime_preserves_boundary_and_invocation_count(

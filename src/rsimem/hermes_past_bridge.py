@@ -30,6 +30,7 @@ from .memory.live_writeback import (
     StaticSemanticWritebackConfig,
     StaticSemanticWritebackRuntime,
 )
+from .memory.adaptive_policy_store import JsonAdaptivePolicyStore
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
 
 
@@ -338,6 +339,24 @@ class HermesPastBenchBridge:
                 raise ValueError("static semantic writeback requires lifecycle evaluation")
             if static_completion_client is None:
                 raise ValueError("static semantic writeback requires a completion client")
+            adaptive_store = None
+            if static_writeback_config.adaptive_enabled:
+                relative_store = Path(
+                    static_writeback_config.adaptive_policy_store_path or ""
+                )
+                if relative_store.is_absolute() or ".." in relative_store.parts:
+                    raise ValueError(
+                        "adaptive policy store must be relative to Hermes home"
+                    )
+                store_path = (hermes_home / relative_store).resolve()
+                if not store_path.is_relative_to(hermes_home.resolve()):
+                    raise ValueError("adaptive policy store escapes Hermes home")
+                adaptive_store = JsonAdaptivePolicyStore(
+                    store_path,
+                    trusted_root_policy_versions=(
+                        static_writeback_config.adaptive_trusted_roots
+                    ),
+                )
             self.static_writeback = StaticSemanticWritebackRuntime(
                 hermes_home,
                 static_completion_client,
@@ -358,6 +377,9 @@ class HermesPastBenchBridge:
                     if static_writeback_config.utility_enabled
                     else None
                 ),
+                adaptive_policy_store=adaptive_store,
+                adaptive_parameters=static_writeback_config.adaptive_parameters,
+                require_adaptive_policy=static_writeback_config.adaptive_enabled,
             )
         else:
             self.static_writeback = None
