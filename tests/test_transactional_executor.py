@@ -119,6 +119,16 @@ class _ControlledBackend:
             )
             self.native.mutate(partial)
             raise OSError("fixture partial write")
+        if self.mode == "preexisting_race":
+            assert mutation.artifact is not None
+            self.native.mutate(MemoryMutation(
+                MemoryMutationAction.ADD,
+                MemoryKind.SEMANTIC,
+                artifact=replace(
+                    mutation.artifact,
+                    artifact_id="candidate.external-race",
+                ),
+            ))
         result = self.native.mutate(mutation)
         self._last_applied_id = result.artifact_id
         return result
@@ -476,6 +486,15 @@ def test_each_crash_point_has_restart_stable_idempotent_recovery(tmp_path, point
     with pytest.raises(InjectedMutationCrash) as crashed:
         executor.execute(request, crash_at=point)
     assert crashed.value.point == point
+    crashed_receipt = store.all()[0]
+    expected_phase = {
+        CrashPoint.AFTER_RESERVE: MutationReceiptPhase.RESERVED,
+        CrashPoint.BEFORE_BACKEND_CALL: MutationReceiptPhase.APPLYING,
+        CrashPoint.AFTER_BACKEND_WRITE: MutationReceiptPhase.APPLYING,
+        CrashPoint.BEFORE_VERIFICATION: MutationReceiptPhase.VERIFYING,
+        CrashPoint.BEFORE_RECEIPT_COMMIT: MutationReceiptPhase.VERIFIED,
+    }[point]
+    assert crashed_receipt.phase == expected_phase
 
     restarted_store = JsonMutationReceiptStore(case / "receipts.json")
     restarted_validator = MutationValidator(registry, target_resolver=restarted_store)
@@ -580,6 +599,24 @@ def test_validation_rejection_creates_no_receipt_and_preserves_source(tmp_path) 
     assert backend.mutate_calls == 0
     assert store.all() == ()
     assert text not in json.dumps(result.observer_evidence())
+
+
+def test_add_ownership_race_is_blocked_and_never_committed(tmp_path) -> None:
+    backend, _, store, _, executor = _environment(tmp_path)
+    backend.mode = "preexisting_race"
+    request = _request(
+        InternalMemoryAction.ADD,
+        content="Always use TSV.",
+        ordinal="ownership-race",
+    )
+    result = executor.execute(request)
+    assert result.status == MutationExecutionStatus.BLOCKED
+    assert result.reason_code == "add_ownership_ambiguous"
+    receipt = store.all()[0]
+    assert receipt.status == MutationReceiptStatus.PENDING
+    assert receipt.target_blocked is True
+    assert receipt.verified is False
+    assert result.context_exit.source_retained is True
 
 
 def test_execution_contract_schema_mismatch_fails_closed(tmp_path) -> None:
