@@ -222,7 +222,8 @@ class HermesAdapter(RuntimeAdapter):
         rsimem_cfg["semantic_writeback"] = semantic_writeback_cfg
         hermes_cfg["rsimem"] = rsimem_cfg
         static_writeback_enabled = (
-            str(semantic_writeback_cfg.get("mode") or "disabled") == "static"
+            str(semantic_writeback_cfg.get("mode") or "disabled")
+            in {"static", "static_utility"}
         )
         hermes_home = None
         if hermes_cfg.get("home_dir"):

@@ -434,7 +434,7 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
         "compiler_version": "uncompiled-v0",
     }
     rsimem["semantic_writeback"] = {
-        "mode": "static",
+        "mode": "static_utility",
         "timeout_seconds": 10.0,
         "max_output_tokens": 512,
     }
