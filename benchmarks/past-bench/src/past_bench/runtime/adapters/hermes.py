@@ -221,9 +221,9 @@ class HermesAdapter(RuntimeAdapter):
             semantic_writeback_cfg["mode"] = "disabled"
         rsimem_cfg["semantic_writeback"] = semantic_writeback_cfg
         hermes_cfg["rsimem"] = rsimem_cfg
-        static_writeback_enabled = (
+        rsimem_writeback_enabled = (
             str(semantic_writeback_cfg.get("mode") or "disabled")
-            in {"static", "static_utility"}
+            in {"static", "static_utility", "adaptive_utility"}
         )
         hermes_home = None
         if hermes_cfg.get("home_dir"):
@@ -259,12 +259,15 @@ class HermesAdapter(RuntimeAdapter):
                 enabled_toolsets = list(enabled_toolsets)
                 if _PAST_BENCH_TOOLSET not in enabled_toolsets:
                     enabled_toolsets.append(_PAST_BENCH_TOOLSET)
-        if static_writeback_enabled:
+        disabled_toolsets = list(hermes_cfg.get("disabled_toolsets") or [])
+        if rsimem_writeback_enabled:
             enabled_toolsets = [
                 toolset
                 for toolset in (enabled_toolsets or [])
                 if toolset != "memory"
             ]
+            if "memory" not in disabled_toolsets:
+                disabled_toolsets.append("memory")
 
         memory_cfg = hermes_cfg.get("config_overrides", {}).get("memory", {})
         memory_active = bool(memory_cfg.get("memory_enabled", True) or memory_cfg.get("user_profile_enabled", True))
@@ -291,11 +294,11 @@ class HermesAdapter(RuntimeAdapter):
             temperature=self.request.runtime_config.temperature,
             max_iterations=int(hermes_cfg.get("max_iterations", 50)),
             enabled_toolsets=enabled_toolsets,
-            disabled_toolsets=hermes_cfg.get("disabled_toolsets"),
+            disabled_toolsets=disabled_toolsets or None,
             skip_context_files=bool(hermes_cfg.get("skip_context_files", True)),
             skip_memory=(
                 False
-                if static_writeback_enabled
+                if rsimem_writeback_enabled
                 else bool(hermes_cfg.get(
                     "skip_memory",
                     (not persistence_enabled) or (not memory_active),
@@ -305,6 +308,8 @@ class HermesAdapter(RuntimeAdapter):
             session_db=session_db,
             model_usage_callback=collected_model_calls.append,
         )
+        if rsimem_writeback_enabled:
+            self._isolate_rsimem_semantic_writer(agent)
         self._activate_rsimem_bridge(agent, hermes_cfg, hermes_home)
 
         prompt = _build_hermes_prompt(self.request)
@@ -383,6 +388,34 @@ class HermesAdapter(RuntimeAdapter):
             model_calls=model_calls,
             final_output=final_text,
         )
+
+    @staticmethod
+    def _isolate_rsimem_semantic_writer(agent: Any) -> None:
+        """Keep native semantic reads while removing every native writer surface."""
+
+        tools = getattr(agent, "tools", None)
+        valid_tool_names = getattr(agent, "valid_tool_names", None)
+        if not isinstance(tools, list) or not isinstance(valid_tool_names, set):
+            raise ValueError("RSIMem writer isolation requires Hermes tool surfaces")
+
+        def tool_name(definition: object) -> str | None:
+            if not isinstance(definition, dict):
+                return None
+            function = definition.get("function")
+            if not isinstance(function, dict):
+                return None
+            name = function.get("name")
+            return name if isinstance(name, str) else None
+
+        agent.tools = [definition for definition in tools if tool_name(definition) != "memory"]
+        agent.valid_tool_names.discard("memory")
+        agent._memory_nudge_interval = 0
+        agent._skill_nudge_interval = 0
+
+        if any(tool_name(definition) == "memory" for definition in agent.tools):
+            raise ValueError("native Hermes memory writer remains model-visible")
+        if "memory" in agent.valid_tool_names:
+            raise ValueError("native Hermes memory writer remains executable")
 
     @staticmethod
     def _complete_model_call_sum(
