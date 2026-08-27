@@ -29,8 +29,10 @@ if [[ "${METHOD_SET}" == "baseline" ]]; then
   output_family="static_sm01"
 elif [[ "${METHOD_SET}" == "utility" ]]; then
   output_family="static_utility_sm01"
+elif [[ "${METHOD_SET}" == "feedback" ]]; then
+  output_family="feedback_sm01"
 else
-  echo "RSIMEM_STATIC_METHOD_SET must be baseline or utility." >&2
+  echo "RSIMEM_STATIC_METHOD_SET must be baseline, utility, or feedback." >&2
   exit 2
 fi
 if (
@@ -74,6 +76,7 @@ from pathlib import Path
 from rsimem.experiment_manifest import (
     STATIC_METHOD_VARIANTS,
     STATIC_UTILITY_METHOD_VARIANTS,
+    FEEDBACK_METHOD_VARIANTS,
     initialize_batch_manifest,
     resolved_environment_profile,
     resolved_family_budget,
@@ -81,11 +84,11 @@ from rsimem.experiment_manifest import (
     resolved_run_profile,
 )
 run = resolved_run_profile(Path(sys.argv[4]))
-modes = (
-    STATIC_METHOD_VARIANTS
-    if sys.argv[12] == "baseline"
-    else STATIC_UTILITY_METHOD_VARIANTS
-)
+modes = {
+    "baseline": STATIC_METHOD_VARIANTS,
+    "utility": STATIC_UTILITY_METHOD_VARIANTS,
+    "feedback": FEEDBACK_METHOD_VARIANTS,
+}[sys.argv[12]]
 initialize_batch_manifest(
     Path(sys.argv[1]),
     replicates=int(sys.argv[2]),
@@ -104,6 +107,9 @@ initialize_batch_manifest(
     past_bench_tree=sys.argv[10],
     past_bench_dirty=sys.argv[11] == "true",
     execution_modes=modes,
+    semantic_feedback_contract=(
+        "sm01_tsv_v1" if sys.argv[12] == "feedback" else "disabled"
+    ),
 )
 ' "${manifest_path}" "${REPLICATES}" "${TASK_FAMILY}" \
   "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" \
@@ -143,9 +149,14 @@ import sys
 from rsimem.experiment_manifest import (
     STATIC_METHOD_VARIANTS,
     STATIC_UTILITY_METHOD_VARIANTS,
+    FEEDBACK_METHOD_VARIANTS,
     execution_order,
 )
-modes = STATIC_METHOD_VARIANTS if sys.argv[2] == "baseline" else STATIC_UTILITY_METHOD_VARIANTS
+modes = {
+    "baseline": STATIC_METHOD_VARIANTS,
+    "utility": STATIC_UTILITY_METHOD_VARIANTS,
+    "feedback": FEEDBACK_METHOD_VARIANTS,
+}[sys.argv[2]]
 print("\n".join(execution_order(int(sys.argv[1]), modes)))
 ' "${replicate}" "${METHOD_SET}"
   )
@@ -155,12 +166,14 @@ print("\n".join(execution_order(int(sys.argv[1]), modes)))
     ordinal=$((ordinal + 1))
     persistence_variant="with_persistence"
     semantic_mode="disabled"
+    feedback_contract="disabled"
     if [[ "${method}" == "no-persistence" ]]; then
       persistence_variant="without_persistence"
     elif [[ "${method}" == "static-rsimem" ]]; then
       semantic_mode="static"
     elif [[ "${method}" == "static-utility-rsimem" ]]; then
       semantic_mode="static_utility"
+      [[ "${METHOD_SET}" != "feedback" ]] || feedback_contract="sm01_tsv_v1"
     fi
     base_name="${batch_id}_r$(printf '%02d' "${replicate}")_${method//-/_}"
     run_name="$(manifest_call next "${replicate}" "${ordinal}" "${method}" "${base_name}")"
@@ -187,6 +200,7 @@ print("\n".join(execution_order(int(sys.argv[1]), modes)))
       --rsimem-lifecycle-policy-version static-sm01-v1 \
       --rsimem-lifecycle-compiler-version uncompiled-v0 \
       --rsimem-semantic-writeback-mode "${semantic_mode}" \
+      --rsimem-semantic-feedback-contract "${feedback_contract}" \
       "${proxy_args[@]}"; then
       manifest_call record "${replicate}" "${ordinal}" "${method}" "${run_name}" failed past_bench
       exit 1
