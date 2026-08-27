@@ -5,6 +5,14 @@ from pathlib import Path
 
 import pytest
 
+from rsimem.memory.adaptive_matched_validation import (
+    JsonMatchedValidationDecisionStore,
+    MatchedAcceptanceCriteria,
+    MatchedAdaptivePolicyActivationCoordinator,
+    MatchedAdaptivePolicyValidator,
+)
+from rsimem.memory_systems.mem0_flat import FrozenMem0UtilityGate
+from rsimem.memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
 from rsimem.experiment_manifest import (
     ADAPTIVE_METHOD_VARIANTS,
     STATIC_METHOD_VARIANTS,
@@ -14,12 +22,14 @@ from rsimem.experiment_manifest import (
     load_manifest,
     next_attempt_name,
     record_attempt,
+    resolved_adaptive_policy_profile,
     resolved_environment_profile,
     resolved_family_budget,
     resolved_model_profile,
     resolved_run_profile,
     validate_manifest,
 )
+from test_adaptive_matched_validation import _observations, _offline_validated
 
 
 def _manifest_kwargs() -> dict[str, object]:
@@ -64,6 +74,19 @@ def _manifest_kwargs() -> dict[str, object]:
         "past_bench_commit": "past-last-change",
         "past_bench_tree": "past-tree",
         "past_bench_dirty": False,
+    }
+
+
+def _adaptive_profile() -> dict[str, object]:
+    return {
+        "configSchemaVersion": 1,
+        "configDigest": "a" * 64,
+        "storeSchemaVersion": 1,
+        "storeDigest": "b" * 64,
+        "activePolicyVersion": "adaptive.policy-v2",
+        "activeArtifactId": "adaptive-policy.artifact-v2",
+        "activeArtifactDigest": "c" * 64,
+        "preparation": "external_audited_active_store",
     }
 
 
@@ -187,11 +210,13 @@ def test_manifest_schedules_static_method_variants(tmp_path: Path) -> None:
         adaptive_path,
         **_manifest_kwargs(),
         execution_modes=ADAPTIVE_METHOD_VARIANTS,
+        adaptive_policy=_adaptive_profile(),
     )
     adaptive = load_manifest(adaptive_path)
     assert adaptive["configuration"]["executionModes"] == list(
         ADAPTIVE_METHOD_VARIANTS
     )
+    assert adaptive["configuration"]["adaptivePolicy"] == _adaptive_profile()
     assert adaptive["executionOrderByReplicate"]["2"] == [
         "native-hermes",
         "native-ledger",
@@ -199,6 +224,83 @@ def test_manifest_schedules_static_method_variants(tmp_path: Path) -> None:
         "adaptive-rsimem",
         "no-persistence",
     ]
+
+    with pytest.raises(ValueError, match="adaptive policy profile"):
+        initialize_batch_manifest(
+            tmp_path / "adaptive-missing-policy.json",
+            **_manifest_kwargs(),
+            execution_modes=ADAPTIVE_METHOD_VARIANTS,
+        )
+
+
+def test_resolved_adaptive_policy_profile_binds_real_active_store(
+    tmp_path: Path,
+) -> None:
+    base_gate = FrozenMem0UtilityGate()
+    base_policy = Mem0FlatSemanticPolicy(object(), utility_gate=base_gate)
+    _, split, artifact, store, _ = _offline_validated(
+        tmp_path,
+        suffix="manifest",
+        policy_version=base_policy.descriptor.policy_version,
+    )
+    observations = _observations(artifact, split)
+    criteria = MatchedAcceptanceCriteria()
+    decision = MatchedAdaptivePolicyValidator().evaluate(
+        artifact,
+        split,
+        observations,
+        criteria,
+    )
+    coordinator = MatchedAdaptivePolicyActivationCoordinator(
+        store,
+        JsonMatchedValidationDecisionStore(tmp_path / "matched-manifest"),
+    )
+    coordinator.apply(
+        artifact,
+        decision,
+        split=split,
+        observations=observations,
+        criteria=criteria,
+    )
+    config_path = tmp_path / "adaptive-config.json"
+    config_path.write_text(json.dumps({
+        "schema_version": 1,
+        "prepared_policy_store_file": store.path.name,
+        "adaptive_policy_store_path": ".rsimem/adaptive-policies.json",
+        "adaptive_trusted_roots": [base_policy.descriptor.policy_version],
+        "adaptive_parameters": [{
+            "parameter_id": "parameter.fact",
+            "name": "retrieval_accept_threshold",
+            "prompt_ref": "mem0-flat.retrieval",
+            "baseline_value": 0.35,
+        }],
+    }), encoding="utf-8")
+
+    profile = resolved_adaptive_policy_profile(config_path)
+
+    assert profile["activePolicyVersion"] == artifact.policy_version
+    assert profile["activeArtifactId"] == artifact.artifact_id
+    assert profile["activeArtifactDigest"] == artifact.content_digest
+    assert len(profile["configDigest"]) == 64
+    assert len(profile["storeDigest"]) == 64
+    assert profile["preparation"] == "external_audited_active_store"
+
+    empty_config = tmp_path / "empty-config.json"
+    empty_store = tmp_path / "empty-store.json"
+    empty_config.write_text(config_path.read_text(encoding="utf-8").replace(
+        store.path.name,
+        empty_store.name,
+    ), encoding="utf-8")
+    empty_store.write_text(json.dumps({
+        "schema_version": 1,
+        "trusted_root_policy_versions": [base_policy.descriptor.policy_version],
+        "artifacts": {},
+        "records": {},
+        "transitions": {},
+        "active_policy_version": None,
+    }), encoding="utf-8")
+    with pytest.raises(ValueError, match="no ACTIVE policy"):
+        resolved_adaptive_policy_profile(empty_config)
 
 
 def test_manifest_fails_closed_for_missing_field_unknown_mode_and_dirty_benchmark(

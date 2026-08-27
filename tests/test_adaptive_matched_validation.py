@@ -27,6 +27,7 @@ from rsimem.memory.adaptive_policy_validation import (
 )
 from rsimem.memory.feedback_dataset import FeedbackLabel
 from test_adaptive_policy_validation import _multi_dataset, _proposal
+from test_feedback_dataset import POLICY_VERSION
 
 
 def _digest(value: str) -> str:
@@ -82,8 +83,16 @@ def _observations(
     return tuple(values)
 
 
-def _offline_validated(tmp_path, *, suffix: str = "first"):
-    dataset, gate = _multi_dataset(training_negative=True)
+def _offline_validated(
+    tmp_path,
+    *,
+    suffix: str = "first",
+    policy_version: str = POLICY_VERSION,
+):
+    dataset, gate = _multi_dataset(
+        training_negative=True,
+        policy_version=policy_version,
+    )
     split = TimeOrderedAdaptiveSplitter().split(dataset, gate)
     artifact = _proposal(dataset, gate, split)
     offline = AdaptivePolicyValidator().evaluate(

@@ -25,7 +25,7 @@ from rsimem.memory.adaptive_policy_validation import (
 )
 from rsimem.memory.attribution import DeterministicFirstAttributor
 from rsimem.memory.feedback_dataset import evaluate_feedback_dataset_stage_gate
-from test_feedback_dataset import _dataset, _graph
+from test_feedback_dataset import POLICY_VERSION, _dataset, _graph
 
 
 def _canonical(value: object) -> str:
@@ -55,11 +55,18 @@ def _rebind_example(example, ordinal: int):
     return replace(rebound, example_id=_stable_id("feedback-example", payload))
 
 
-def _multi_dataset(*, training_negative: bool):
-    negative_graph = _graph("injected_not_used")
+def _multi_dataset(
+    *,
+    training_negative: bool,
+    policy_version: str = POLICY_VERSION,
+):
+    negative_graph = _graph(
+        "injected_not_used",
+        policy_version=policy_version,
+    )
     negative_report = DeterministicFirstAttributor().attribute(negative_graph)
     negative = _dataset(negative_graph, reports=(negative_report,))
-    positive_graph = _graph("used")
+    positive_graph = _graph("used", policy_version=policy_version)
     positive = _dataset(positive_graph)
     training_source = negative if training_negative else positive
     examples = (

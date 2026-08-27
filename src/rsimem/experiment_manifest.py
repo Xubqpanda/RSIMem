@@ -51,6 +51,7 @@ _REQUIRED_CONFIGURATION = {
     "adapterFailurePolicy",
     "adapterProjectionVerification",
     "seedControl",
+    "adaptivePolicy",
 }
 _REQUIRED_REVISIONS = {
     "rsimemCommit",
@@ -85,6 +86,91 @@ def _canonical_digest(value: Any) -> str:
         sort_keys=True,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def resolved_adaptive_policy_profile(config_path: Path) -> dict[str, Any]:
+    """Resolve and verify one prepared ACTIVE policy without exposing content."""
+
+    resolved_config = config_path.expanduser().resolve()
+    try:
+        config = json.loads(resolved_config.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("adaptive policy config cannot be read") from exc
+    expected = {
+        "schema_version",
+        "prepared_policy_store_file",
+        "adaptive_policy_store_path",
+        "adaptive_trusted_roots",
+        "adaptive_parameters",
+    }
+    if not isinstance(config, dict) or set(config) != expected:
+        raise ValueError("adaptive policy config fields are incomplete or unknown")
+    if config.get("schema_version") != 1:
+        raise ValueError("unsupported adaptive policy config schema")
+    prepared_file = config.get("prepared_policy_store_file")
+    if not isinstance(prepared_file, str) or not prepared_file.strip():
+        raise ValueError("prepared adaptive policy store file is invalid")
+    prepared_path = Path(prepared_file)
+    if (
+        prepared_path.is_absolute()
+        or ".." in prepared_path.parts
+        or prepared_path.name != prepared_path.as_posix()
+    ):
+        raise ValueError("prepared adaptive policy store must be a sibling file")
+    source_store = (resolved_config.parent / prepared_path).resolve()
+    if not source_store.is_relative_to(resolved_config.parent):
+        raise ValueError("prepared adaptive policy store escapes config directory")
+    try:
+        store_payload = json.loads(source_store.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("prepared adaptive policy store cannot be read") from exc
+
+    from .memory.adaptive_mem0_binding import ActiveAdaptiveMem0Binder
+    from .memory.adaptive_policy_store import JsonAdaptivePolicyStore
+    from .memory.live_writeback import StaticSemanticWritebackConfig
+    from .memory_systems.mem0_flat import FrozenMem0UtilityGate
+    from .memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
+
+    runtime = StaticSemanticWritebackConfig.from_mapping({
+        "mode": "adaptive_utility",
+        "adaptive_policy_store_path": config["adaptive_policy_store_path"],
+        "adaptive_trusted_roots": config["adaptive_trusted_roots"],
+        "adaptive_parameters": config["adaptive_parameters"],
+    })
+    destination = Path(runtime.adaptive_policy_store_path or "")
+    if destination.is_absolute() or ".." in destination.parts:
+        raise ValueError("adaptive policy store must be relative to Hermes home")
+    store = JsonAdaptivePolicyStore(
+        source_store,
+        trusted_root_policy_versions=runtime.adaptive_trusted_roots,
+    )
+    snapshot = store.snapshot()
+    if snapshot.active is None:
+        raise ValueError("prepared adaptive policy store has no ACTIVE policy")
+    base_gate = FrozenMem0UtilityGate()
+    base_policy = Mem0FlatSemanticPolicy(object(), utility_gate=base_gate)
+    binding = ActiveAdaptiveMem0Binder(runtime.adaptive_parameters).bind(
+        store,
+        base_gate,
+        expected_parent_policy_version=base_policy.descriptor.policy_version,
+    )
+    if not binding.adaptive or binding.artifact_id != snapshot.active.artifact_id:
+        raise ValueError("prepared adaptive policy does not bind to Mem0 runtime")
+    runtime_identity = {
+        key: value
+        for key, value in config.items()
+        if key != "prepared_policy_store_file"
+    }
+    return {
+        "configSchemaVersion": config["schema_version"],
+        "configDigest": _canonical_digest(runtime_identity),
+        "storeSchemaVersion": store_payload.get("schema_version"),
+        "storeDigest": _canonical_digest(store_payload),
+        "activePolicyVersion": snapshot.active.policy_version,
+        "activeArtifactId": snapshot.active.artifact_id,
+        "activeArtifactDigest": snapshot.active.content_digest,
+        "preparation": "external_audited_active_store",
+    }
 
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
@@ -296,7 +382,7 @@ def _validate_attempts(value: dict[str, Any]) -> None:
 
 
 def validate_manifest(value: Any) -> dict[str, Any]:
-    if not isinstance(value, dict) or value.get("schemaVersion") != 2:
+    if not isinstance(value, dict) or value.get("schemaVersion") != 3:
         raise ValueError("unsupported experiment manifest schema")
     if not isinstance(value.get("experimentId"), str) or not value["experimentId"]:
         raise ValueError("manifest experiment identity is missing")
@@ -389,6 +475,38 @@ def validate_manifest(value: Any) -> dict[str, Any]:
         raise ValueError("manifest contains an unknown execution mode")
     if len(set(modes)) != len(modes):
         raise ValueError("manifest contains duplicate execution modes")
+    adaptive_policy = configuration.get("adaptivePolicy")
+    if "adaptive-rsimem" in modes:
+        adaptive_policy = _validate_non_empty_object(
+            adaptive_policy,
+            "adaptive policy profile",
+        )
+        _require_exact_fields(adaptive_policy, {
+            "configSchemaVersion",
+            "configDigest",
+            "storeSchemaVersion",
+            "storeDigest",
+            "activePolicyVersion",
+            "activeArtifactId",
+            "activeArtifactDigest",
+            "preparation",
+        }, "adaptive policy profile")
+        if (
+            adaptive_policy.get("configSchemaVersion") != 1
+            or adaptive_policy.get("storeSchemaVersion") != 1
+            or adaptive_policy.get("preparation")
+            != "external_audited_active_store"
+        ):
+            raise ValueError("manifest adaptive policy schema is invalid")
+        _require_non_empty_strings(adaptive_policy, (
+            "configDigest",
+            "storeDigest",
+            "activePolicyVersion",
+            "activeArtifactId",
+            "activeArtifactDigest",
+        ), "adaptive policy profile")
+    elif adaptive_policy is not None:
+        raise ValueError("non-adaptive manifest cannot bind an adaptive policy")
 
     revisions = _validate_non_empty_object(value.get("revisions"), "revisions")
     if set(revisions) != _REQUIRED_REVISIONS:
@@ -450,6 +568,7 @@ def initialize_batch_manifest(
     past_bench_tree: str,
     past_bench_dirty: bool,
     execution_modes: tuple[str, ...] = EXECUTION_MODES,
+    adaptive_policy: dict[str, Any] | None = None,
 ) -> str:
     if replicates < 1:
         raise ValueError("replicates must be positive")
@@ -468,6 +587,7 @@ def initialize_batch_manifest(
         "adapterFailurePolicy": "fail_closed",
         "adapterProjectionVerification": adapter_projection_verification,
         "seedControl": "independent_unseeded_replicates",
+        "adaptivePolicy": adaptive_policy,
     }
     revisions = {
         "rsimemCommit": rsimem_commit,
@@ -487,7 +607,7 @@ def initialize_batch_manifest(
         "executionOrderByReplicate": schedule,
     }
     value = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "experimentId": _canonical_digest(identity_payload),
         **identity_payload,
         "attempts": [],
