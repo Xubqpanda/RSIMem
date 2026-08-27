@@ -2,7 +2,11 @@
 
 RSIMem is the experiment and evaluation repository for LightRSI's memory-mediated recursive self-improvement research.
 
-It studies whether an agent can improve future behavior by recursively updating its memory policy while accounting for the full lifecycle cost of context, memory, controller, and downstream execution.
+The first method study asks whether deployment-observable delayed feedback can
+improve the semantic fact-extraction prompt from version N to N+1. Routing,
+invocation timing, the update prompt, retrieval behavior, backend, and model
+profile remain frozen. Resource usage is recorded as a raw evaluation vector;
+it is not an input to prompt learning or activation.
 
 The initial evaluation uses [PAST-Bench](https://github.com/Gen-Verse/PAST-Bench), an interactive benchmark with ordered cross-session tasks, real tools, sandbox execution, and matched persistence controls.
 

@@ -127,11 +127,11 @@ Stage 5 is complete for the isolated deterministic path. Live PAST-Bench activat
 - [ ] Report task score, persistence gap, memory retrieval, injected tokens, model calls, tool calls, retries, controller cost, ingestor cost, storage cost, and wall time.
 - [ ] Expand to semantic-relevant update families only after the first family is fully attributable.
 
-### Stage 7: Adaptive Policy
+### Stage 7: Extraction-Prompt Adaptation
 
-- [ ] Collect delayed evidence for retrieval, injection, actual use, task outcome, tool behavior, retries, supersession, non-use, and lifecycle cost.
-- [ ] Estimate realized future utility without using hidden grader labels in the policy path.
-- [ ] Version semantic extraction/update/consolidation and retrieval policies while keeping route and cadence fixed.
+- [ ] Collect extraction-owned delayed evidence for opportunity, explicit memory-specific use, outcome, supersession, conflict, unresolved state, and censoring.
+- [ ] Estimate delayed extraction utility without hidden grader labels or resource usage in the policy path.
+- [ ] Version only the semantic extraction prompt while keeping update, retrieval, route, cadence, backend, and model profile fixed.
 - [ ] Use attributed failure subgraphs to update the responsible operation policy instead of broadcasting every task failure to all prior memory operations.
 - [ ] Validate proposed policy versions on held-out episodes before activation.
 - [ ] Support rejection, rollback, and reproducible replay.
@@ -173,4 +173,4 @@ Acceptance requires native behavior to remain unchanged, the memory artifact to 
 
 ## Current Boundary
 
-The scheduler, evaluator protocol, lifecycle controller, snapshot/writeback contracts, Hermes execution-surface baselines, transactional semantic mutation, Mem0-flat construction, delayed feedback, adaptive validation/activation/rollback, and ACTIVE-policy runtime binding are implemented. Static SM01 live writeback has audited matched evidence. Phase 2K now has a default-disabled five-method PAST-Bench launcher with strict prepared-store isolation and manifest identity, but no live adaptive replicate or cross-family claim yet. No PAST-Bench task definition, official score, answer key, or hidden grading contract may enter policy preparation or be changed while the remaining experiments run.
+The scheduler, evaluator protocol, lifecycle controller, snapshot/writeback contracts, Hermes execution-surface baselines, transactional semantic mutation, Mem0-flat construction, delayed feedback, and threshold-oriented activation/rollback infrastructure are implemented. Static SM01 live writeback has audited matched evidence. Extraction-prompt artifacts, validation, binding, and live adaptive evidence remain pending. No PAST-Bench task definition, official score, answer key, hidden grading contract, or resource-cost scalar may enter prompt optimization.
