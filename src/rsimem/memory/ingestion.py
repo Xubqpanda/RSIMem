@@ -386,11 +386,20 @@ class InternalMemoryOperation:
     expected_revision: str | None
     old_content_digest: str | None
     new_content_digest: str | None
+    transaction_required: bool
+    recovery_receipt_required: bool
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "action", InternalMemoryAction(self.action))
         if not self.operation_id.strip() or not _REASON_CODE.fullmatch(self.reason_code):
             raise ValueError("resolved internal operation identity is invalid")
+        if type(self.transaction_required) is not bool or type(
+            self.recovery_receipt_required
+        ) is not bool:
+            raise TypeError("resolved mutation safety flags must be bool")
+        mutating = self.action != InternalMemoryAction.NONE
+        if self.transaction_required != mutating or self.recovery_receipt_required != mutating:
+            raise ValueError("resolved mutation safety requirements do not match action")
         for digest in (self.old_content_digest, self.new_content_digest):
             if digest is not None and not _DIGEST.fullmatch(digest):
                 raise ValueError("resolved internal operation digest must be sha256")
@@ -620,6 +629,8 @@ class SemanticIngestionCoordinator:
                 expected_revision=target.revision if target else None,
                 old_content_digest=target.content_digest if target else None,
                 new_content_digest=proposal.new_content_digest,
+                transaction_required=proposal.action != InternalMemoryAction.NONE,
+                recovery_receipt_required=proposal.action != InternalMemoryAction.NONE,
             ))
         return MemoryIngestResult(
             execution_id=execution_id,
