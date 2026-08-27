@@ -646,30 +646,38 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2C.1 Host-Neutral Validation
 
-- □ 校验 mutation kind、action、backend capability、namespace、target ownership 和 expected revision。
-- □ 校验 content、metadata allowlist、resource path/count/size 和 provenance consistency。
-- □ Validation result 只包含 reason code、digest 和 size，不包含原文。
-- □ Path traversal、absolute path、duplicate resource、oversized content、invalid namespace 和 stale revision 全部拒绝。
-- □ Validation failure 不调用 `backend.mutate`，不创建 committed receipt。
+- √ 校验 mutation kind、action、backend capability、namespace、target ownership 和 expected revision。
+- √ 校验 content、metadata allowlist、resource path/count/size 和 provenance consistency。
+- √ Validation result 只包含 reason code、digest 和 size，不包含原文。
+- √ Path traversal、absolute path、duplicate resource、oversized content、invalid namespace 和 stale revision 全部拒绝。
+- √ Validation failure 不调用 `backend.mutate`，不创建 committed receipt。
 
 ### 2C.2 Semantic Validation
 
-- □ Semantic 校验 `memory/user` namespace、entry delimiter、字符预算、duplicate 和 conflict。
-- □ Semantic entry 仅允许 durable fact、preference、rule 和 constraint，不接受完整 transcript、tool payload 或 skill resource。
-- □ Prompt injection、credential、machine path、fabricated target、changed source 和 cross-run target 被拒绝。
-- □ Episodic/procedural validator 保持 disabled；没有对应 research gate 和 fixture 时不能通过 generic mutation path 写入。
+- √ Semantic 校验 `memory/user` namespace、entry delimiter、字符预算、duplicate 和 conflict。
+- √ Semantic entry 仅允许 durable fact、preference、rule 和 constraint，不接受完整 transcript、tool payload 或 skill resource。
+- √ Prompt injection、credential、machine path、fabricated target、changed source 和 cross-run target 被拒绝。
+- √ Episodic/procedural validator 保持 disabled；没有对应 research gate 和 fixture 时不能通过 generic mutation path 写入。
 
 验收需求：
 
-- □ Semantic memory 有完整 allow/reject matrix。
-- □ Safe semantic fixture 通过。
-- □ Disabled episodic/procedural mutation 被 capability gate 拒绝。
+- √ Semantic memory 有完整 allow/reject matrix。
+- √ Safe semantic fixture 通过。
+- √ Disabled episodic/procedural mutation 被 capability gate 拒绝。
 
 ### 2C.3 阶段闸门
 
-- □ Semantic memory validation 正反向 fixture 完整。
-- □ Security failure、revision conflict 和 unsupported action 均 fail closed。
-- □ 任何 rejected output 都没有修改 backend。
+- √ Semantic memory validation 正反向 fixture 完整。
+- √ Security failure、revision conflict 和 unsupported action 均 fail closed。
+- √ 任何 rejected output 都没有修改 backend。
+
+### 2C 验收记录（2026-08-27）
+
+- Contract：`VALIDATION_CONTRACT_SCHEMA_VERSION=1`。Host 通过 `TrustedValidationContext` 绑定 source/scope/validity，通过 `TargetOwnershipResolver` 解析 target ownership；framework 不能逐次提供一个自称 trusted 的 target binding。
+- Commits：`17776f6`（host-neutral/semantic validation 与 allow/reject matrix）、`cf63146`（validator-owned target ownership resolver、backend read failure 与 Hermes budget 对齐）、`86c9a14`（任意 malformed payload fail closed 与 numeric hash revision compatibility）。
+- Focused evidence：`test_memory_validation.py` 覆盖 ADD/UPDATE/DELETE/NONE、安全 semantic 类别、metadata/resource/provenance、duplicate/conflict、prompt injection、credential、machine path、target fabrication、cross-run、revision、backend failure 和 disabled memory kinds；所有 case 均断言 `mutate_calls == 0`。
+- Full acceptance：RSIMem `175 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
+- 已知限制：semantic durability/quality 仍依赖受限 category contract 加 deterministic structure/security checks，不能替代后续真实模型质量评估；prompt-injection pattern 是 conservative denylist，不构成完整内容安全证明。当前 ownership registry 仅供 fixture 使用且不持久化，Phase 2D 必须由 transaction receipt/recovery 提供 durable ownership。尚未创建 committed receipt，也未执行任何 backend mutation；episodic/procedural mutation 保持 disabled。
 
 ## 15. 第二阶段 2D：事务化 Mutation Executor
 

@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem ingestor, real writeback mutation, static policy, or adaptive policy is active yet. The active implementation scope is now semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E, Phase 2A, and Phase 2B are complete. Phase 2C host-neutral mutation validation and the semantic security boundary are the active milestone; no real RSIMem mutation is enabled yet.
+Phase 1A-1E and Phase 2A-2C are complete. Phase 2D transactional mutation execution, recovery, and context-exit gating are the active milestone; no real RSIMem mutation is enabled yet.
 
 ## Completed Work
 
@@ -151,18 +151,30 @@ the operation graph's mutation fixture is synthetic. No real model-based memory
 construction, validator, transaction executor, backend mutation, or live-run
 operation tracing is enabled.
 
+### Phase 2C Validation And Security Boundary
+
+- [x] Add a content-free host-neutral validation result and fail-closed candidate pipeline.
+- [x] Bind source, scope, validity, backend ownership, target ownership, revision, and actual target digest through trusted runtime state.
+- [x] Enforce the semantic namespace, Hermes character budget, metadata/resource, duplicate/conflict, durable-category, and security allow/reject matrix.
+- [x] Keep episodic/procedural mutation disabled and prove every rejected candidate leaves backend mutation count at zero.
+
+Known boundary: target ownership persistence and committed receipts do not exist
+yet. Semantic category and denylist checks enforce the current deterministic
+contract but do not establish model-generated memory quality or comprehensive
+prompt-injection resistance.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `154 passed`.
+- [x] Pass all RSIMem tests: `175 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `385 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2C Mutation Validation And Security Boundary**
+### **Current: Phase 2D Transactional Mutation Executor**
 
-Phase 2B now provides versioned prompt artifacts, canonical ingestion planning, deterministic failure semantics, content-free usage accounting, and append-only operation evidence without writing Hermes memory. The immediate objective is Phase 2C: validate every framework-produced semantic mutation at a host-neutral security boundary before any output can reach `MemoryRuntime.mutate()` or a Hermes file.
+Phase 2C now rejects unsafe or inconsistent framework output before it can reach `MemoryRuntime.mutate()` or a Hermes file. The immediate objective is Phase 2D: reserve one durable pending receipt, apply a validated semantic mutation, reread and verify actual storage, commit or recover deterministically after each crash point, and permit logical context exit only after verified commit.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -252,11 +264,11 @@ Acceptance criteria:
 
 ## Immediate Execution Order
 
-1. Implement the Phase 2C host-neutral validation result and failure pipeline.
-2. Add the semantic allow/reject matrix for namespace, content, provenance, ownership, revision, and security constraints.
-3. Prove rejected output never calls `backend.mutate` and keep episodic/procedural mutation disabled.
-4. Begin the Phase 2D transaction executor only after the full 2C gate passes.
-5. Connect model-based Mem0-flat semantic construction and the SM01 loop only after transactional recovery is proven.
+1. Define the Phase 2D pending/committed/failed/rolled-back receipt state machine and atomic reservation.
+2. Implement strict `validate -> reserve -> mutate -> reread -> verify -> commit` execution behind an isolated-fixture flag.
+3. Cover five crash points, restart recovery, revision conflict, orphan detection, and unknown-state target blocking.
+4. Gate logical source exit on reread-verified committed memory while keeping physical rewrite disabled.
+5. Connect model-based Mem0-flat semantic construction and the SM01 loop only after the full transaction/recovery gate passes.
 
 ## Update Policy
 
