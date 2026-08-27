@@ -19,7 +19,14 @@ from rsimem.memory.ingestion import (
 from rsimem.memory.operation_graph import AtomicOperationRecorder
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
+    ArtifactKind,
+    OperationKind,
     materialize_operation_graph,
+)
+from rsimem.memory.utility import (
+    MEM0_CONSOLIDATION_UPDATE_PARAMETER_ID,
+    MEM0_UTILITY_PARAMETER_IDS,
+    UtilityTarget,
 )
 from rsimem.memory.attribution import DeterministicFirstAttributor, FailureCategory
 from rsimem.memory.runtime import MemoryBackendRegistry
@@ -356,6 +363,45 @@ def test_frozen_utility_gate_replay_is_deterministic_and_content_free(tmp_path) 
     assert first_evidence == second_evidence
     assert len(setup[3].calls) == 4
     assert "Always use CSV with four columns." not in repr(second_evidence)
+
+
+def test_operation_graph_binds_stable_runtime_owned_utility_parameters(
+    tmp_path,
+) -> None:
+    log = AppendOnlyOperationEvidenceLog()
+    setup = _setup(
+        tmp_path,
+        operation=_operation_response(InternalMemoryAction.ADD, use_candidate=False),
+        utility_gate=FrozenMem0UtilityGate(),
+        operation_recorder=AtomicOperationRecorder(log),
+    )
+    setup[-1].ingest(setup[5], setup[6])
+    graph = materialize_operation_graph(log.events)
+    parameters = {
+        artifact.artifact_id: artifact
+        for artifact in graph.artifacts
+        if artifact.kind == ArtifactKind.POLICY_PARAMETER
+    }
+    expected = {
+        *MEM0_UTILITY_PARAMETER_IDS.values(),
+        MEM0_CONSOLIDATION_UPDATE_PARAMETER_ID,
+    }
+    assert expected.issubset(parameters)
+    assert all(parameters[value].provenance_ref == value for value in expected)
+    by_kind = {operation.kind: operation for operation in graph.operations}
+    assert MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.GENERATION] in (
+        by_kind[OperationKind.FACT_EXTRACTION].input_artifact_ids
+    )
+    assert MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.RETRIEVAL] in (
+        by_kind[OperationKind.RELATED_MEMORY_RETRIEVAL].input_artifact_ids
+    )
+    decision_inputs = by_kind[
+        OperationKind.INTERNAL_OPERATION_DECISION
+    ].input_artifact_ids
+    assert MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.INTERNAL_OPERATION] in (
+        decision_inputs
+    )
+    assert MEM0_CONSOLIDATION_UPDATE_PARAMETER_ID in decision_inputs
 
 
 def test_utility_policy_version_does_not_change_route_or_invocation_count(tmp_path) -> None:

@@ -28,6 +28,11 @@ from ...memory.ingestion import (
     SemanticPolicyDescriptor,
 )
 from ...memory.runtime import MemoryBackendRegistry
+from ...memory.utility import (
+    MEM0_CONSOLIDATION_UPDATE_PARAMETER_ID,
+    MEM0_UTILITY_PARAMETER_IDS,
+    UtilityTarget,
+)
 from ...memory.operation_graph import (
     ArtifactKind,
     ArtifactNode,
@@ -486,6 +491,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         content_digest: str,
         revision: str,
         provenance_ref: str,
+        artifact_id: str | None = None,
     ) -> str:
         assert self.operation_recorder is not None
         artifact = self._artifact_node(
@@ -496,9 +502,38 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             byte_size=0,
             revision=revision,
             provenance_ref=provenance_ref,
+            artifact_id=artifact_id,
         )
         self.operation_recorder.record_artifact(artifact)
         return artifact.artifact_id
+
+    def _record_utility_parameter(
+        self,
+        context: OperationContext,
+        target: UtilityTarget,
+        *,
+        update: bool = False,
+    ) -> str | None:
+        if self.operation_recorder is None or self.utility_gate is None:
+            return None
+        policy = (
+            self.utility_gate.update_policy
+            if update and self.utility_gate.update_policy is not None
+            else self.utility_gate.policy_for(target)
+        )
+        parameter_id = (
+            MEM0_CONSOLIDATION_UPDATE_PARAMETER_ID
+            if update
+            else MEM0_UTILITY_PARAMETER_IDS[target]
+        )
+        return self._record_parameter_artifact(
+            context,
+            logical_name=parameter_id,
+            content_digest=policy.digest,
+            revision=policy.policy_version,
+            provenance_ref=parameter_id,
+            artifact_id=parameter_id,
+        )
 
     def _begin_trace(
         self,
@@ -533,12 +568,20 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             revision=self.fact_prompt.artifact.version,
             provenance_ref=self.fact_prompt.artifact.prompt_id,
         )
+        generation_parameter = self._record_utility_parameter(
+            context,
+            UtilityTarget.GENERATION,
+        )
         extraction_spec = self._operation_spec(
             context,
             OperationKind.FACT_EXTRACTION,
             f"{request.idempotency_key}.extraction",
             parents=(source_spec.operation_id,),
-            inputs=(source.artifact_id, prompt_parameter),
+            inputs=tuple(filter(None, (
+                source.artifact_id,
+                prompt_parameter,
+                generation_parameter,
+            ))),
         )
         return context, source_spec.operation_id, source.artifact_id, extraction_spec
 
@@ -703,6 +746,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         related_operation_ids: list[str] = []
         related_artifact_ids: list[str] = []
         retrieval_parameter = None
+        retrieval_utility_parameter = None
         if self.operation_recorder is not None and trace_state is not None:
             retrieval_parameter = self._record_parameter_artifact(
                 trace_state[0],
@@ -710,6 +754,10 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 content_digest=self.retrieval.digest,
                 revision=self.retrieval.version,
                 provenance_ref=self.retrieval.version,
+            )
+            retrieval_utility_parameter = self._record_utility_parameter(
+                trace_state[0],
+                UtilityTarget.RETRIEVAL,
             )
         for index, fact in enumerate(facts):
             related_spec = None
@@ -719,7 +767,11 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                     OperationKind.RELATED_MEMORY_RETRIEVAL,
                     f"{request.idempotency_key}.related.{index}",
                     parents=(trace_state[3].operation_id,),
-                    inputs=(fact_artifacts[index], retrieval_parameter),
+                    inputs=tuple(filter(None, (
+                        fact_artifacts[index],
+                        retrieval_parameter,
+                        retrieval_utility_parameter,
+                    ))),
                 )
             related_scope = (
                 self.operation_recorder.operation_scope(related_spec)
@@ -800,6 +852,15 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 revision=self.operation_prompt.artifact.version,
                 provenance_ref=self.operation_prompt.artifact.prompt_id,
             )
+            internal_utility_parameter = self._record_utility_parameter(
+                trace_state[0],
+                UtilityTarget.INTERNAL_OPERATION,
+            )
+            update_utility_parameter = self._record_utility_parameter(
+                trace_state[0],
+                UtilityTarget.INTERNAL_OPERATION,
+                update=True,
+            )
             decision_spec = self._operation_spec(
                 trace_state[0],
                 OperationKind.INTERNAL_OPERATION_DECISION,
@@ -809,6 +870,16 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                     *fact_artifacts,
                     *related_artifact_ids,
                     decision_parameter,
+                    *(
+                        (internal_utility_parameter,)
+                        if internal_utility_parameter is not None
+                        else ()
+                    ),
+                    *(
+                        (update_utility_parameter,)
+                        if update_utility_parameter is not None
+                        else ()
+                    ),
                 ),
             )
         decision_scope = (

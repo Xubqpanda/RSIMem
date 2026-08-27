@@ -24,7 +24,11 @@ from .memory.operation_graph import (
     OperationKind,
     materialize_operation_graph,
 )
-from .memory.utility import STATIC_UTILITY_FEATURE_SCHEMA
+from .memory.utility import (
+    MEM0_UTILITY_PARAMETER_IDS,
+    STATIC_UTILITY_FEATURE_SCHEMA,
+    UtilityTarget,
+)
 from .memory_systems.mem0_flat import FrozenMem0UtilityGate
 from .memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
 
@@ -149,6 +153,12 @@ def assemble_feedback_batch(
     resolved_count = labels[FeedbackLabel.POSITIVE] + labels[FeedbackLabel.NEGATIVE]
     if resolved_count < 1:
         raise ValueError("feedback preparation produced no resolved example")
+    retrieval_parameter = MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.RETRIEVAL]
+    if any(
+        retrieval_parameter not in example.policy_parameter_ids
+        for example in dataset.examples
+    ):
+        raise ValueError("feedback evidence lacks trusted retrieval ownership")
 
     dataset_path, _ = JsonDelayedFeedbackDatasetStore(
         output_root / "datasets"
@@ -166,6 +176,7 @@ def assemble_feedback_batch(
         "observationCutoffOperationId": dataset.window.cutoff_operation_id,
         "sourceLogs": source_logs,
         "exampleIds": [example.example_id for example in dataset.examples],
+        "runtimeOwnedParameterIds": [retrieval_parameter],
     }
     report = {
         **identity,
