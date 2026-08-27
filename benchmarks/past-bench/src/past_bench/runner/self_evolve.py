@@ -77,8 +77,6 @@ def build_hermes_extra_body(
     if semantic_writeback_mode in {"static", "static_utility", "adaptive_utility"}:
         if rsimem_mode != "native+ledger":
             raise ValueError("static semantic writeback requires native+ledger mode")
-        if rsimem_lifecycle_evaluator_mode == "disabled":
-            raise ValueError("static semantic writeback requires lifecycle evaluation")
         if semantic_writeback_mode == "adaptive_utility":
             if rsimem_adaptive_config is None:
                 raise ValueError("adaptive semantic writeback requires adaptive config")
