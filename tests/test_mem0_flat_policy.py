@@ -212,7 +212,10 @@ def test_flat_retrieval_contract_is_restart_stable_and_revision_bound(tmp_path) 
     assert config.top_k == 5
     assert config.threshold == 0.12
     assert config.rebuild_semantics == "snapshot-rebuild-per-ingest-v1"
-    assert config.digest[:16] in policy.descriptor.policy_version
+    assert policy.semantic_manifest.retrieval_component_digest == config.digest
+    assert policy.descriptor.policy_version == (
+        policy.semantic_manifest.composite_policy_version
+    )
 
     first = reader.search(request, "Always use TSV with four columns.")
     restarted = FlatSemanticCandidateReader(

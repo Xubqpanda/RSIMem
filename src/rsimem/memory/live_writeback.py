@@ -40,12 +40,17 @@ from .operation_graph import (
     AppendOnlyOperationEvidenceLog,
     AtomicOperationRecorder,
 )
+from .prompt_components import PromptAdapterRegistry
 from .receipts import JsonMutationReceiptStore
 from .semantic_loop import SemanticWritebackLoop, SemanticWritebackLoopResult
 from .validation import MutationValidator
 from ..memory_systems.mem0_flat.policy import (
     FlatSemanticCandidateReader,
     Mem0FlatSemanticPolicy,
+)
+from ..memory_systems.mem0_flat.prompt_adapter import (
+    MEM0_FLAT_EXTRACTION_SLOT_ID,
+    Mem0FlatPromptAdapter,
 )
 from ..memory_systems.mem0_flat.prompts import CompletionClient
 from ..memory_systems.mem0_flat.utility_gate import FrozenMem0UtilityGate
@@ -418,10 +423,24 @@ class StaticSemanticWritebackRuntime:
         base_gate = utility_gate
         if adaptive_policy_store is not None and base_gate is None:
             base_gate = FrozenMem0UtilityGate()
+        self.prompt_registry = PromptAdapterRegistry()
+        self.prompt_adapter = Mem0FlatPromptAdapter()
+        self.prompt_registry.register(self.prompt_adapter)
+        extraction_artifact = self.prompt_registry.root_artifact(
+            MEM0_FLAT_EXTRACTION_SLOT_ID
+        )
+        self.extraction_binding = self.prompt_registry.bind(
+            MEM0_FLAT_EXTRACTION_SLOT_ID,
+            extraction_artifact,
+        )
         base_policy = Mem0FlatSemanticPolicy(
             completion_client,
+            fact_prompt=self.prompt_adapter.bound_template(
+                self.extraction_binding
+            ),
             operation_recorder=self.operation_recorder,
             utility_gate=base_gate,
+            extraction_binding=self.extraction_binding,
         )
         self.adaptive_binding: AdaptiveMem0Binding | None = None
         if adaptive_policy_store is None:
@@ -443,8 +462,12 @@ class StaticSemanticWritebackRuntime:
             self.policy = (
                 Mem0FlatSemanticPolicy(
                     completion_client,
+                    fact_prompt=self.prompt_adapter.bound_template(
+                        self.extraction_binding
+                    ),
                     operation_recorder=self.operation_recorder,
                     utility_gate=self.utility_gate,
+                    extraction_binding=self.extraction_binding,
                     descriptor_policy_version=(
                         self.adaptive_binding.actual_policy_version
                     ),
