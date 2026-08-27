@@ -13,7 +13,13 @@ from rsimem.lifecycle import (
     HermesLifecycleDryRunRuntime,
     TaskLifecycleState,
 )
-from rsimem.memory import MemoryKind, MemoryQuery
+from rsimem.memory import (
+    MemoryArtifact,
+    MemoryKind,
+    MemoryMutation,
+    MemoryMutationAction,
+    MemoryQuery,
+)
 from rsimem.memory.live_writeback import (
     STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION,
     StaticSemanticWritebackConfig,
@@ -411,3 +417,30 @@ def test_dry_run_observer_does_not_change_direct_compilation(tmp_path) -> None:
     assert len([event for event in observer.events if event["kind"] == "memory_ingestion"]) == 1
     plain.close()
     observed.close()
+
+
+def test_static_runtime_fails_audit_on_semantic_mutation_without_receipt(
+    tmp_path,
+) -> None:
+    runtime = _runtime(tmp_path, _client())
+    backend = runtime.registry.resolve(MemoryKind.SEMANTIC)
+    result = backend.mutate(MemoryMutation(
+        MemoryMutationAction.ADD,
+        MemoryKind.SEMANTIC,
+        artifact=MemoryArtifact(
+            "native-candidate",
+            MemoryKind.SEMANTIC,
+            "Unreceipted native mutation.",
+            namespace="memory",
+        ),
+    ))
+    assert result.accepted is True
+
+    with pytest.raises(ValueError, match="semantic mutation audit failed"):
+        runtime.close()
+    assert runtime.mutation_audit_report is not None
+    issue = next(
+        issue for issue in runtime.mutation_audit_report.issues
+        if issue.kind == "semantic_state_changed_without_receipt"
+    )
+    assert issue.writer_identity.value == "native_hermes"

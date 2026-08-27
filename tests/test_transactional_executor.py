@@ -45,7 +45,10 @@ from rsimem.memory.receipts import (
     MutationReceiptStatus,
     SemanticMutationWriter,
 )
-from rsimem.memory.receipt_audit import audit_mutation_receipts
+from rsimem.memory.receipt_audit import (
+    audit_mutation_receipts,
+    capture_semantic_mutation_audit_scope,
+)
 from rsimem.memory.attribution import DeterministicFirstAttributor, FailureCategory
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
@@ -572,6 +575,7 @@ def test_backend_acceptance_without_matching_reread_stays_blocked(tmp_path, mode
 def test_each_crash_point_has_restart_stable_idempotent_recovery(tmp_path, point) -> None:
     case = tmp_path / point.value
     backend, registry, store, validator, executor = _environment(case)
+    audit_scope = capture_semantic_mutation_audit_scope(store, registry)
     request = _request(
         InternalMemoryAction.ADD,
         content=f"Always use TSV for {point.value}.",
@@ -610,6 +614,19 @@ def test_each_crash_point_has_restart_stable_idempotent_recovery(tmp_path, point
     )
     assert recovered.writer_identity == expected_writer
     assert recovered_receipt.writer_identity == expected_writer
+    audit = audit_mutation_receipts(
+        restarted_store,
+        registry,
+        semantic_scope=audit_scope,
+        allowed_writers=(SemanticMutationWriter.RSIMEM_EXECUTOR,),
+    )
+    disallowed = {
+        issue.kind for issue in audit.issues
+        if issue.kind == "disallowed_mutation_writer"
+    }
+    assert bool(disallowed) is (
+        expected_writer == SemanticMutationWriter.OPERATOR_RECOVERY
+    )
     duplicate = restarted.execute(request)
     assert duplicate.status == MutationExecutionStatus.DUPLICATE
     assert duplicate.mutation_id == recovered.mutation_id
