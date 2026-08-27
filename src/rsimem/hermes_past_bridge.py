@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from .hermes_integration import (
     HermesAdapterExecutionError,
@@ -17,6 +17,13 @@ from .hermes_integration import (
     build_configured_hermes_runtime,
 )
 from .ledger import MemoryLedgerObserver
+from .lifecycle import (
+    EvaluationTrigger,
+    HermesLifecycleConfig,
+    HermesLifecycleDryRunResult,
+    HermesLifecycleDryRunRuntime,
+    TaskLifecycleState,
+)
 from .memory import MemoryEvent, MemoryEventKind, MemoryKind, MemoryQuery
 
 
@@ -252,6 +259,10 @@ class HermesPastBenchBridge:
         experiment_variant: str,
         family_id: str | None = None,
         stage: str | None = None,
+        lifecycle_config: HermesLifecycleConfig | None = None,
+        lifecycle_evidence_path: Path | None = None,
+        lifecycle_receipt_path: Path | None = None,
+        lifecycle_complete: Callable[[str], str] | None = None,
     ) -> None:
         if config.mode == HermesExecutionMode.NATIVE:
             raise ValueError("native mode must not construct an RSIMem bridge")
@@ -275,6 +286,36 @@ class HermesPastBenchBridge:
             observers=(self.ledger,),
         )
         self._tool_handlers: dict[str, Callable[..., str]] = {}
+        self._agent: object | None = None
+        self._last_task_completed = False
+        self._session_end_emitted = False
+        self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
+        self._lifecycle_failures: list[tuple[str, str]] = []
+        lifecycle_config = lifecycle_config or HermesLifecycleConfig()
+        self.lifecycle = (
+            HermesLifecycleDryRunRuntime(
+                lifecycle_config,
+                run_id=run_id,
+                episode_id=episode_id,
+                session_id=session_id,
+                task_id=task_id,
+                variant=experiment_variant,
+                trace_id=trace_id,
+                receipt_path=(
+                    lifecycle_receipt_path
+                    or self.evidence_path.with_name("rsimem_lifecycle_receipts.json")
+                ),
+                evidence_path=(
+                    lifecycle_evidence_path
+                    or self.evidence_path.with_name("rsimem_lifecycle_events.jsonl")
+                ),
+                family_id=family_id,
+                stage=stage,
+                injected_complete=lifecycle_complete,
+            )
+            if lifecycle_config.enabled
+            else None
+        )
         self._closed = False
 
     @property
@@ -282,6 +323,7 @@ class HermesPastBenchBridge:
         return self.config.mode == HermesExecutionMode.ADAPTER_LEDGER
 
     def attach(self, agent: object) -> None:
+        self._agent = agent
         memory_store = getattr(agent, "_memory_store", None)
         if memory_store is not None:
             agent._memory_store = _PromptMemoryStore(self, memory_store)
@@ -293,6 +335,55 @@ class HermesPastBenchBridge:
                 str(getattr(agent, "session_id", "") or "") or None,
             )
         self._wrap_skill_handlers()
+
+    @property
+    def lifecycle_results(self) -> tuple[HermesLifecycleDryRunResult, ...]:
+        return tuple(self._lifecycle_results)
+
+    @property
+    def lifecycle_failures(self) -> tuple[tuple[str, str], ...]:
+        return tuple(self._lifecycle_failures)
+
+    def on_task_completed(self, result: Mapping[str, Any]) -> None:
+        """Receive the explicit post-conversation task boundary from PAST."""
+
+        if self.lifecycle is None or result.get("completed") is not True:
+            return
+        self._last_task_completed = True
+        self._process_lifecycle_boundary(
+            EvaluationTrigger.TASK_COMPLETED,
+            TaskLifecycleState.COMPLETED,
+        )
+
+    def _process_lifecycle_boundary(
+        self,
+        trigger: EvaluationTrigger,
+        task_state: TaskLifecycleState,
+    ) -> None:
+        assert self.lifecycle is not None
+        try:
+            agent = self._agent
+            if agent is None:
+                raise ValueError("Hermes lifecycle bridge is not attached")
+            session_db = getattr(agent, "_session_db", None)
+            native_session_id = str(getattr(agent, "session_id", "") or "")
+            if session_db is None or not native_session_id:
+                raise ValueError("Hermes lifecycle requires a persisted native session")
+            rows = session_db.get_messages(native_session_id)
+            result = self.lifecycle.process(
+                rows,
+                trigger=trigger,
+                task_state=task_state,
+                source_ref=f"hermes_state:session:{native_session_id}",
+            )
+        except Exception as exc:
+            self._lifecycle_failures.append((trigger.value, type(exc).__name__))
+            return
+        if not any(
+            item.evaluation.evaluation_id == result.evaluation.evaluation_id
+            for item in self._lifecycle_results
+        ):
+            self._lifecycle_results.append(result)
 
     def adapter_call(
         self,
@@ -481,6 +572,16 @@ class HermesPastBenchBridge:
             return
         self._closed = True
         try:
+            if self.lifecycle is not None and not self._session_end_emitted:
+                self._session_end_emitted = True
+                self._process_lifecycle_boundary(
+                    EvaluationTrigger.SESSION_END,
+                    (
+                        TaskLifecycleState.COMPLETED
+                        if self._last_task_completed
+                        else TaskLifecycleState.FAILED
+                    ),
+                )
             from tools.registry import registry
 
             for tool_name, handler in self._tool_handlers.items():
@@ -489,4 +590,5 @@ class HermesPastBenchBridge:
                     entry.handler = handler
             self._tool_handlers.clear()
         finally:
+            self._agent = None
             self.runtime.close()

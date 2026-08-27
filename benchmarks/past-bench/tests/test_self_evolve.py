@@ -117,6 +117,11 @@ def test_build_hermes_extra_body_contains_persistence_overrides(tmp_path: Path):
         "adapter_failure_policy": "fail_closed",
         "verify_native_projection": False,
         "evidence_path": str(tmp_path / "artifacts" / "rsimem_memory_events.jsonl"),
+        "lifecycle": {
+            "evaluator_mode": "disabled",
+            "policy_version": "phase1-dry-run-v1",
+            "compiler_version": "uncompiled-v0",
+        },
     }
 
 

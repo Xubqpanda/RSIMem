@@ -40,6 +40,9 @@ def build_hermes_extra_body(
     rsimem_mode: str = "native",
     rsimem_adapter_failure_policy: str = "fail_closed",
     rsimem_verify_native_projection: bool = False,
+    rsimem_lifecycle_evaluator_mode: str = "disabled",
+    rsimem_lifecycle_policy_version: str = "phase1-dry-run-v1",
+    rsimem_lifecycle_compiler_version: str = "uncompiled-v0",
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -75,6 +78,11 @@ def build_hermes_extra_body(
                 "adapter_failure_policy": rsimem_adapter_failure_policy,
                 "verify_native_projection": rsimem_verify_native_projection,
                 "evidence_path": str(artifacts_dir / "rsimem_memory_events.jsonl"),
+                "lifecycle": {
+                    "evaluator_mode": rsimem_lifecycle_evaluator_mode,
+                    "policy_version": rsimem_lifecycle_policy_version,
+                    "compiler_version": rsimem_lifecycle_compiler_version,
+                },
             },
         }
     }
@@ -485,6 +493,15 @@ class HermesPersistenceBackend(PersistenceBackend):
             ),
             rsimem_verify_native_projection=(
                 sequence.hermes.rsimem_verify_native_projection
+            ),
+            rsimem_lifecycle_evaluator_mode=(
+                sequence.hermes.rsimem_lifecycle_evaluator_mode
+            ),
+            rsimem_lifecycle_policy_version=(
+                sequence.hermes.rsimem_lifecycle_policy_version
+            ),
+            rsimem_lifecycle_compiler_version=(
+                sequence.hermes.rsimem_lifecycle_compiler_version
             ),
         )
 

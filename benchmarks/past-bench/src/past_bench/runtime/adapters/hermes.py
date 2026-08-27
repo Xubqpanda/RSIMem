@@ -186,6 +186,8 @@ class HermesAdapter(RuntimeAdapter):
                 conversation_history=[],
                 task_id=self.request.session_id,
             )
+        if self._rsimem_bridge is not None:
+            self._rsimem_bridge.on_task_completed(result)
         self._set_session_title_if_missing(agent)
 
         review_wait_s = float(
@@ -307,6 +309,7 @@ class HermesAdapter(RuntimeAdapter):
             HermesExperimentConfig,
         )
         from rsimem.hermes_past_bridge import HermesPastBenchBridge
+        from rsimem.lifecycle import HermesLifecycleConfig
 
         metadata = self.request.runtime_config.metadata
         experiment_variant = str(metadata.get("experiment_variant") or "").strip()
@@ -334,6 +337,15 @@ class HermesAdapter(RuntimeAdapter):
             experiment_variant=experiment_variant,
             family_id=(str(metadata["family_id"]) if metadata.get("family_id") else None),
             stage=(str(metadata["stage"]) if metadata.get("stage") else None),
+            lifecycle_config=HermesLifecycleConfig.from_mapping(
+                rsimem_cfg.get("lifecycle")
+            ),
+            lifecycle_evidence_path=(
+                capture_dir / "rsimem_lifecycle_events.jsonl"
+            ),
+            lifecycle_receipt_path=(
+                capture_dir / "rsimem_lifecycle_receipts.json"
+            ),
         )
         try:
             bridge.attach(agent)
