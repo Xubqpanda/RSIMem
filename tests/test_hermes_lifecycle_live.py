@@ -68,6 +68,7 @@ def test_deterministic_live_runtime_reserves_once_per_boundary(tmp_path) -> None
         for line in (tmp_path / "lifecycle.jsonl").read_text(encoding="utf-8").splitlines()
     ]
     assert kinds.count("context_snapshot") == 2
+    assert kinds.count("evaluation_accepted") == 2
     assert kinds.count("dry_run_mutation") == 2
 
 
@@ -134,3 +135,59 @@ def test_disabled_and_unknown_lifecycle_configuration_fail_closed(tmp_path) -> N
         HermesLifecycleConfig.from_mapping({"turn_interval": 1})
     with pytest.raises(ValueError, match="requires an injected client"):
         _runtime(tmp_path, HermesLifecycleConfig(evaluator_mode="injected_json"))
+
+
+def test_evaluator_failure_is_audited_and_same_boundary_can_retry(tmp_path) -> None:
+    calls = 0
+
+    def complete(prompt: str) -> str:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise TimeoutError("fixture timeout with private response text")
+        request = json.loads(prompt)
+        return json.dumps({
+            "policy_version": "ignored",
+            "signals": [
+                {
+                    "segment_id": segment["segment_id"],
+                    "context_action": "retain",
+                    "writeback_action": "defer",
+                    "utility_estimate": 0,
+                    "confidence": 1,
+                }
+                for segment in request["segments"]
+            ],
+        })
+
+    runtime = _runtime(
+        tmp_path,
+        HermesLifecycleConfig(
+            evaluator_mode="injected_json",
+            policy_version="host-retry-v1",
+        ),
+        complete=complete,
+    )
+    kwargs = {
+        "trigger": EvaluationTrigger.TASK_COMPLETED,
+        "task_state": TaskLifecycleState.COMPLETED,
+        "source_ref": "hermes_state:session:live",
+    }
+    with pytest.raises(TimeoutError, match="fixture timeout"):
+        runtime.process(_rows(), **kwargs)
+    result = runtime.process(_rows(), **kwargs)
+
+    assert calls == 2
+    assert result.evaluation.policy_version == "host-retry-v1"
+    events = [
+        json.loads(line)
+        for line in (tmp_path / "lifecycle.jsonl").read_text(encoding="utf-8").splitlines()
+    ]
+    assert [event["kind"] for event in events] == [
+        "context_snapshot",
+        "evaluation_rejected",
+        "evaluation_accepted",
+    ]
+    serialized = json.dumps(events, ensure_ascii=True)
+    assert "private response text" not in serialized
+    assert not (tmp_path / "receipts.json").exists()

@@ -353,6 +353,38 @@ class LifecycleLedgerObserver:
             },
         )
 
+    def record_evaluation(
+        self,
+        snapshot: ContextSnapshot,
+        *,
+        evaluation_id: str,
+        trigger: str,
+        evaluator: str,
+        policy_version: str,
+        status: str,
+        reason_codes: tuple[str, ...] = (),
+    ) -> None:
+        """Record evaluator disposition without prompt or response content."""
+
+        if status not in {"accepted", "rejected"}:
+            raise ValueError("lifecycle evaluation status must be accepted or rejected")
+        self._append(
+            kind=f"evaluation_{status}",
+            run_id=snapshot.run_id,
+            episode_id=snapshot.episode_id,
+            session_id=snapshot.session_id,
+            task_id=snapshot.task_id,
+            snapshot_id=snapshot.snapshot_id,
+            data={
+                "evaluationId": evaluation_id,
+                "trigger": trigger,
+                "evaluator": evaluator,
+                "policyVersion": policy_version,
+                "status": status,
+                "reasonCodes": list(reason_codes),
+            },
+        )
+
     def record(self, event: WritebackEvent) -> None:
         """Implement WritebackObserver without retaining plan or source content."""
 
