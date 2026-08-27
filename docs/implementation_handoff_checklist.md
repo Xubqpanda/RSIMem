@@ -955,30 +955,37 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2I.1 Lifecycle Join 与 Label
 
-- □ 从 atomic operation graph 连接 source、extraction、related-memory retrieval、internal operation、mutation、artifact revision、query、retrieval、injection、task、tool、supersession 和 recovery。
-- □ 支持一个 artifact 多次 retrieval、一次 query 多个 hit 和共享 physical execution。
-- □ 明确 observation window、cutoff 和 policy version。
-- □ 显式记录 non-retrieval、retrieved-not-injected、injected-not-used、superseded 和 censored。
-- □ Label 只使用后续 retrieval、injection、tool behavior、retry、completion、supersession、non-use 和 lifecycle cost。
-- □ Official PAST-Bench score 只用于最终 evaluation，不进入 policy-update label。
-- □ 定义 positive、negative、unresolved 和 censored utility。
-- □ 为每个 label 保留 attributed operation IDs 和最小 failure subgraph，使 extraction、operation decision 与 retrieval policy 能分别接收反馈。
+- √ 从 atomic operation graph 连接 source、extraction、related-memory retrieval、internal operation、mutation、artifact revision、query、retrieval、injection、task、tool、supersession 和 recovery。
+- √ 支持一个 artifact 多次 retrieval、一次 query 多个 hit 和共享 physical execution。
+- √ 明确 observation window、cutoff 和 policy version。
+- √ 显式记录 non-retrieval、retrieved-not-injected、injected-not-used、superseded 和 censored。
+- √ Label 只使用后续 retrieval、injection、tool behavior、retry、completion、supersession、non-use 和 lifecycle cost。
+- √ Official PAST-Bench score 只用于最终 evaluation，不进入 policy-update label。
+- √ 定义 positive、negative、unresolved 和 censored utility。
+- √ 为每个 label 保留 attributed operation IDs 和最小 failure subgraph，使 extraction、operation decision 与 retrieval policy 能分别接收反馈。
 
 验收需求：
 
-- □ Referential-integrity audit 发现 orphan、duplicate、revision mismatch 和 future leakage。
-- □ 同一 evidence 重复生成 canonical-equivalent dataset。
-- □ 四类 label fixture 通过，修改 attribution window 生成新版本且不覆盖旧数据。
-- □ Dataset 不包含 raw memory、prompt、response 或 hidden evidence。
-- □ 删除无关 operation 后 label 不变；删除被归因 operation 后 integrity audit 失败，防止把整条 trajectory 无差别作为训练样本。
+- √ Referential-integrity audit 发现 orphan、duplicate、revision mismatch 和 future leakage。
+- √ 同一 evidence 重复生成 canonical-equivalent dataset。
+- √ 四类 label fixture 通过，修改 attribution window 生成新版本且不覆盖旧数据。
+- √ Dataset 不包含 raw memory、prompt、response 或 hidden evidence。
+- √ 删除无关 operation 后 label 不变；删除被归因 operation 后 integrity audit 失败，防止把整条 trajectory 无差别作为训练样本。
 
 ### 2I.2 Exposure Bias
 
-- □ 记录 artifact 是否有曝光机会、是否进入 candidate set 和是否被 policy 过滤。
-- □ 区分“没有价值”和“没有曝光机会”，不把未召回直接标为负 utility。
-- □ 记录 propensity 或 deterministic eligibility，支持偏差分析。
-- □ Missing propensity 时禁止使用需要 propensity correction 的 estimator。
-- □ Dataset report 显示 observation count 和 censoring rate。
+- √ 记录 artifact 是否有曝光机会、是否进入 candidate set 和是否被 policy 过滤。
+- √ 区分“没有价值”和“没有曝光机会”，不把未召回直接标为负 utility。
+- √ 记录 propensity 或 deterministic eligibility，支持偏差分析。
+- √ Missing propensity 时禁止使用需要 propensity correction 的 estimator。
+- √ Dataset report 显示 observation count 和 censoring rate。
+
+2I.1-2I.2 验收记录：
+
+- Dataset contract：新增版本化 observation window、四类 delayed utility label、content-free provenance、artifact-specific exposure join、raw resource/retry evidence 和 immutable JSON store。即时 extraction/decision attribution 只保留为 provenance，只有 retrieval、injection、use、tool behavior、downstream outcome、supersession 和 recovery 可以决定 delayed failure label。
+- Exposure contract：显式记录 opportunity、candidate inclusion、policy filtering、deterministic/logged/missing propensity；需要 propensity correction 的 estimator 对 missing 或 zero propensity fail closed。Dataset report 输出 observation、opportunity、candidate、filter、missing propensity、label/exposure count 和 censoring rate。
+- Commits：`9930fee`、`5305318`、`7ae15e8`、`19b34d6`、`f0ff3f5`。Focused feedback/SM01/future-trace/attribution tests `30 passed`；full RSIMem `282 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check`、diff check 和 source credential-shape scan 通过。
+- 已知限制：当前 propensity 是 deterministic fixture eligibility evidence，不是由随机化 logging policy 估计的因果 propensity。2I.3 的冻结版本与阶段级 replay/leakage gate 尚未独立关闭，adaptive learner 保持 disabled。
 
 ### 2I.3 阶段闸门
 
