@@ -1,0 +1,1003 @@
+"""Extraction-owned delayed feedback contracts and deterministic labels."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Protocol, runtime_checkable
+
+
+EXTRACTION_FEEDBACK_SCHEMA_VERSION = 1
+EXTRACTION_FEEDBACK_SCHEMA = "extraction-feedback-v1"
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
+_SEMANTIC_KEY = re.compile(r"^[a-z][a-z0-9_.:-]{0,127}$")
+
+
+def _canonical(value: object) -> str:
+    return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+
+def _digest(value: object) -> str:
+    return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def _stable_id(prefix: str, value: object) -> str:
+    return f"{prefix}.{_digest(value)[:40]}"
+
+
+def _require_id(value: str, name: str) -> None:
+    if not isinstance(value, str) or _IDENTIFIER.fullmatch(value) is None:
+        raise ValueError(f"{name} must be a stable identifier")
+
+
+def _require_digest(value: str, name: str) -> None:
+    if not isinstance(value, str) or _DIGEST.fullmatch(value) is None:
+        raise ValueError(f"{name} must be sha256")
+
+
+def _require_key(value: str) -> None:
+    if not isinstance(value, str) or _SEMANTIC_KEY.fullmatch(value) is None:
+        raise ValueError("semantic key must be normalized and stable")
+
+
+def _require_unique(values: tuple[str, ...], name: str) -> None:
+    if len(values) != len(set(values)):
+        raise ValueError(f"{name} must be unique")
+
+
+class ExtractionFeedbackLabel(StrEnum):
+    USEFUL = "useful"
+    HARMFUL = "harmful"
+    MISSED = "missed"
+    UNRESOLVED = "unresolved"
+    CENSORED = "censored"
+
+
+class ExtractionFeedbackLevel(StrEnum):
+    SOURCE = "source"
+    EXTRACTION_SET = "extraction_set"
+    FACT = "fact"
+
+
+class ExtractionSetStatus(StrEnum):
+    NONEMPTY = "nonempty"
+    EMPTY = "empty"
+    FILTERED = "filtered"
+    NONE = "none"
+    MUTATION_FAILED = "mutation_failed"
+
+
+class FactDisposition(StrEnum):
+    PERSISTED = "persisted"
+    FILTERED = "filtered"
+    NONE = "none"
+    MUTATION_FAILED = "mutation_failed"
+
+
+class ExtractionQualityIssue(StrEnum):
+    UNSUPPORTED = "unsupported"
+    TRANSIENT = "transient"
+    CONFLICTING = "conflicting"
+
+
+class ExposureMode(StrEnum):
+    EAGER_SYSTEM_PROMPT = "eager_system_prompt"
+    SELECTIVE_RETRIEVAL = "selective_retrieval"
+    NOT_EXPOSED = "not_exposed"
+
+
+class AttributionConfidence(StrEnum):
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    NONE = "none"
+
+
+class DeploymentSurface(StrEnum):
+    CURRENT_INPUT = "current_input"
+    FINAL_RESPONSE = "final_response"
+    TOOL_EVENT = "tool_event"
+    TASK_COMPLETION = "task_completion"
+
+
+@dataclass(frozen=True, slots=True)
+class OpportunityContract:
+    contract_id: str
+    family_id: str
+    eligible_stages: tuple[str, ...]
+    memory_scope_keys: tuple[str, ...]
+    allowed_surfaces: tuple[DeploymentSurface, ...]
+    ambiguity_semantics: str = "set_level_unless_unique"
+    schema_version: int = EXTRACTION_FEEDBACK_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _require_id(self.contract_id, "opportunity contract ID")
+        _require_id(self.family_id, "opportunity family ID")
+        if self.schema_version != EXTRACTION_FEEDBACK_SCHEMA_VERSION:
+            raise ValueError("unsupported opportunity contract schema")
+        object.__setattr__(
+            self,
+            "allowed_surfaces",
+            tuple(DeploymentSurface(value) for value in self.allowed_surfaces),
+        )
+        _require_unique(self.eligible_stages, "eligible stages")
+        _require_unique(self.memory_scope_keys, "memory scope keys")
+        if not self.eligible_stages or not self.memory_scope_keys:
+            raise ValueError("opportunity contract requires stages and scope keys")
+        for value in self.memory_scope_keys:
+            _require_key(value)
+        if set(self.allowed_surfaces) != {
+            DeploymentSurface.CURRENT_INPUT,
+            DeploymentSurface.TASK_COMPLETION,
+        }:
+            raise ValueError("opportunity contract surfaces are not least privilege")
+        if self.ambiguity_semantics != "set_level_unless_unique":
+            raise ValueError("unsupported opportunity ambiguity semantics")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "contract_id": self.contract_id,
+            "family_id": self.family_id,
+            "eligible_stages": list(self.eligible_stages),
+            "memory_scope_keys": list(self.memory_scope_keys),
+            "allowed_surfaces": [value.value for value in self.allowed_surfaces],
+            "ambiguity_semantics": self.ambiguity_semantics,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class UseContract:
+    contract_id: str
+    family_id: str
+    parser_id: str
+    allowed_surfaces: tuple[DeploymentSurface, ...]
+    schema_version: int = EXTRACTION_FEEDBACK_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        for value, name in (
+            (self.contract_id, "use contract ID"),
+            (self.family_id, "use contract family ID"),
+            (self.parser_id, "use parser ID"),
+        ):
+            _require_id(value, name)
+        if self.schema_version != EXTRACTION_FEEDBACK_SCHEMA_VERSION:
+            raise ValueError("unsupported use contract schema")
+        object.__setattr__(
+            self,
+            "allowed_surfaces",
+            tuple(DeploymentSurface(value) for value in self.allowed_surfaces),
+        )
+        _require_unique(
+            tuple(value.value for value in self.allowed_surfaces),
+            "use contract surfaces",
+        )
+        if not self.allowed_surfaces or DeploymentSurface.TASK_COMPLETION in self.allowed_surfaces:
+            raise ValueError("use contract surfaces are invalid")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "contract_id": self.contract_id,
+            "family_id": self.family_id,
+            "parser_id": self.parser_id,
+            "allowed_surfaces": [value.value for value in self.allowed_surfaces],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class OutcomeContract:
+    contract_id: str
+    family_id: str
+    parser_id: str
+    allowed_surfaces: tuple[DeploymentSurface, ...]
+    schema_version: int = EXTRACTION_FEEDBACK_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        for value, name in (
+            (self.contract_id, "outcome contract ID"),
+            (self.family_id, "outcome contract family ID"),
+            (self.parser_id, "outcome parser ID"),
+        ):
+            _require_id(value, name)
+        if self.schema_version != EXTRACTION_FEEDBACK_SCHEMA_VERSION:
+            raise ValueError("unsupported outcome contract schema")
+        object.__setattr__(
+            self,
+            "allowed_surfaces",
+            tuple(DeploymentSurface(value) for value in self.allowed_surfaces),
+        )
+        _require_unique(
+            tuple(value.value for value in self.allowed_surfaces),
+            "outcome contract surfaces",
+        )
+        if DeploymentSurface.TASK_COMPLETION not in self.allowed_surfaces:
+            raise ValueError("outcome contract requires task completion evidence")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "contract_id": self.contract_id,
+            "family_id": self.family_id,
+            "parser_id": self.parser_id,
+            "allowed_surfaces": [value.value for value in self.allowed_surfaces],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class FamilyFeedbackContract:
+    opportunity: OpportunityContract
+    use: UseContract
+    outcome: OutcomeContract
+    contract_digest: str
+    contract_schema: str = EXTRACTION_FEEDBACK_SCHEMA
+    schema_version: int = EXTRACTION_FEEDBACK_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if (
+            self.schema_version != EXTRACTION_FEEDBACK_SCHEMA_VERSION
+            or self.contract_schema != EXTRACTION_FEEDBACK_SCHEMA
+        ):
+            raise ValueError("unsupported family feedback contract schema")
+        families = {
+            self.opportunity.family_id,
+            self.use.family_id,
+            self.outcome.family_id,
+        }
+        if len(families) != 1:
+            raise ValueError("family feedback contract components disagree")
+        if self.contract_digest != _digest(self.identity_payload()):
+            raise ValueError("family feedback contract digest mismatch")
+
+    @classmethod
+    def create(
+        cls,
+        opportunity: OpportunityContract,
+        use: UseContract,
+        outcome: OutcomeContract,
+    ) -> "FamilyFeedbackContract":
+        core = {
+            "schema_version": EXTRACTION_FEEDBACK_SCHEMA_VERSION,
+            "contract_schema": EXTRACTION_FEEDBACK_SCHEMA,
+            "opportunity": opportunity.payload(),
+            "use": use.payload(),
+            "outcome": outcome.payload(),
+        }
+        return cls(opportunity, use, outcome, _digest(core))
+
+    @property
+    def family_id(self) -> str:
+        return self.opportunity.family_id
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "contract_schema": self.contract_schema,
+            "opportunity": self.opportunity.payload(),
+            "use": self.use.payload(),
+            "outcome": self.outcome.payload(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ObservableToolEvent:
+    event_id: str
+    tool_name: str
+    success: bool
+    subject_ids: tuple[str, ...] = ()
+    recipient_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        _require_id(self.event_id, "tool event ID")
+        _require_id(self.tool_name, "tool name")
+        if type(self.success) is not bool:
+            raise TypeError("tool event success must be bool")
+        _require_unique(self.subject_ids, "tool event subjects")
+        _require_unique(self.recipient_ids, "tool event recipients")
+
+
+@dataclass(frozen=True, slots=True)
+class DeploymentObservation:
+    observation_id: str
+    family_id: str
+    stage: str
+    task_id: str
+    current_input_projection_digest: str
+    current_input_semantic_keys: tuple[str, ...]
+    task_semantic_keys: tuple[str, ...]
+    final_response: str
+    tool_events: tuple[ObservableToolEvent, ...]
+    completed: bool
+    observation_complete: bool = True
+    censor_reason: str | None = None
+
+    def __post_init__(self) -> None:
+        for value, name in (
+            (self.observation_id, "deployment observation ID"),
+            (self.family_id, "deployment family ID"),
+            (self.stage, "deployment stage"),
+            (self.task_id, "deployment task ID"),
+        ):
+            _require_id(value, name)
+        _require_digest(
+            self.current_input_projection_digest,
+            "current input projection digest",
+        )
+        for values in (self.current_input_semantic_keys, self.task_semantic_keys):
+            _require_unique(values, "deployment semantic keys")
+            for value in values:
+                _require_key(value)
+        if type(self.completed) is not bool or type(self.observation_complete) is not bool:
+            raise TypeError("deployment observation flags must be bool")
+        if self.observation_complete == (self.censor_reason is not None):
+            raise ValueError("deployment censor reason must match completeness")
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSemanticBinding:
+    artifact_id: str
+    semantic_key: str
+
+    def __post_init__(self) -> None:
+        _require_id(self.artifact_id, "memory artifact ID")
+        _require_key(self.semantic_key)
+
+
+@dataclass(frozen=True, slots=True)
+class FutureMemoryEvidence:
+    future_opportunity_id: str
+    exposure_mode: ExposureMode
+    artifact_bindings: tuple[ArtifactSemanticBinding, ...]
+    opportunity_operation_id: str | None
+    injection_operation_id: str | None
+
+    def __post_init__(self) -> None:
+        _require_id(self.future_opportunity_id, "future opportunity ID")
+        object.__setattr__(self, "exposure_mode", ExposureMode(self.exposure_mode))
+        artifact_ids = tuple(value.artifact_id for value in self.artifact_bindings)
+        _require_unique(artifact_ids, "future memory artifact IDs")
+        for value in (self.opportunity_operation_id, self.injection_operation_id):
+            if value is not None:
+                _require_id(value, "future operation ID")
+        if self.exposure_mode == ExposureMode.NOT_EXPOSED:
+            if self.injection_operation_id is not None:
+                raise ValueError("not-exposed evidence cannot carry injection")
+        elif self.injection_operation_id is None:
+            raise ValueError("exposed memory evidence requires injection operation")
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractedFactEvidence:
+    fact_id: str
+    semantic_key: str
+    disposition: FactDisposition
+    artifact_id: str | None = None
+    quality_issue: ExtractionQualityIssue | None = None
+
+    def __post_init__(self) -> None:
+        _require_id(self.fact_id, "extracted fact ID")
+        _require_key(self.semantic_key)
+        object.__setattr__(self, "disposition", FactDisposition(self.disposition))
+        if self.artifact_id is not None:
+            _require_id(self.artifact_id, "extracted fact artifact ID")
+        if self.quality_issue is not None:
+            object.__setattr__(
+                self,
+                "quality_issue",
+                ExtractionQualityIssue(self.quality_issue),
+            )
+        if (self.disposition == FactDisposition.PERSISTED) != (
+            self.artifact_id is not None
+        ):
+            raise ValueError("persisted fact disposition must match artifact identity")
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionSourceEvidence:
+    source_id: str
+    source_projection_digest: str
+    extraction_set_id: str
+    status: ExtractionSetStatus
+    available_semantic_keys: tuple[str, ...]
+    facts: tuple[ExtractedFactEvidence, ...]
+
+    def __post_init__(self) -> None:
+        _require_id(self.source_id, "extraction source ID")
+        _require_digest(self.source_projection_digest, "source projection digest")
+        _require_id(self.extraction_set_id, "extraction set ID")
+        object.__setattr__(self, "status", ExtractionSetStatus(self.status))
+        _require_unique(self.available_semantic_keys, "source semantic keys")
+        for value in self.available_semantic_keys:
+            _require_key(value)
+        fact_ids = tuple(value.fact_id for value in self.facts)
+        _require_unique(fact_ids, "extracted fact IDs")
+        if self.status == ExtractionSetStatus.EMPTY and self.facts:
+            raise ValueError("empty extraction set cannot carry facts")
+        if self.status == ExtractionSetStatus.NONEMPTY and not self.facts:
+            raise ValueError("nonempty extraction set requires facts")
+
+
+@dataclass(frozen=True, slots=True)
+class MissedExtractionEvidence:
+    missed_id: str
+    semantic_key: str
+    source_span_digest: str
+    future_opportunity_id: str
+    absence_outcome_operation_id: str
+    deterministically_attributed: bool
+
+    def __post_init__(self) -> None:
+        _require_id(self.missed_id, "missed extraction ID")
+        _require_key(self.semantic_key)
+        _require_digest(self.source_span_digest, "missed source span digest")
+        _require_id(self.future_opportunity_id, "missed future opportunity ID")
+        _require_id(
+            self.absence_outcome_operation_id,
+            "missed absence outcome operation ID",
+        )
+        if type(self.deterministically_attributed) is not bool:
+            raise TypeError("missed attribution flag must be bool")
+
+
+@dataclass(frozen=True, slots=True)
+class ContractResolution:
+    opportunity_observed: bool
+    current_input_confounded: bool
+    explicit_use: bool
+    successful_outcome: bool | None
+    harmful_outcome: bool
+    used_artifact_ids: tuple[str, ...]
+    opportunity_operation_id: str | None
+    use_operation_id: str | None
+    outcome_operation_id: str | None
+    reason_codes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        for value in (
+            self.opportunity_observed,
+            self.current_input_confounded,
+            self.explicit_use,
+            self.harmful_outcome,
+        ):
+            if type(value) is not bool:
+                raise TypeError("feedback resolution flags must be bool")
+        if self.successful_outcome is not None and type(self.successful_outcome) is not bool:
+            raise TypeError("feedback outcome must be bool or unknown")
+        _require_unique(self.used_artifact_ids, "used artifact IDs")
+        for value in (
+            self.opportunity_operation_id,
+            self.use_operation_id,
+            self.outcome_operation_id,
+        ):
+            if value is not None:
+                _require_id(value, "feedback operation ID")
+        _require_unique(self.reason_codes, "feedback reason codes")
+        if self.explicit_use and self.use_operation_id is None:
+            raise ValueError("explicit use requires an operation identity")
+        if self.successful_outcome is not None and self.outcome_operation_id is None:
+            raise ValueError("known outcome requires an operation identity")
+
+
+@runtime_checkable
+class FamilyFeedbackResolver(Protocol):
+    @property
+    def contract(self) -> FamilyFeedbackContract: ...
+
+    def resolve(
+        self,
+        observation: DeploymentObservation,
+        future: FutureMemoryEvidence,
+    ) -> ContractResolution: ...
+
+
+class FeedbackContractRegistry:
+    def __init__(self) -> None:
+        self._resolvers: dict[str, FamilyFeedbackResolver] = {}
+
+    def register(self, resolver: FamilyFeedbackResolver) -> None:
+        family_id = resolver.contract.family_id
+        if family_id in self._resolvers:
+            raise ValueError(f"feedback family already registered: {family_id}")
+        self._resolvers[family_id] = resolver
+
+    def resolver(self, family_id: str) -> FamilyFeedbackResolver:
+        try:
+            return self._resolvers[family_id]
+        except KeyError as exc:
+            raise KeyError(f"unregistered feedback family: {family_id}") from exc
+
+    def resolve(
+        self,
+        observation: DeploymentObservation,
+        future: FutureMemoryEvidence,
+    ) -> tuple[FamilyFeedbackContract, ContractResolution]:
+        resolver = self.resolver(observation.family_id)
+        return resolver.contract, resolver.resolve(observation, future)
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionFeedbackExample:
+    example_id: str
+    primary_unit_id: str
+    level: ExtractionFeedbackLevel
+    primary: bool
+    label: ExtractionFeedbackLabel
+    source_id: str
+    extraction_set_id: str
+    future_opportunity_id: str
+    fact_id: str | None
+    semantic_key: str | None
+    artifact_ids: tuple[str, ...]
+    exposure_mode: ExposureMode
+    opportunity_operation_id: str | None
+    use_operation_id: str | None
+    outcome_operation_id: str | None
+    attribution_confidence: AttributionConfidence
+    reason_codes: tuple[str, ...]
+    contract_digest: str
+    schema_version: int = EXTRACTION_FEEDBACK_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        for value in (self.example_id, self.primary_unit_id, self.source_id, self.extraction_set_id):
+            _require_id(value, "extraction feedback identity")
+        _require_id(self.future_opportunity_id, "future opportunity ID")
+        object.__setattr__(self, "level", ExtractionFeedbackLevel(self.level))
+        object.__setattr__(self, "label", ExtractionFeedbackLabel(self.label))
+        object.__setattr__(self, "exposure_mode", ExposureMode(self.exposure_mode))
+        object.__setattr__(
+            self,
+            "attribution_confidence",
+            AttributionConfidence(self.attribution_confidence),
+        )
+        if type(self.primary) is not bool:
+            raise TypeError("feedback primary flag must be bool")
+        if self.primary != (self.level == ExtractionFeedbackLevel.EXTRACTION_SET):
+            raise ValueError("only extraction-set feedback is primary")
+        if (self.level == ExtractionFeedbackLevel.FACT) != (self.fact_id is not None):
+            raise ValueError("fact-level feedback requires a fact identity")
+        if self.fact_id is not None:
+            _require_id(self.fact_id, "feedback fact ID")
+        if self.semantic_key is not None:
+            _require_key(self.semantic_key)
+        _require_unique(self.artifact_ids, "feedback artifact IDs")
+        _require_unique(self.reason_codes, "feedback reason codes")
+        _require_digest(self.contract_digest, "feedback contract digest")
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionFeedbackDataset:
+    dataset_id: str
+    source_projection_digest: str
+    contract_digest: str
+    examples: tuple[ExtractionFeedbackExample, ...]
+    schema_version: int = EXTRACTION_FEEDBACK_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _require_id(self.dataset_id, "extraction feedback dataset ID")
+        _require_digest(self.source_projection_digest, "feedback source digest")
+        _require_digest(self.contract_digest, "feedback contract digest")
+        ids = tuple(value.example_id for value in self.examples)
+        _require_unique(ids, "feedback example IDs")
+        if sum(value.primary for value in self.examples) != 1:
+            raise ValueError("feedback dataset requires exactly one primary unit")
+
+
+class ExtractionFeedbackBuilder:
+    def __init__(self, registry: FeedbackContractRegistry) -> None:
+        self.registry = registry
+
+    def build(
+        self,
+        source: ExtractionSourceEvidence,
+        observation: DeploymentObservation,
+        future: FutureMemoryEvidence,
+        *,
+        missed: tuple[MissedExtractionEvidence, ...] = (),
+    ) -> ExtractionFeedbackDataset:
+        contract, resolution = self.registry.resolve(observation, future)
+        if observation.family_id != contract.family_id:
+            raise ValueError("feedback observation family differs from contract")
+        if observation.stage not in contract.opportunity.eligible_stages:
+            raise ValueError("feedback observation stage is not contract-eligible")
+        if set(binding.semantic_key for binding in future.artifact_bindings) - set(
+            contract.opportunity.memory_scope_keys
+        ):
+            raise ValueError("future memory evidence escapes contract scope")
+        primary_id = _stable_id("feedback-unit", {
+            "source_id": source.source_id,
+            "extraction_set_id": source.extraction_set_id,
+            "future_opportunity_id": future.future_opportunity_id,
+        })
+        label, confidence, reasons = self._set_label(
+            source,
+            observation,
+            future,
+            resolution,
+            missed,
+        )
+        common = {
+            "primary_unit_id": primary_id,
+            "label": label,
+            "source_id": source.source_id,
+            "extraction_set_id": source.extraction_set_id,
+            "future_opportunity_id": future.future_opportunity_id,
+            "artifact_ids": tuple(
+                binding.artifact_id for binding in future.artifact_bindings
+            ),
+            "exposure_mode": future.exposure_mode,
+            "opportunity_operation_id": resolution.opportunity_operation_id,
+            "use_operation_id": resolution.use_operation_id,
+            "outcome_operation_id": resolution.outcome_operation_id,
+            "attribution_confidence": confidence,
+            "reason_codes": reasons,
+            "contract_digest": contract.contract_digest,
+        }
+        examples = [
+            self._example(ExtractionFeedbackLevel.SOURCE, False, None, None, **common),
+            self._example(
+                ExtractionFeedbackLevel.EXTRACTION_SET,
+                True,
+                None,
+                None,
+                **common,
+            ),
+        ]
+        facts_by_artifact = {
+            fact.artifact_id: fact
+            for fact in source.facts
+            if fact.artifact_id is not None
+        }
+        uniquely_used = (
+            facts_by_artifact.get(resolution.used_artifact_ids[0])
+            if len(resolution.used_artifact_ids) == 1
+            else None
+        )
+        for fact in source.facts:
+            fact_label = ExtractionFeedbackLabel.UNRESOLVED
+            fact_confidence = AttributionConfidence.NONE
+            fact_reasons = ("fact_contribution_ambiguous",)
+            if fact.quality_issue is not None:
+                fact_label = ExtractionFeedbackLabel.HARMFUL
+                fact_confidence = AttributionConfidence.HIGH
+                fact_reasons = (f"extraction_{fact.quality_issue.value}",)
+            elif uniquely_used is fact and label in {
+                ExtractionFeedbackLabel.USEFUL,
+                ExtractionFeedbackLabel.HARMFUL,
+            }:
+                fact_label = label
+                fact_confidence = AttributionConfidence.HIGH
+                fact_reasons = reasons
+            examples.append(self._example(
+                ExtractionFeedbackLevel.FACT,
+                False,
+                fact.fact_id,
+                fact.semantic_key,
+                **{
+                    **common,
+                    "label": fact_label,
+                    "artifact_ids": (
+                        (fact.artifact_id,) if fact.artifact_id is not None else ()
+                    ),
+                    "attribution_confidence": fact_confidence,
+                    "reason_codes": fact_reasons,
+                },
+            ))
+        dataset_id = _stable_id("extraction-feedback", {
+            "source_projection_digest": source.source_projection_digest,
+            "contract_digest": contract.contract_digest,
+            "examples": [value.example_id for value in examples],
+        })
+        return ExtractionFeedbackDataset(
+            dataset_id,
+            source.source_projection_digest,
+            contract.contract_digest,
+            tuple(examples),
+        )
+
+    @staticmethod
+    def _example(
+        level: ExtractionFeedbackLevel,
+        primary: bool,
+        fact_id: str | None,
+        semantic_key: str | None,
+        **values: object,
+    ) -> ExtractionFeedbackExample:
+        identity = {
+            "primary_unit_id": values["primary_unit_id"],
+            "level": level.value,
+            "fact_id": fact_id,
+            "label": ExtractionFeedbackLabel(values["label"]).value,
+            "contract_digest": values["contract_digest"],
+        }
+        return ExtractionFeedbackExample(
+            example_id=_stable_id("feedback-example", identity),
+            level=level,
+            primary=primary,
+            fact_id=fact_id,
+            semantic_key=semantic_key,
+            **values,
+        )
+
+    @staticmethod
+    def _set_label(
+        source: ExtractionSourceEvidence,
+        observation: DeploymentObservation,
+        future: FutureMemoryEvidence,
+        resolution: ContractResolution,
+        missed: tuple[MissedExtractionEvidence, ...],
+    ) -> tuple[ExtractionFeedbackLabel, AttributionConfidence, tuple[str, ...]]:
+        if not observation.observation_complete:
+            return (
+                ExtractionFeedbackLabel.CENSORED,
+                AttributionConfidence.NONE,
+                (observation.censor_reason or "observation_censored",),
+            )
+        quality_issues = tuple(
+            fact.quality_issue for fact in source.facts if fact.quality_issue is not None
+        )
+        if quality_issues:
+            return (
+                ExtractionFeedbackLabel.HARMFUL,
+                AttributionConfidence.HIGH,
+                tuple(sorted({f"extraction_{value.value}" for value in quality_issues})),
+            )
+        extracted_keys = {fact.semantic_key for fact in source.facts}
+        valid_missed = tuple(
+            value for value in missed
+            if value.semantic_key in source.available_semantic_keys
+            and value.semantic_key not in extracted_keys
+            and value.future_opportunity_id == future.future_opportunity_id
+            and value.deterministically_attributed
+            and resolution.opportunity_observed
+            and resolution.successful_outcome is False
+            and value.absence_outcome_operation_id == resolution.outcome_operation_id
+        )
+        if valid_missed:
+            return (
+                ExtractionFeedbackLabel.MISSED,
+                AttributionConfidence.HIGH,
+                ("high_confidence_missed_extraction",),
+            )
+        if resolution.current_input_confounded:
+            return (
+                ExtractionFeedbackLabel.UNRESOLVED,
+                AttributionConfidence.NONE,
+                ("current_input_confounded",),
+            )
+        if not resolution.opportunity_observed:
+            return (
+                ExtractionFeedbackLabel.UNRESOLVED,
+                AttributionConfidence.NONE,
+                ("opportunity_not_observed",),
+            )
+        if not resolution.explicit_use:
+            return (
+                ExtractionFeedbackLabel.UNRESOLVED,
+                AttributionConfidence.NONE,
+                (
+                    "injected_not_used"
+                    if future.exposure_mode != ExposureMode.NOT_EXPOSED
+                    else "not_exposed"
+                ,),
+            )
+        if not resolution.used_artifact_ids:
+            return (
+                ExtractionFeedbackLabel.UNRESOLVED,
+                AttributionConfidence.NONE,
+                ("use_not_bound_to_memory",),
+            )
+        if any(value is None for value in (
+            resolution.opportunity_operation_id,
+            resolution.use_operation_id,
+            resolution.outcome_operation_id,
+        )):
+            return (
+                ExtractionFeedbackLabel.UNRESOLVED,
+                AttributionConfidence.NONE,
+                ("incomplete_opportunity_use_outcome_chain",),
+            )
+        if resolution.successful_outcome is True:
+            return (
+                ExtractionFeedbackLabel.USEFUL,
+                AttributionConfidence.HIGH,
+                ("opportunity_use_outcome_success",),
+            )
+        if resolution.harmful_outcome and resolution.successful_outcome is False:
+            return (
+                ExtractionFeedbackLabel.HARMFUL,
+                AttributionConfidence.HIGH,
+                ("memory_use_harmfully_attributed",),
+            )
+        return (
+            ExtractionFeedbackLabel.UNRESOLVED,
+            AttributionConfidence.LOW,
+            resolution.reason_codes or ("outcome_not_attributable",),
+        )
+
+
+class _NotesFamilyResolver:
+    def __init__(self, contract: FamilyFeedbackContract, parser: str) -> None:
+        self._contract = contract
+        self.parser = parser
+
+    @property
+    def contract(self) -> FamilyFeedbackContract:
+        return self._contract
+
+    @staticmethod
+    def _tsv_rows(value: str) -> tuple[tuple[str, ...], ...]:
+        rows = []
+        for line in value.splitlines():
+            fields = tuple(field.strip() for field in line.strip().strip("`").split("\t"))
+            if len(fields) == 4:
+                rows.append(fields)
+        return tuple(rows)
+
+    @classmethod
+    def _valid_tsv(cls, value: str, *, normalized: bool) -> bool:
+        rows = cls._tsv_rows(value)
+        header = next((index for index, row in enumerate(rows) if tuple(
+            field.casefold() for field in row
+        ) == ("owner", "priority", "task", "due_date")), None)
+        data = rows[header + 1:] if header is not None else ()
+        if not data or not all(all(field for field in row) for row in data):
+            return False
+        if not normalized:
+            return True
+        priorities = {"low", "medium", "high", "critical"}
+        return all(
+            row[1].casefold() in priorities
+            and re.fullmatch(r"\d{4}/\d{2}/\d{2}", row[3]) is not None
+            for row in data
+        )
+
+    @staticmethod
+    def _successful_share(observation: DeploymentObservation) -> bool:
+        return any(
+            event.tool_name == "notes_share" and event.success
+            for event in observation.tool_events
+        )
+
+    def resolve(
+        self,
+        observation: DeploymentObservation,
+        future: FutureMemoryEvidence,
+    ) -> ContractResolution:
+        if observation.family_id != self.contract.family_id:
+            raise ValueError("deployment observation family differs from resolver")
+        scope = set(self.contract.opportunity.memory_scope_keys)
+        relevant_task = bool(scope & set(observation.task_semantic_keys))
+        confounded = bool(scope & set(observation.current_input_semantic_keys))
+        artifact_ids = tuple(
+            binding.artifact_id
+            for binding in future.artifact_bindings
+            if binding.semantic_key in scope
+        )
+        exposed = (
+            future.exposure_mode != ExposureMode.NOT_EXPOSED
+            and future.injection_operation_id is not None
+        )
+        explicit_use = False
+        harmful = False
+        if self.parser == "sm01_tsv_use_v1":
+            explicit_use = self._valid_tsv(observation.final_response, normalized=False)
+        elif self.parser == "sm05_normalized_tsv_use_v1":
+            explicit_use = self._valid_tsv(observation.final_response, normalized=True)
+        elif self.parser == "sm02_boundary_use_v1":
+            shares = tuple(
+                event for event in observation.tool_events
+                if event.tool_name == "notes_share" and event.success
+            )
+            explicit_use = bool(shares) and all(
+                "ava_chen" not in event.recipient_ids for event in shares
+            )
+            harmful = any("ava_chen" in event.recipient_ids for event in shares)
+        else:
+            raise ValueError("unknown family feedback parser")
+        opportunity_id = future.opportunity_operation_id if relevant_task else None
+        use_id = (
+            _stable_id("use", {
+                "observation_id": observation.observation_id,
+                "parser": self.parser,
+            })
+            if explicit_use or harmful
+            else None
+        )
+        successful_share = self._successful_share(observation)
+        known_outcome = relevant_task and observation.observation_complete
+        success = (
+            observation.completed and successful_share and explicit_use
+            if known_outcome
+            else None
+        )
+        harmful_outcome = bool(
+            known_outcome and observation.completed and successful_share and harmful
+        )
+        outcome_id = (
+            _stable_id("outcome", {
+                "observation_id": observation.observation_id,
+                "completed": observation.completed,
+                "share": successful_share,
+            })
+            if known_outcome
+            else None
+        )
+        return ContractResolution(
+            opportunity_observed=relevant_task,
+            current_input_confounded=confounded,
+            explicit_use=explicit_use or harmful,
+            successful_outcome=(False if harmful_outcome else success),
+            harmful_outcome=harmful_outcome,
+            used_artifact_ids=(
+                artifact_ids
+                if (explicit_use or harmful) and not confounded and exposed
+                else ()
+            ),
+            opportunity_operation_id=opportunity_id,
+            use_operation_id=use_id,
+            outcome_operation_id=outcome_id,
+            reason_codes=(),
+        )
+
+
+def _notes_contract(
+    family_id: str,
+    semantic_keys: tuple[str, ...],
+    parser_id: str,
+) -> FamilyFeedbackContract:
+    return FamilyFeedbackContract.create(
+        OpportunityContract(
+            f"{family_id}.opportunity-v1",
+            family_id,
+            ("eval_far", "eval_near"),
+            semantic_keys,
+            (
+                DeploymentSurface.CURRENT_INPUT,
+                DeploymentSurface.TASK_COMPLETION,
+            ),
+        ),
+        UseContract(
+            f"{family_id}.use-v1",
+            family_id,
+            parser_id,
+            (DeploymentSurface.FINAL_RESPONSE, DeploymentSurface.TOOL_EVENT),
+        ),
+        OutcomeContract(
+            f"{family_id}.outcome-v1",
+            family_id,
+            "notes_share_completion-v1",
+            (DeploymentSurface.TOOL_EVENT, DeploymentSurface.TASK_COMPLETION),
+        ),
+    )
+
+
+def default_feedback_contract_registry() -> FeedbackContractRegistry:
+    registry = FeedbackContractRegistry()
+    for family_id, keys, parser in (
+        (
+            "SM01_preference_adoption",
+            ("preference.summary.tsv",),
+            "sm01_tsv_use_v1",
+        ),
+        (
+            "SM02_constraint_retention",
+            ("constraint.share.exclude_ava_chen",),
+            "sm02_boundary_use_v1",
+        ),
+        (
+            "SM05_weak_trigger_preference_adoption",
+            (
+                "preference.summary.tsv",
+                "preference.priority.normalized",
+                "preference.date.yyyy_mm_dd",
+            ),
+            "sm05_normalized_tsv_use_v1",
+        ),
+    ):
+        contract = _notes_contract(family_id, keys, parser)
+        registry.register(_NotesFamilyResolver(contract, parser))
+    return registry
