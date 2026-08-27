@@ -132,6 +132,8 @@ class ExitEvidence:
     reusable_facts: tuple[str, ...]
     reusable_procedures: tuple[str, ...]
     update_hints: tuple[str, ...]
+    utility_estimate: float = 0.0
+    confidence: float = 0.0
     schema_version: int = LIFECYCLE_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -145,6 +147,10 @@ class ExitEvidence:
             object.__setattr__(self, "temporal_validity", TemporalValidity(self.temporal_validity))
         if self.unresolved_state is not None and not self.unresolved_state.strip():
             raise ValueError("unresolved_state must be non-empty when present")
+        if not 0.0 <= self.utility_estimate <= 1.0:
+            raise ValueError("exit evidence utility_estimate must be in [0,1]")
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError("exit evidence confidence must be in [0,1]")
         if not self.provenance:
             raise ValueError("exit evidence requires deterministic provenance")
         sequences = (
@@ -174,6 +180,8 @@ class ExitEvidence:
             "reusable_facts": self.reusable_facts,
             "reusable_procedures": self.reusable_procedures,
             "update_hints": self.update_hints,
+            "utility_estimate": self.utility_estimate,
+            "confidence": self.confidence,
         }
 
 @dataclass(frozen=True, slots=True)
@@ -938,6 +946,8 @@ class WritebackCoordinator:
                 item.reusable_procedures for item in signals
             ),
             update_hints=combined(item.update_hints for item in signals),
+            utility_estimate=min(item.utility_estimate for item in signals),
+            confidence=min(item.confidence for item in signals),
         )
         key_payload = {
             "schema_version": LIFECYCLE_CONTRACT_SCHEMA_VERSION,
