@@ -456,6 +456,13 @@ class HermesPersistenceConfig(BaseModel):
         "bypass_native",
     ] = "fail_closed"
     rsimem_verify_native_projection: bool = False
+    rsimem_lifecycle_evaluator_mode: Literal[
+        "disabled",
+        "deterministic",
+        "injected_json",
+    ] = "disabled"
+    rsimem_lifecycle_policy_version: str = "phase1-dry-run-v1"
+    rsimem_lifecycle_compiler_version: str = "uncompiled-v0"
 
 
 class SelfEvolveTaskRef(BaseModel):

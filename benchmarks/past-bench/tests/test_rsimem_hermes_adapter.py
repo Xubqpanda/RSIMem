@@ -196,3 +196,102 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
         assert PRIVATE_MEMORY not in serialized
         assert "task table is ready" not in serialized.lower()
     assert '"kind": "projection_check"' in evidence["native+adapter+ledger"]
+
+
+def test_past_bench_emits_explicit_lifecycle_boundaries(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from hermes_state import SessionDB
+
+    home = tmp_path / "home"
+    home.mkdir()
+    artifacts = tmp_path / "artifacts"
+    fake_run_agent = types.ModuleType("run_agent")
+
+    class LifecycleAgent:
+        def __init__(self, **kwargs):
+            self._session_db = kwargs["session_db"]
+            self.session_id = "native-lifecycle-session"
+            self.session_log_file = None
+            self._memory_store = None
+            self._session_db.create_session(
+                self.session_id,
+                "past_bench",
+                model="fixture-model",
+            )
+
+        def _execute_recorded_model_call(self, *args, **kwargs):
+            return None
+
+        async def _execute_recorded_async_model_call(self, *args, **kwargs):
+            return None
+
+        def run_conversation(self, **kwargs):
+            self._session_db.append_message(
+                self.session_id,
+                "user",
+                "Always use TSV output.",
+            )
+            self._session_db.append_message(
+                self.session_id,
+                "assistant",
+                "Understood.",
+            )
+            return {
+                "final_response": "Understood.",
+                "messages": [],
+                "completed": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+            }
+
+        def wait_for_background_reviews(self, timeout=0):
+            return True
+
+    fake_run_agent.AIAgent = LifecycleAgent
+    monkeypatch.setitem(sys.modules, "run_agent", fake_run_agent)
+    monkeypatch.setattr(
+        HermesAdapter,
+        "_reload_hermes_modules_if_needed",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr("hermes_state.DEFAULT_DB_PATH", home / "state.db")
+
+    request = _request(home, artifacts, "native+adapter+ledger")
+    request.model.extra_body["hermes"]["rsimem"]["lifecycle"] = {
+        "evaluator_mode": "deterministic",
+        "policy_version": "phase1-fixture-v1",
+        "compiler_version": "uncompiled-v0",
+    }
+    adapter = HermesAdapter(
+        AgentSpec(name="hermes", adapter="hermes"),
+        request,
+    )
+    try:
+        response = adapter.step(StepRequest(
+            session_id=request.session_id,
+            step_id=0,
+        ))
+    finally:
+        adapter.close("fixture session end")
+
+    assert response.status == "finished", response.error
+    events = [
+        json.loads(line)
+        for line in (artifacts / "rsimem_lifecycle_events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert [event["kind"] for event in events].count("context_snapshot") == 2
+    assert [event["kind"] for event in events].count("dry_run_mutation") == 2
+    assert {event["data"].get("status") for event in events} >= {
+        "accepted",
+        "created",
+        "valid",
+        None,
+    }
+    serialized = json.dumps(events, ensure_ascii=True)
+    assert "Always use TSV output." not in serialized
+    assert str(home) not in serialized
+    assert (artifacts / "rsimem_lifecycle_receipts.json").exists()

@@ -9,7 +9,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
-from ..ledger import LifecycleLedgerObserver
 from ..memory.contracts import MemoryKind
 from .contracts import (
     CompletionStatus,
@@ -210,6 +209,8 @@ class HermesLifecycleDryRunRuntime:
         self.task_id = task_id
         self._collector = HermesStateSnapshotCollector()
         self._processed: dict[str, HermesLifecycleDryRunResult] = {}
+        from ..ledger import LifecycleLedgerObserver
+
         self.observer = LifecycleLedgerObserver(
             variant=variant,
             trace_id=trace_id,

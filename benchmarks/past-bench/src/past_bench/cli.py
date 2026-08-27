@@ -2188,6 +2188,15 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     rsimem_adapter_failure_policy=(
                         sequence.hermes.rsimem_adapter_failure_policy
                     ),
+                    rsimem_lifecycle_evaluator_mode=(
+                        sequence.hermes.rsimem_lifecycle_evaluator_mode
+                    ),
+                    rsimem_lifecycle_policy_version=(
+                        sequence.hermes.rsimem_lifecycle_policy_version
+                    ),
+                    rsimem_lifecycle_compiler_version=(
+                        sequence.hermes.rsimem_lifecycle_compiler_version
+                    ),
                 )
 
             print(
