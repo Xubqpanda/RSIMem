@@ -589,6 +589,7 @@ class FeedbackDatasetStageGate:
     ok: bool
     issues: tuple[str, ...]
     dataset_id: str
+    dataset_payload_digest: str
     replay_dataset_id: str | None
     expected_config_digest: str
     actual_config_digest: str
@@ -806,7 +807,13 @@ class DelayedFeedbackDatasetBuilder:
             )
             attributed = []
             failure_subgraph = []
-            policy_parameters = []
+            policy_parameters = [
+                artifact_id
+                for item in related_operations
+                for artifact_id in item.input_artifact_ids
+                if artifacts.get(artifact_id) is not None
+                and artifacts[artifact_id].kind == ArtifactKind.POLICY_PARAMETER
+            ]
             attribution_record_ids = []
             attribution_methods = []
             failure_categories = []
@@ -1430,6 +1437,7 @@ def evaluate_feedback_dataset_stage_gate(
         ok=not issues,
         issues=tuple(sorted(issues)),
         dataset_id=dataset.dataset_id,
+        dataset_payload_digest=_digest(dataset.payload()),
         replay_dataset_id=None if replay is None else replay.dataset_id,
         expected_config_digest=expected_config.digest,
         actual_config_digest=dataset.config.digest,
