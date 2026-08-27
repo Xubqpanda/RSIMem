@@ -10,6 +10,7 @@ PYTHON_BIN="${RSIMEM_ROOT}/.venv/bin/python"
 REPLICATES="${RSIMEM_REPLICATES:-3}"
 REPLICATE_START="${RSIMEM_REPLICATE_START:-1}"
 REPLICATE_END="${RSIMEM_REPLICATE_END:-${REPLICATES}}"
+METHOD_SET="${RSIMEM_STATIC_METHOD_SET:-baseline}"
 TASK_FAMILY="memory_ability/SM01_preference_adoption"
 
 if [[ -z "${GPT_LUNA_API_KEY:-}" ]]; then
@@ -22,6 +23,14 @@ if [[ ! -x "${PAST_BENCH_BIN}" || ! -f "${PAST_BENCH_ROOT}/pyproject.toml" ]]; t
 fi
 if [[ ! "${REPLICATES}" =~ ^[3-9][0-9]*$ ]]; then
   echo "RSIMEM_REPLICATES must be at least 3." >&2
+  exit 2
+fi
+if [[ "${METHOD_SET}" == "baseline" ]]; then
+  output_family="static_sm01"
+elif [[ "${METHOD_SET}" == "utility" ]]; then
+  output_family="static_utility_sm01"
+else
+  echo "RSIMEM_STATIC_METHOD_SET must be baseline or utility." >&2
   exit 2
 fi
 if (
@@ -39,7 +48,7 @@ if [[ ! "${batch_id}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "RSIMEM_BATCH_ID contains unsupported characters." >&2
   exit 2
 fi
-batch_root="${RSIMEM_ROOT}/outputs/static_sm01/hermes_luna/${batch_id}"
+batch_root="${RSIMEM_ROOT}/outputs/${output_family}/hermes_luna/${batch_id}"
 manifest_path="${batch_root}/batch_manifest.json"
 rsimem_commit="$(git -C "${RSIMEM_ROOT}" rev-parse HEAD)"
 past_bench_commit="$(git -C "${RSIMEM_ROOT}" log -1 --format=%H -- benchmarks/past-bench)"
@@ -64,6 +73,7 @@ import sys
 from pathlib import Path
 from rsimem.experiment_manifest import (
     STATIC_METHOD_VARIANTS,
+    STATIC_UTILITY_METHOD_VARIANTS,
     initialize_batch_manifest,
     resolved_environment_profile,
     resolved_family_budget,
@@ -71,6 +81,11 @@ from rsimem.experiment_manifest import (
     resolved_run_profile,
 )
 run = resolved_run_profile(Path(sys.argv[4]))
+modes = (
+    STATIC_METHOD_VARIANTS
+    if sys.argv[12] == "baseline"
+    else STATIC_UTILITY_METHOD_VARIANTS
+)
 initialize_batch_manifest(
     Path(sys.argv[1]),
     replicates=int(sys.argv[2]),
@@ -88,14 +103,15 @@ initialize_batch_manifest(
     past_bench_commit=sys.argv[9],
     past_bench_tree=sys.argv[10],
     past_bench_dirty=sys.argv[11] == "true",
-    execution_modes=STATIC_METHOD_VARIANTS,
+    execution_modes=modes,
 )
 ' "${manifest_path}" "${REPLICATES}" "${TASK_FAMILY}" \
   "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" \
   "${RSIMEM_ROOT}/configs/agents.yaml" \
   "${PAST_BENCH_ROOT}/self-evolve-tasks-v2/${TASK_FAMILY}" \
   "${rsimem_commit}" "${rsimem_dirty}" "${past_bench_commit}" \
-  "${past_bench_tree}" "${past_bench_dirty}"
+  "${past_bench_tree}" "${past_bench_dirty}" \
+  "${METHOD_SET}"
 
 manifest_call() {
   local operation="$1"
@@ -115,6 +131,7 @@ else:
 
 echo "Static SM01 batch: ${batch_root}"
 echo "Replicates: ${REPLICATE_START}-${REPLICATE_END} of ${REPLICATES}"
+echo "Method set: ${METHOD_SET}"
 echo "RSIMem commit: ${rsimem_commit}"
 echo "PAST-Bench commit/tree: ${past_bench_commit} / ${past_bench_tree}"
 
@@ -123,9 +140,14 @@ for replicate in $(seq "${REPLICATE_START}" "${REPLICATE_END}"); do
   mapfile -t methods < <(
     PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
 import sys
-from rsimem.experiment_manifest import STATIC_METHOD_VARIANTS, execution_order
-print("\n".join(execution_order(int(sys.argv[1]), STATIC_METHOD_VARIANTS)))
-' "${replicate}"
+from rsimem.experiment_manifest import (
+    STATIC_METHOD_VARIANTS,
+    STATIC_UTILITY_METHOD_VARIANTS,
+    execution_order,
+)
+modes = STATIC_METHOD_VARIANTS if sys.argv[2] == "baseline" else STATIC_UTILITY_METHOD_VARIANTS
+print("\n".join(execution_order(int(sys.argv[1]), modes)))
+' "${replicate}" "${METHOD_SET}"
   )
   echo "Replicate ${replicate} order: ${methods[*]}"
   ordinal=0
@@ -137,6 +159,8 @@ print("\n".join(execution_order(int(sys.argv[1]), STATIC_METHOD_VARIANTS)))
       persistence_variant="without_persistence"
     elif [[ "${method}" == "static-rsimem" ]]; then
       semantic_mode="static"
+    elif [[ "${method}" == "static-utility-rsimem" ]]; then
+      semantic_mode="static_utility"
     fi
     base_name="${batch_id}_r$(printf '%02d' "${replicate}")_${method//-/_}"
     run_name="$(manifest_call next "${replicate}" "${ordinal}" "${method}" "${base_name}")"
@@ -195,6 +219,29 @@ comparison = {variant: results}
     if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.audit \
       "${trace_dir}" --output "${trace_dir}/audit.json"; then
       manifest_call record "${replicate}" "${ordinal}" "${method}" "${run_name}" failed audit
+      exit 1
+    fi
+    if ! "${PYTHON_BIN}" -c '
+import json
+import sys
+from pathlib import Path
+report = json.loads((Path(sys.argv[1]) / "audit.json").read_text(encoding="utf-8"))
+utility = report.get("staticUtility")
+if not isinstance(utility, dict):
+    raise ValueError("audit report has no static utility evidence")
+if sys.argv[2] == "static-utility-rsimem":
+    if utility.get("uniqueExecutions", 0) < 1:
+        raise ValueError("static utility run produced no utility executions")
+    for field in ("gateDigests", "gateVersions", "featureSchemas", "policyVersions"):
+        if len(utility.get(field) or []) != 1:
+            raise ValueError(f"static utility run did not freeze {field}")
+    targets = utility.get("targets") or {}
+    if targets.get("generation", 0) < 1 or targets.get("internal_operation", 0) < 1:
+        raise ValueError("static utility run did not exercise generation/internal objective")
+elif utility.get("events") != 0:
+    raise ValueError("baseline static run unexpectedly emitted utility decisions")
+' "${trace_dir}" "${method}"; then
+      manifest_call record "${replicate}" "${ordinal}" "${method}" "${run_name}" failed utility_audit
       exit 1
     fi
     manifest_call record "${replicate}" "${ordinal}" "${method}" "${run_name}" completed ""

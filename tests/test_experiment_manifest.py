@@ -7,6 +7,7 @@ import pytest
 
 from rsimem.experiment_manifest import (
     STATIC_METHOD_VARIANTS,
+    STATIC_UTILITY_METHOD_VARIANTS,
     execution_order,
     initialize_batch_manifest,
     load_manifest,
@@ -92,6 +93,14 @@ def test_execution_order_rotates_modes_across_replicates() -> None:
         "static-rsimem",
         "no-persistence",
     )
+    assert execution_order(1, STATIC_UTILITY_METHOD_VARIANTS) == (
+        "static-rsimem",
+        "static-utility-rsimem",
+    )
+    assert execution_order(2, STATIC_UTILITY_METHOD_VARIANTS) == (
+        "static-utility-rsimem",
+        "static-rsimem",
+    )
 
 
 def test_manifest_records_effective_configuration_and_attempt_order(tmp_path: Path) -> None:
@@ -159,6 +168,18 @@ def test_manifest_schedules_static_method_variants(tmp_path: Path) -> None:
         run_name="r01_no_persistence",
         status="running",
     )
+
+    utility_path = tmp_path / "static-utility-methods.json"
+    initialize_batch_manifest(
+        utility_path,
+        **_manifest_kwargs(),
+        execution_modes=STATIC_UTILITY_METHOD_VARIANTS,
+    )
+    utility = load_manifest(utility_path)
+    assert utility["executionOrderByReplicate"]["2"] == [
+        "static-utility-rsimem",
+        "static-rsimem",
+    ]
 
 
 def test_manifest_fails_closed_for_missing_field_unknown_mode_and_dirty_benchmark(
