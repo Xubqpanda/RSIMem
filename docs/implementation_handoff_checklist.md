@@ -1032,19 +1032,27 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2J.2 Validation、Activation 与 Rollback
 
-- □ 按时间或 task group 划分 train/validation，避免 future leakage。
-- □ 与 frozen static policy 在同一 held-out evidence 比较。
-- □ 预先定义 quality、cost、stability 和 uncertainty acceptance criterion。
-- □ 未通过 criterion 的 proposal 保持 rejected。
-- □ 原子切换 active policy pointer，每个 decision 记录实际 version。
-- □ 支持 operator rollback 和 automatic safety rollback。
+- √ 按时间或 task group 划分 train/validation，避免 future leakage。
+- √ 与 frozen static policy 在同一 held-out evidence 比较。
+- √ 预先定义 quality、cost、stability 和 uncertainty acceptance criterion。
+- √ 未通过 criterion 的 proposal 保持 rejected。
+- √ 原子切换 active policy pointer，每个 decision 记录实际 version。
+- √ 支持 operator rollback 和 automatic safety rollback。
 
 验收需求：
 
-- □ Split identity、cutoff 和 episode membership 可审计。
-- □ Acceptance decision 可重放，不根据 test official score 选择 policy。
-- □ Activation crash 不产生两个 active policy。
-- □ Repeated activation/rejection/rollback 幂等，restart 后稳定。
+- √ Split identity、cutoff 和 episode membership 可审计。
+- √ Acceptance decision 可重放，不根据 test official score 选择 policy。
+- √ Activation crash 不产生两个 active policy。
+- √ Repeated activation/rejection/rollback 幂等，restart 后稳定。
+
+2J.2 验收记录：
+
+- 两级 validation：time-ordered episode split 与 content-free offline pre-screen 只能把 proposal 推进到 `validated`；最终 activation 必须 replay static/proposal matched held-out observation pairs。Pair 强制匹配 example、episode、task-input digest、budget、evidence cutoff 和实际 policy version。
+- Criterion/decision：quality 只统计两侧均 resolved 的 deployment-observable label；cost、stability 和 uncertainty 使用同一 held-out pair。Criteria、split、offline decision 和 matched decision 均 content-addressed；official score/grader/answer/expectation 不在 API surface。
+- Activation/rollback：matched coordinator 是唯一高层 activation 路径；decision 先持久化，再通过原子 active pointer 激活。Activation crash 保持 `validated` 且无 active；operator/automatic rollback 使用 content-addressed evidence，transition replay 幂等并可跨 restart 审计。
+- Commits：`3ce428b`（training membership）、`28e340f`（split/offline validation/decision persistence）、`70077ea`（封堵 offline activation）、`ce76d86`（matched receipt requirement）、`f5c294b`（matched execution gate）和 `03c1984`（example/episode binding）。Full RSIMem `314 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check` 和 diff check 通过。
+- 已知限制：当前完成的是 deterministic implementation gate，尚未把 active artifact 参数接入真实 Mem0-flat semantic decision。Matched observation 仍由 fixture 提供，不构成 PAST-Bench adaptive quality claim；这些属于 2J.3 和 2K。
 
 ### 2J.3 阶段闸门
 
