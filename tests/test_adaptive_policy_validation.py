@@ -17,10 +17,12 @@ from rsimem.memory.adaptive_policy import (
 from rsimem.memory.adaptive_policy_store import JsonAdaptivePolicyStore
 from rsimem.memory.adaptive_policy_validation import (
     AdaptiveAcceptanceCriteria,
+    AdaptiveRollbackReceipt,
     AdaptivePolicyLifecycleCoordinator,
     AdaptivePolicyValidator,
     AdaptiveSplitConfig,
     JsonAdaptiveValidationDecisionStore,
+    MatchedActivationReceipt,
     TimeOrderedAdaptiveSplitter,
 )
 from rsimem.memory.attribution import DeterministicFirstAttributor
@@ -238,7 +240,7 @@ def test_quality_regression_is_rejected_and_remains_inactive(tmp_path) -> None:
     assert policy_store.snapshot().active is None
 
 
-def test_offline_screening_stops_at_validated_and_runtime_uses_parent(tmp_path) -> None:
+def test_matched_receipt_activates_then_safety_receipt_rolls_back(tmp_path) -> None:
     dataset, gate = _multi_dataset(training_negative=True)
     split = TimeOrderedAdaptiveSplitter().split(dataset, gate)
     artifact = _proposal(dataset, gate, split)
@@ -272,6 +274,50 @@ def test_offline_screening_stops_at_validated_and_runtime_uses_parent(tmp_path) 
     )
     assert binding.actual_policy_version == dataset.config.policy_version
     assert binding.adaptive is False
+
+    receipt = MatchedActivationReceipt.create(
+        validation_decision_id=decision.decision_id,
+        artifact_id=artifact.artifact_id,
+        parent_policy_version=artifact.parent_policy_version,
+        proposal_policy_version=artifact.policy_version,
+        task_group_ids=split.validation_task_ids,
+        static_trace_ids=tuple(
+            f"trace.static.{index}"
+            for index, _ in enumerate(split.validation_task_ids, 1)
+        ),
+        proposal_trace_ids=tuple(
+            f"trace.proposal.{index}"
+            for index, _ in enumerate(split.validation_task_ids, 1)
+        ),
+        budget_id="budget.held-out-v1",
+        matched_audit_id="audit.matched-held-out-v1",
+        accepted=True,
+        reason_codes=("matched_execution_passed",),
+    )
+    activated = coordinator.activate(artifact, decision, receipt)
+    duplicate_activation = coordinator.activate(artifact, decision, receipt)
+    assert activated == duplicate_activation
+    assert activated.state == AdaptivePolicyState.ACTIVE
+    active_binding = coordinator.bind_runtime_decision(
+        "runtime-decision.adaptive",
+        fallback_policy_version=dataset.config.policy_version,
+    )
+    assert active_binding.actual_policy_version == artifact.policy_version
+    assert active_binding.adaptive is True
+
+    rollback = AdaptiveRollbackReceipt.create(
+        policy_version=artifact.policy_version,
+        automatic=True,
+        evidence_ids=("evidence.stability-regression",),
+        reason_code="safety_regression",
+    )
+    rolled = coordinator.rollback(rollback)
+    replay_rollback = coordinator.rollback(rollback)
+    assert rolled == replay_rollback
+    assert rolled.state == AdaptivePolicyState.ROLLED_BACK
+    assert policy_store.snapshot().active is None
+    with pytest.raises(ValueError, match="receipt identity"):
+        replace(receipt, budget_id="budget.drift")
 
 
 def test_offline_validation_crash_leaves_proposal_and_retry_is_stable(
@@ -322,3 +368,67 @@ def test_offline_validation_crash_leaves_proposal_and_retry_is_stable(
     recovered = coordinator.apply(artifact, decision)
     assert recovered.state == AdaptivePolicyState.VALIDATED
     assert store.snapshot().active_policy_version is None
+
+
+def test_matched_activation_crash_leaves_validated_and_retry_is_stable(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    dataset, gate = _multi_dataset(training_negative=True)
+    split = TimeOrderedAdaptiveSplitter().split(dataset, gate)
+    artifact = _proposal(dataset, gate, split)
+    decision = AdaptivePolicyValidator().evaluate(
+        artifact,
+        dataset,
+        gate,
+        split,
+        AdaptiveAcceptanceCriteria(),
+    )
+    path = tmp_path / "policies.json"
+    store = JsonAdaptivePolicyStore(
+        path,
+        trusted_root_policy_versions=(dataset.config.policy_version,),
+    )
+    coordinator = AdaptivePolicyLifecycleCoordinator(
+        store,
+        JsonAdaptiveValidationDecisionStore(tmp_path / "decisions"),
+    )
+    coordinator.apply(artifact, decision)
+    receipt = MatchedActivationReceipt.create(
+        validation_decision_id=decision.decision_id,
+        artifact_id=artifact.artifact_id,
+        parent_policy_version=artifact.parent_policy_version,
+        proposal_policy_version=artifact.policy_version,
+        task_group_ids=split.validation_task_ids,
+        static_trace_ids=tuple(
+            f"trace.static.{index}"
+            for index, _ in enumerate(split.validation_task_ids, 1)
+        ),
+        proposal_trace_ids=tuple(
+            f"trace.proposal.{index}"
+            for index, _ in enumerate(split.validation_task_ids, 1)
+        ),
+        budget_id="budget.held-out-v1",
+        matched_audit_id="audit.matched-held-out-v1",
+        accepted=True,
+        reason_codes=("matched_execution_passed",),
+    )
+    original_write = store._write_unlocked
+
+    def fail_activation(payload):
+        raise RuntimeError("simulated matched activation crash")
+
+    monkeypatch.setattr(store, "_write_unlocked", fail_activation)
+    with pytest.raises(RuntimeError, match="activation crash"):
+        coordinator.activate(artifact, decision, receipt)
+    crashed = JsonAdaptivePolicyStore(
+        path,
+        trusted_root_policy_versions=(dataset.config.policy_version,),
+    ).snapshot()
+    assert crashed.active is None
+    assert crashed.records[0].state == AdaptivePolicyState.VALIDATED
+
+    monkeypatch.setattr(store, "_write_unlocked", original_write)
+    recovered = coordinator.activate(artifact, decision, receipt)
+    assert recovered.state == AdaptivePolicyState.ACTIVE
+    assert store.snapshot().active_policy_version == artifact.policy_version
