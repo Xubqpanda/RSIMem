@@ -282,6 +282,8 @@ print("true" if completed == expected else "false")
   if [[ "${feedback_complete}" == "true" ]]; then
     PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.feedback_preparation \
       "${batch_root}" --output "${batch_root}/prepared"
+    PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.adaptive_preparation \
+      "${batch_root}/prepared" --output "${batch_root}/prepared/adaptive"
   else
     echo "Feedback batch is partial; preparation assembly deferred."
   fi
