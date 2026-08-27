@@ -361,6 +361,7 @@ class HermesPastBenchBridge:
         task_state: TaskLifecycleState,
     ) -> None:
         assert self.lifecycle is not None
+        evidence_count = len(self.lifecycle.observer.events)
         try:
             agent = self._agent
             if agent is None:
@@ -377,6 +378,8 @@ class HermesPastBenchBridge:
                 source_ref=f"hermes_state:session:{native_session_id}",
             )
         except Exception as exc:
+            if len(self.lifecycle.observer.events) == evidence_count:
+                self.lifecycle.record_boundary_rejection(trigger, exc)
             self._lifecycle_failures.append((trigger.value, type(exc).__name__))
             return
         if not any(

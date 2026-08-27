@@ -5,6 +5,7 @@ import os
 import sqlite3
 from dataclasses import asdict, replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -24,7 +25,11 @@ from rsimem.hermes_integration import (
 )
 from rsimem.hermes_past_bridge import HermesPastBenchBridge
 from rsimem.ledger import LifecycleLedgerObserver
-from rsimem.lifecycle import RawResourceUsage, run_sm01_preference_fixture
+from rsimem.lifecycle import (
+    HermesLifecycleConfig,
+    RawResourceUsage,
+    run_sm01_preference_fixture,
+)
 from rsimem.memory import (
     MemoryArtifact,
     MemoryHit,
@@ -745,3 +750,73 @@ def test_lifecycle_ledger_appends_incrementally_and_resumes(tmp_path: Path) -> N
             trace_id="trace-sm01-fixture",
             output_path=output,
         )
+
+
+def test_lifecycle_ledger_records_content_free_pre_snapshot_rejection(tmp_path: Path) -> None:
+    output = tmp_path / "lifecycle.jsonl"
+    observer = LifecycleLedgerObserver(
+        variant="native+adapter+ledger",
+        trace_id="trace-host-failure",
+        output_path=output,
+    )
+    observer.record_boundary_rejection(
+        run_id="run-host-failure",
+        episode_id="episode-host-failure",
+        session_id="session-host-failure",
+        task_id="task-host-failure",
+        boundary_id="boundary-stable",
+        trigger="task_completed",
+        reason_code="host_valueerror",
+    )
+    event = observer.events[0]
+    assert event["kind"] == "boundary_rejected"
+    assert event["snapshotId"] is None
+    assert event["data"] == {
+        "evaluationId": "boundary-stable",
+        "boundaryId": "boundary-stable",
+        "trigger": "task_completed",
+        "status": "rejected",
+        "reasonCodes": ["host_valueerror"],
+    }
+
+
+def test_live_bridge_persists_pre_snapshot_failure_without_failing_task(tmp_path: Path) -> None:
+    home = _hermes_home(tmp_path / "home")
+    lifecycle_path = tmp_path / "artifacts" / "lifecycle.jsonl"
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "memory.jsonl",
+        run_id="run-host-failure",
+        trace_id="trace-host-failure",
+        episode_id="episode-host-failure",
+        session_id="session-host-failure",
+        task_id="task-host-failure",
+        experiment_variant="with_persistence",
+        lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
+        lifecycle_evidence_path=lifecycle_path,
+        lifecycle_receipt_path=tmp_path / "artifacts" / "receipts.json",
+    )
+    bridge.attach(SimpleNamespace(
+        _memory_store=None,
+        _session_db=None,
+        session_id="native-session",
+    ))
+    bridge.on_task_completed({"completed": True})
+    bridge.close()
+
+    assert bridge.lifecycle_results == ()
+    assert bridge.lifecycle_failures == (
+        ("task_completed", "ValueError"),
+        ("session_end", "ValueError"),
+    )
+    events = [
+        json.loads(line)
+        for line in lifecycle_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [event["kind"] for event in events] == [
+        "boundary_rejected",
+        "boundary_rejected",
+    ]
+    assert all(event["snapshotId"] is None for event in events)
+    assert PRIVATE_PREFERENCE not in json.dumps(events, ensure_ascii=True)
