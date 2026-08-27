@@ -932,9 +932,20 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2H.3 阶段闸门
 
-- □ Semantic generation/internal operation/retrieval outcome 使用统一 utility semantics。
-- □ Static LightRSI 可在 selected semantic-relevant PAST-Bench families 运行并审计。
-- □ Policy 在 run 内保持冻结。
+- √ Semantic generation/internal operation/retrieval outcome 使用统一 utility semantics。
+- √ Static LightRSI 可在 selected semantic-relevant PAST-Bench families 运行并审计。
+- √ Policy 在 run 内保持冻结。
+
+2H.3 验收记录：
+
+- Live gate：完成 `SM01_preference_adoption` 的 3-replicate rotated `static-rsimem` / `static-utility-rsimem` batch。6/6 scheduled slots completed，54 unique traces，284 unique physical model requests，6/6 audit `ok=true`。Batch 与完整 raw evidence 位于 ignored 的 `outputs/static_utility_sm01/hermes_luna/static_utility_sm01_20260827_v1`；正式报告见 [`static_utility_sm01_20260827.md`](static_utility_sm01_20260827.md)。
+- Frozen audit：新增 `static_utility_decisions` strict ledger join。Utility event 与 `semantic-static-utility-features-v1` ingestion execution 必须 exact match；unknown/content fields、numeric/schema violation、orphan/missing execution、run 内或跨 replicate gate/policy/schema drift 均 fail closed。3 个 live utility runs 共 18 expected/observed executions，gate digest、gate version、feature schema 和 scorer policy 各自全局唯一。
+- Matched boundary：deterministic fixture 证明 static/utility 使用相同 route、source snapshot、boundary、two-prompt cadence、raw usage contract 和 transaction/exit semantics。Live 每个 method/run 均为 6 ingestion executions、7 ingestion-policy model requests、1 planned `ADD`、5 `NONE`、0 retries。Provider 没有 seed，因此 live token、latency、trajectory 和 score 不要求逐值相等。
+- Utility coverage：live 每个 utility run产生 1 个 accepted generation decision 和 1 个 accepted internal-operation decision。该 batch 后续 boundary 没有抽取出 durable fact，未进入 related retrieval；retrieval 的统一 scorer/filter/rank 由 deterministic Mem0-flat integration fixture 验收，不宣称 live retrieval coverage。
+- Result boundary：Static utility primary score mean `0.4106`，static baseline `0.3700`；差异完全来自一个 unseeded replicate，且两者 hard pass rate 均为 0，因此不做质量优势声明。Raw generation/storage/retrieval/injection/recovery quantities保持独立，不换算 provider price；physical rewrite 仍 disabled，saved tokens 保持 unknown/not applicable。
+- Commits：`05866b1`（utility ledger/audit）、`6f41add`（rotated launcher/manifest）、`40109eb`（rebuildable content-free batch analysis）。Focused analysis/manifest/ledger tests `34 passed`；full RSIMem `266 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check`、diff check、analysis replay、source credential scan、exact-key batch scan 和 outputs ignore check 通过。
+- Failure evidence：第一次 static slot 因调用 launcher 时外层命令被误设为 1 秒 timeout，记录为 `launcher_timeout`；隔离 retry attempt 2 完成。该失败不属于 provider/method failure，不进入 aggregate，也未覆盖 manifest history。
+- 已知限制：本闸门只关闭 frozen static semantic objective。它不生成 delayed utility label，不更新 policy，不实现 physical rewrite，也不支持 adaptive/self-improving claim；这些依次属于 2I、2J 与 2K。
 
 ## 20. 第二阶段 2I：Delayed Feedback Dataset
 

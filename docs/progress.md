@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default. Static Mem0-flat semantic writeback is now available only through the explicit live experiment configuration; adaptive policy updates remain disabled. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A-1E, Phase 2A-2D, and Phase 2E are complete. Phase 2H unified static memory policy objective is the active milestone. Live mutation remains opt-in and restricted to the audited static experiment path.
+Phase 1A-1E, Phase 2A-2E, and Phase 2H are complete. Phase 2I delayed feedback dataset is the active milestone. Live mutation remains opt-in and restricted to the audited static experiment path; adaptive policy updates remain disabled.
 
 ## Completed Work
 
@@ -185,20 +185,22 @@ operator/recovery handling rather than being guessed.
 
 Static PAST-Bench semantic writeback is complete for SM01: 9/9 rotated method attempts passed audit, with 81 unique traces and content-free ingestion/mutation evidence. Admission timing varied across replicates; delayed utility labels and adaptive policy updates remain later gates.
 
+The frozen static utility gate is also complete for SM01. The accepted 3-replicate static/static-utility batch has 6/6 completed scheduled slots, 54 unique traces, exact utility/ingestion joins, and one stable gate/policy/schema identity across utility replicates. Results and limitations are recorded in [`static_utility_sm01_20260827.md`](static_utility_sm01_20260827.md); no quality-superiority or adaptive-policy claim is made.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `262 passed`.
+- [x] Pass all RSIMem tests: `266 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `387 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2H.3 Static Policy Execution Gate**
+### **Current: Phase 2I.1 Lifecycle Join And Delayed Utility Labels**
 
-Phase 2H.2 now connects the frozen future-utility objective to Mem0-flat generation admission, related-memory filtering/ranking, and internal operation admission under an explicit `static_utility` mode. Matched deterministic fixtures prove that `static` and `static_utility` share the same semantic route, source snapshot, task boundary, two-prompt cadence, raw model usage, mutation transaction, and physical-rewrite-disabled exit contract. Utility decisions are persisted as content-free lifecycle evidence, and the policy/config binding cannot change within a run.
+Phase 2H freezes one interpretable future-utility-per-cost objective across semantic generation admission, internal operation admission, and retrieval filtering/ranking without changing route or invocation scheduling. Deterministic matched fixtures and the audited live SM01 batch establish fixed policy identity, content-free evidence, raw-cost accounting, and explicit limitations.
 
-The immediate objective is 2H.3: execute and audit `static_utility` through a selected semantic-relevant PAST-Bench family using the configured provider. This gate remains open until the provider credential is injected through `GPT_LUNA_API_KEY`; no credential is stored in source, config, shell scripts, logs, or committed outputs.
+The immediate objective is 2I.1: construct a versioned delayed-feedback dataset from the existing atomic operation graph and lifecycle evidence. Labels must use only deployment-observable future evidence, preserve exact attributed operation IDs and observation cutoffs, represent positive/negative/unresolved/censored outcomes, and keep official benchmark scores and raw memory/prompt/response content out of learner input.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -251,11 +253,11 @@ Acceptance criteria:
 
 ### Static LightRSI Writeback
 
-- [ ] Invoke the Hermes semantic route at the same task/session boundary used by its control policy.
-- [ ] Expose only ingest/add externally; let the semantic policy produce ADD, UPDATE, DELETE, or NONE.
-- [ ] Define one fixed future-utility-per-cost objective for evaluating semantic construction/update and retrieval behavior.
+- [x] Invoke the Hermes semantic route at the same task/session boundary used by its control policy.
+- [x] Expose only ingest/add externally; let the semantic policy produce ADD, UPDATE, DELETE, or NONE.
+- [x] Define one fixed future-utility-per-cost objective for evaluating semantic construction/update and retrieval behavior.
 - [x] Link source context, ingestion execution, internal operation, stored artifact, retrieval, injection, downstream execution, and outcome through stable lifecycle IDs.
-- [ ] Compare no persistence, native memory, and static LightRSI under matched settings.
+- [x] Compare no persistence, native memory, and static LightRSI under matched settings.
 - [ ] Verify that quality gains are reported together with ingestion-policy, storage, retrieval, injection, and recovery costs.
 
 ### Adaptive LightRSI Loop
