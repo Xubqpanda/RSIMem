@@ -26,12 +26,15 @@ from .receipts import (
 )
 from .runtime import MemoryBackendRegistry
 from .operation_graph import (
+    ArtifactKind,
+    ArtifactNode,
     AtomicOperationRecorder,
     MutationEdge,
     OperationContext,
     OperationKind,
     OperationSpec,
     OperationStatus,
+    build_artifact_id,
     build_operation_id,
 )
 from .validation import (
@@ -46,6 +49,7 @@ from .validation import (
 MUTATION_EXECUTOR_SCHEMA_VERSION = 1
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _REASON_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 
 
 def _canonical_json(value: object) -> str:
@@ -102,6 +106,8 @@ class MutationExecutionRequest:
     trusted_context: TrustedValidationContext
     current_source_digest: str
     trigger: EvaluationTrigger
+    evidence_input_artifact_ids: tuple[str, ...] = ()
+    evidence_proposal_operation_ids: tuple[str, ...] = ()
     schema_version: int = MUTATION_EXECUTOR_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -110,6 +116,14 @@ class MutationExecutionRequest:
         object.__setattr__(self, "trigger", EvaluationTrigger(self.trigger))
         if not _DIGEST.fullmatch(self.current_source_digest):
             raise ValueError("mutation execution current_source_digest must be sha256")
+        for name, values in (
+            ("input artifact", self.evidence_input_artifact_ids),
+            ("proposal operation", self.evidence_proposal_operation_ids),
+        ):
+            if len(values) != len(set(values)) or any(
+                not _IDENTIFIER.fullmatch(value) for value in values
+            ):
+                raise ValueError(f"mutation evidence {name} IDs must be unique identifiers")
 
 
 @dataclass(frozen=True, slots=True)
@@ -302,7 +316,9 @@ class TransactionalMutationExecutor:
             context,
             "validation",
             parent_ids=(request.trusted_context.provenance.operation_id,),
+            input_ids=request.evidence_input_artifact_ids,
         )
+        validation_artifact_id = None
         if self.operation_recorder is None:
             validation = self.validator.validate(
                 request.candidate,
@@ -318,7 +334,15 @@ class TransactionalMutationExecutor:
                     current_source_digest=request.current_source_digest,
                     trusted_context=request.trusted_context,
                 )
+                validation_artifact = self._validation_artifact(
+                    request,
+                    context,
+                    validation,
+                )
+                self.operation_recorder.record_artifact(validation_artifact)
+                validation_artifact_id = validation_artifact.artifact_id
                 scope.complete(
+                    output_artifact_ids=(validation_artifact_id,),
                     status=(
                         OperationStatus.SUCCESS
                         if validation.accepted
@@ -357,6 +381,7 @@ class TransactionalMutationExecutor:
             validation,
             crash_at=crash_at,
             parent_operation_ids=(validation_spec.operation_id,),
+            validation_artifact_id=validation_artifact_id,
         )
 
     def recover(
@@ -604,6 +629,7 @@ class TransactionalMutationExecutor:
         *,
         crash_at: CrashPoint | None,
         parent_operation_ids: tuple[str, ...] = (),
+        validation_artifact_id: str | None = None,
     ) -> MutationExecutionResult:
         applying = self._transition(receipt, phase=MutationReceiptPhase.APPLYING)
         self._inject(crash_at, CrashPoint.BEFORE_BACKEND_CALL)
@@ -613,6 +639,7 @@ class TransactionalMutationExecutor:
             validation,
             crash_at=crash_at,
             parent_operation_ids=parent_operation_ids,
+            validation_artifact_id=validation_artifact_id,
         )
 
     def _call_backend(
@@ -623,6 +650,7 @@ class TransactionalMutationExecutor:
         *,
         crash_at: CrashPoint | None,
         parent_operation_ids: tuple[str, ...] = (),
+        validation_artifact_id: str | None = None,
     ) -> MutationExecutionResult:
         context = self._operation_context(request)
         mutation_spec = self._operation_spec(
@@ -631,6 +659,14 @@ class TransactionalMutationExecutor:
             context,
             "mutation",
             parent_ids=parent_operation_ids,
+            input_ids=tuple(dict.fromkeys((
+                *request.evidence_input_artifact_ids,
+                *(
+                    (validation_artifact_id,)
+                    if validation_artifact_id is not None
+                    else ()
+                ),
+            ))),
         )
         if receipt.action == InternalMemoryAction.NONE:
             if self.operation_recorder is not None:
@@ -643,7 +679,8 @@ class TransactionalMutationExecutor:
                     mutation_id=receipt.mutation_id,
                     operation_id=mutation_spec.operation_id,
                     proposal_operation_ids=(
-                        request.trusted_context.provenance.operation_id,
+                        request.evidence_proposal_operation_ids
+                        or (request.trusted_context.provenance.operation_id,)
                     ),
                     action=receipt.action,
                     target_artifact_id=None,
@@ -672,11 +709,21 @@ class TransactionalMutationExecutor:
                     )
                     scope.complete(
                         status=(
+                            OperationStatus.REJECTED
+                            if result.accepted
+                            and receipt.action == InternalMemoryAction.ADD
+                            and result.reason_code == "already_present"
+                            else
                             OperationStatus.SUCCESS
                             if result.accepted
                             else OperationStatus.REJECTED
                         ),
                         reason_code=(
+                            "add_ownership_ambiguous"
+                            if result.accepted
+                            and receipt.action == InternalMemoryAction.ADD
+                            and result.reason_code == "already_present"
+                            else
                             None
                             if result.accepted
                             else result.reason_code or "backend_rejected"
@@ -743,7 +790,10 @@ class TransactionalMutationExecutor:
             self.operation_recorder.record_mutation(MutationEdge(
                 mutation_id=receipt.mutation_id,
                 operation_id=mutation_spec.operation_id,
-                proposal_operation_ids=(request.trusted_context.provenance.operation_id,),
+                proposal_operation_ids=(
+                    request.evidence_proposal_operation_ids
+                    or (request.trusted_context.provenance.operation_id,)
+                ),
                 action=receipt.action,
                 target_artifact_id=(
                     receipt.target_artifact_id or applied_artifact_id
@@ -806,6 +856,12 @@ class TransactionalMutationExecutor:
             self._operation_context(request),
             "verification",
             parent_ids=parent_operation_ids,
+            input_ids=(
+                (current.applied_artifact_id,)
+                if current.action != InternalMemoryAction.DELETE
+                and current.applied_artifact_id is not None
+                else ()
+            ),
         )
         if self.operation_recorder is None:
             verified, reason, artifact, storage_bytes = self._verify(
@@ -818,7 +874,18 @@ class TransactionalMutationExecutor:
                     current,
                     request.candidate,
                 )
+                output_artifact_ids = ()
+                if artifact is not None:
+                    memory_artifact = self._memory_artifact(
+                        request,
+                        artifact.artifact_id,
+                        artifact.content,
+                        artifact.revision,
+                    )
+                    self.operation_recorder.record_artifact(memory_artifact)
+                    output_artifact_ids = (memory_artifact.artifact_id,)
                 scope.complete(
+                    output_artifact_ids=output_artifact_ids,
                     status=(
                         OperationStatus.SUCCESS
                         if verified
@@ -1165,6 +1232,48 @@ class TransactionalMutationExecutor:
                 None,
                 failure_reason=reason,
             ),
+        )
+
+    @staticmethod
+    def _validation_artifact(
+        request: MutationExecutionRequest,
+        context: OperationContext,
+        validation: ValidationResult,
+    ) -> ArtifactNode:
+        payload = _canonical_json(validation.observer_evidence())
+        digest = _sha(payload)
+        return ArtifactNode(
+            build_artifact_id(
+                ArtifactKind.VALIDATION_RESULT,
+                context,
+                logical_name=f"{request.ingest_result.execution_id}.validation",
+                content_digest=digest,
+            ),
+            ArtifactKind.VALIDATION_RESULT,
+            "semantic-validation-result-v1",
+            digest,
+            len(payload.encode("utf-8")),
+            None,
+            None,
+            validation.operation_id,
+        )
+
+    @staticmethod
+    def _memory_artifact(
+        request: MutationExecutionRequest,
+        artifact_id: str,
+        content: str,
+        revision: str | None,
+    ) -> ArtifactNode:
+        return ArtifactNode(
+            artifact_id,
+            ArtifactKind.MEMORY_ARTIFACT,
+            "hermes-semantic-artifact-v1",
+            _sha(content),
+            len(content.encode("utf-8")),
+            None,
+            revision,
+            request.ingest_result.fixed_route.backend,
         )
 
     @staticmethod

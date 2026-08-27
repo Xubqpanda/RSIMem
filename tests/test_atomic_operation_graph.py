@@ -624,6 +624,23 @@ def test_operation_scope_preserves_exception_and_records_failed_operation() -> N
     assert graph.operations[0].reason_code == "operation_exception"
 
 
+def test_operation_scope_preserves_explicit_rejection_when_control_raises() -> None:
+    context = _context()
+    log = AppendOnlyOperationEvidenceLog()
+    recorder = AtomicOperationRecorder(log)
+    spec = _spec(context, OperationKind.INTERNAL_OPERATION_DECISION, "rejected")
+    with pytest.raises(RuntimeError, match="fixture rejection"):
+        with recorder.operation_scope(spec) as operation:
+            operation.complete(
+                status=OperationStatus.REJECTED,
+                reason_code="invalid_proposal",
+            )
+            raise RuntimeError("fixture rejection")
+    graph = materialize_operation_graph(log.events)
+    assert graph.operations[0].status == OperationStatus.REJECTED
+    assert graph.operations[0].reason_code == "invalid_proposal"
+
+
 def test_rejected_proposal_failed_mutation_and_none_are_not_merged() -> None:
     context = _context()
     log = AppendOnlyOperationEvidenceLog()

@@ -94,6 +94,7 @@ class ArtifactKind(StrEnum):
     INJECTION = "injection"
     USE_EVIDENCE = "use_evidence"
     OUTCOME = "outcome"
+    POLICY_PARAMETER = "policy_parameter"
 
 
 class OperationStatus(StrEnum):
@@ -773,10 +774,16 @@ class AtomicOperationRecorder:
                 context=spec.context,
                 parent_operation_ids=spec.parent_operation_ids,
                 input_artifact_ids=spec.input_artifact_ids,
-                output_artifact_ids=(),
+                output_artifact_ids=(
+                    handle.output_artifact_ids if handle.completed else ()
+                ),
                 retry_identity=spec.retry_identity,
-                status=OperationStatus.FAILED,
-                reason_code="operation_exception",
+                status=(
+                    handle.status if handle.completed else OperationStatus.FAILED
+                ),
+                reason_code=(
+                    handle.reason_code if handle.completed else "operation_exception"
+                ),
                 latency_ms=latency,
                 usage=handle.usage,
             ))

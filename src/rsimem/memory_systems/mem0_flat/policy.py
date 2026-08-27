@@ -7,6 +7,7 @@ import json
 import math
 import re
 import time
+from contextlib import nullcontext
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
@@ -27,6 +28,17 @@ from ...memory.ingestion import (
     SemanticPolicyDescriptor,
 )
 from ...memory.runtime import MemoryBackendRegistry
+from ...memory.operation_graph import (
+    ArtifactKind,
+    ArtifactNode,
+    AtomicOperationRecorder,
+    OperationContext,
+    OperationKind,
+    OperationSpec,
+    OperationStatus,
+    build_artifact_id,
+    build_operation_id,
+)
 from ...memory.validation import (
     SemanticMemoryCategory,
     TargetOwnershipResolver,
@@ -307,6 +319,19 @@ class ExtractedSemanticFact:
     temporal_validity: TemporalValidity
 
 
+@dataclass(frozen=True, slots=True)
+class Mem0FlatOperationTrace:
+    context: OperationContext
+    source_operation_id: str
+    source_artifact_id: str
+    extraction_operation_id: str
+    fact_artifact_ids: tuple[str, ...]
+    related_operation_ids: tuple[str, ...]
+    related_artifact_ids: tuple[str, ...]
+    decision_operation_id: str | None
+    proposal_artifact_ids: tuple[str, ...]
+
+
 class _RejectedDecision(Exception):
     def __init__(self, reason_code: str) -> None:
         self.reason_code = reason_code
@@ -326,6 +351,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         policy_version: str | None = None,
         framework_version: str = "mem0-flat-framework-v1",
         feature_schema_version: str = "semantic-fact-features-v1",
+        operation_recorder: AtomicOperationRecorder | None = None,
     ) -> None:
         if fact_prompt.artifact.policy_version != operation_prompt.artifact.policy_version:
             raise ValueError("Mem0 prompt policy versions must match")
@@ -333,6 +359,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         self.retrieval = retrieval
         self.fact_prompt = fact_prompt
         self.operation_prompt = operation_prompt
+        self.operation_recorder = operation_recorder
         base_policy_version = policy_version or fact_prompt.artifact.policy_version
         bound_policy_version = f"{base_policy_version}.{retrieval.digest[:16]}"
         self._descriptor = SemanticPolicyDescriptor(
@@ -352,6 +379,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         )
         self._facts: dict[str, ExtractedSemanticFact] = {}
         self._target_namespaces: dict[str, str] = {}
+        self._operation_traces: dict[str, Mem0FlatOperationTrace] = {}
 
     @property
     def descriptor(self) -> SemanticPolicyDescriptor:
@@ -362,6 +390,169 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
 
     def namespace_for_target(self, artifact_id: str | None) -> str | None:
         return self._target_namespaces.get(artifact_id or "")
+
+    def operation_trace(self, request_id: str) -> Mem0FlatOperationTrace | None:
+        return self._operation_traces.get(request_id)
+
+    def _operation_context(self, request: SemanticIngestRequest) -> OperationContext:
+        source = request.provenance.source
+        return OperationContext(
+            source.run_id,
+            source.episode_id,
+            source.session_id,
+            source.task_id,
+            self.descriptor.policy_version,
+            self.descriptor.prompt_version,
+            self.descriptor.framework_version,
+        )
+
+    @staticmethod
+    def _artifact_node(
+        context: OperationContext,
+        kind: ArtifactKind,
+        logical_name: str,
+        content_digest: str,
+        *,
+        byte_size: int,
+        revision: str | None,
+        provenance_ref: str,
+        artifact_id: str | None = None,
+    ) -> ArtifactNode:
+        return ArtifactNode(
+            artifact_id=(
+                artifact_id
+                or build_artifact_id(
+                    kind,
+                    context,
+                    logical_name=logical_name,
+                    content_digest=content_digest,
+                )
+            ),
+            kind=kind,
+            artifact_schema_version=(
+                "hermes-semantic-artifact-v1"
+                if kind == ArtifactKind.MEMORY_ARTIFACT
+                else "semantic-operation-artifact-v1"
+            ),
+            content_digest=content_digest,
+            byte_size=byte_size,
+            token_size=None,
+            revision=revision,
+            provenance_ref=provenance_ref,
+        )
+
+    @staticmethod
+    def _operation_spec(
+        context: OperationContext,
+        kind: OperationKind,
+        step_id: str,
+        *,
+        parents: tuple[str, ...] = (),
+        inputs: tuple[str, ...] = (),
+    ) -> OperationSpec:
+        return OperationSpec(
+            build_operation_id(
+                kind,
+                context,
+                step_id=step_id,
+                parent_operation_ids=parents,
+                input_artifact_ids=inputs,
+            ),
+            kind,
+            context,
+            parents,
+            inputs,
+        )
+
+    def _record_parameter_artifact(
+        self,
+        context: OperationContext,
+        *,
+        logical_name: str,
+        content_digest: str,
+        revision: str,
+        provenance_ref: str,
+    ) -> str:
+        assert self.operation_recorder is not None
+        artifact = self._artifact_node(
+            context,
+            ArtifactKind.POLICY_PARAMETER,
+            logical_name,
+            content_digest,
+            byte_size=0,
+            revision=revision,
+            provenance_ref=provenance_ref,
+        )
+        self.operation_recorder.record_artifact(artifact)
+        return artifact.artifact_id
+
+    def _begin_trace(
+        self,
+        request: SemanticIngestRequest,
+    ) -> tuple[OperationContext, str, str, OperationSpec] | None:
+        if self.operation_recorder is None:
+            return None
+        context = self._operation_context(request)
+        source_payload = _canonical_json(request.canonical_payload())
+        source_digest = _sha(source_payload)
+        source = self._artifact_node(
+            context,
+            ArtifactKind.SOURCE_OBSERVATION,
+            f"{request.idempotency_key}.source",
+            source_digest,
+            byte_size=len(source_payload.encode("utf-8")),
+            revision=request.provenance.base_revision,
+            provenance_ref=request.provenance.source.snapshot_id,
+        )
+        self.operation_recorder.record_artifact(source)
+        source_spec = self._operation_spec(
+            context,
+            OperationKind.SOURCE_OBSERVATION,
+            f"{request.idempotency_key}.source",
+        )
+        with self.operation_recorder.operation_scope(source_spec) as operation:
+            operation.complete(output_artifact_ids=(source.artifact_id,))
+        prompt_parameter = self._record_parameter_artifact(
+            context,
+            logical_name=f"{self.fact_prompt.artifact.prompt_id}.template",
+            content_digest=self.fact_prompt.artifact.template_digest,
+            revision=self.fact_prompt.artifact.version,
+            provenance_ref=self.fact_prompt.artifact.prompt_id,
+        )
+        extraction_spec = self._operation_spec(
+            context,
+            OperationKind.FACT_EXTRACTION,
+            f"{request.idempotency_key}.extraction",
+            parents=(source_spec.operation_id,),
+            inputs=(source.artifact_id, prompt_parameter),
+        )
+        return context, source_spec.operation_id, source.artifact_id, extraction_spec
+
+    def _store_trace(
+        self,
+        request: SemanticIngestRequest,
+        trace_state: tuple[OperationContext, str, str, OperationSpec] | None,
+        *,
+        fact_artifact_ids: tuple[str, ...] = (),
+        related_operation_ids: tuple[str, ...] = (),
+        related_artifact_ids: tuple[str, ...] = (),
+        decision_operation_id: str | None = None,
+        proposal_artifact_ids: tuple[str, ...] = (),
+    ) -> None:
+        if trace_state is None:
+            return
+        context, source_operation_id, source_artifact_id, extraction_spec = trace_state
+        self._operation_traces[request.idempotency_key] = Mem0FlatOperationTrace(
+            context,
+            source_operation_id,
+            source_artifact_id,
+            extraction_spec.operation_id,
+            fact_artifact_ids,
+            related_operation_ids,
+            related_artifact_ids,
+            decision_operation_id,
+            proposal_artifact_ids,
+        )
 
     def ingest(
         self,
@@ -374,32 +565,100 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 (),
                 reason_codes=("invalid_candidate_reader",),
             )
+        trace_state = self._begin_trace(request)
+        self._store_trace(request, trace_state)
+        extraction_spec = trace_state[3] if trace_state is not None else None
         if request.exit_evidence.unresolved_state is not None:
+            if extraction_spec is not None:
+                assert self.operation_recorder is not None
+                with self.operation_recorder.operation_scope(extraction_spec) as operation:
+                    operation.complete(
+                        status=OperationStatus.REJECTED,
+                        reason_code="unresolved_source",
+                    )
             return SemanticPolicyDecision(
                 MemoryIngestStatus.REJECTED,
                 (),
                 reason_codes=("unresolved_source",),
             )
         if request.validity != TemporalValidity.DURABLE:
+            if extraction_spec is not None:
+                assert self.operation_recorder is not None
+                with self.operation_recorder.operation_scope(extraction_spec) as operation:
+                    operation.complete(
+                        status=OperationStatus.REJECTED,
+                        reason_code="non_durable_source",
+                    )
             return SemanticPolicyDecision(
                 MemoryIngestStatus.REJECTED,
                 (),
                 reason_codes=("non_durable_source",),
             )
 
-        extraction = self.fact_prompt.render({
-            "source_messages": [
-                {
-                    "role": message.role,
-                    "content": message.content,
-                    "name": message.name,
-                }
-                for message in request.source_experience.messages
-            ],
-            "exit_evidence": request.exit_evidence.compiler_input_payload(),
-        })
-        extraction_result = self.completion_client.complete(extraction)
-        facts, filtered_count = self._parse_facts(extraction_result.output_text, request)
+        extraction_scope = (
+            self.operation_recorder.operation_scope(extraction_spec)
+            if self.operation_recorder is not None and extraction_spec is not None
+            else nullcontext(None)
+        )
+        with extraction_scope as extraction_operation:
+            extraction = self.fact_prompt.render({
+                "source_messages": [
+                    {
+                        "role": message.role,
+                        "content": message.content,
+                        "name": message.name,
+                    }
+                    for message in request.source_experience.messages
+                ],
+                "exit_evidence": request.exit_evidence.compiler_input_payload(),
+            })
+            extraction_result = self.completion_client.complete(extraction)
+            facts, filtered_count = self._parse_facts(
+                extraction_result.output_text,
+                request,
+            )
+            fact_artifacts = ()
+            if self.operation_recorder is not None and trace_state is not None:
+                context = trace_state[0]
+                values = []
+                for fact in facts:
+                    artifact = self._artifact_node(
+                        context,
+                        ArtifactKind.EXTRACTED_FACT,
+                        fact.fact_id,
+                        fact.content_digest,
+                        byte_size=len(fact.content.encode("utf-8")),
+                        revision=self.descriptor.feature_schema_version,
+                        provenance_ref=request.provenance.source.snapshot_id,
+                        artifact_id=fact.fact_id,
+                    )
+                    self.operation_recorder.record_artifact(artifact)
+                    values.append(artifact.artifact_id)
+                fact_artifacts = tuple(values)
+                assert extraction_operation is not None
+                extraction_operation.complete(
+                    output_artifact_ids=fact_artifacts,
+                    status=(
+                        OperationStatus.SUCCESS
+                        if facts
+                        else OperationStatus.REJECTED
+                        if filtered_count
+                        else OperationStatus.NONE
+                    ),
+                    reason_code=(
+                        None
+                        if facts
+                        else "non_durable_fact"
+                        if filtered_count
+                        else "no_durable_fact"
+                    ),
+                    usage=extraction_result.usage,
+                )
+        self._store_trace(
+            request,
+            trace_state,
+            fact_artifact_ids=fact_artifacts,
+        )
         if not facts:
             if filtered_count:
                 return SemanticPolicyDecision(
@@ -419,8 +678,65 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
 
         related_by_fact: dict[int, tuple[RelatedMemoryView, ...]] = {}
         flattened: dict[str, RelatedMemoryView] = {}
+        related_operation_ids: list[str] = []
+        related_artifact_ids: list[str] = []
+        retrieval_parameter = None
+        if self.operation_recorder is not None and trace_state is not None:
+            retrieval_parameter = self._record_parameter_artifact(
+                trace_state[0],
+                logical_name=f"{self.retrieval.version}.parameters",
+                content_digest=self.retrieval.digest,
+                revision=self.retrieval.version,
+                provenance_ref=self.retrieval.version,
+            )
         for index, fact in enumerate(facts):
-            views = candidates.search(request, fact.content)
+            related_spec = None
+            if trace_state is not None and retrieval_parameter is not None:
+                related_spec = self._operation_spec(
+                    trace_state[0],
+                    OperationKind.RELATED_MEMORY_RETRIEVAL,
+                    f"{request.idempotency_key}.related.{index}",
+                    parents=(trace_state[3].operation_id,),
+                    inputs=(fact_artifacts[index], retrieval_parameter),
+                )
+            related_scope = (
+                self.operation_recorder.operation_scope(related_spec)
+                if self.operation_recorder is not None and related_spec is not None
+                else nullcontext(None)
+            )
+            with related_scope as related_operation:
+                views = candidates.search(request, fact.content)
+                output_ids = []
+                if self.operation_recorder is not None:
+                    for view in views:
+                        artifact = self._artifact_node(
+                            trace_state[0],
+                            ArtifactKind.MEMORY_ARTIFACT,
+                            view.candidate.artifact_id,
+                            view.candidate.content_digest,
+                            byte_size=len(view.content.encode("utf-8")),
+                            revision=view.candidate.revision,
+                            provenance_ref=request.fixed_route.backend,
+                            artifact_id=view.candidate.artifact_id,
+                        )
+                        self.operation_recorder.record_artifact(artifact)
+                        output_ids.append(artifact.artifact_id)
+                    assert related_operation is not None
+                    related_operation.complete(
+                        output_artifact_ids=tuple(output_ids),
+                        status=(
+                            OperationStatus.SUCCESS
+                            if output_ids
+                            else OperationStatus.NONE
+                        ),
+                        reason_code=None if output_ids else "no_related_memory",
+                        usage=(candidates.usage if index == 0 else RawResourceUsage()),
+                    )
+            if related_spec is not None:
+                related_operation_ids.append(related_spec.operation_id)
+            for artifact_id in output_ids:
+                if artifact_id not in related_artifact_ids:
+                    related_artifact_ids.append(artifact_id)
             related_by_fact[index] = views
             for view in views:
                 flattened[view.candidate.candidate_id] = view
@@ -451,14 +767,87 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 for candidate_id, view in sorted(flattened.items())
             ],
         })
-        operation_result = self.completion_client.complete(decision_prompt)
-        try:
-            operations = self._parse_operations(
-                operation_result.output_text,
-                facts,
-                flattened,
+        decision_spec = None
+        if self.operation_recorder is not None and trace_state is not None:
+            decision_parameter = self._record_parameter_artifact(
+                trace_state[0],
+                logical_name=f"{self.operation_prompt.artifact.prompt_id}.template",
+                content_digest=self.operation_prompt.artifact.template_digest,
+                revision=self.operation_prompt.artifact.version,
+                provenance_ref=self.operation_prompt.artifact.prompt_id,
             )
+            decision_spec = self._operation_spec(
+                trace_state[0],
+                OperationKind.INTERNAL_OPERATION_DECISION,
+                f"{request.idempotency_key}.decision",
+                parents=(trace_state[3].operation_id, *related_operation_ids),
+                inputs=(
+                    *fact_artifacts,
+                    *related_artifact_ids,
+                    decision_parameter,
+                ),
+            )
+        decision_scope = (
+            self.operation_recorder.operation_scope(decision_spec)
+            if self.operation_recorder is not None and decision_spec is not None
+            else nullcontext(None)
+        )
+        proposal_artifact_ids = ()
+        try:
+            with decision_scope as decision_operation:
+                operation_result = self.completion_client.complete(decision_prompt)
+                try:
+                    operations = self._parse_operations(
+                        operation_result.output_text,
+                        facts,
+                        flattened,
+                    )
+                except _RejectedDecision as exc:
+                    if decision_operation is not None:
+                        decision_operation.complete(
+                            status=OperationStatus.REJECTED,
+                            reason_code=exc.reason_code,
+                            usage=operation_result.usage,
+                        )
+                    raise
+                if self.operation_recorder is not None and trace_state is not None:
+                    values = []
+                    for index, proposal in enumerate(operations):
+                        payload = _canonical_json({
+                            "ordinal": index,
+                            "action": proposal.action.value,
+                            "reason_code": proposal.reason_code,
+                            "candidate_id": proposal.candidate_id,
+                            "new_content_digest": proposal.new_content_digest,
+                        })
+                        artifact = self._artifact_node(
+                            trace_state[0],
+                            ArtifactKind.OPERATION_PROPOSAL,
+                            f"{request.idempotency_key}.proposal.{index}",
+                            _sha(payload),
+                            byte_size=len(payload.encode("utf-8")),
+                            revision=self.descriptor.policy_version,
+                            provenance_ref=self.operation_prompt.artifact.prompt_id,
+                        )
+                        self.operation_recorder.record_artifact(artifact)
+                        values.append(artifact.artifact_id)
+                    proposal_artifact_ids = tuple(values)
+                    assert decision_operation is not None
+                    decision_operation.complete(
+                        output_artifact_ids=proposal_artifact_ids,
+                        usage=operation_result.usage,
+                    )
         except _RejectedDecision as exc:
+            self._store_trace(
+                request,
+                trace_state,
+                fact_artifact_ids=fact_artifacts,
+                related_operation_ids=tuple(related_operation_ids),
+                related_artifact_ids=tuple(related_artifact_ids),
+                decision_operation_id=(
+                    decision_spec.operation_id if decision_spec is not None else None
+                ),
+            )
             return SemanticPolicyDecision(
                 MemoryIngestStatus.REJECTED,
                 (),
@@ -469,6 +858,17 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 ),
                 reason_codes=(exc.reason_code,),
             )
+        self._store_trace(
+            request,
+            trace_state,
+            fact_artifact_ids=fact_artifacts,
+            related_operation_ids=tuple(related_operation_ids),
+            related_artifact_ids=tuple(related_artifact_ids),
+            decision_operation_id=(
+                decision_spec.operation_id if decision_spec is not None else None
+            ),
+            proposal_artifact_ids=proposal_artifact_ids,
+        )
         return SemanticPolicyDecision(
             MemoryIngestStatus.SUCCESS,
             operations,
