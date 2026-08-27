@@ -2143,6 +2143,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     )
     if getattr(args, "compare_no_persistence", False):
         variants.append(("without_persistence", False))
+    shared_cold_variant = (
+        variants[0][0] if len(variants) == 1 else "with_persistence"
+    )
 
     # §15 reflection_off control: flip the sequence's reflection_enabled flag
     # for this run so PC04 / failure_reflection families can measure
@@ -2683,7 +2686,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         "episode_id": _sc_episode_dir.name,
                         "family_id": _sc_episode.family_id,
                         "stage": _sc_episode.stage,
-                        "experiment_variant": "with_persistence",
+                        "experiment_variant": shared_cold_variant,
                     },
                 )
 

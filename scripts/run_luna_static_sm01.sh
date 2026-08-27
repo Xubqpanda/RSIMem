@@ -167,6 +167,31 @@ print("\n".join(execution_order(int(sys.argv[1]), STATIC_METHOD_VARIANTS)))
       manifest_call record "${replicate}" "${ordinal}" "${method}" "${run_name}" failed past_bench
       exit 1
     fi
+    if ! "${PYTHON_BIN}" -c '
+import json
+import sys
+from pathlib import Path
+run_dir = Path(sys.argv[1])
+results = json.loads((run_dir / "sequence_results.json").read_text(encoding="utf-8"))
+variant = results.get("variant")
+if variant not in {"with_persistence", "without_persistence"}:
+    raise ValueError("single-variant results have an unknown persistence identity")
+comparison = {variant: results}
+(run_dir / "sequence_comparison.json").write_text(
+    json.dumps(comparison, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+' "${trace_dir}"; then
+      manifest_call record "${replicate}" "${ordinal}" "${method}" "${run_name}" failed normalize
+      exit 1
+    fi
+    if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.ledger \
+      "${trace_dir}/sequence_comparison.json" \
+      --output "${trace_dir}/ledger.jsonl" \
+      --judge-disabled; then
+      manifest_call record "${replicate}" "${ordinal}" "${method}" "${run_name}" failed ledger
+      exit 1
+    fi
     if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.audit \
       "${trace_dir}" --output "${trace_dir}/audit.json"; then
       manifest_call record "${replicate}" "${ordinal}" "${method}" "${run_name}" failed audit
