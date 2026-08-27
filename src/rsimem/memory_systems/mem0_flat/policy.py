@@ -330,12 +330,29 @@ class ExtractedSemanticFact:
 
 
 @dataclass(frozen=True, slots=True)
+class FactExtractionTrace:
+    fact_id: str
+    content_digest: str
+    accepted: bool
+    reason_code: str | None
+
+    def __post_init__(self) -> None:
+        if not self.fact_id.strip() or not _DIGEST.fullmatch(self.content_digest):
+            raise ValueError("fact extraction trace identity is invalid")
+        if type(self.accepted) is not bool:
+            raise TypeError("fact extraction accepted flag must be bool")
+        if self.accepted == (self.reason_code is not None):
+            raise ValueError("fact extraction reason must describe only rejected facts")
+
+
+@dataclass(frozen=True, slots=True)
 class Mem0FlatOperationTrace:
     context: OperationContext
     source_operation_id: str
     source_artifact_id: str
     extraction_operation_id: str
     fact_artifact_ids: tuple[str, ...]
+    fact_extractions: tuple[FactExtractionTrace, ...]
     related_operation_ids: tuple[str, ...]
     related_artifact_ids: tuple[str, ...]
     decision_operation_id: str | None
@@ -639,6 +656,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         trace_state: tuple[OperationContext, str, str, OperationSpec] | None,
         *,
         fact_artifact_ids: tuple[str, ...] = (),
+        fact_extractions: tuple[FactExtractionTrace, ...] = (),
         related_operation_ids: tuple[str, ...] = (),
         related_artifact_ids: tuple[str, ...] = (),
         decision_operation_id: str | None = None,
@@ -653,6 +671,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             source_artifact_id,
             extraction_spec.operation_id,
             fact_artifact_ids,
+            fact_extractions,
             related_operation_ids,
             related_artifact_ids,
             decision_operation_id,
@@ -716,10 +735,11 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 "exit_evidence": request.exit_evidence.compiler_input_payload(),
             })
             extraction_result = self.completion_client.complete(extraction)
-            facts, filtered_count = self._parse_facts(
+            facts, fact_extractions = self._parse_facts(
                 extraction_result.output_text,
                 request,
             )
+            filtered_count = sum(not value.accepted for value in fact_extractions)
             fact_artifacts = ()
             if self.operation_recorder is not None and trace_state is not None:
                 context = trace_state[0]
@@ -761,6 +781,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             request,
             trace_state,
             fact_artifact_ids=fact_artifacts,
+            fact_extractions=fact_extractions,
         )
         if not facts:
             if filtered_count:
@@ -989,6 +1010,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 request,
                 trace_state,
                 fact_artifact_ids=fact_artifacts,
+                fact_extractions=fact_extractions,
                 related_operation_ids=tuple(related_operation_ids),
                 related_artifact_ids=tuple(related_artifact_ids),
                 decision_operation_id=(
@@ -1009,6 +1031,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             request,
             trace_state,
             fact_artifact_ids=fact_artifacts,
+            fact_extractions=fact_extractions,
             related_operation_ids=tuple(related_operation_ids),
             related_artifact_ids=tuple(related_artifact_ids),
             decision_operation_id=(
@@ -1030,31 +1053,21 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         self,
         raw: str,
         request: SemanticIngestRequest,
-    ) -> tuple[tuple[ExtractedSemanticFact, ...], int]:
+    ) -> tuple[tuple[ExtractedSemanticFact, ...], tuple[FactExtractionTrace, ...]]:
         value = _strict_object(raw, {"facts"})
         raw_facts = value["facts"]
         if not isinstance(raw_facts, list):
             raise InvalidPolicyOutputError("facts must be a list")
         facts = []
+        traces = []
         seen = set()
-        filtered_count = 0
         for item in raw_facts:
             if not isinstance(item, str):
                 raise InvalidPolicyOutputError("fact must be a string")
             content = " ".join(item.split())
             if not content or len(content) > 2_000:
                 raise InvalidPolicyOutputError("fact length is invalid")
-            if (
-                _TEMPORARY.search(content)
-                or _TRANSCRIPT.search(content)
-                or _TOOL_NOISE.search(content)
-            ):
-                filtered_count += 1
-                continue
             digest = _sha(content)
-            if digest in seen:
-                continue
-            seen.add(digest)
             category = _classify(content)
             scope = request.scope
             namespace = "user" if scope == MemoryScope.USER else "memory"
@@ -1073,8 +1086,24 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 request.validity,
             )
             self._facts[digest] = fact
+            if (
+                _TEMPORARY.search(content)
+                or _TRANSCRIPT.search(content)
+                or _TOOL_NOISE.search(content)
+            ):
+                traces.append(FactExtractionTrace(
+                    fact.fact_id,
+                    digest,
+                    False,
+                    "non_durable_fact",
+                ))
+                continue
+            if digest in seen:
+                continue
+            seen.add(digest)
             facts.append(fact)
-        return tuple(facts), filtered_count
+            traces.append(FactExtractionTrace(fact.fact_id, digest, True, None))
+        return tuple(facts), tuple(traces)
 
     def _parse_operations(
         self,
