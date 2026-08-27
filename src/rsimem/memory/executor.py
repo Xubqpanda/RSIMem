@@ -909,8 +909,11 @@ class TransactionalMutationExecutor:
         }[receipt.action]
         artifact = None
         if receipt.action in {InternalMemoryAction.ADD, InternalMemoryAction.UPDATE}:
-            assert isinstance(candidate.content, str)
-            assert isinstance(candidate.metadata, Mapping)
+            if not isinstance(candidate.content, str) or not isinstance(
+                candidate.metadata,
+                Mapping,
+            ):
+                raise ValueError("validated mutation candidate content is invalid")
             artifact = MemoryArtifact(
                 artifact_id=(
                     str(candidate.candidate_id)
@@ -950,7 +953,8 @@ class TransactionalMutationExecutor:
                     if current_ids == receipt.pre_artifact_ids
                     else ProbeState.UNKNOWN
                 )
-            assert receipt.target_artifact_id is not None
+            if receipt.target_artifact_id is None:
+                return ProbeResult(ProbeState.UNKNOWN)
             target = backend.get(receipt.target_artifact_id)
             if target is not None:
                 if (

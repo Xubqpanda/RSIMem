@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 
 import pytest
@@ -431,6 +432,52 @@ def test_default_disabled_and_non_natural_boundary_never_touch_storage(tmp_path)
     assert not store.path.exists()
 
 
+def test_two_concurrent_executors_mutate_backend_once(tmp_path) -> None:
+    backend, registry, store, _, _ = _environment(tmp_path)
+    request = _request(
+        InternalMemoryAction.ADD,
+        content="Always use TSV.",
+        ordinal="concurrent",
+    )
+
+    def execute():
+        local_store = JsonMutationReceiptStore(tmp_path / "receipts.json")
+        local_validator = MutationValidator(registry, target_resolver=local_store)
+        local_executor = TransactionalMutationExecutor(
+            registry,
+            local_validator,
+            local_store,
+            enabled=True,
+            isolated_fixture=True,
+        )
+        return local_executor.execute(request)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: execute(), range(2)))
+    assert backend.mutate_calls == 1
+    assert MutationExecutionStatus.COMMITTED in {item.status for item in results}
+    assert {item.status for item in results}.issubset({
+        MutationExecutionStatus.COMMITTED,
+        MutationExecutionStatus.DUPLICATE,
+        MutationExecutionStatus.BLOCKED,
+    })
+    assert len(store.all()) == 1
+    assert store.all()[0].status == MutationReceiptStatus.COMMITTED
+
+
+def test_corrupt_receipt_store_stops_executor_before_backend(tmp_path) -> None:
+    backend, _, store, _, executor = _environment(tmp_path)
+    store.path.write_text("{broken", encoding="utf-8")
+    request = _request(
+        InternalMemoryAction.ADD,
+        content="Always use TSV.",
+        ordinal="corrupt-store",
+    )
+    with pytest.raises(ValueError, match="malformed mutation receipt store"):
+        executor.execute(request)
+    assert backend.mutate_calls == 0
+
+
 @pytest.mark.parametrize(
     "mode",
     ("permission_error", "disk_error", "revision_conflict", "partial_write"),
@@ -453,6 +500,47 @@ def test_backend_failures_never_commit_receipt(tmp_path, mode) -> None:
     assert receipts[0].status != MutationReceiptStatus.COMMITTED
     assert result.context_exit.logical_exit is False
     assert result.context_exit.source_retained is True
+
+
+def test_terminal_failure_restart_does_not_retry_backend(tmp_path) -> None:
+    backend, registry, store, _, executor = _environment(tmp_path)
+    backend.mode = "permission_error"
+    request = _request(
+        InternalMemoryAction.ADD,
+        content="Always use TSV.",
+        ordinal="terminal-failure",
+    )
+    failed = executor.execute(request)
+    assert failed.status == MutationExecutionStatus.FAILED
+    assert store.all()[0].status == MutationReceiptStatus.FAILED
+    calls = backend.mutate_calls
+
+    restarted_store = JsonMutationReceiptStore(tmp_path / "receipts.json")
+    restarted = TransactionalMutationExecutor(
+        registry,
+        MutationValidator(registry, target_resolver=restarted_store),
+        restarted_store,
+        enabled=True,
+        isolated_fixture=True,
+    )
+    recovered = restarted.recover(request)
+    assert recovered.status == MutationExecutionStatus.FAILED
+    assert backend.mutate_calls == calls
+
+
+def test_session_end_is_natural_but_physical_rewrite_remains_disabled(tmp_path) -> None:
+    _, _, _, _, executor = _environment(tmp_path)
+    request = _request(
+        InternalMemoryAction.ADD,
+        content="Always use TSV.",
+        ordinal="session-end",
+        trigger=EvaluationTrigger.SESSION_END,
+    )
+    result = executor.execute(request)
+    assert result.status == MutationExecutionStatus.COMMITTED
+    assert result.context_exit.natural_exit is True
+    assert result.context_exit.logical_exit is True
+    assert result.context_exit.physical_rewrite is False
 
 
 @pytest.mark.parametrize("mode", ("reread_missing", "reread_mismatch"))
