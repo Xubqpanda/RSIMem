@@ -275,9 +275,23 @@ class TimeOrderedAdaptiveSplitter:
             or gate.dataset_payload_digest != _digest(dataset.payload())
         ):
             raise ValueError("adaptive split requires accepted dataset evidence")
+        runs_by_episode: dict[str, set[str]] = {}
+        for example in dataset.examples:
+            runs_by_episode.setdefault(example.source_episode_id, set()).add(
+                example.run_id
+            )
+
+        def group_id(example: object) -> str:
+            episode_id = example.source_episode_id
+            return (
+                f"{example.run_id}:{episode_id}"
+                if len(runs_by_episode[episode_id]) > 1
+                else episode_id
+            )
+
         groups: dict[str, list[object]] = {}
         for example in dataset.examples:
-            groups.setdefault(example.source_episode_id, []).append(example)
+            groups.setdefault(group_id(example), []).append(example)
         ordered_groups = tuple(groups)
         if len(ordered_groups) <= config.validation_group_count:
             raise ValueError("adaptive split has insufficient chronological groups")
@@ -285,18 +299,18 @@ class TimeOrderedAdaptiveSplitter:
         training = tuple(
             example
             for example in dataset.examples
-            if example.source_episode_id not in validation_groups
+            if group_id(example) not in validation_groups
         )
         validation = tuple(
             example
             for example in dataset.examples
-            if example.source_episode_id in validation_groups
+            if group_id(example) in validation_groups
         )
         training_episodes = tuple(dict.fromkeys(
-            example.source_episode_id for example in training
+            group_id(example) for example in training
         ))
         validation_episodes = tuple(dict.fromkeys(
-            example.source_episode_id for example in validation
+            group_id(example) for example in validation
         ))
         training_tasks = tuple(dict.fromkeys(
             task_id for example in training for task_id in example.task_ids
@@ -314,7 +328,7 @@ class TimeOrderedAdaptiveSplitter:
             "training_example_ids": [item.example_id for item in training],
             "validation_example_ids": [item.example_id for item in validation],
             "validation_membership": [
-                [item.example_id, item.source_episode_id] for item in validation
+                [item.example_id, group_id(item)] for item in validation
             ],
             "training_episode_ids": list(training_episodes),
             "validation_episode_ids": list(validation_episodes),
@@ -333,7 +347,7 @@ class TimeOrderedAdaptiveSplitter:
             training_example_ids=tuple(item.example_id for item in training),
             validation_example_ids=tuple(item.example_id for item in validation),
             validation_membership=tuple(
-                (item.example_id, item.source_episode_id) for item in validation
+                (item.example_id, group_id(item)) for item in validation
             ),
             training_episode_ids=training_episodes,
             validation_episode_ids=validation_episodes,
