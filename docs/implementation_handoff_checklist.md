@@ -908,18 +908,27 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 ### 2H.2 Fixed Invocation 下的 Static Policy
 
-- □ Semantic route 使用固定 Mem0-style extraction、internal operation 和 flat retrieval policy。
-- □ 所有 static variant 接收相同 semantic route、boundary 和 source trajectory。
-- □ Static policy 在整个 run 中冻结，不使用当前 run 反馈在线更新。
-- □ Logical exit 只有在 persistence commit 后生效。
-- □ Physical rewrite disabled 时不报告 saved tokens；启用时根据真实 forwarded context 计算。
+- √ Semantic route 使用固定 Mem0-style extraction、internal operation 和 flat retrieval policy。
+- √ 所有 static variant 接收相同 semantic route、boundary 和 source trajectory。
+- √ Static policy 在整个 run 中冻结，不使用当前 run 反馈在线更新。
+- √ Logical exit 只有在 persistence commit 后生效。
+- √ Physical rewrite disabled 时不报告 saved tokens；启用时根据真实 forwarded context 计算。
 
 验收需求：
 
-- □ 相同 route、input、feature 和 version 产生相同 internal operation/retrieval output。
-- □ Policy version 不改变 route 或 invocation count。
-- □ Unsupported internal operation 在 capability/validation 阶段过滤。
-- □ Natural、logical 和 physical exit evidence 分开统计。
+- √ 相同 route、input、feature 和 version 产生相同 internal operation/retrieval output。
+- √ Policy version 不改变 route 或 invocation count。
+- √ Unsupported internal operation 在 capability/validation 阶段过滤。
+- √ Natural、logical 和 physical exit evidence 分开统计。
+
+2H.2 验收记录：
+
+- Contract：新增显式 `static_utility` opt-in mode；原 `static` baseline 和 disabled default 不变。两种 active mode 使用相同 `hermes-native-semantic` route、task/session boundary、source snapshot、Mem0 extraction prompt、internal-operation prompt 和 provider invocation count。
+- Frozen binding：`FrozenMem0UtilityConfig` 与 `StaticUtilityPolicy` 均不可变；bound policy identity 对 config、threshold、weight、cost cap、retrieval config 和 feature schema 做 canonical digest。相同请求重放会重置并重建等价 decision evidence，不从当前 run outcome 更新 scorer。
+- Unified decision：generation admission、related-memory filtering/ranking 和 ADD/UPDATE/DELETE admission 共用 `semantic-static-utility-policy-v1`。Non-ACCEPT mutation 降为 `NONE`，但不会跳过既定 extraction/operation prompt；unsupported operation 仍由既有 capability/validation contract fail closed。
+- Evidence：lifecycle ledger 增量写入 content-free `static_utility_decisions`，只保留 target、disposition、score、risk/cost、reason、schema/version 和 input digest。Natural、logical、physical exit 分开；physical rewrite 保持 disabled，`savedTokens=None`。
+- Commits：`81a2427`、`dbed4e9`、`79a5f7a`、`a2dceae`。Focused policy/utility/writeback tests `30 passed`，Hermes bridge/transaction focused tests `67 passed`，PAST plumbing focused tests `30 passed`。Full RSIMem `262 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check`、diff check 和 credential-shape scan 通过。
+- 已知限制：2H.2 证明 deterministic policy/runtime contract 与 PAST plumbing；尚未用真实 provider 在 selected semantic-relevant PAST family 运行 `static_utility` 并审计，因此 2H.3 保持未完成。Physical rewrite 没有实现，也不报告推测 token 节省。
 
 ### 2H.3 阶段闸门
 

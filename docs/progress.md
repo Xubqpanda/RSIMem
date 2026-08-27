@@ -187,16 +187,18 @@ Static PAST-Bench semantic writeback is complete for SM01: 9/9 rotated method at
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `253 passed`.
+- [x] Pass all RSIMem tests: `262 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `387 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Phase 2H.2 Fixed-Invocation Static Policy**
+### **Current: Phase 2H.3 Static Policy Execution Gate**
 
-Phase 2E provides Mem0-flat semantic construction, validated live writeback, revision-bound operation evidence, deterministic-first failure attribution, and the audited no-persistence/native/static SM01 comparison documented in [`static_sm01_20260827.md`](static_sm01_20260827.md). Phase 2H.1 now freezes host-observed/model-predicted/delayed feature sources, explicit missing values, full lifecycle cost buckets, and one interpretable monotone scorer shared by generation, internal operation, and retrieval targets. The immediate objective is 2H.2: connect that frozen objective to the fixed Mem0-flat route without changing invocation count or learning from the current run.
+Phase 2H.2 now connects the frozen future-utility objective to Mem0-flat generation admission, related-memory filtering/ranking, and internal operation admission under an explicit `static_utility` mode. Matched deterministic fixtures prove that `static` and `static_utility` share the same semantic route, source snapshot, task boundary, two-prompt cadence, raw model usage, mutation transaction, and physical-rewrite-disabled exit contract. Utility decisions are persisted as content-free lifecycle evidence, and the policy/config binding cannot change within a run.
+
+The immediate objective is 2H.3: execute and audit `static_utility` through a selected semantic-relevant PAST-Bench family using the configured provider. This gate remains open until the provider credential is injected through `GPT_LUNA_API_KEY`; no credential is stored in source, config, shell scripts, logs, or committed outputs.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
