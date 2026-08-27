@@ -43,6 +43,7 @@ from rsimem.memory.receipts import (
     JsonMutationReceiptStore,
     MutationReceiptPhase,
     MutationReceiptStatus,
+    SemanticMutationWriter,
 )
 from rsimem.memory.receipt_audit import audit_mutation_receipts
 from rsimem.memory.attribution import DeterministicFirstAttributor, FailureCategory
@@ -277,6 +278,7 @@ def test_add_update_delete_none_and_duplicate_restart_paths(tmp_path) -> None:
     add_request = _request(InternalMemoryAction.ADD, content=add_text, ordinal="add")
     added = executor.execute(add_request)
     assert added.status == MutationExecutionStatus.COMMITTED
+    assert added.writer_identity == SemanticMutationWriter.RSIMEM_EXECUTOR
     assert added.receipt_id is not None
     assert added.artifact_id is not None
     assert added.revision == _artifact(backend, add_text).revision
@@ -599,7 +601,15 @@ def test_each_crash_point_has_restart_stable_idempotent_recovery(tmp_path, point
     )
     recovered = restarted.recover(request)
     assert recovered.status == MutationExecutionStatus.COMMITTED
-    assert restarted_store.all()[0].status == MutationReceiptStatus.COMMITTED
+    recovered_receipt = restarted_store.all()[0]
+    assert recovered_receipt.status == MutationReceiptStatus.COMMITTED
+    expected_writer = (
+        SemanticMutationWriter.OPERATOR_RECOVERY
+        if point in {CrashPoint.AFTER_RESERVE, CrashPoint.BEFORE_BACKEND_CALL}
+        else SemanticMutationWriter.RSIMEM_EXECUTOR
+    )
+    assert recovered.writer_identity == expected_writer
+    assert recovered_receipt.writer_identity == expected_writer
     duplicate = restarted.execute(request)
     assert duplicate.status == MutationExecutionStatus.DUPLICATE
     assert duplicate.mutation_id == recovered.mutation_id

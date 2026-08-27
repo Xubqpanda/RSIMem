@@ -17,7 +17,7 @@ from .ingestion import InternalMemoryAction
 from .validation import TrustedTargetBinding, ValidationProvenance
 
 
-MUTATION_RECEIPT_SCHEMA_VERSION = 1
+MUTATION_RECEIPT_SCHEMA_VERSION = 2
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _REASON_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -43,6 +43,12 @@ class MutationReceiptPhase(StrEnum):
     TERMINAL = "terminal"
 
 
+class SemanticMutationWriter(StrEnum):
+    NATIVE_HERMES = "native_hermes"
+    RSIMEM_EXECUTOR = "rsimem_executor"
+    OPERATOR_RECOVERY = "operator_recovery"
+
+
 @dataclass(frozen=True, slots=True)
 class MutationReceipt:
     receipt_id: str
@@ -62,6 +68,7 @@ class MutationReceipt:
     kind: MemoryKind
     provenance: ValidationProvenance
     pre_artifact_ids: tuple[str, ...] = ()
+    writer_identity: SemanticMutationWriter | None = None
     status: MutationReceiptStatus = MutationReceiptStatus.PENDING
     phase: MutationReceiptPhase = MutationReceiptPhase.RESERVED
     applied_artifact_id: str | None = None
@@ -81,6 +88,14 @@ class MutationReceipt:
         object.__setattr__(self, "kind", MemoryKind(self.kind))
         object.__setattr__(self, "status", MutationReceiptStatus(self.status))
         object.__setattr__(self, "phase", MutationReceiptPhase(self.phase))
+        if self.writer_identity is not None:
+            object.__setattr__(
+                self,
+                "writer_identity",
+                SemanticMutationWriter(self.writer_identity),
+            )
+            if self.writer_identity == SemanticMutationWriter.NATIVE_HERMES:
+                raise ValueError("native Hermes mutations cannot own RSIMem receipts")
         for value in (
             self.receipt_id,
             self.idempotency_key,
@@ -152,6 +167,16 @@ class MutationReceipt:
             raise ValueError("NONE receipt cannot carry mutation state")
 
     def _validate_state_shape(self) -> None:
+        mutates_backend = self.action != InternalMemoryAction.NONE
+        applied_phase = self.phase in {
+            MutationReceiptPhase.APPLIED,
+            MutationReceiptPhase.VERIFYING,
+            MutationReceiptPhase.VERIFIED,
+        }
+        if self.action == InternalMemoryAction.NONE and self.writer_identity is not None:
+            raise ValueError("NONE receipt cannot carry a mutation writer")
+        if mutates_backend and applied_phase and self.writer_identity is None:
+            raise ValueError("applied mutation receipt requires writer identity")
         if self.status == MutationReceiptStatus.PENDING:
             if self.phase == MutationReceiptPhase.TERMINAL:
                 raise ValueError("pending receipt cannot be terminal")
@@ -167,6 +192,8 @@ class MutationReceipt:
         if self.status == MutationReceiptStatus.COMMITTED:
             if not self.verified or self.reason_code is not None:
                 raise ValueError("committed receipt must be verified without failure")
+            if mutates_backend and self.writer_identity is None:
+                raise ValueError("committed mutation receipt requires writer identity")
             if self.action in {InternalMemoryAction.ADD, InternalMemoryAction.UPDATE}:
                 if not all((
                     self.applied_artifact_id,
@@ -216,6 +243,9 @@ class MutationReceipt:
     def to_dict(self) -> dict[str, object]:
         return {
             **self.core_payload(),
+            "writer_identity": (
+                self.writer_identity.value if self.writer_identity is not None else None
+            ),
             "status": self.status.value,
             "phase": self.phase.value,
             "applied_artifact_id": self.applied_artifact_id,
@@ -254,6 +284,7 @@ class MutationReceipt:
                 kind=value["kind"],
                 provenance=_provenance_from_payload(provenance),
                 pre_artifact_ids=tuple(value["pre_artifact_ids"]),
+                writer_identity=value["writer_identity"],
                 status=value["status"],
                 phase=value["phase"],
                 applied_artifact_id=value["applied_artifact_id"],

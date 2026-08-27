@@ -23,6 +23,7 @@ from .receipts import (
     MutationReceipt,
     MutationReceiptPhase,
     MutationReceiptStatus,
+    SemanticMutationWriter,
 )
 from .runtime import MemoryBackendRegistry
 from .operation_graph import (
@@ -165,12 +166,19 @@ class MutationExecutionResult:
     revision: str | None
     storage_bytes: int
     context_exit: ContextExitReport
+    writer_identity: SemanticMutationWriter | None = None
     schema_version: int = MUTATION_EXECUTOR_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         if self.schema_version != MUTATION_EXECUTOR_SCHEMA_VERSION:
             raise ValueError("unsupported mutation execution result schema version")
         object.__setattr__(self, "status", MutationExecutionStatus(self.status))
+        if self.writer_identity is not None:
+            object.__setattr__(
+                self,
+                "writer_identity",
+                SemanticMutationWriter(self.writer_identity),
+            )
         if not self.mutation_id.strip():
             raise ValueError("mutation execution result requires mutation_id")
         if self.receipt_id is not None and not self.receipt_id.strip():
@@ -193,6 +201,9 @@ class MutationExecutionResult:
             "artifact_id": self.artifact_id,
             "revision": self.revision,
             "storage_bytes": self.storage_bytes,
+            "writer_identity": (
+                self.writer_identity.value if self.writer_identity is not None else None
+            ),
             "context_exit": {
                 "natural_exit": self.context_exit.natural_exit,
                 "logical_exit": self.context_exit.logical_exit,
@@ -446,7 +457,13 @@ class TransactionalMutationExecutor:
                     request,
                     reason="reserved_mutation_rolled_back",
                 )
-            return self._apply_reserved(receipt, request, None, crash_at=None)
+            return self._apply_reserved(
+                receipt,
+                request,
+                None,
+                crash_at=None,
+                writer_identity=SemanticMutationWriter.OPERATOR_RECOVERY,
+            )
 
         probe = self._probe(receipt)
         if mode == RecoveryMode.ROLLBACK_IF_SAFE:
@@ -472,12 +489,22 @@ class TransactionalMutationExecutor:
 
         if receipt.phase == MutationReceiptPhase.APPLYING:
             if probe.state == ProbeState.PRE_STATE:
-                return self._call_backend(receipt, request, None, crash_at=None)
+                return self._call_backend(
+                    receipt,
+                    request,
+                    None,
+                    crash_at=None,
+                    writer_identity=SemanticMutationWriter.OPERATOR_RECOVERY,
+                )
             if (
                 probe.state == ProbeState.DESIRED_STATE
                 and receipt.action != InternalMemoryAction.DELETE
             ):
-                applied = self._mark_applied_from_probe(receipt, probe)
+                applied = self._mark_applied_from_probe(
+                    receipt,
+                    probe,
+                    writer_identity=SemanticMutationWriter.RSIMEM_EXECUTOR,
+                )
                 return self._verify_and_commit(applied, request, None, crash_at=None)
             blocked = self._block(receipt, "applying_state_unknown")
             return self._result(
@@ -632,6 +659,7 @@ class TransactionalMutationExecutor:
         validation: ValidationResult | None,
         *,
         crash_at: CrashPoint | None,
+        writer_identity: SemanticMutationWriter = SemanticMutationWriter.RSIMEM_EXECUTOR,
         parent_operation_ids: tuple[str, ...] = (),
         validation_artifact_id: str | None = None,
     ) -> MutationExecutionResult:
@@ -642,6 +670,7 @@ class TransactionalMutationExecutor:
             request,
             validation,
             crash_at=crash_at,
+            writer_identity=writer_identity,
             parent_operation_ids=parent_operation_ids,
             validation_artifact_id=validation_artifact_id,
         )
@@ -653,6 +682,7 @@ class TransactionalMutationExecutor:
         validation: ValidationResult | None,
         *,
         crash_at: CrashPoint | None,
+        writer_identity: SemanticMutationWriter,
         parent_operation_ids: tuple[str, ...] = (),
         validation_artifact_id: str | None = None,
     ) -> MutationExecutionResult:
@@ -789,6 +819,7 @@ class TransactionalMutationExecutor:
             phase=MutationReceiptPhase.APPLIED,
             applied_artifact_id=applied_artifact_id,
             applied_revision=result.revision,
+            writer_identity=writer_identity,
         )
         if self.operation_recorder is not None:
             self.operation_recorder.record_mutation(MutationEdge(
@@ -1102,6 +1133,8 @@ class TransactionalMutationExecutor:
         self,
         receipt: MutationReceipt,
         probe: ProbeResult,
+        *,
+        writer_identity: SemanticMutationWriter,
     ) -> MutationReceipt:
         artifact = probe.artifact
         if receipt.action in {InternalMemoryAction.ADD, InternalMemoryAction.UPDATE}:
@@ -1112,11 +1145,13 @@ class TransactionalMutationExecutor:
                 phase=MutationReceiptPhase.APPLIED,
                 applied_artifact_id=artifact.artifact_id,
                 applied_revision=artifact.revision,
+                writer_identity=writer_identity,
             )
         return self._transition(
             receipt,
             phase=MutationReceiptPhase.APPLIED,
             applied_artifact_id=receipt.target_artifact_id,
+            writer_identity=writer_identity,
         )
 
     def _transition(self, receipt: MutationReceipt, **changes: object) -> MutationReceipt:
@@ -1202,6 +1237,7 @@ class TransactionalMutationExecutor:
             artifact_id=receipt.applied_artifact_id,
             revision=receipt.applied_revision,
             storage_bytes=receipt.storage_bytes,
+            writer_identity=receipt.writer_identity,
             context_exit=self.exit_gate.evaluate(
                 request.trigger,
                 receipt if status in {
@@ -1231,6 +1267,7 @@ class TransactionalMutationExecutor:
             artifact_id=None,
             revision=None,
             storage_bytes=0,
+            writer_identity=None,
             context_exit=self.exit_gate.evaluate(
                 request.trigger,
                 None,

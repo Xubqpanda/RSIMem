@@ -234,6 +234,11 @@ class SemanticWritebackLoop:
                         "operation_id": operation.operation_id,
                         "mutation_id": result.mutation_id,
                         "receipt_id": result.receipt_id,
+                        "writer_identity": (
+                            result.writer_identity.value
+                            if result.writer_identity is not None
+                            else None
+                        ),
                         "snapshot_id": source.snapshot_id,
                     },
                 ))
