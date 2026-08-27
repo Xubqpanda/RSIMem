@@ -17,6 +17,7 @@ from rsimem.experiment_manifest import (
     ADAPTIVE_METHOD_VARIANTS,
     STATIC_METHOD_VARIANTS,
     STATIC_UTILITY_METHOD_VARIANTS,
+    adaptive_method_execution_profile,
     execution_order,
     initialize_batch_manifest,
     load_manifest,
@@ -125,6 +126,35 @@ def test_execution_order_rotates_modes_across_replicates() -> None:
         "static-utility-rsimem",
         "static-rsimem",
     )
+
+
+def test_adaptive_method_execution_profiles_freeze_only_intended_differences() -> None:
+    profiles = {
+        method: adaptive_method_execution_profile(method)
+        for method in ADAPTIVE_METHOD_VARIANTS
+    }
+    assert profiles["no-persistence"] == {
+        "persistenceVariant": "without_persistence",
+        "rsimemMode": "native",
+        "lifecycleEvaluatorMode": "disabled",
+        "semanticWritebackMode": "disabled",
+        "adaptiveConfigRequired": False,
+    }
+    assert profiles["native-hermes"]["rsimemMode"] == "native"
+    assert profiles["native-ledger"]["rsimemMode"] == "native+ledger"
+    assert profiles["static-rsimem"]["semanticWritebackMode"] == (
+        "static_utility"
+    )
+    assert profiles["adaptive-rsimem"]["semanticWritebackMode"] == (
+        "adaptive_utility"
+    )
+    assert profiles["adaptive-rsimem"]["adaptiveConfigRequired"] is True
+    assert sum(
+        profile["adaptiveConfigRequired"] is True
+        for profile in profiles.values()
+    ) == 1
+    with pytest.raises(ValueError, match="unknown adaptive"):
+        adaptive_method_execution_profile("static-utility-rsimem")
 
 
 def test_manifest_records_effective_configuration_and_attempt_order(tmp_path: Path) -> None:

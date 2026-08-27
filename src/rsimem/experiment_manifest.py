@@ -31,6 +31,43 @@ ADAPTIVE_METHOD_VARIANTS = (
     "static-rsimem",
     "adaptive-rsimem",
 )
+_ADAPTIVE_METHOD_EXECUTION = {
+    "no-persistence": {
+        "persistenceVariant": "without_persistence",
+        "rsimemMode": "native",
+        "lifecycleEvaluatorMode": "disabled",
+        "semanticWritebackMode": "disabled",
+        "adaptiveConfigRequired": False,
+    },
+    "native-hermes": {
+        "persistenceVariant": "with_persistence",
+        "rsimemMode": "native",
+        "lifecycleEvaluatorMode": "disabled",
+        "semanticWritebackMode": "disabled",
+        "adaptiveConfigRequired": False,
+    },
+    "native-ledger": {
+        "persistenceVariant": "with_persistence",
+        "rsimemMode": "native+ledger",
+        "lifecycleEvaluatorMode": "deterministic",
+        "semanticWritebackMode": "disabled",
+        "adaptiveConfigRequired": False,
+    },
+    "static-rsimem": {
+        "persistenceVariant": "with_persistence",
+        "rsimemMode": "native+ledger",
+        "lifecycleEvaluatorMode": "deterministic",
+        "semanticWritebackMode": "static_utility",
+        "adaptiveConfigRequired": False,
+    },
+    "adaptive-rsimem": {
+        "persistenceVariant": "with_persistence",
+        "rsimemMode": "native+ledger",
+        "lifecycleEvaluatorMode": "deterministic",
+        "semanticWritebackMode": "adaptive_utility",
+        "adaptiveConfigRequired": True,
+    },
+}
 _KNOWN_MODES = frozenset((
     *EXECUTION_MODES,
     *STATIC_METHOD_VARIANTS,
@@ -76,6 +113,14 @@ def execution_order(
         raise ValueError("execution modes must be unique known modes")
     offset = (replicate - 1) % len(modes)
     return modes[offset:] + modes[:offset]
+
+
+def adaptive_method_execution_profile(method: str) -> dict[str, object]:
+    """Return the frozen PAST execution contract for one Phase 2K method."""
+
+    if method not in ADAPTIVE_METHOD_VARIANTS:
+        raise ValueError("unknown adaptive experiment method")
+    return dict(_ADAPTIVE_METHOD_EXECUTION[method])
 
 
 def _canonical_digest(value: Any) -> str:
