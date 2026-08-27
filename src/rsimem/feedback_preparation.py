@@ -5,19 +5,23 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from .experiment_manifest import FEEDBACK_METHOD_VARIANTS, load_manifest
 from .memory.attribution import DeterministicFirstAttributor
 from .memory.feedback_dataset import (
     DelayedFeedbackConfig,
+    DelayedFeedbackDataset,
     DelayedFeedbackDatasetBuilder,
+    FeedbackDatasetAudit,
     FeedbackLabel,
     FeedbackDatasetStageGate,
     FeedbackObservationWindow,
     JsonDelayedFeedbackDatasetStore,
+    build_feedback_dataset_report,
     evaluate_feedback_dataset_stage_gate,
 )
 from .memory.operation_graph import (
@@ -35,6 +39,35 @@ from .memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
 
 
 FEEDBACK_PREPARATION_SCHEMA_VERSION = 2
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_PREPARATION_IDENTITY_FIELDS = (
+    "schemaVersion",
+    "sourceExperimentId",
+    "sourceRevisions",
+    "feedbackContract",
+    "parentPolicyVersion",
+    "operationGraphDigest",
+    "datasetId",
+    "datasetPayloadDigest",
+    "datasetConfigDigest",
+    "observationCutoffOperationId",
+    "sourceLogs",
+    "exampleIds",
+    "runtimeOwnedParameterIds",
+    "stageGate",
+)
+_PREPARATION_SUMMARY_FIELDS = (
+    "preparationId",
+    "attemptCount",
+    "operationCount",
+    "artifactCount",
+    "mutationCount",
+    "operationKindCounts",
+    "labelCounts",
+    "resolvedExampleCount",
+    "censoredExampleCount",
+    "datasetPath",
+)
 _REQUIRED_FUTURE_KINDS = {
     OperationKind.FUTURE_QUERY,
     OperationKind.RETRIEVAL,
@@ -96,6 +129,152 @@ def _stage_gate_payload(gate: FeedbackDatasetStageGate) -> dict[str, Any]:
             },
         },
     }
+
+
+def _strict_mapping(
+    value: object,
+    fields: set[str],
+    name: str,
+) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise ValueError(f"malformed {name}")
+    return value
+
+
+def load_prepared_feedback_dataset(
+    prepared_root: Path,
+) -> tuple[DelayedFeedbackDataset, FeedbackDatasetStageGate, dict[str, Any]]:
+    """Load a content-addressed dataset from an accepted preparation manifest."""
+
+    prepared_root = prepared_root.expanduser().resolve()
+    manifest_path = prepared_root / "preparation_manifest.json"
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("feedback preparation manifest cannot be read") from exc
+    expected_fields = set((*_PREPARATION_IDENTITY_FIELDS, *_PREPARATION_SUMMARY_FIELDS))
+    manifest = dict(_strict_mapping(raw, expected_fields, "feedback preparation manifest"))
+    if manifest["schemaVersion"] != FEEDBACK_PREPARATION_SCHEMA_VERSION:
+        raise ValueError("unsupported feedback preparation schema")
+    dataset_id = manifest["datasetId"]
+    dataset_path_value = manifest["datasetPath"]
+    if (
+        not isinstance(dataset_id, str)
+        or not isinstance(dataset_path_value, str)
+        or dataset_path_value != f"datasets/{dataset_id}.json"
+    ):
+        raise ValueError("feedback preparation dataset path is invalid")
+    dataset_path = (prepared_root / dataset_path_value).resolve()
+    if not dataset_path.is_relative_to(prepared_root):
+        raise ValueError("feedback preparation dataset path escapes its root")
+    try:
+        serialized = dataset_path.read_text(encoding="utf-8")
+        dataset = DelayedFeedbackDataset.from_payload(json.loads(serialized))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+        raise ValueError("prepared feedback dataset is malformed") from exc
+    if serialized != _canonical(dataset.payload()) + "\n":
+        raise ValueError("prepared feedback dataset is not canonical")
+    dataset_digest = _digest(dataset.payload())
+    if (
+        dataset.dataset_id != dataset_id
+        or manifest["datasetPayloadDigest"] != dataset_digest
+        or manifest["datasetConfigDigest"] != dataset.config.digest
+        or manifest["parentPolicyVersion"] != dataset.config.policy_version
+        or manifest["observationCutoffOperationId"]
+        != dataset.window.cutoff_operation_id
+        or manifest["exampleIds"]
+        != [example.example_id for example in dataset.examples]
+    ):
+        raise ValueError("feedback preparation dataset identity mismatch")
+
+    retrieval_parameter = MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.RETRIEVAL]
+    if manifest["runtimeOwnedParameterIds"] != [retrieval_parameter] or any(
+        retrieval_parameter not in example.policy_parameter_ids
+        for example in dataset.examples
+    ):
+        raise ValueError("feedback preparation runtime owner mismatch")
+    if manifest["feedbackContract"] != "sm01_tsv_v1":
+        raise ValueError("feedback preparation signal contract is not frozen")
+
+    label_counts = Counter(example.label for example in dataset.examples)
+    audit = FeedbackDatasetAudit(
+        ok=True,
+        issues=(),
+        example_count=len(dataset.examples),
+        label_counts=tuple(
+            (label, label_counts[label]) for label in FeedbackLabel
+        ),
+    )
+    gate = FeedbackDatasetStageGate(
+        ok=True,
+        issues=(),
+        dataset_id=dataset.dataset_id,
+        dataset_payload_digest=dataset_digest,
+        replay_dataset_id=dataset.dataset_id,
+        expected_config_digest=dataset.config.digest,
+        actual_config_digest=dataset.config.digest,
+        audit=audit,
+        report=build_feedback_dataset_report(dataset),
+    )
+    if manifest["stageGate"] != _stage_gate_payload(gate):
+        raise ValueError("feedback preparation stage gate mismatch")
+    expected_labels = {
+        label.value: label_counts[label] for label in FeedbackLabel
+    }
+    if (
+        manifest["labelCounts"] != expected_labels
+        or manifest["resolvedExampleCount"]
+        != label_counts[FeedbackLabel.POSITIVE] + label_counts[FeedbackLabel.NEGATIVE]
+        or manifest["censoredExampleCount"] != label_counts[FeedbackLabel.CENSORED]
+        or manifest["operationCount"] != dataset.source_operation_count
+    ):
+        raise ValueError("feedback preparation summary mismatch")
+    operation_counts = _strict_mapping(
+        manifest["operationKindCounts"],
+        {kind.value for kind in OperationKind},
+        "feedback operation counts",
+    )
+    if any(type(value) is not int or value < 0 for value in operation_counts.values()) or (
+        sum(operation_counts.values()) != manifest["operationCount"]
+    ):
+        raise ValueError("feedback preparation operation counts are invalid")
+    if any(
+        type(manifest[field]) is not int or manifest[field] < 0
+        for field in ("attemptCount", "artifactCount", "mutationCount")
+    ) or manifest["attemptCount"] < 1:
+        raise ValueError("feedback preparation counts are invalid")
+    for field in ("operationGraphDigest", "datasetPayloadDigest"):
+        if not isinstance(manifest[field], str) or _DIGEST.fullmatch(manifest[field]) is None:
+            raise ValueError("feedback preparation digest is invalid")
+    if not isinstance(manifest["sourceRevisions"], Mapping):
+        raise ValueError("feedback preparation revisions are invalid")
+    source_logs = manifest["sourceLogs"]
+    if not isinstance(source_logs, list) or not source_logs:
+        raise ValueError("feedback preparation source logs are invalid")
+    for value in source_logs:
+        source = _strict_mapping(
+            value,
+            {"replicate", "runName", "relativePath", "sha256", "eventCount"},
+            "feedback preparation source log",
+        )
+        relative = Path(str(source["relativePath"]))
+        if (
+            type(source["replicate"]) is not int
+            or source["replicate"] < 1
+            or type(source["eventCount"]) is not int
+            or source["eventCount"] < 1
+            or relative.is_absolute()
+            or ".." in relative.parts
+            or not isinstance(source["sha256"], str)
+            or _DIGEST.fullmatch(source["sha256"]) is None
+        ):
+            raise ValueError("feedback preparation source log is invalid")
+
+    identity = {field: manifest[field] for field in _PREPARATION_IDENTITY_FIELDS}
+    expected_id = f"feedback-preparation.{_digest(identity)[:40]}"
+    if manifest["preparationId"] != expected_id:
+        raise ValueError("feedback preparation identity mismatch")
+    return dataset, gate, manifest
 
 
 def _completed_feedback_attempts(manifest: dict[str, Any]) -> tuple[dict[str, Any], ...]:
