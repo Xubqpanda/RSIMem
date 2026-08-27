@@ -1126,6 +1126,10 @@ RSIMEM_ADAPTIVE_CONFIG=outputs/adaptive_validation_sm01/hermes_luna/<validation-
 
 ### 2K.2 Metrics 与 Ablation
 
+- √ 五方法 analyzer 从 manifest、audit、ledger、sequence result 和 atomic operation graph 重建 raw quality/resource/mechanism quantities；缺失 token bucket、audit/privacy failure、policy drift 和不完整 replicate fail closed。
+- √ 按 replicate 报告 static -> adaptive paired quality、usage、storage 和 lifecycle-cost delta，并输出 content-free cost-quality frontier；provider price 保持 `null`。
+- √ Claim guard 默认拒绝单 family 的 recursive self-improvement、generalization 和 statistical superiority；只有真实 evidence 满足对应 gate 才能解除。
+- √ Ablation applicability 由最终 ACTIVE artifact 与实际 runtime component 决定；首轮 retrieval-only learner 的 generation-policy update 标为 not applicable，不能伪装成已执行消融。
 - □ 报告 task score、pass rate、persistence gap 和 mechanism evidence。
 - □ 报告 model tokens/calls、tools、retry、latency 和 wall time。
 - □ 报告 ingestion/generation policy、storage、retrieval、injection、policy update 和 recovery cost。
@@ -1139,6 +1143,14 @@ RSIMEM_ADAPTIVE_CONFIG=outputs/adaptive_validation_sm01/hermes_luna/<validation-
 - □ Provider price 变化不要求重新运行。
 - □ Adaptive gain 不来自更高 budget、未计费调用或 leakage。
 - □ 每个 ablation 只改变一个因素并保持 backend/model/task matched。
+
+2K.2 execution-readiness 验收记录（2026-08-28）：
+
+- Analyzer：`adaptive-future-utility-raw-cost-v1` 保留 requests、全部 token buckets、retry、wall time、tools、storage、retrieval/injection/use、mutation/supersession/recovery 和 ingestion/utility accounting；derived utility-per-cost 不包含 provider price。
+- Matched comparison：static/adaptive delta 按 replicate 配对，不用两个独立 aggregate mean 冒充 paired evidence；configured budget identity 与 realized request/token/cost delta 分开报告。
+- Claim boundary：一个通过 audit 的 SM01 batch最多支持 fixed-route/unified-objective/operation-attributed implementation evidence；recursive iteration、跨 family generalization和quality superiority仍为 fail-closed。
+- Commits：`a525114`（five-method raw/derived analyzer）与 `6749b2c`（paired delta 和 claim guard）。Full RSIMem `345 passed`；PAST-Bench `390 passed, 2 skipped`；compileall、`pip check`、全部 shell syntax、diff check 和 tracked-secret scan 通过。
+- 已知限制：尚无真实 adaptive batch，所有 report/metrics/ablation 结果项保持未完成。当前 production learner 只更新 retrieval threshold；只有未来 ACTIVE artifact 真正包含 generation/update parameter 时，才允许增加对应单因素 ablation。
 
 ### 2K.3 Claim Gate
 

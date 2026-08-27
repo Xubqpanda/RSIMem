@@ -195,9 +195,11 @@ Phase 2J is complete at the deterministic implementation gate. Time-ordered spli
 
 Phase 2K.1 execution plumbing now covers the complete production preparation boundary. A live feedback batch is content-addressed and reloaded before a run-qualified time split trains only the stable retrieval threshold. Offline screening stops at `VALIDATED/REJECTED`; a separate static/proposal held-out launcher derives labels and costs only from audited operation/deployment evidence, and only an accepted matched decision can create a production ACTIVE store and config. Validation-only trial configs are rejected by the official five-method resolver. No new live feedback, held-out validation, or adaptive five-method replicate has run because the current shell has no provider credential.
 
+Phase 2K.2 analysis plumbing is execution-ready. The five-method launcher now rebuilds raw quality, usage, storage, retrieval/injection/use, mutation/recovery, and policy evidence after a complete batch, reports replicate-paired static/adaptive deltas, leaves provider pricing unset, and emits fail-closed claim eligibility. A single SM01 batch cannot unlock recursive iteration, cross-family generalization, or statistical superiority. Ablations apply only to components present in the final ACTIVE artifact; the current retrieval-only learner has no generation-policy update to ablate.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `342 passed`.
+- [x] Pass all RSIMem tests: `345 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `390 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.

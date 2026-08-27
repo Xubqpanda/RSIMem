@@ -36,6 +36,8 @@ The first implementation stops at these five variants.
 
 Additional component ablations are added only after the end-to-end result is stable.
 
+The first production learner updates only the runtime-owned retrieval acceptance threshold because the currently frozen delayed feedback is attributable to future retrieval, injection, use, and outcome. Generation-policy or consolidation-policy ablations are not applicable to that artifact. An ablation is added only when the final ACTIVE artifact actually changes the named component, and every ablation must differ from the full method by exactly one component while preserving backend, model, budget, task order, invocation boundary, and persistence isolation.
+
 ## Metrics
 
 Task quality uses the native PAST-Bench task score, persistence gap, and mechanism evidence.
@@ -45,6 +47,10 @@ Raw resource accounting records model input and output tokens, cache usage, mode
 Derived metrics include total cost, cost per successful episode, future utility per lifecycle cost, and the cost--quality frontier.
 
 Raw resource quantities are retained separately from provider prices so that monetary results can be recomputed.
+
+The five-method adaptive report uses `adaptive-future-utility-raw-cost-v1`. It retains every replicate value and computes static-to-adaptive deltas within the same rotated replicate. Configured budget equality is reported separately from realized request, token, storage, and lifecycle-cost differences. Provider pricing remains absent from the canonical analysis artifact.
+
+Claim eligibility is fail-closed. One audited SM01 batch can provide implementation evidence for the fixed semantic route, unified objective, and operation-attributed update, but it cannot by itself establish statistical quality superiority, a second recursive policy iteration, or cross-family generalization.
 
 ## Phase 1C Read-Path Analysis Protocol
 
