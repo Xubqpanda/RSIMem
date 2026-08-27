@@ -20,7 +20,15 @@ STATIC_METHOD_VARIANTS = (
     "native-hermes",
     "static-rsimem",
 )
-_KNOWN_MODES = frozenset((*EXECUTION_MODES, *STATIC_METHOD_VARIANTS))
+STATIC_UTILITY_METHOD_VARIANTS = (
+    "static-rsimem",
+    "static-utility-rsimem",
+)
+_KNOWN_MODES = frozenset((
+    *EXECUTION_MODES,
+    *STATIC_METHOD_VARIANTS,
+    *STATIC_UTILITY_METHOD_VARIANTS,
+))
 _ATTEMPT_STATUSES = {"running", "completed", "failed"}
 _REQUIRED_CONFIGURATION = {
     "taskFamily",
