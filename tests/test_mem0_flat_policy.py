@@ -16,6 +16,12 @@ from rsimem.memory.ingestion import (
     SemanticIngestionCoordinator,
     SemanticPolicyRegistry,
 )
+from rsimem.memory.operation_graph import AtomicOperationRecorder
+from rsimem.memory.operation_graph import (
+    AppendOnlyOperationEvidenceLog,
+    materialize_operation_graph,
+)
+from rsimem.memory.attribution import DeterministicFirstAttributor, FailureCategory
 from rsimem.memory.runtime import MemoryBackendRegistry
 from rsimem.memory.validation import (
     InMemoryTargetOwnershipRegistry,
@@ -67,6 +73,7 @@ def _setup(
     facts='{"facts": ["Always use TSV with four columns."]}',
     operation=None,
     usage=RawResourceUsage(input_tokens=7, output_tokens=3, model_requests=1, duration_ms=2),
+    operation_recorder=None,
 ):
     memories = tmp_path / "memories"
     memories.mkdir(parents=True)
@@ -97,7 +104,10 @@ def _setup(
     if operation is not None:
         responses[INTERNAL_OPERATION_PROMPT.artifact.prompt_id] = operation
     client = FakeCompletionClient(responses, usage=usage)
-    policy = Mem0FlatSemanticPolicy(client)
+    policy = Mem0FlatSemanticPolicy(
+        client,
+        operation_recorder=operation_recorder,
+    )
     request = _request(
         policy.descriptor.policy_version,
         policy.descriptor.framework_version,
@@ -280,16 +290,24 @@ def test_duplicate_native_memory_uses_none_without_claiming_ownership(tmp_path) 
     ),
 )
 def test_unknown_owner_and_hallucinated_target_are_rejected(tmp_path, operation, reason) -> None:
+    log = AppendOnlyOperationEvidenceLog()
     setup = _setup(
         tmp_path,
         entries=("Always use CSV with four columns.",),
         owned=False,
         operation=operation,
+        operation_recorder=AtomicOperationRecorder(log),
     )
     result = setup[-1].ingest(setup[5], setup[6])
     assert result is not None and result.status == MemoryIngestStatus.REJECTED
     assert result.reason_codes == (reason,)
     assert result.operations == ()
+    report = DeterministicFirstAttributor().attribute(
+        materialize_operation_graph(log.events)
+    )
+    assert len(report.records) == 1
+    assert report.records[0].category == FailureCategory.WRONG_UPDATE_TARGET
+    assert report.records[0].policy_parameter_ids
 
 
 def test_temporary_and_unresolved_sources_are_rejected_without_mutation(tmp_path) -> None:
@@ -365,3 +383,26 @@ def test_completion_timeout_becomes_structured_failure(tmp_path) -> None:
     assert result is not None and result.status == MemoryIngestStatus.FAILED
     assert result.reason_codes == ("policy_timeout",)
     assert "SENTINEL" not in repr(result.observer_evidence())
+
+
+def test_operation_observer_failure_does_not_change_mem0_policy_result(tmp_path) -> None:
+    class FailingSink:
+        def append(self, event):
+            del event
+            raise OSError("SENTINEL_PRIVATE_OBSERVER_FAILURE")
+
+    operation = _operation_response(InternalMemoryAction.ADD, use_candidate=False)
+    control = _setup(tmp_path / "control", operation=operation)
+    recorder = AtomicOperationRecorder(FailingSink())
+    observed = _setup(
+        tmp_path / "observed",
+        operation=operation,
+        operation_recorder=recorder,
+    )
+    control_result = control[-1].ingest(control[5], control[6])
+    observed_result = observed[-1].ingest(observed[5], observed[6])
+
+    assert observed_result.observer_evidence() == control_result.observer_evidence()
+    assert recorder.observer_failures
+    assert recorder.attribution_gaps
+    assert "SENTINEL" not in repr(recorder.observer_failures)

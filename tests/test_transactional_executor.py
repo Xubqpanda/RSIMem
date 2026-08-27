@@ -45,6 +45,7 @@ from rsimem.memory.receipts import (
     MutationReceiptStatus,
 )
 from rsimem.memory.receipt_audit import audit_mutation_receipts
+from rsimem.memory.attribution import DeterministicFirstAttributor, FailureCategory
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     AtomicOperationRecorder,
@@ -699,6 +700,32 @@ def test_add_ownership_race_is_blocked_and_never_committed(tmp_path) -> None:
         content="Always use TSV.",
         ordinal="ownership-race",
     )
+    provenance = request.trusted_context.provenance
+    context = OperationContext(
+        provenance.run_id,
+        provenance.episode_id,
+        provenance.session_id,
+        provenance.task_id,
+        request.ingest_result.policy_version,
+        request.ingest_result.prompt_version,
+        request.ingest_result.framework_version,
+    )
+    log = AppendOnlyOperationEvidenceLog()
+    recorder = AtomicOperationRecorder(log)
+    recorder.record_operation(OperationRecord(
+        provenance.operation_id,
+        OperationKind.INTERNAL_OPERATION_DECISION,
+        context,
+        (),
+        (),
+        (),
+        "attempt-0",
+        OperationStatus.SUCCESS,
+        None,
+        0,
+        RawResourceUsage(),
+    ))
+    executor.operation_recorder = recorder
     result = executor.execute(request)
     assert result.status == MutationExecutionStatus.BLOCKED
     assert result.reason_code == "add_ownership_ambiguous"
@@ -707,6 +734,11 @@ def test_add_ownership_race_is_blocked_and_never_committed(tmp_path) -> None:
     assert receipt.target_blocked is True
     assert receipt.verified is False
     assert result.context_exit.source_retained is True
+    report = DeterministicFirstAttributor().attribute(
+        materialize_operation_graph(log.events)
+    )
+    assert len(report.records) == 1
+    assert report.records[0].category == FailureCategory.DUPLICATE_ADD
 
 
 def test_execution_contract_schema_mismatch_fails_closed(tmp_path) -> None:
