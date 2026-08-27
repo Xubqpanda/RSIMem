@@ -12,10 +12,13 @@ from typing import Callable, Mapping, Protocol, Sequence, runtime_checkable
 from ..lifecycle import (
     ContextSnapshot,
     EvaluationTrigger,
+    ExitEvidence,
     LIFECYCLE_CONTRACT_SCHEMA_VERSION,
+    MemoryScope,
     ProvenanceRef,
     RawResourceUsage,
     TaskLifecycleState,
+    TemporalValidity,
     WritebackPlan,
     WritebackPlanValidator,
 )
@@ -63,6 +66,28 @@ class MemoryIngestStatus(StrEnum):
     SUCCESS = "success"
     FAILED = "failed"
     REJECTED = "rejected"
+
+
+class MemoryIngestOutcome(StrEnum):
+    PLANNED_MUTATION = "planned_mutation"
+    NO_CHANGE = "no_change"
+    FAILED = "failed"
+    REJECTED = "rejected"
+
+
+class InvalidPolicyOutputError(ValueError):
+    """An untrusted completion could not be parsed into the policy contract."""
+
+
+class PolicyExecutionError(RuntimeError):
+    """Structured policy failure with content-free usage and reason evidence."""
+
+    def __init__(self, reason_code: str, usage: RawResourceUsage = RawResourceUsage()) -> None:
+        if not _REASON_CODE.fullmatch(reason_code):
+            raise ValueError("policy execution failure reason must be machine-readable")
+        super().__init__(reason_code)
+        self.reason_code = reason_code
+        self.usage = usage
 
 
 @dataclass(frozen=True, slots=True)
@@ -126,55 +151,36 @@ class FixedMemoryRouter:
 class IngestionProvenance:
     source: ProvenanceRef
     plan_id: str
+    base_revision: str
     schema_version: int = INGESTION_CONTRACT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         _require_schema(self.schema_version, "ingestion provenance")
         if self.source.schema_version != LIFECYCLE_CONTRACT_SCHEMA_VERSION:
             raise ValueError("ingestion provenance requires lifecycle schema v1")
-        if not self.plan_id.strip():
-            raise ValueError("ingestion provenance requires plan_id")
+        if not self.plan_id.strip() or not self.base_revision.strip():
+            raise ValueError("ingestion provenance requires plan_id and base_revision")
         if not self.source.segment_ids or not self.source.evaluation_id:
             raise ValueError("ingestion provenance requires source segments and evaluation")
 
 
-@dataclass(frozen=True, slots=True)
-class SemanticIngestRequest:
-    source_experience: MemoryExperience
-    fixed_route: FixedMemoryRoute
-    policy_version: str
-    provenance: IngestionProvenance
-    idempotency_key: str
-    trigger: EvaluationTrigger
-    schema_version: int = INGESTION_CONTRACT_SCHEMA_VERSION
-
-    def __post_init__(self) -> None:
-        _require_schema(self.schema_version, "semantic ingest request")
-        object.__setattr__(self, "trigger", EvaluationTrigger(self.trigger))
-        if self.fixed_route != HERMES_NATIVE_ROUTES[MemoryKind.SEMANTIC]:
-            raise ValueError("semantic ingestion requires the fixed Hermes semantic route")
-        if self.trigger not in {
-            EvaluationTrigger.TASK_COMPLETED,
-            EvaluationTrigger.SESSION_END,
-        }:
-            raise ValueError("semantic ingestion requires a natural lifecycle boundary")
-        if not self.policy_version.strip() or not self.idempotency_key.strip():
-            raise ValueError("semantic ingestion policy and idempotency identity are required")
-        if not self.source_experience.messages:
-            raise ValueError("semantic ingestion requires source messages")
-        if self.source_experience.score is not None:
-            raise ValueError("hidden or evaluation score cannot enter semantic ingestion")
-        forbidden = {
-            "action", "operation", "backend", "target", "artifact_id", "revision",
-            "policy_version", "framework_version", "grader", "score",
-        }
-        if forbidden.intersection(str(key).lower() for key in self.source_experience.metadata):
-            raise ValueError("source metadata cannot predeclare routing, operation, or policy")
-
-    def canonical_payload(self) -> dict[str, object]:
-        source = self.source_experience
-        return {
-            "schema_version": self.schema_version,
+def _semantic_request_identity(
+    *,
+    source_experience: MemoryExperience,
+    fixed_route: FixedMemoryRoute,
+    exit_evidence: ExitEvidence,
+    scope: MemoryScope,
+    validity: TemporalValidity,
+    policy_version: str,
+    framework_version: str,
+    provenance: IngestionProvenance,
+    trigger: EvaluationTrigger,
+    schema_version: int,
+) -> dict[str, object]:
+    source = source_experience
+    return {
+        "schema_version": schema_version,
+        "experience": {
             "experience_id": source.experience_id,
             "session_id": source.session_id,
             "task_id": source.task_id,
@@ -188,23 +194,149 @@ class SemanticIngestRequest:
                 }
                 for message in source.messages
             ],
-            "route": {
-                "kind": self.fixed_route.kind.value,
-                "backend": self.fixed_route.backend,
-                "access_mode": self.fixed_route.access_mode.value,
-            },
-            "trigger": self.trigger.value,
-            "policy_version": self.policy_version,
-            "provenance": {
-                "run_id": self.provenance.source.run_id,
-                "episode_id": self.provenance.source.episode_id,
-                "session_id": self.provenance.source.session_id,
-                "task_id": self.provenance.source.task_id,
-                "snapshot_id": self.provenance.source.snapshot_id,
-                "segment_ids": self.provenance.source.segment_ids,
-                "evaluation_id": self.provenance.source.evaluation_id,
-                "plan_id": self.provenance.plan_id,
-            },
+            "metadata": dict(source.metadata),
+        },
+        "route": {
+            "kind": fixed_route.kind.value,
+            "backend": fixed_route.backend,
+            "access_mode": fixed_route.access_mode.value,
+        },
+        "exit_evidence": {
+            **exit_evidence.compiler_input_payload(),
+            "safe_to_evict": exit_evidence.safe_to_evict,
+            "provenance": exit_evidence.provenance,
+        },
+        "scope": scope.value,
+        "validity": validity.value,
+        "trigger": trigger.value,
+        "policy_version": policy_version,
+        "framework_version": framework_version,
+        "provenance": {
+            "run_id": provenance.source.run_id,
+            "episode_id": provenance.source.episode_id,
+            "session_id": provenance.source.session_id,
+            "task_id": provenance.source.task_id,
+            "snapshot_id": provenance.source.snapshot_id,
+            "source_ref": provenance.source.source_ref,
+            "segment_ids": provenance.source.segment_ids,
+            "evaluation_id": provenance.source.evaluation_id,
+            "plan_id": provenance.plan_id,
+            "base_revision": provenance.base_revision,
+        },
+    }
+
+
+@dataclass(frozen=True, slots=True)
+class SemanticIngestRequest:
+    source_experience: MemoryExperience
+    fixed_route: FixedMemoryRoute
+    exit_evidence: ExitEvidence
+    scope: MemoryScope
+    validity: TemporalValidity
+    policy_version: str
+    framework_version: str
+    provenance: IngestionProvenance
+    idempotency_key: str
+    trigger: EvaluationTrigger
+    schema_version: int = INGESTION_CONTRACT_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _require_schema(self.schema_version, "semantic ingest request")
+        object.__setattr__(self, "trigger", EvaluationTrigger(self.trigger))
+        object.__setattr__(self, "scope", MemoryScope(self.scope))
+        object.__setattr__(self, "validity", TemporalValidity(self.validity))
+        if self.fixed_route != HERMES_NATIVE_ROUTES[MemoryKind.SEMANTIC]:
+            raise ValueError("semantic ingestion requires the fixed Hermes semantic route")
+        if self.trigger not in {
+            EvaluationTrigger.TASK_COMPLETED,
+            EvaluationTrigger.SESSION_END,
+        }:
+            raise ValueError("semantic ingestion requires a natural lifecycle boundary")
+        if any(not value.strip() for value in (
+            self.policy_version,
+            self.framework_version,
+            self.idempotency_key,
+        )):
+            raise ValueError("semantic ingestion policy, framework, and idempotency identity are required")
+        if not self.source_experience.messages:
+            raise ValueError("semantic ingestion requires source messages")
+        if self.source_experience.score is not None:
+            raise ValueError("hidden or evaluation score cannot enter semantic ingestion")
+        forbidden = {
+            "action", "operation", "backend", "target", "artifact_id", "revision",
+            "policy_version", "framework_version", "grader", "score",
+        }
+        if forbidden.intersection(str(key).lower() for key in self.source_experience.metadata):
+            raise ValueError("source metadata cannot predeclare routing, operation, or policy")
+
+        source = self.provenance.source
+        experience = self.source_experience
+        if (
+            experience.session_id != source.session_id
+            or experience.task_id != source.task_id
+        ):
+            raise ValueError("semantic ingestion source identity must match provenance")
+        if self.exit_evidence.scope != self.scope:
+            raise ValueError("semantic ingestion scope must match exit evidence")
+        if self.exit_evidence.temporal_validity != self.validity:
+            raise ValueError("semantic ingestion validity must match exit evidence")
+        expected_key = _stable_id("ingest_request", self.identity_payload())
+        if self.idempotency_key != expected_key:
+            raise ValueError("semantic ingestion idempotency identity is not canonical")
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        source_experience: MemoryExperience,
+        fixed_route: FixedMemoryRoute,
+        exit_evidence: ExitEvidence,
+        scope: MemoryScope,
+        validity: TemporalValidity,
+        policy_version: str,
+        framework_version: str,
+        provenance: IngestionProvenance,
+        trigger: EvaluationTrigger,
+        schema_version: int = INGESTION_CONTRACT_SCHEMA_VERSION,
+    ) -> SemanticIngestRequest:
+        normalized_scope = MemoryScope(scope)
+        normalized_validity = TemporalValidity(validity)
+        normalized_trigger = EvaluationTrigger(trigger)
+        values = {
+            "source_experience": source_experience,
+            "fixed_route": fixed_route,
+            "exit_evidence": exit_evidence,
+            "scope": normalized_scope,
+            "validity": normalized_validity,
+            "policy_version": policy_version,
+            "framework_version": framework_version,
+            "provenance": provenance,
+            "trigger": normalized_trigger,
+            "schema_version": schema_version,
+        }
+        identity = _semantic_request_identity(**values)
+        return cls(
+            **values,
+            idempotency_key=_stable_id("ingest_request", identity),
+        )
+
+    def identity_payload(self) -> dict[str, object]:
+        return _semantic_request_identity(
+            source_experience=self.source_experience,
+            fixed_route=self.fixed_route,
+            exit_evidence=self.exit_evidence,
+            scope=self.scope,
+            validity=self.validity,
+            policy_version=self.policy_version,
+            framework_version=self.framework_version,
+            provenance=self.provenance,
+            trigger=self.trigger,
+            schema_version=self.schema_version,
+        )
+
+    def canonical_payload(self) -> dict[str, object]:
+        return {
+            **self.identity_payload(),
             "idempotency_key": self.idempotency_key,
         }
 
@@ -215,6 +347,7 @@ def build_semantic_ingest_request(
     experience: MemoryExperience,
     *,
     policy_version: str,
+    framework_version: str,
     router: FixedMemoryRouter | None = None,
 ) -> SemanticIngestRequest:
     """Project a validated completed source into operation-free ingestion."""
@@ -239,22 +372,24 @@ def build_semantic_ingest_request(
         raise ValueError("semantic ingestion requires a currently valid source plan")
     if experience.session_id != snapshot.session_id or experience.task_id != snapshot.task_id:
         raise ValueError("semantic experience identity must match the source snapshot")
-    provenance = IngestionProvenance(plan.provenance, plan.plan_id)
-    idempotency_key = _stable_id("ingest_request", {
-        "schema_version": INGESTION_CONTRACT_SCHEMA_VERSION,
-        "plan_id": plan.plan_id,
-        "source_segment_ids": plan.source_segment_ids,
-        "base_revision": plan.base_revision,
-        "route": router.semantic.backend,
-        "policy_version": policy_version,
-        "trigger": snapshot.lifecycle_state,
-    })
-    return SemanticIngestRequest(
+    if plan.base_revision != snapshot.context_revision:
+        raise ValueError("semantic ingestion source plan is stale")
+    if plan.exit_evidence.scope is None or plan.exit_evidence.temporal_validity is None:
+        raise ValueError("semantic ingestion requires resolved scope and validity")
+    provenance = IngestionProvenance(
+        plan.provenance,
+        plan.plan_id,
+        plan.base_revision,
+    )
+    return SemanticIngestRequest.create(
         source_experience=experience,
         fixed_route=router.semantic,
+        exit_evidence=plan.exit_evidence,
+        scope=plan.exit_evidence.scope,
+        validity=plan.exit_evidence.temporal_validity,
         policy_version=policy_version,
+        framework_version=framework_version,
         provenance=provenance,
-        idempotency_key=idempotency_key,
         trigger=EvaluationTrigger(snapshot.lifecycle_state),
     )
 
@@ -423,10 +558,13 @@ class InternalMemoryOperation:
 class MemoryIngestResult:
     execution_id: str
     status: MemoryIngestStatus
+    outcome: MemoryIngestOutcome
     operations: tuple[InternalMemoryOperation, ...]
     usage: RawResourceUsage
     reason_codes: tuple[str, ...]
     source_digest: str
+    content_digests: tuple[str, ...]
+    fixed_route: FixedMemoryRoute
     policy_provider: str
     policy_version: str
     framework_version: str
@@ -438,6 +576,7 @@ class MemoryIngestResult:
     def __post_init__(self) -> None:
         _require_schema(self.schema_version, "memory ingest result")
         object.__setattr__(self, "status", MemoryIngestStatus(self.status))
+        object.__setattr__(self, "outcome", MemoryIngestOutcome(self.outcome))
         if any(not value.strip() for value in (
             self.execution_id, self.source_digest, self.policy_provider,
             self.policy_version, self.framework_version, self.prompt_version,
@@ -446,12 +585,58 @@ class MemoryIngestResult:
             raise ValueError("memory ingest result identity is incomplete")
         if not _DIGEST.fullmatch(self.source_digest):
             raise ValueError("memory ingest source_digest must be sha256")
+        if any(not _DIGEST.fullmatch(value) for value in self.content_digests):
+            raise ValueError("memory ingest content digests must be sha256")
+        if len(self.content_digests) != len(set(self.content_digests)):
+            raise ValueError("memory ingest content digests must be unique")
+        if self.fixed_route != HERMES_NATIVE_ROUTES[MemoryKind.SEMANTIC]:
+            raise ValueError("memory ingest result requires the fixed semantic route")
         if any(not _REASON_CODE.fullmatch(code) for code in self.reason_codes):
             raise ValueError("memory ingest result reason codes must be machine-readable")
         if self.status == MemoryIngestStatus.SUCCESS and not self.operations:
             raise ValueError("successful memory ingest result requires operations")
         if self.status != MemoryIngestStatus.SUCCESS and self.operations:
             raise ValueError("failed/rejected memory ingest result cannot carry operations")
+        expected_outcome = (
+            MemoryIngestOutcome.PLANNED_MUTATION
+            if self.status == MemoryIngestStatus.SUCCESS
+            and any(item.action != InternalMemoryAction.NONE for item in self.operations)
+            else MemoryIngestOutcome.NO_CHANGE
+            if self.status == MemoryIngestStatus.SUCCESS
+            else MemoryIngestOutcome.FAILED
+            if self.status == MemoryIngestStatus.FAILED
+            else MemoryIngestOutcome.REJECTED
+        )
+        if self.outcome != expected_outcome:
+            raise ValueError("memory ingest outcome does not match status and operations")
+        expected_digests: list[str] = []
+        for operation in self.operations:
+            for value in (operation.old_content_digest, operation.new_content_digest):
+                if value is not None and value not in expected_digests:
+                    expected_digests.append(value)
+        if self.content_digests != tuple(expected_digests):
+            raise ValueError("memory ingest content digests do not match ordered operations")
+
+    def observer_evidence(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "execution_id": self.execution_id,
+            "status": self.status.value,
+            "outcome": self.outcome.value,
+            "operation_ids": [item.operation_id for item in self.operations],
+            "operation_actions": [item.action.value for item in self.operations],
+            "source_digest": self.source_digest,
+            "content_digests": list(self.content_digests),
+            "route_backend": self.fixed_route.backend,
+            "memory_kind": self.fixed_route.kind.value,
+            "policy_provider": self.policy_provider,
+            "policy_version": self.policy_version,
+            "framework_version": self.framework_version,
+            "prompt_version": self.prompt_version,
+            "feature_schema_version": self.feature_schema_version,
+            "reason_codes": list(self.reason_codes),
+            "resources": self.usage.to_dict(),
+        }
 
 
 class SemanticPolicyRegistry:
@@ -524,6 +709,54 @@ def mem0_flat_policy(
     )
 
 
+class DeterministicPassThroughIngestor:
+    """Fixture-only policy that returns one predeclared host-neutral decision."""
+
+    fixture_only = True
+
+    def __init__(
+        self,
+        operations: Sequence[InternalOperationProposal],
+        *,
+        status: MemoryIngestStatus = MemoryIngestStatus.SUCCESS,
+        usage: RawResourceUsage = RawResourceUsage(),
+        reason_codes: tuple[str, ...] = (),
+        policy_version: str = "deterministic-pass-through-v1",
+        framework_version: str = "deterministic-fixture-v1",
+        prompt_version: str = "no-prompt-v1",
+        feature_schema_version: str = "fixture-features-v1",
+    ) -> None:
+        self._descriptor = SemanticPolicyDescriptor(
+            provider="deterministic_fixture",
+            policy_version=policy_version,
+            framework_version=framework_version,
+            prompt_version=prompt_version,
+            feature_schema_version=feature_schema_version,
+            capability=PolicyCapability(
+                frozenset(InternalMemoryAction),
+                add_time_update=True,
+            ),
+        )
+        self._decision = SemanticPolicyDecision(
+            status,
+            tuple(operations),
+            usage=usage,
+            reason_codes=reason_codes,
+        )
+
+    @property
+    def descriptor(self) -> SemanticPolicyDescriptor:
+        return self._descriptor
+
+    def ingest(
+        self,
+        request: SemanticIngestRequest,
+        candidates: ExistingMemoryCandidateReader,
+    ) -> SemanticPolicyDecision:
+        del request, candidates
+        return self._decision
+
+
 class SemanticIngestionCoordinator:
     """Validate policy proposals and bind trusted targets without mutation."""
 
@@ -549,15 +782,24 @@ class SemanticIngestionCoordinator:
         self,
         request: SemanticIngestRequest,
         candidates: ExistingMemoryCandidateReader,
+        *,
+        current_source_revision: str | None = None,
     ) -> MemoryIngestResult | None:
         if not self.enabled:
             return None
         if request.fixed_route != self.router.semantic:
             raise ValueError("semantic request route differs from the fixed runtime route")
+        if current_source_revision is not None:
+            if not current_source_revision.strip():
+                raise ValueError("current source revision must not be empty")
+            if current_source_revision != request.provenance.base_revision:
+                raise ValueError("semantic ingestion source snapshot is stale")
         policy = self.registry.resolve(self.provider)
         descriptor = policy.descriptor
         if request.policy_version != descriptor.policy_version:
             raise ValueError("semantic request policy version differs from runtime binding")
+        if request.framework_version != descriptor.framework_version:
+            raise ValueError("semantic request framework version differs from runtime binding")
 
         request_digest = _digest(request.canonical_payload())
         previous = self._results.get(request.idempotency_key)
@@ -575,12 +817,103 @@ class SemanticIngestionCoordinator:
             "prompt_version": descriptor.prompt_version,
             "feature_schema_version": descriptor.feature_schema_version,
         })
-        decision = policy.ingest(request, candidates)
+        try:
+            decision = policy.ingest(request, candidates)
+        except PolicyExecutionError as exc:
+            result = self._failure_result(
+                request,
+                descriptor,
+                execution_id,
+                request_digest,
+                status=MemoryIngestStatus.FAILED,
+                reason_code=exc.reason_code,
+                usage=exc.usage,
+            )
+            self._results[request.idempotency_key] = (request_digest, result)
+            return result
+        except TimeoutError:
+            result = self._failure_result(
+                request,
+                descriptor,
+                execution_id,
+                request_digest,
+                status=MemoryIngestStatus.FAILED,
+                reason_code="policy_timeout",
+            )
+            self._results[request.idempotency_key] = (request_digest, result)
+            return result
+        except (InvalidPolicyOutputError, json.JSONDecodeError):
+            result = self._failure_result(
+                request,
+                descriptor,
+                execution_id,
+                request_digest,
+                status=MemoryIngestStatus.REJECTED,
+                reason_code="invalid_policy_json",
+            )
+            self._results[request.idempotency_key] = (request_digest, result)
+            return result
+        except Exception:
+            result = self._failure_result(
+                request,
+                descriptor,
+                execution_id,
+                request_digest,
+                status=MemoryIngestStatus.FAILED,
+                reason_code="policy_exception",
+            )
+            self._results[request.idempotency_key] = (request_digest, result)
+            return result
+        if not isinstance(decision, SemanticPolicyDecision):
+            result = self._failure_result(
+                request,
+                descriptor,
+                execution_id,
+                request_digest,
+                status=MemoryIngestStatus.REJECTED,
+                reason_code="invalid_policy_result",
+            )
+            self._results[request.idempotency_key] = (request_digest, result)
+            return result
         result = self._resolve_decision(
             request, descriptor, decision, candidates, execution_id, request_digest,
         )
         self._results[request.idempotency_key] = (request_digest, result)
         return result
+
+    @staticmethod
+    def _failure_result(
+        request: SemanticIngestRequest,
+        descriptor: SemanticPolicyDescriptor,
+        execution_id: str,
+        source_digest: str,
+        *,
+        status: MemoryIngestStatus,
+        reason_code: str,
+        usage: RawResourceUsage = RawResourceUsage(),
+    ) -> MemoryIngestResult:
+        outcome = (
+            MemoryIngestOutcome.REJECTED
+            if status == MemoryIngestStatus.REJECTED
+            else MemoryIngestOutcome.FAILED
+        )
+        return MemoryIngestResult(
+            execution_id=execution_id,
+            status=status,
+            outcome=outcome,
+            operations=(),
+            usage=usage,
+            reason_codes=(reason_code,),
+            source_digest=source_digest,
+            content_digests=(),
+            fixed_route=request.fixed_route,
+            policy_provider=descriptor.provider,
+            policy_version=descriptor.policy_version,
+            framework_version=descriptor.framework_version,
+            prompt_version=descriptor.prompt_version,
+            feature_schema_version=descriptor.feature_schema_version,
+            idempotency_key=request.idempotency_key,
+        )
 
     @staticmethod
     def _resolve_decision(
@@ -632,13 +965,31 @@ class SemanticIngestionCoordinator:
                 transaction_required=proposal.action != InternalMemoryAction.NONE,
                 recovery_receipt_required=proposal.action != InternalMemoryAction.NONE,
             ))
+        content_digests: list[str] = []
+        for operation in resolved:
+            for value in (operation.old_content_digest, operation.new_content_digest):
+                if value is not None and value not in content_digests:
+                    content_digests.append(value)
+        outcome = (
+            MemoryIngestOutcome.PLANNED_MUTATION
+            if decision.status == MemoryIngestStatus.SUCCESS
+            and any(item.action != InternalMemoryAction.NONE for item in resolved)
+            else MemoryIngestOutcome.NO_CHANGE
+            if decision.status == MemoryIngestStatus.SUCCESS
+            else MemoryIngestOutcome.FAILED
+            if decision.status == MemoryIngestStatus.FAILED
+            else MemoryIngestOutcome.REJECTED
+        )
         return MemoryIngestResult(
             execution_id=execution_id,
             status=decision.status,
+            outcome=outcome,
             operations=tuple(resolved),
             usage=decision.usage,
             reason_codes=decision.reason_codes,
             source_digest=source_digest,
+            content_digests=tuple(content_digests),
+            fixed_route=request.fixed_route,
             policy_provider=descriptor.provider,
             policy_version=descriptor.policy_version,
             framework_version=descriptor.framework_version,
