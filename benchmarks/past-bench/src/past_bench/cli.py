@@ -1967,7 +1967,20 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
     mode = getattr(args, "rsimem_mode", None)
     failure_policy = getattr(args, "rsimem_adapter_failure_policy", None)
     verify_projection = getattr(args, "rsimem_verify_native_projection", False)
-    if mode is None and failure_policy is None and not verify_projection:
+    lifecycle_mode = getattr(args, "rsimem_lifecycle_evaluator_mode", None)
+    lifecycle_policy = getattr(args, "rsimem_lifecycle_policy_version", None)
+    lifecycle_compiler = getattr(args, "rsimem_lifecycle_compiler_version", None)
+    lifecycle_timeout = getattr(args, "rsimem_lifecycle_timeout_seconds", None)
+    lifecycle_max_tokens = getattr(args, "rsimem_lifecycle_max_output_tokens", None)
+    if all(value is None for value in (
+        mode,
+        failure_policy,
+        lifecycle_mode,
+        lifecycle_policy,
+        lifecycle_compiler,
+        lifecycle_timeout,
+        lifecycle_max_tokens,
+    )) and not verify_projection:
         return
     if not str(args.agent).startswith("hermes"):
         raise SystemExit("RSIMem execution overrides require a Hermes agent")
@@ -1977,6 +1990,16 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         sequence.hermes.rsimem_adapter_failure_policy = failure_policy
     if verify_projection:
         sequence.hermes.rsimem_verify_native_projection = True
+    if lifecycle_mode is not None:
+        sequence.hermes.rsimem_lifecycle_evaluator_mode = lifecycle_mode
+    if lifecycle_policy is not None:
+        sequence.hermes.rsimem_lifecycle_policy_version = lifecycle_policy
+    if lifecycle_compiler is not None:
+        sequence.hermes.rsimem_lifecycle_compiler_version = lifecycle_compiler
+    if lifecycle_timeout is not None:
+        sequence.hermes.rsimem_lifecycle_timeout_seconds = lifecycle_timeout
+    if lifecycle_max_tokens is not None:
+        sequence.hermes.rsimem_lifecycle_max_output_tokens = lifecycle_max_tokens
 
 
 def _print_episode_result_summary(result: dict) -> None:
@@ -3385,6 +3408,24 @@ def main(argv: list[str] | None = None) -> None:
         "--rsimem-verify-native-projection",
         action="store_true",
         help="Fail closed unless each adapter read exactly matches a native shadow read",
+    )
+    p_evolve.add_argument(
+        "--rsimem-lifecycle-evaluator-mode",
+        choices=["disabled", "deterministic", "injected_json"],
+        default=None,
+        help="Explicitly opt into the Hermes lifecycle dry-run evaluator",
+    )
+    p_evolve.add_argument("--rsimem-lifecycle-policy-version", default=None)
+    p_evolve.add_argument("--rsimem-lifecycle-compiler-version", default=None)
+    p_evolve.add_argument(
+        "--rsimem-lifecycle-timeout-seconds",
+        type=float,
+        default=None,
+    )
+    p_evolve.add_argument(
+        "--rsimem-lifecycle-max-output-tokens",
+        type=int,
+        default=None,
     )
 
     # cleanup

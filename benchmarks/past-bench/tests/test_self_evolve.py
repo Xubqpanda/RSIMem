@@ -180,10 +180,22 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
         agent="hermes-luna",
         rsimem_mode="native+adapter+ledger",
         rsimem_adapter_failure_policy="fail_closed",
+        rsimem_verify_native_projection=True,
+        rsimem_lifecycle_evaluator_mode="deterministic",
+        rsimem_lifecycle_policy_version="phase1-acceptance-v1",
+        rsimem_lifecycle_compiler_version="uncompiled-v0",
+        rsimem_lifecycle_timeout_seconds=15.0,
+        rsimem_lifecycle_max_output_tokens=2048,
     ))
 
     assert sequence.hermes.rsimem_mode == "native+adapter+ledger"
     assert sequence.hermes.rsimem_adapter_failure_policy == "fail_closed"
+    assert sequence.hermes.rsimem_verify_native_projection is True
+    assert sequence.hermes.rsimem_lifecycle_evaluator_mode == "deterministic"
+    assert sequence.hermes.rsimem_lifecycle_policy_version == "phase1-acceptance-v1"
+    assert sequence.hermes.rsimem_lifecycle_compiler_version == "uncompiled-v0"
+    assert sequence.hermes.rsimem_lifecycle_timeout_seconds == 15.0
+    assert sequence.hermes.rsimem_lifecycle_max_output_tokens == 2048
 
     with pytest.raises(SystemExit, match="Hermes agent"):
         _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
