@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 from dataclasses import replace
 
 import pytest
 
+from rsimem.audit import summarize_ingestion_usage
 from rsimem.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import (
     DeterministicPreferenceEvaluator,
@@ -33,6 +35,7 @@ from rsimem.memory.ingestion import (
     FixedMemoryRoute,
     FixedMemoryRouter,
     HERMES_NATIVE_ROUTES,
+    INGESTION_CONTRACT_SCHEMA_VERSION,
     InternalMemoryAction,
     InternalOperationProposal,
     InvalidPolicyOutputError,
@@ -370,6 +373,15 @@ def test_unknown_stale_duplicate_and_unsupported_operations_fail_closed() -> Non
             _Candidates((candidate,), resolved={"candidate-1": stale}),
         )
 
+    ambiguous = ExistingMemoryCandidate(
+        "candidate-1", "artifact-other", "revision-1", _sha("other"),
+    )
+    with pytest.raises(ValueError, match="ambiguous candidate"):
+        _coordinator(policy).ingest(
+            _request(),
+            _Candidates((candidate, ambiguous), resolved={"candidate-1": ambiguous}),
+        )
+
     duplicate_policy = BoundSemanticPolicy(
         _descriptor(),
         lambda request, candidates: SemanticPolicyDecision(
@@ -535,10 +547,34 @@ def test_request_identity_is_order_stable_and_covers_framework_evidence() -> Non
 
 def test_request_rejects_missing_versions_noncanonical_identity_and_stale_source() -> None:
     request = _request()
+    assert INGESTION_CONTRACT_SCHEMA_VERSION == 1
+    with pytest.raises(ValueError, match="unsupported semantic ingest request schema"):
+        replace(request, schema_version=2)
     with pytest.raises(ValueError, match="policy, framework"):
         replace(request, framework_version="")
+    with pytest.raises(ValueError, match="plan_id and base_revision"):
+        replace(request, provenance=replace(request.provenance, base_revision=""))
+    with pytest.raises(ValueError, match="experience_id"):
+        replace(
+            request,
+            source_experience=replace(request.source_experience, experience_id=""),
+        )
     with pytest.raises(ValueError, match="not canonical"):
         replace(request, idempotency_key="forged")
+    with pytest.raises(TypeError):
+        InternalOperationProposal(
+            InternalMemoryAction.ADD,
+            "new_fact",
+            new_content_digest=_sha("fact"),
+            resources=[{"path": "/forged"}],
+        )
+    with pytest.raises(TypeError):
+        InternalOperationProposal(
+            InternalMemoryAction.ADD,
+            "new_fact",
+            new_content_digest=_sha("fact"),
+            openai_messages=[{"role": "system"}],
+        )
 
     policy = BoundSemanticPolicy(
         _descriptor(),
@@ -686,6 +722,13 @@ def test_deterministic_pass_through_ingestor_supports_all_internal_actions_witho
         if proposal.action == InternalMemoryAction.NONE
         else MemoryIngestOutcome.PLANNED_MUTATION
     )
+    expected_digests = {
+        InternalMemoryAction.ADD: (_sha("new"),),
+        InternalMemoryAction.UPDATE: (_sha("old"), _sha("updated")),
+        InternalMemoryAction.DELETE: (_sha("old"),),
+        InternalMemoryAction.NONE: (),
+    }
+    assert result.content_digests == expected_digests[proposal.action]
     assert memory_file.read_bytes() == before
     assert backend.get("missing-artifact") is None
 
@@ -745,6 +788,40 @@ def test_ingestion_success_and_failure_usage_enter_content_free_ledger(tmp_path)
     assert "Always use TSV" not in serialized
     assert "existing native memory" not in serialized
 
+    failure_usage = RawResourceUsage(
+        input_tokens=7,
+        output_tokens=0,
+        model_requests=1,
+        duration_ms=8,
+    )
+
+    def fail(failed_request, candidates):
+        raise PolicyExecutionError("provider_timeout", failure_usage)
+
+    failed_policy = BoundSemanticPolicy(_descriptor(), fail)
+    failed_request = _request()
+    failed = _coordinator(failed_policy).ingest(failed_request, _Candidates())
+    assert failed is not None
+    observer.record_ingestion(failed_request, failed)
+    assert observer.events[-1]["data"]["resources"]["inputTokens"] == 7
+    assert observer.events[-1]["data"]["status"] == "failed"
+    summary = summarize_ingestion_usage(list(observer.events))
+    assert summary["uniqueExecutions"] == 2
+    assert summary["inputTokens"] == 20
+    assert summary["modelRequests"] == 2
+    assert summary["retries"] == 1
+    assert summary["statuses"] == {"success": 1, "failed": 1}
+
+    duplicate_summary = summarize_ingestion_usage([
+        *observer.events,
+        observer.events[0],
+    ])
+    assert duplicate_summary["duplicateViews"] == 1
+    conflict = copy.deepcopy(observer.events[0])
+    conflict["data"]["resources"]["inputTokens"] = 99
+    with pytest.raises(ValueError, match="conflicting memory ingestion execution"):
+        summarize_ingestion_usage([observer.events[0], conflict])
+
     restarted = LifecycleLedgerObserver(
         variant="fixture",
         trace_id="trace-ingestion",
@@ -753,4 +830,5 @@ def test_ingestion_success_and_failure_usage_enter_content_free_ledger(tmp_path)
         output_path=path,
     )
     restarted.record_ingestion(request, result)
-    assert len(restarted.events) == 1
+    restarted.record_ingestion(failed_request, failed)
+    assert len(restarted.events) == 2

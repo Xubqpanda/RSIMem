@@ -926,7 +926,11 @@ class SemanticIngestionCoordinator:
     ) -> MemoryIngestResult:
         resolved: list[InternalMemoryOperation] = []
         seen: set[tuple[InternalMemoryAction, str | None]] = set()
-        available = {item.candidate_id: item for item in candidates.candidates(request)}
+        candidate_values = tuple(candidates.candidates(request))
+        candidate_ids = [item.candidate_id for item in candidate_values]
+        if len(candidate_ids) != len(set(candidate_ids)):
+            raise ValueError("semantic candidate reader returned an ambiguous candidate")
+        available = {item.candidate_id: item for item in candidate_values}
         for index, proposal in enumerate(decision.operations):
             if proposal.action not in descriptor.capability.operations:
                 raise ValueError("semantic policy proposed an unsupported operation")

@@ -45,6 +45,81 @@ def _call_sum(calls: list[dict[str, Any]], field: str) -> int | None:
     return sum(int(value) for value in values)
 
 
+def summarize_ingestion_usage(ledger: list[dict[str, Any]]) -> dict[str, Any]:
+    """Audit content-free ingestion component usage without double billing it."""
+
+    events = [event for event in ledger if event.get("kind") == "memory_ingestion"]
+    by_execution: dict[str, str] = {}
+    unique: list[dict[str, Any]] = []
+    for event in events:
+        data = event.get("data")
+        if not isinstance(data, dict):
+            raise ValueError("memory ingestion ledger event requires data")
+        execution_id = data.get("executionId")
+        resources = data.get("resources")
+        if not isinstance(execution_id, str) or not execution_id:
+            raise ValueError("memory ingestion ledger event requires executionId")
+        if not isinstance(resources, dict):
+            raise ValueError("memory ingestion ledger event requires resources")
+        canonical = json.dumps(data, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        existing = by_execution.get(execution_id)
+        if existing is not None:
+            if existing != canonical:
+                raise ValueError(f"conflicting memory ingestion execution: {execution_id}")
+            continue
+        by_execution[execution_id] = canonical
+        unique.append(data)
+
+    resource_fields = {
+        "inputTokens": "inputTokens",
+        "outputTokens": "outputTokens",
+        "cacheReadTokens": "cacheReadTokens",
+        "cacheWriteTokens": "cacheWriteTokens",
+        "reasoningTokens": "reasoningTokens",
+        "modelRequests": "modelRequests",
+        "retryCount": "retries",
+        "durationMs": "durationMs",
+        "storageBytes": "storageBytes",
+    }
+    totals = {output: 0 for output in resource_fields.values()}
+    completeness = {
+        output: True
+        for field, output in resource_fields.items()
+        if field in {
+            "inputTokens",
+            "outputTokens",
+            "cacheReadTokens",
+            "cacheWriteTokens",
+            "reasoningTokens",
+            "durationMs",
+        }
+    }
+    statuses = Counter()
+    outcomes = Counter()
+    for data in unique:
+        resources = data["resources"]
+        statuses.update((str(data.get("status")),))
+        outcomes.update((str(data.get("outcome")),))
+        for source, output in resource_fields.items():
+            value = resources.get(source)
+            if value is None:
+                if output in completeness:
+                    completeness[output] = False
+                continue
+            if type(value) is not int or value < 0:
+                raise ValueError(f"invalid memory ingestion resource: {source}")
+            totals[output] += value
+    return {
+        "events": len(events),
+        "uniqueExecutions": len(unique),
+        "duplicateViews": len(events) - len(unique),
+        **totals,
+        "complete": completeness,
+        "statuses": dict(statuses),
+        "outcomes": dict(outcomes),
+    }
+
+
 def audit_run(run_dir: Path) -> dict[str, Any]:
     """Return a privacy-safe reconciliation report for one completed run."""
     run_dir = run_dir.resolve()
@@ -126,6 +201,7 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         purposes.update(str(call.get("purpose")) for call in calls)
 
     ledger_calls = [event for event in ledger if event.get("kind") == "model_call_usage"]
+    ingestion_usage = summarize_ingestion_usage(ledger)
     billing_ids = [event.get("data", {}).get("billingExecutionId") for event in ledger_calls]
     billing_ids = [value for value in billing_ids if isinstance(value, str) and value]
     if len(set(billing_ids)) != totals["requests"]:
@@ -207,6 +283,7 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         "ledgerModelCallViews": len(ledger_calls),
         "ledgerUniqueBillingCalls": len(set(billing_ids)),
         "ledgerDuplicateViews": len(ledger_calls) - len(set(billing_ids)),
+        "ingestionUsage": ingestion_usage,
         "projectionChecks": len(projection_checks),
         "projectionMismatches": projection_mismatches,
         "adapterNativeBypasses": adapter_bypasses,

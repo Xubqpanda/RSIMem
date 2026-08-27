@@ -14,6 +14,7 @@ from rsimem.memory_systems.mem0_flat import (
     MEMBASE_LICENSE,
     MEMBASE_PROMPT_PATH,
     MEMBASE_SOURCE_DIGEST,
+    PROMPT_CONTRACT_SCHEMA_VERSION,
     SEMANTIC_RETRIEVAL_SCORER_PROMPT,
     FakeCompletionClient,
     PromptTemplate,
@@ -67,6 +68,9 @@ def test_local_fact_prompt_excludes_non_construction_answer_instructions() -> No
 
 def test_template_digest_and_required_artifact_fields_fail_closed() -> None:
     artifact = FACT_EXTRACTION_PROMPT.artifact
+    assert PROMPT_CONTRACT_SCHEMA_VERSION == 1
+    with pytest.raises(ValueError, match="unsupported prompt artifact schema"):
+        replace(artifact, schema_version=2)
     with pytest.raises(ValueError, match="digest does not match"):
         PromptTemplate(artifact, FACT_EXTRACTION_PROMPT.template + "changed")
     with pytest.raises(ValueError, match="input schema"):
