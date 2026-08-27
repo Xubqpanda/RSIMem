@@ -654,7 +654,6 @@ class TransactionalMutationExecutor:
                 ))
             applied = self._transition(receipt, phase=MutationReceiptPhase.APPLIED)
             self._inject(crash_at, CrashPoint.AFTER_BACKEND_WRITE)
-            self._inject(crash_at, CrashPoint.BEFORE_VERIFICATION)
             return self._verify_and_commit(
                 applied,
                 request,
@@ -707,6 +706,18 @@ class TransactionalMutationExecutor:
                 else "backend_rejected"
             )
             return self._backend_failure(receipt, request, validation, reason)
+        if (
+            receipt.action == InternalMemoryAction.ADD
+            and result.reason_code == "already_present"
+        ):
+            blocked = self._block(receipt, "add_ownership_ambiguous")
+            return self._result(
+                MutationExecutionStatus.BLOCKED,
+                blocked,
+                request,
+                reason="add_ownership_ambiguous",
+                validation=validation,
+            )
         applied_artifact_id = (
             receipt.target_artifact_id
             if receipt.action == InternalMemoryAction.DELETE
@@ -721,6 +732,7 @@ class TransactionalMutationExecutor:
                 reason="backend_result_incomplete",
                 validation=validation,
             )
+        self._inject(crash_at, CrashPoint.AFTER_BACKEND_WRITE)
         applied = self._transition(
             receipt,
             phase=MutationReceiptPhase.APPLIED,
@@ -741,8 +753,6 @@ class TransactionalMutationExecutor:
                 after_digest=receipt.after_content_digest,
                 receipt_id=receipt.receipt_id,
             ))
-        self._inject(crash_at, CrashPoint.AFTER_BACKEND_WRITE)
-        self._inject(crash_at, CrashPoint.BEFORE_VERIFICATION)
         return self._verify_and_commit(
             applied,
             request,
@@ -789,6 +799,7 @@ class TransactionalMutationExecutor:
         current = receipt
         if current.phase == MutationReceiptPhase.APPLIED:
             current = self._transition(current, phase=MutationReceiptPhase.VERIFYING)
+        self._inject(crash_at, CrashPoint.BEFORE_VERIFICATION)
         verification_spec = self._operation_spec(
             OperationKind.REREAD_VERIFICATION,
             request,
