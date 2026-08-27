@@ -552,6 +552,9 @@ def test_tracing_levels_privacy_and_overhead_budget_are_explicit() -> None:
     disabled = AtomicOperationRecorder(disabled_log, tracing_level=TracingLevel.DISABLED)
     disabled.record_artifact(artifact)
     assert disabled.metrics.event_count == 0
+    disabled_report = disabled.overhead_report()
+    assert disabled_report["configured_level"] == "disabled"
+    assert disabled_report["event_count"] == 0
 
     sampled_out_log = AppendOnlyOperationEvidenceLog()
     sampled_out = AtomicOperationRecorder(
@@ -566,6 +569,10 @@ def test_tracing_levels_privacy_and_overhead_budget_are_explicit() -> None:
     minimal = AtomicOperationRecorder(minimal_log, tracing_level=TracingLevel.MINIMAL)
     minimal.record_artifact(artifact)
     assert minimal.metrics.event_count == 1
+    minimal_report = minimal.overhead_report()
+    assert minimal_report["configured_level"] == "minimal"
+    assert minimal_report["event_count"] == 1
+    assert minimal_report["serialized_bytes"] > 0
 
     diagnostic_log = AppendOnlyOperationEvidenceLog()
     diagnostic = AtomicOperationRecorder(
@@ -580,6 +587,7 @@ def test_tracing_levels_privacy_and_overhead_budget_are_explicit() -> None:
     )
     diagnostic.record_artifact(artifact)
     report = diagnostic.overhead_report()
+    assert report["configured_level"] == "diagnostic"
     assert report["event_count"] == 1
     assert report["serialized_bytes"] > 0
     assert report["cpu_time_ms"] >= 0

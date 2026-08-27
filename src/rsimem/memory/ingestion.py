@@ -341,6 +341,11 @@ class SemanticIngestRequest:
         }
 
 
+# Phase 2B's generic contract name resolves to the only enabled route-specific
+# request. Additional route policies must define their own validated projection.
+MemoryIngestRequest = SemanticIngestRequest
+
+
 def build_semantic_ingest_request(
     snapshot: ContextSnapshot,
     plan: WritebackPlan,
