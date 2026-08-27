@@ -1052,14 +1052,22 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 - Criterion/decision：quality 只统计两侧均 resolved 的 deployment-observable label；cost、stability 和 uncertainty 使用同一 held-out pair。Criteria、split、offline decision 和 matched decision 均 content-addressed；official score/grader/answer/expectation 不在 API surface。
 - Activation/rollback：matched coordinator 是唯一高层 activation 路径；decision 先持久化，再通过原子 active pointer 激活。Activation crash 保持 `validated` 且无 active；operator/automatic rollback 使用 content-addressed evidence，transition replay 幂等并可跨 restart 审计。
 - Commits：`3ce428b`（training membership）、`28e340f`（split/offline validation/decision persistence）、`70077ea`（封堵 offline activation）、`ce76d86`（matched receipt requirement）、`f5c294b`（matched execution gate）和 `03c1984`（example/episode binding）。Full RSIMem `314 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check` 和 diff check 通过。
-- 已知限制：当前完成的是 deterministic implementation gate，尚未把 active artifact 参数接入真实 Mem0-flat semantic decision。Matched observation 仍由 fixture 提供，不构成 PAST-Bench adaptive quality claim；这些属于 2J.3 和 2K。
+- 已知限制：2J.2 只负责 split、offline screening 与 matched activation contract；active artifact 到 Mem0-flat decision 的绑定由 2J.3 完成。Matched observation 仍由 fixture 提供，不构成 PAST-Bench adaptive quality claim；真实 replicates 属于 2K。
 
 ### 2J.3 阶段闸门
 
-- □ Policy N+1 由 deployment-observable feedback 生成。
-- □ N+1 通过 held-out validation 后才激活。
-- □ Activation、rejection、rollback 和 replay 全部可审计。
-- □ 满足 memory-mediated adaptive self-improvement 的实现定义。
+- √ Policy N+1 由 deployment-observable feedback 生成。
+- √ N+1 通过 held-out validation 后才激活。
+- √ Activation、rejection、rollback 和 replay 全部可审计。
+- √ 满足 memory-mediated adaptive self-improvement 的实现定义。
+
+2J.3 验收记录：
+
+- Runtime binding：`ActiveAdaptiveMem0Binder` 只读取唯一 active artifact，并将 allowlisted extraction、internal-operation、consolidation-UPDATE 和 retrieval threshold 映射到固定 Mem0-flat utility gate。无 active artifact 时返回原 static gate，空 override 不改变 static digest、route 或 prompt cadence。
+- Actual version：N+1 runtime 先把所有 unchanged/changed target scorer 统一绑定到 active artifact version，再应用 target-specific threshold。Generation、internal-operation 和 retrieval utility decision 与 binding observer 均记录实际 N+1 version。
+- End-to-end replay：deterministic fixture 从 N 的 atomic operation/delayed-feedback dataset 生成 proposal，经 time-ordered offline validation 和 static/proposal matched held-out gate 激活 N+1；同一 retrieval feature/cost digest 下，N 为 `accept`、N+1 为 `defer`。结构化 audit exact join dataset、artifact、offline/matched decision、active store、binding 与 future decision。
+- Commit：`9999c11`。Focused adaptive/feedback/Mem0 tests `70 passed`；full RSIMem `317 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check` 和 diff check 通过。
+- 已知限制：本闸门关闭的是 deterministic memory-mediated adaptive implementation definition，不是 PAST-Bench quality claim。尚未运行 adaptive live replicates，也未证明两轮递归更新、跨 family 泛化或统计优势；这些属于 2K。
 
 ## 22. 第二阶段 2K：PAST-Bench 实验与论文验收
 
