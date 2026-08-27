@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections import Counter
 from dataclasses import dataclass
 
 from .contracts import MemoryQuery
-from .executor import _sha
 from .ingestion import InternalMemoryAction
 from .receipts import (
     JsonMutationReceiptStore,
@@ -14,6 +14,10 @@ from .receipts import (
     MutationReceiptStatus,
 )
 from .runtime import MemoryBackendRegistry
+
+
+def _sha(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)

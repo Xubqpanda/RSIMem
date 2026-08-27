@@ -498,7 +498,8 @@ class JsonMutationReceiptStore:
         if len(bindings) != 1:
             raise ValueError("conflicting committed target ownership receipts")
         revision, digest, kind, namespace, owner_run_id = bindings.pop()
-        assert revision is not None and digest is not None
+        if revision is None or digest is None:
+            raise ValueError("committed target ownership receipt is incomplete")
         return TrustedTargetBinding(
             backend=backend,
             artifact_id=artifact_id,
