@@ -1,4 +1,4 @@
-"""Deterministic semantic policy learning from frozen delayed feedback."""
+"""Legacy threshold-learning experiment retained for infrastructure replay."""
 
 from __future__ import annotations
 
@@ -19,13 +19,15 @@ from .feedback_dataset import (
     FeedbackLabel,
 )
 from .utility import STATIC_UTILITY_FEATURE_SCHEMA
+from .adaptation_contract import AdaptiveArtifactKind
 
 
-ADAPTIVE_POLICY_SCHEMA_VERSION = 1
-ADAPTIVE_POLICY_ARTIFACT_SCHEMA = "semantic-adaptive-policy-artifact-v1"
-ADAPTIVE_POLICY_TRAINING_SCHEMA = "semantic-adaptive-policy-training-v1"
-ADAPTIVE_POLICY_LEARNER_VERSION = "semantic-parameter-bayesian-v1"
-ADAPTIVE_POLICY_OBJECTIVE = "delayed-future-utility-per-cost-v1"
+ADAPTIVE_POLICY_SCHEMA_VERSION = 2
+ADAPTIVE_POLICY_ARTIFACT_SCHEMA = "legacy-semantic-threshold-artifact-v2"
+ADAPTIVE_POLICY_TRAINING_SCHEMA = "legacy-semantic-threshold-training-v2"
+ADAPTIVE_POLICY_LEARNER_VERSION = "legacy-semantic-threshold-bayesian-v2"
+ADAPTIVE_POLICY_OBJECTIVE = "legacy-delayed-threshold-experiment-v2"
+ADAPTIVE_POLICY_ARTIFACT_KIND = AdaptiveArtifactKind.LEGACY_THRESHOLD_EXPERIMENT
 FIXED_SEMANTIC_ROUTE = "hermes-native-semantic"
 FIXED_INVOCATION_BOUNDARY = "task-completion-or-session-end-v1"
 ADAPTIVE_POLICY_FEATURES = (
@@ -35,7 +37,6 @@ ADAPTIVE_POLICY_FEATURES = (
     "policy_parameter_ids",
     "operation_membership",
     "failure_subgraph_operation_ids",
-    "raw_resource_usage",
 )
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -157,10 +158,14 @@ class AdaptiveTrainingConfig:
     window_version: str = DELAYED_FEEDBACK_WINDOW_VERSION
     route_backend: str = FIXED_SEMANTIC_ROUTE
     invocation_boundary: str = FIXED_INVOCATION_BOUNDARY
+    artifact_kind: AdaptiveArtifactKind = ADAPTIVE_POLICY_ARTIFACT_KIND
     training_schema: str = ADAPTIVE_POLICY_TRAINING_SCHEMA
     schema_version: int = ADAPTIVE_POLICY_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "artifact_kind", AdaptiveArtifactKind(
+            self.artifact_kind
+        ))
         if self.schema_version != ADAPTIVE_POLICY_SCHEMA_VERSION:
             raise ValueError("unsupported adaptive training schema")
         for name in (
@@ -207,6 +212,7 @@ class AdaptiveTrainingConfig:
             or self.route_backend != FIXED_SEMANTIC_ROUTE
             or self.invocation_boundary != FIXED_INVOCATION_BOUNDARY
             or self.training_schema != ADAPTIVE_POLICY_TRAINING_SCHEMA
+            or self.artifact_kind != ADAPTIVE_POLICY_ARTIFACT_KIND
         ):
             raise ValueError("adaptive training identity is not frozen")
         missing_rate = _finite(
@@ -262,6 +268,7 @@ class AdaptiveTrainingConfig:
             "window_version": self.window_version,
             "route_backend": self.route_backend,
             "invocation_boundary": self.invocation_boundary,
+            "artifact_kind": self.artifact_kind.value,
         }
 
 
@@ -434,13 +441,18 @@ class AdaptivePolicyArtifact:
     provenance_operation_ids: tuple[str, ...]
     state: AdaptivePolicyState
     content_digest: str
+    artifact_kind: AdaptiveArtifactKind = ADAPTIVE_POLICY_ARTIFACT_KIND
     artifact_schema: str = ADAPTIVE_POLICY_ARTIFACT_SCHEMA
     schema_version: int = ADAPTIVE_POLICY_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "artifact_kind", AdaptiveArtifactKind(
+            self.artifact_kind
+        ))
         if (
             self.schema_version != ADAPTIVE_POLICY_SCHEMA_VERSION
             or self.artifact_schema != ADAPTIVE_POLICY_ARTIFACT_SCHEMA
+            or self.artifact_kind != ADAPTIVE_POLICY_ARTIFACT_KIND
         ):
             raise ValueError("unsupported adaptive policy artifact schema")
         object.__setattr__(self, "state", AdaptivePolicyState(self.state))
@@ -516,6 +528,7 @@ class AdaptivePolicyArtifact:
         return {
             "schema_version": self.schema_version,
             "artifact_schema": self.artifact_schema,
+            "artifact_kind": self.artifact_kind.value,
             "parent_policy_version": self.parent_policy_version,
             "dataset_id": self.dataset_id,
             "dataset_payload_digest": self.dataset_payload_digest,
@@ -539,7 +552,7 @@ class AdaptivePolicyArtifact:
         }
 
     def expected_policy_version(self) -> str:
-        return f"semantic-adaptive.{_digest(self.version_basis())[:24]}"
+        return f"legacy-threshold.{_digest(self.version_basis())[:24]}"
 
     def identity_payload(self) -> dict[str, object]:
         return {**self.version_basis(), "policy_version": self.policy_version}
@@ -579,6 +592,7 @@ class AdaptivePolicyArtifact:
         basis = {
             "schema_version": ADAPTIVE_POLICY_SCHEMA_VERSION,
             "artifact_schema": ADAPTIVE_POLICY_ARTIFACT_SCHEMA,
+            "artifact_kind": ADAPTIVE_POLICY_ARTIFACT_KIND.value,
             "parent_policy_version": config.parent_policy_version,
             "dataset_id": dataset.dataset_id,
             "dataset_payload_digest": gate.dataset_payload_digest,
@@ -600,7 +614,7 @@ class AdaptivePolicyArtifact:
             "provenance_operation_ids": list(provenance_operations),
             "state": AdaptivePolicyState.PROPOSAL.value,
         }
-        version = f"semantic-adaptive.{_digest(basis)[:24]}"
+        version = f"legacy-threshold.{_digest(basis)[:24]}"
         identity = {**basis, "policy_version": version}
         content_digest = _digest(identity)
         return cls(
@@ -627,6 +641,7 @@ class AdaptivePolicyArtifact:
             provenance_operation_ids=provenance_operations,
             state=AdaptivePolicyState.PROPOSAL,
             content_digest=content_digest,
+            artifact_kind=ADAPTIVE_POLICY_ARTIFACT_KIND,
         )
 
 
@@ -674,7 +689,7 @@ def _component_operation_ids(
 
 
 class DeterministicAdaptivePolicyLearner:
-    """Fit bounded threshold changes using only trusted delayed evidence."""
+    """Fit legacy bounded threshold changes using delayed evidence."""
 
     @staticmethod
     def _validate_inputs(

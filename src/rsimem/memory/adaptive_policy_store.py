@@ -14,6 +14,7 @@ from typing import Mapping
 
 from .adaptive_policy import (
     AdaptiveFallbackReason,
+    AdaptiveArtifactKind,
     AdaptiveParameterName,
     AdaptiveParameterUpdate,
     AdaptivePolicyArtifact,
@@ -22,7 +23,7 @@ from .adaptive_policy import (
 )
 
 
-ADAPTIVE_POLICY_STORE_SCHEMA_VERSION = 1
+ADAPTIVE_POLICY_STORE_SCHEMA_VERSION = 2
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _REASON_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -241,6 +242,7 @@ def _parse_artifact(value: object) -> AdaptivePolicyArtifact:
     payload = _strict_mapping(value, {
         "schema_version",
         "artifact_schema",
+        "artifact_kind",
         "artifact_id",
         "policy_version",
         "parent_policy_version",
@@ -291,6 +293,7 @@ def _parse_artifact(value: object) -> AdaptivePolicyArtifact:
             state=AdaptivePolicyState(payload["state"]),
             content_digest=payload["content_digest"],
             artifact_schema=payload["artifact_schema"],
+            artifact_kind=AdaptiveArtifactKind(payload["artifact_kind"]),
             schema_version=payload["schema_version"],
         )
     except (KeyError, TypeError, ValueError) as exc:

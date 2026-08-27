@@ -1,4 +1,4 @@
-"""Matched held-out execution gate for adaptive policy activation."""
+"""Matched held-out gate for the legacy retrieval-threshold experiment."""
 
 from __future__ import annotations
 
@@ -21,9 +21,9 @@ from .adaptive_policy_validation import AdaptiveValidationSplit
 from .feedback_dataset import FeedbackLabel
 
 
-MATCHED_VALIDATION_SCHEMA_VERSION = 1
-MATCHED_CRITERIA_VERSION = "semantic-adaptive-matched-criteria-v1"
-MATCHED_DECISION_SCHEMA = "semantic-adaptive-matched-decision-v1"
+MATCHED_VALIDATION_SCHEMA_VERSION = 2
+MATCHED_CRITERIA_VERSION = "legacy-semantic-threshold-matched-criteria-v2"
+MATCHED_DECISION_SCHEMA = "legacy-semantic-threshold-matched-decision-v2"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _REASON = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -73,7 +73,6 @@ class MatchedPolicyObservation:
     variant: MatchedPolicyVariant
     policy_version: str
     label: FeedbackLabel
-    lifecycle_cost: float
     stability_failure: bool
     uncertainty: float
     evidence_id: str
@@ -96,15 +95,13 @@ class MatchedPolicyObservation:
             _require_identifier(value, "matched policy observation identity")
         if _DIGEST.fullmatch(self.task_input_digest) is None:
             raise ValueError("matched task input digest is invalid")
-        cost = _finite(self.lifecycle_cost, "matched lifecycle cost")
         uncertainty = _finite(self.uncertainty, "matched uncertainty")
-        if cost <= 0 or not 0.0 <= uncertainty <= 1.0:
+        if not 0.0 <= uncertainty <= 1.0:
             raise ValueError("matched held-out metrics are invalid")
         if type(self.stability_failure) is not bool:
             raise TypeError("matched stability flag must be bool")
         if type(self.evidence_cutoff) is not int or self.evidence_cutoff < 0:
             raise ValueError("matched evidence cutoff is invalid")
-        object.__setattr__(self, "lifecycle_cost", cost)
         object.__setattr__(self, "uncertainty", uncertainty)
 
     def payload(self) -> dict[str, object]:
@@ -116,7 +113,6 @@ class MatchedPolicyObservation:
             "variant": self.variant.value,
             "policy_version": self.policy_version,
             "label": self.label.value,
-            "lifecycle_cost": self.lifecycle_cost,
             "stability_failure": self.stability_failure,
             "uncertainty": self.uncertainty,
             "evidence_id": self.evidence_id,
@@ -135,7 +131,6 @@ class MatchedPolicyObservation:
             "variant",
             "policy_version",
             "label",
-            "lifecycle_cost",
             "stability_failure",
             "uncertainty",
             "evidence_id",
@@ -154,7 +149,6 @@ class MatchedPolicyObservation:
                 variant=MatchedPolicyVariant(value["variant"]),
                 policy_version=value["policy_version"],
                 label=FeedbackLabel(value["label"]),
-                lifecycle_cost=value["lifecycle_cost"],
                 stability_failure=value["stability_failure"],
                 uncertainty=value["uncertainty"],
                 evidence_id=value["evidence_id"],
@@ -171,7 +165,6 @@ class MatchedAcceptanceCriteria:
     minimum_matched_examples: int = 1
     minimum_resolved_examples: int = 1
     minimum_quality_delta: float = 0.0
-    maximum_cost_ratio: float = 1.0
     maximum_stability_failures: int = 0
     maximum_mean_uncertainty: float = 0.25
     criteria_version: str = MATCHED_CRITERIA_VERSION
@@ -196,19 +189,16 @@ class MatchedAcceptanceCriteria:
         ):
             raise ValueError("matched stability criterion is invalid")
         quality = _finite(self.minimum_quality_delta, "matched quality criterion")
-        cost = _finite(self.maximum_cost_ratio, "matched cost criterion")
         uncertainty = _finite(
             self.maximum_mean_uncertainty,
             "matched uncertainty criterion",
         )
         if (
             not -1.0 <= quality <= 1.0
-            or cost < 0
             or not 0.0 <= uncertainty <= 1.0
         ):
             raise ValueError("matched acceptance criteria are out of range")
         object.__setattr__(self, "minimum_quality_delta", quality)
-        object.__setattr__(self, "maximum_cost_ratio", cost)
         object.__setattr__(self, "maximum_mean_uncertainty", uncertainty)
 
     @property
@@ -222,7 +212,6 @@ class MatchedAcceptanceCriteria:
             "minimum_matched_examples": self.minimum_matched_examples,
             "minimum_resolved_examples": self.minimum_resolved_examples,
             "minimum_quality_delta": self.minimum_quality_delta,
-            "maximum_cost_ratio": self.maximum_cost_ratio,
             "maximum_stability_failures": self.maximum_stability_failures,
             "maximum_mean_uncertainty": self.maximum_mean_uncertainty,
         }
@@ -242,7 +231,6 @@ class MatchedValidationDecision:
     static_quality: float
     proposal_quality: float
     quality_delta: float
-    cost_ratio: float
     stability_failures: int
     mean_uncertainty: float
     reason_codes: tuple[str, ...]
@@ -284,7 +272,6 @@ class MatchedValidationDecision:
         static_quality = _finite(self.static_quality, "matched static quality")
         proposal_quality = _finite(self.proposal_quality, "matched proposal quality")
         quality_delta = _finite(self.quality_delta, "matched quality delta")
-        cost_ratio = _finite(self.cost_ratio, "matched cost ratio")
         uncertainty = _finite(self.mean_uncertainty, "matched mean uncertainty")
         if (
             not 0.0 <= static_quality <= 1.0
@@ -294,7 +281,6 @@ class MatchedValidationDecision:
                 proposal_quality - static_quality,
                 abs_tol=1e-12,
             )
-            or cost_ratio < 0
             or not 0.0 <= uncertainty <= 1.0
         ):
             raise ValueError("matched validation decision metrics are inconsistent")
@@ -331,7 +317,6 @@ class MatchedValidationDecision:
             "static_quality": self.static_quality,
             "proposal_quality": self.proposal_quality,
             "quality_delta": self.quality_delta,
-            "cost_ratio": self.cost_ratio,
             "stability_failures": self.stability_failures,
             "mean_uncertainty": self.mean_uncertainty,
             "reason_codes": list(self.reason_codes),
@@ -486,13 +471,7 @@ class MatchedAdaptivePolicyValidator:
         static_quality = quality(static_values)
         proposal_quality = quality(proposal_values)
         quality_delta = proposal_quality - static_quality
-        all_static = [values[MatchedPolicyVariant.STATIC] for values in pairs.values()]
         all_proposal = [values[MatchedPolicyVariant.PROPOSAL] for values in pairs.values()]
-        static_cost = sum(item.lifecycle_cost for item in all_static) / len(all_static)
-        proposal_cost = sum(item.lifecycle_cost for item in all_proposal) / len(
-            all_proposal
-        )
-        cost_ratio = proposal_cost / static_cost
         stability_failures = sum(item.stability_failure for item in all_proposal)
         uncertainty = sum(item.uncertainty for item in all_proposal) / len(
             all_proposal
@@ -504,8 +483,6 @@ class MatchedAdaptivePolicyValidator:
             reasons.append("insufficient_resolved_examples")
         if quality_delta < criteria.minimum_quality_delta:
             reasons.append("quality_criterion_failed")
-        if cost_ratio > criteria.maximum_cost_ratio:
-            reasons.append("cost_criterion_failed")
         if stability_failures > criteria.maximum_stability_failures:
             reasons.append("stability_criterion_failed")
         if uncertainty > criteria.maximum_mean_uncertainty:
@@ -526,7 +503,6 @@ class MatchedAdaptivePolicyValidator:
             "static_quality": static_quality,
             "proposal_quality": proposal_quality,
             "quality_delta": quality_delta,
-            "cost_ratio": cost_ratio,
             "stability_failures": stability_failures,
             "mean_uncertainty": uncertainty,
             "reason_codes": list(reason_codes),
@@ -550,7 +526,6 @@ class MatchedAdaptivePolicyValidator:
             static_quality=static_quality,
             proposal_quality=proposal_quality,
             quality_delta=quality_delta,
-            cost_ratio=cost_ratio,
             stability_failures=stability_failures,
             mean_uncertainty=uncertainty,
             reason_codes=reason_codes,
@@ -622,7 +597,6 @@ class JsonMatchedValidationDecisionStore:
             "static_quality",
             "proposal_quality",
             "quality_delta",
-            "cost_ratio",
             "stability_failures",
             "mean_uncertainty",
             "reason_codes",
@@ -646,7 +620,6 @@ class JsonMatchedValidationDecisionStore:
                 static_quality=value["static_quality"],
                 proposal_quality=value["proposal_quality"],
                 quality_delta=value["quality_delta"],
-                cost_ratio=value["cost_ratio"],
                 stability_failures=value["stability_failures"],
                 mean_uncertainty=value["mean_uncertainty"],
                 reason_codes=tuple(value["reason_codes"]),

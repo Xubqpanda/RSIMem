@@ -39,7 +39,7 @@ def _observations(
     split,
     *,
     proposal_positive: bool = True,
-    proposal_cost: float = 0.8,
+    proposal_stability_failure: bool = False,
 ):
     values = []
     for index, (example_id, episode_id) in enumerate(zip(
@@ -50,7 +50,6 @@ def _observations(
             "split_id": split.split_id,
             "example_id": example_id,
             "episode_id": episode_id,
-            "stability_failure": False,
             "uncertainty": 0.1,
             "evidence_cutoff": 20 + index,
             "task_input_digest": _digest(f"task-input-{index}"),
@@ -62,7 +61,7 @@ def _observations(
                 variant=MatchedPolicyVariant.STATIC,
                 policy_version=artifact.parent_policy_version,
                 label=FeedbackLabel.NEGATIVE,
-                lifecycle_cost=1.0,
+                stability_failure=False,
                 evidence_id=f"evidence.static.{index}",
                 **common,
             ),
@@ -75,7 +74,7 @@ def _observations(
                     if proposal_positive
                     else FeedbackLabel.NEGATIVE
                 ),
-                lifecycle_cost=proposal_cost,
+                stability_failure=proposal_stability_failure,
                 evidence_id=f"evidence.proposal.{index}",
                 **common,
             ),
@@ -138,11 +137,22 @@ def test_matched_validation_replay_activation_restart_and_runtime_binding(
     assert decision.accepted is True
     assert decision.quality_delta == 1.0
     assert decision.resolved_example_count == decision.matched_example_count
-    assert decision.cost_ratio == pytest.approx(0.8)
     assert decision.used_policy_versions == (
         artifact.parent_policy_version,
         artifact.policy_version,
     )
+    serialized = json.dumps({
+        "criteria": criteria.payload(),
+        "observations": [item.payload() for item in observations],
+        "decision": decision.payload(),
+    }, sort_keys=True)
+    for forbidden in (
+        '"lifecycle_cost"',
+        '"maximum_cost_ratio"',
+        '"cost_ratio"',
+        '"lifecycleCostUnits"',
+    ):
+        assert forbidden not in serialized
     decisions = JsonMatchedValidationDecisionStore(tmp_path / "matched")
     coordinator = MatchedAdaptivePolicyActivationCoordinator(store, decisions)
     assert coordinator.apply(
@@ -183,15 +193,14 @@ def test_matched_rejection_and_pair_drift_fail_closed(tmp_path) -> None:
         artifact,
         split,
         proposal_positive=False,
-        proposal_cost=1.2,
+        proposal_stability_failure=True,
     )
     criteria = MatchedAcceptanceCriteria(minimum_quality_delta=0.1)
     validator = MatchedAdaptivePolicyValidator()
     decision = validator.evaluate(artifact, split, observations, criteria)
     assert decision.accepted is False
-    assert {"quality_criterion_failed", "cost_criterion_failed"} <= set(
-        decision.reason_codes
-    )
+    assert "quality_criterion_failed" in decision.reason_codes
+    assert "stability_criterion_failed" in decision.reason_codes
     coordinator = MatchedAdaptivePolicyActivationCoordinator(
         store,
         JsonMatchedValidationDecisionStore(tmp_path / "matched-rejected"),

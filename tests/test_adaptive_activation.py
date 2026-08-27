@@ -29,7 +29,7 @@ def _observation_batch(
     preparation,
     *,
     proposal_positive: bool = True,
-    proposal_cost: float = 0.8,
+    proposal_stability_failure: bool = False,
     official_evaluation: bool = False,
     audit_ok: bool = True,
 ) -> Path:
@@ -37,7 +37,7 @@ def _observation_batch(
         preparation.artifact,
         preparation.split,
         proposal_positive=proposal_positive,
-        proposal_cost=proposal_cost,
+        proposal_stability_failure=proposal_stability_failure,
     )
     observations = []
     source_runs = []
@@ -180,7 +180,7 @@ def test_matched_rejection_does_not_generate_deployment_config(
         tmp_path / "rejected-observations.json",
         preparation,
         proposal_positive=False,
-        proposal_cost=1.2,
+        proposal_stability_failure=True,
     )
     output = tmp_path / "rejected"
 
