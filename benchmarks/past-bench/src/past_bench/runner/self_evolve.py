@@ -50,6 +50,7 @@ def build_hermes_extra_body(
     rsimem_semantic_writeback_timeout_seconds: float = 30.0,
     rsimem_semantic_writeback_max_output_tokens: int = 4096,
     rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | dict | None = None,
+    rsimem_adaptive_policy_source_path: str = "",
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -78,9 +79,29 @@ def build_hermes_extra_body(
             adaptive = RSIMemAdaptiveWritebackConfig.model_validate(
                 rsimem_adaptive_config
             )
+            source = Path(rsimem_adaptive_policy_source_path).expanduser()
+            if not rsimem_adaptive_policy_source_path or not source.is_file():
+                raise ValueError(
+                    "adaptive semantic writeback requires a prepared policy store"
+                )
+            source = source.resolve()
+            target = (
+                home_dir / adaptive.adaptive_policy_store_path
+            ).expanduser().resolve()
+            resolved_home = home_dir.expanduser().resolve()
+            if not target.is_relative_to(resolved_home):
+                raise ValueError("adaptive policy store escapes Hermes home")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.exists():
+                if target.read_bytes() != source.read_bytes():
+                    raise ValueError(
+                        "attempt-local adaptive policy store conflicts with prepared store"
+                    )
+            else:
+                shutil.copy2(source, target)
             semantic_writeback.update(adaptive.model_dump(
                 mode="json",
-                exclude={"schema_version"},
+                exclude={"schema_version", "prepared_policy_store_file"},
             ))
         elif rsimem_adaptive_config is not None:
             raise ValueError("adaptive config requires adaptive_utility mode")
@@ -558,6 +579,9 @@ class HermesPersistenceBackend(PersistenceBackend):
                 sequence.hermes.rsimem_semantic_writeback_max_output_tokens
             ),
             rsimem_adaptive_config=sequence.hermes.rsimem_adaptive_config,
+            rsimem_adaptive_policy_source_path=(
+                sequence.hermes.rsimem_adaptive_policy_source_path
+            ),
         )
 
     def snapshot_before(self, state_root: Path, *, include_contents: bool = False) -> dict[str, Any]:

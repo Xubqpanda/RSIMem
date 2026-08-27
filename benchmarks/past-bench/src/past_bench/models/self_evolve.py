@@ -460,6 +460,7 @@ class RSIMemAdaptiveWritebackConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     schema_version: Literal[1] = 1
+    prepared_policy_store_file: str
     adaptive_policy_store_path: str
     adaptive_trusted_roots: list[str]
     adaptive_parameters: list[RSIMemAdaptiveParameterConfig]
@@ -470,6 +471,19 @@ class RSIMemAdaptiveWritebackConfig(BaseModel):
         path = Path(value.strip())
         if not value.strip() or path.is_absolute() or ".." in path.parts:
             raise ValueError("adaptive policy store must be relative to Hermes home")
+        return path.as_posix()
+
+    @field_validator("prepared_policy_store_file")
+    @classmethod
+    def _prepared_store_file(cls, value: str) -> str:
+        path = Path(value.strip())
+        if (
+            not value.strip()
+            or path.is_absolute()
+            or ".." in path.parts
+            or path.name != path.as_posix()
+        ):
+            raise ValueError("prepared adaptive policy store must be a sibling file")
         return path.as_posix()
 
     @field_validator("adaptive_trusted_roots")
@@ -538,6 +552,7 @@ class HermesPersistenceConfig(BaseModel):
     rsimem_semantic_writeback_timeout_seconds: float = 30.0
     rsimem_semantic_writeback_max_output_tokens: int = 4096
     rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | None = None
+    rsimem_adaptive_policy_source_path: str = Field(default="", exclude=True)
 
     @model_validator(mode="after")
     def _validate_adaptive_writeback_pair(self):

@@ -43,6 +43,7 @@ _MISSING_TOOL = object()
 def _adaptive_config() -> dict:
     return {
         "schema_version": 1,
+        "prepared_policy_store_file": "adaptive-policy-store.json",
         "adaptive_policy_store_path": ".rsimem/adaptive-policies.json",
         "adaptive_trusted_roots": ["mem0-flat.static-policy-v1"],
         "adaptive_parameters": [{
@@ -218,9 +219,12 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
         "rsimem_lifecycle_evaluator_mode": "deterministic",
         "rsimem_semantic_writeback_mode": "adaptive_utility",
     }
+    source_store = tmp_path / "adaptive-policy-store.json"
+    source_store.write_text('{"active": true}\n', encoding="utf-8")
     enabled = build_hermes_extra_body(
         persistence_enabled=True,
         rsimem_adaptive_config=_adaptive_config(),
+        rsimem_adaptive_policy_source_path=str(source_store),
         **common,
     )["hermes"]
     writeback = enabled["rsimem"]["semantic_writeback"]
@@ -233,18 +237,34 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
         "adaptive_parameters"
     ]
     assert "schema_version" not in writeback
+    assert "prepared_policy_store_file" not in writeback
     assert "memory" not in enabled["enabled_toolsets"]
+    copied_store = tmp_path / "home" / ".rsimem" / "adaptive-policies.json"
+    assert copied_store.read_bytes() == source_store.read_bytes()
 
+    disabled_home = tmp_path / "disabled-home"
     disabled = build_hermes_extra_body(
         persistence_enabled=False,
         rsimem_adaptive_config=_adaptive_config(),
-        **common,
+        rsimem_adaptive_policy_source_path=str(source_store),
+        **{**common, "home_dir": disabled_home},
     )["hermes"]["rsimem"]["semantic_writeback"]
     assert disabled == {
         "mode": "disabled",
         "timeout_seconds": 30.0,
         "max_output_tokens": 4096,
     }
+    assert not (disabled_home / ".rsimem" / "adaptive-policies.json").exists()
+
+    copied_store.write_text('{"active": false}\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="conflicts with prepared store"):
+        build_hermes_extra_body(
+            persistence_enabled=True,
+            rsimem_adaptive_config=_adaptive_config(),
+            rsimem_adaptive_policy_source_path=str(source_store),
+            **common,
+        )
+    copied_store.write_bytes(source_store.read_bytes())
 
     with pytest.raises(ValueError, match="requires adaptive config"):
         build_hermes_extra_body(persistence_enabled=True, **common)
@@ -252,18 +272,21 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
         build_hermes_extra_body(
             persistence_enabled=True,
             rsimem_adaptive_config=_adaptive_config(),
+            rsimem_adaptive_policy_source_path=str(source_store),
             **{**common, "rsimem_mode": "native+adapter+ledger"},
         )
     with pytest.raises(ValueError, match="requires lifecycle"):
         build_hermes_extra_body(
             persistence_enabled=True,
             rsimem_adaptive_config=_adaptive_config(),
+            rsimem_adaptive_policy_source_path=str(source_store),
             **{**common, "rsimem_lifecycle_evaluator_mode": "disabled"},
         )
     with pytest.raises(ValueError, match="requires adaptive_utility"):
         build_hermes_extra_body(
             persistence_enabled=True,
             rsimem_adaptive_config=_adaptive_config(),
+            rsimem_adaptive_policy_source_path=str(source_store),
             **{**common, "rsimem_semantic_writeback_mode": "static_utility"},
         )
 
@@ -346,6 +369,10 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
     )
     sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
     adaptive_config = tmp_path / "adaptive.json"
+    (tmp_path / "adaptive-policy-store.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
     adaptive_config.write_text(
         json.dumps(_adaptive_config()),
         encoding="utf-8",
@@ -382,6 +409,9 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
     assert sequence.hermes.rsimem_adaptive_config.adaptive_policy_store_path == (
         ".rsimem/adaptive-policies.json"
     )
+    assert sequence.hermes.rsimem_adaptive_policy_source_path == str(
+        (tmp_path / "adaptive-policy-store.json").resolve()
+    )
 
     with pytest.raises(SystemExit, match="Hermes agent"):
         _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
@@ -416,6 +446,10 @@ def test_cli_adaptive_override_rejects_missing_or_mismatched_config(
         ))
 
     config_path = tmp_path / "adaptive.json"
+    (tmp_path / "adaptive-policy-store.json").write_text(
+        "{}\n",
+        encoding="utf-8",
+    )
     config_path.write_text(json.dumps(_adaptive_config()), encoding="utf-8")
     sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
     with pytest.raises(SystemExit, match="requires adaptive_utility"):
@@ -519,7 +553,7 @@ def test_hermes_adapter_parses_adaptive_writeback_transport(
             **{
                 key: value
                 for key, value in _adaptive_config().items()
-                if key != "schema_version"
+                if key not in {"schema_version", "prepared_policy_store_file"}
             },
         },
     })
