@@ -32,7 +32,8 @@ Each layer has one responsibility:
 - **Completed-task snapshot collector** converts native messages into stable `ContextSegment` values with session, task, revision, completion, and tool-closure metadata.
 - **Semantic compilation trigger** accepts only trusted `task_completed`; failed, active, unresolved, current-turn, and open-tool sources fail closed.
 - **Context evaluator and writeback coordinator** remain optional context-management infrastructure. Their keep/evict plans cannot enable, disable, or alter semantic compilation.
-- **Semantic ingestor** locally reimplements Mem0 flat extraction and internal operation selection over the fixed Hermes semantic route.
+- **Extraction source projection** freezes allowed roles, stable source IDs, tool-closure atomicity, metadata allowlisting, ordering, content bounds, and deterministic truncation.
+- **Semantic ingestor** consumes exactly that projection and locally reimplements Mem0 flat extraction and internal operation selection over the fixed Hermes semantic route.
 - **Memory runtime and backend** validate and apply mutations while preserving each backend's native storage and retrieval behavior.
 - **Feedback collector** joins retrieval, injection, task, tool, retry, and cost evidence for later policy updates.
 
@@ -103,6 +104,7 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 - [x] Invoke the semantic ingestor directly at the frozen Hermes completed-task boundary without requiring an eviction evaluator or plan.
 - [x] Persist a content-free compilation receipt before model execution so same-source replay and restart do not repeat extraction.
 - [x] Keep session-end cleanup from creating a second semantic compilation attempt.
+- [x] Bind one canonical extraction source projection and digest to the request, receipt, source operation artifact, and rendered extraction prompt.
 - [x] Keep all Hermes routing fixed and do not predict memory form; episodic/procedural policy implementation remains disabled.
 - [x] Expose ingest/add externally and treat framework-internal ADD/UPDATE/DELETE/NONE as observable outcomes.
 - [x] Validate every internal operation before backend mutation.
