@@ -1,6 +1,6 @@
 # Lifecycle Implementation Plan
 
-This document records the implementation path from the current lifecycle control plane to an end-to-end LightRSI memory writeback experiment. The plan keeps the native Hermes behavior as the control and introduces each new layer behind an opt-in path.
+This document records the implementation path from the lifecycle control plane to an end-to-end RSIMem memory writeback experiment. The semantic compiler now consumes a trusted completed-task snapshot directly. Context evaluation remains an optional observer/control-plane path and is not a prerequisite for extraction.
 
 ## Target Architecture
 
@@ -8,19 +8,13 @@ This document records the implementation path from the current lifecycle control
 Host adapter
     |
     v
-Context snapshot collector
+Completed-task snapshot collector
     |
     v
-Evaluation scheduler
+Semantic compilation trigger
     |
     v
-Context evaluator
-    |
-    v
-Lifecycle policy
-    |
-    v
-Writeback coordinator
+Extraction source projection
     |
     v
 Semantic ingestor
@@ -35,18 +29,16 @@ Retrieval, injection, and delayed feedback
 Each layer has one responsibility:
 
 - **Host adapter** reads native messages, task boundaries, tool state, active-turn state, and token accounting from Hermes or a future host.
-- **Context snapshot collector** converts native messages into stable `ContextSegment` values with session, task, revision, completion, and tool-closure metadata.
-- **Evaluation scheduler** decides when evaluation is allowed. It does not know whether the evaluator is an LLM or a local model.
-- **Context evaluator** estimates completion, future reuse, freshness, and unresolved state from a snapshot.
-- **Lifecycle policy** supplies evidence to a fixed Hermes memory route; phase two does not learn route selection or invocation timing.
-- **Writeback coordinator** turns an accepted decision into a validated, provenance-linked writeback plan.
+- **Completed-task snapshot collector** converts native messages into stable `ContextSegment` values with session, task, revision, completion, and tool-closure metadata.
+- **Semantic compilation trigger** accepts only trusted `task_completed`; failed, active, unresolved, current-turn, and open-tool sources fail closed.
+- **Context evaluator and writeback coordinator** remain optional context-management infrastructure. Their keep/evict plans cannot enable, disable, or alter semantic compilation.
 - **Semantic ingestor** locally reimplements Mem0 flat extraction and internal operation selection over the fixed Hermes semantic route.
 - **Memory runtime and backend** validate and apply mutations while preserving each backend's native storage and retrieval behavior.
 - **Feedback collector** joins retrieval, injection, task, tool, retry, and cost evidence for later policy updates.
 
 ## Evaluation Cadence
 
-The first policy evaluates at task completion and session end. Context-pressure evaluation is enabled only when the host supplies a token threshold. Turn-interval and tool-boundary evaluation remain opt-in. Evaluation is not performed per token because the evaluator's own cost could exceed the context savings.
+Semantic compilation occurs only at trusted task completion. Session end performs cleanup and does not create another semantic plan. Context-pressure, turn-interval, tool-boundary, and evaluator cadence remain separate context-management concerns.
 
 The first cadence comparison should contain:
 
@@ -108,7 +100,9 @@ The scheduler must not advance its state when evaluation fails. A retry must be 
 
 ### Stage 5: Validated Semantic Memory Writeback
 
-- [x] Invoke the semantic ingestor only at the frozen Hermes semantic boundary.
+- [x] Invoke the semantic ingestor directly at the frozen Hermes completed-task boundary without requiring an eviction evaluator or plan.
+- [x] Persist a content-free compilation receipt before model execution so same-source replay and restart do not repeat extraction.
+- [x] Keep session-end cleanup from creating a second semantic compilation attempt.
 - [x] Keep all Hermes routing fixed and do not predict memory form; episodic/procedural policy implementation remains disabled.
 - [x] Expose ingest/add externally and treat framework-internal ADD/UPDATE/DELETE/NONE as observable outcomes.
 - [x] Validate every internal operation before backend mutation.
@@ -138,17 +132,17 @@ Stage 5 is complete for the isolated deterministic path. Live PAST-Bench activat
 
 ## Safe Execution Order
 
-The writeback path must follow this order:
+The semantic writeback path must follow this order:
 
 ```text
 snapshot
-  -> evaluate
-  -> validate
+  -> validate completed-task source
+  -> reserve compilation receipt
   -> ingest
   -> validate mutation
   -> persist memory
   -> confirm persistence
-  -> evict context
+  -> natural task exit
 ```
 
 An evaluator or ingestor failure must never cause the source context to be evicted. A backend mutation failure must leave the native context available for bypass or retry. Raw memory content may be present in evaluator and ingestor inputs, but observer-facing ledger events must contain only IDs, actions, counts, sizes, and reason codes.
@@ -160,9 +154,8 @@ The first end-to-end case is `SM01_preference_adoption`:
 ```text
 learn episode
   -> capture Hermes context
-  -> task_completed evaluation
-  -> identify the TSV preference
-  -> create a semantic writeback plan
+  -> trusted task_completed snapshot
+  -> semantic compilation
   -> persist MEMORY.md
   -> start a fresh eval_near session
   -> retrieve and inject the preference
@@ -173,4 +166,4 @@ Acceptance requires native behavior to remain unchanged, the memory artifact to 
 
 ## Current Boundary
 
-The scheduler, evaluator protocol, lifecycle controller, snapshot/writeback contracts, Hermes execution-surface baselines, transactional semantic mutation, Mem0-flat construction, delayed feedback, and threshold-oriented activation/rollback infrastructure are implemented. Static SM01 live writeback has audited matched evidence. Extraction-prompt artifacts, validation, binding, and live adaptive evidence remain pending. No PAST-Bench task definition, official score, answer key, hidden grading contract, or resource-cost scalar may enter prompt optimization.
+The scheduler, evaluator protocol, lifecycle controller, snapshot/writeback contracts, Hermes execution-surface baselines, transactional semantic mutation, Mem0-flat construction, delayed feedback, and threshold-oriented activation/rollback infrastructure are implemented. Semantic compilation is now independent of context eviction and runs once at trusted task completion with restart-safe compilation receipts; physical context rewrite remains disabled. Extraction source projection and prompt artifacts remain pending. No PAST-Bench task definition, official score, answer key, hidden grading contract, or resource-cost scalar may enter prompt optimization.
