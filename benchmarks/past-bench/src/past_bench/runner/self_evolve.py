@@ -45,6 +45,9 @@ def build_hermes_extra_body(
     rsimem_lifecycle_compiler_version: str = "uncompiled-v0",
     rsimem_lifecycle_timeout_seconds: float = 30.0,
     rsimem_lifecycle_max_output_tokens: int = 4096,
+    rsimem_semantic_writeback_mode: str = "disabled",
+    rsimem_semantic_writeback_timeout_seconds: float = 30.0,
+    rsimem_semantic_writeback_max_output_tokens: int = 4096,
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -53,6 +56,18 @@ def build_hermes_extra_body(
         enabled_toolsets.append("skills")
     if session_search_enabled:
         enabled_toolsets.append("session_search")
+
+    semantic_writeback_mode = (
+        rsimem_semantic_writeback_mode if persistence_enabled else "disabled"
+    )
+    if semantic_writeback_mode == "static":
+        if rsimem_mode != "native+ledger":
+            raise ValueError("static semantic writeback requires native+ledger mode")
+        if rsimem_lifecycle_evaluator_mode == "disabled":
+            raise ValueError("static semantic writeback requires lifecycle evaluation")
+        enabled_toolsets = [
+            toolset for toolset in enabled_toolsets if toolset != "memory"
+        ]
 
     return {
         "hermes": {
@@ -86,6 +101,11 @@ def build_hermes_extra_body(
                     "compiler_version": rsimem_lifecycle_compiler_version,
                     "timeout_seconds": rsimem_lifecycle_timeout_seconds,
                     "max_output_tokens": rsimem_lifecycle_max_output_tokens,
+                },
+                "semantic_writeback": {
+                    "mode": semantic_writeback_mode,
+                    "timeout_seconds": rsimem_semantic_writeback_timeout_seconds,
+                    "max_output_tokens": rsimem_semantic_writeback_max_output_tokens,
                 },
             },
         }
@@ -512,6 +532,15 @@ class HermesPersistenceBackend(PersistenceBackend):
             ),
             rsimem_lifecycle_max_output_tokens=(
                 sequence.hermes.rsimem_lifecycle_max_output_tokens
+            ),
+            rsimem_semantic_writeback_mode=(
+                sequence.hermes.rsimem_semantic_writeback_mode
+            ),
+            rsimem_semantic_writeback_timeout_seconds=(
+                sequence.hermes.rsimem_semantic_writeback_timeout_seconds
+            ),
+            rsimem_semantic_writeback_max_output_tokens=(
+                sequence.hermes.rsimem_semantic_writeback_max_output_tokens
             ),
         )
 

@@ -1972,6 +1972,9 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
     lifecycle_compiler = getattr(args, "rsimem_lifecycle_compiler_version", None)
     lifecycle_timeout = getattr(args, "rsimem_lifecycle_timeout_seconds", None)
     lifecycle_max_tokens = getattr(args, "rsimem_lifecycle_max_output_tokens", None)
+    semantic_mode = getattr(args, "rsimem_semantic_writeback_mode", None)
+    semantic_timeout = getattr(args, "rsimem_semantic_writeback_timeout_seconds", None)
+    semantic_max_tokens = getattr(args, "rsimem_semantic_writeback_max_output_tokens", None)
     if all(value is None for value in (
         mode,
         failure_policy,
@@ -1980,6 +1983,9 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         lifecycle_compiler,
         lifecycle_timeout,
         lifecycle_max_tokens,
+        semantic_mode,
+        semantic_timeout,
+        semantic_max_tokens,
     )) and not verify_projection:
         return
     if not str(args.agent).startswith("hermes"):
@@ -2000,6 +2006,12 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         sequence.hermes.rsimem_lifecycle_timeout_seconds = lifecycle_timeout
     if lifecycle_max_tokens is not None:
         sequence.hermes.rsimem_lifecycle_max_output_tokens = lifecycle_max_tokens
+    if semantic_mode is not None:
+        sequence.hermes.rsimem_semantic_writeback_mode = semantic_mode
+    if semantic_timeout is not None:
+        sequence.hermes.rsimem_semantic_writeback_timeout_seconds = semantic_timeout
+    if semantic_max_tokens is not None:
+        sequence.hermes.rsimem_semantic_writeback_max_output_tokens = semantic_max_tokens
 
 
 def _print_episode_result_summary(result: dict) -> None:
@@ -2225,6 +2237,15 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     ),
                     rsimem_lifecycle_max_output_tokens=(
                         sequence.hermes.rsimem_lifecycle_max_output_tokens
+                    ),
+                    rsimem_semantic_writeback_mode=(
+                        sequence.hermes.rsimem_semantic_writeback_mode
+                    ),
+                    rsimem_semantic_writeback_timeout_seconds=(
+                        sequence.hermes.rsimem_semantic_writeback_timeout_seconds
+                    ),
+                    rsimem_semantic_writeback_max_output_tokens=(
+                        sequence.hermes.rsimem_semantic_writeback_max_output_tokens
                     ),
                 )
 
@@ -3424,6 +3445,21 @@ def main(argv: list[str] | None = None) -> None:
     )
     p_evolve.add_argument(
         "--rsimem-lifecycle-max-output-tokens",
+        type=int,
+        default=None,
+    )
+    p_evolve.add_argument(
+        "--rsimem-semantic-writeback-mode",
+        choices=["disabled", "static"],
+        default=None,
+    )
+    p_evolve.add_argument(
+        "--rsimem-semantic-writeback-timeout-seconds",
+        type=float,
+        default=None,
+    )
+    p_evolve.add_argument(
+        "--rsimem-semantic-writeback-max-output-tokens",
         type=int,
         default=None,
     )
