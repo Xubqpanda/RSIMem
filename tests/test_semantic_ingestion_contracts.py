@@ -40,6 +40,7 @@ from rsimem.memory.ingestion import (
     InternalOperationProposal,
     InvalidPolicyOutputError,
     MemoryIngestOutcome,
+    MemoryIngestRequest,
     MemoryIngestStatus,
     PolicyExecutionError,
     PolicyCapability,
@@ -177,6 +178,7 @@ def test_fixed_router_preserves_three_native_routes_and_only_enables_semantic() 
 
 def test_external_contract_has_fixed_route_and_no_operation_or_target_fields() -> None:
     request = _request()
+    assert isinstance(request, MemoryIngestRequest)
     assert request.fixed_route == HERMES_NATIVE_ROUTES[MemoryKind.SEMANTIC]
     assert request.trigger == EvaluationTrigger.TASK_COMPLETED
     assert set(request.__dataclass_fields__) == {
