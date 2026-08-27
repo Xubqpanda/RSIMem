@@ -884,6 +884,8 @@ class AdaptiveRuntimePolicyBinding:
 
 
 class AdaptivePolicyLifecycleCoordinator:
+    """Apply deterministic offline screening; matched validation owns activation."""
+
     def __init__(
         self,
         policy_store: JsonAdaptivePolicyStore,
@@ -919,11 +921,10 @@ class AdaptivePolicyLifecycleCoordinator:
             transition_id=f"{decision.decision_id}.validated",
             reason_code="held_out_validation_passed",
         )
-        record, _ = self.policy_store.transition(
-            artifact.policy_version,
-            to_state=AdaptivePolicyState.ACTIVE,
-            transition_id=f"{decision.decision_id}.activated",
-            reason_code="held_out_validation_passed",
+        record = next(
+            item
+            for item in self.policy_store.snapshot().records
+            if item.policy_version == artifact.policy_version
         )
         return record
 
