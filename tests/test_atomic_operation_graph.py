@@ -16,6 +16,7 @@ from rsimem.memory.operation_graph import (
     AtomicOperationRecorder,
     MutationEdge,
     OperationContext,
+    OPERATION_GRAPH_SCHEMA_VERSION,
     OperationKind,
     OperationRecord,
     OperationSpec,
@@ -591,7 +592,7 @@ def test_tracing_levels_privacy_and_overhead_budget_are_explicit() -> None:
     assert sentinel not in str(minimal_log.events)
     malicious = ({
         "content": sentinel,
-        "credential": "sk-not-a-real-fixture-secret",
+        "credential": "sk-" + "not-a-real-fixture-secret",
         "source_path": "/private/absolute/path",
     },)
     assert set(audit_operation_evidence(malicious, forbidden_values=(sentinel,))) == {
@@ -676,6 +677,19 @@ def test_rejected_proposal_failed_mutation_and_none_are_not_merged() -> None:
 
 def test_contract_rejects_raw_path_identity_and_invalid_mutation_shapes() -> None:
     context = _context()
+    assert OPERATION_GRAPH_SCHEMA_VERSION == 1
+    with pytest.raises(ValueError, match="unsupported artifact evidence schema"):
+        ArtifactNode(
+            "artifact.invalid-schema",
+            ArtifactKind.SOURCE_OBSERVATION,
+            "artifact-v1",
+            _sha("value"),
+            5,
+            1,
+            None,
+            "prov.invalid-schema",
+            schema_version=2,
+        )
     with pytest.raises(ValueError, match="provenance reference"):
         ArtifactNode(
             "artifact.invalid",

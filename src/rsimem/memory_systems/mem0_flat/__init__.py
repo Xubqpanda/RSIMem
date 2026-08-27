@@ -7,6 +7,7 @@ from .prompts import (
     MEMBASE_LICENSE,
     MEMBASE_PROMPT_PATH,
     MEMBASE_SOURCE_DIGEST,
+    PROMPT_CONTRACT_SCHEMA_VERSION,
     SEMANTIC_RETRIEVAL_SCORER_PROMPT,
     CompletionResult,
     FakeCompletionClient,
@@ -26,6 +27,7 @@ __all__ = [
     "MEMBASE_LICENSE",
     "MEMBASE_PROMPT_PATH",
     "MEMBASE_SOURCE_DIGEST",
+    "PROMPT_CONTRACT_SCHEMA_VERSION",
     "PromptArtifact",
     "PromptSourceProvenance",
     "PromptTemplate",
@@ -33,4 +35,3 @@ __all__ = [
     "SEMANTIC_RETRIEVAL_SCORER_PROMPT",
     "build_prompt_catalog",
 ]
-
