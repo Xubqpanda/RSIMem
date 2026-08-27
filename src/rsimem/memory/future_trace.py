@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from enum import StrEnum
+from typing import Mapping
 
 from .contracts import MemoryKind, MemoryQuery
 from .operation_graph import (
@@ -22,6 +24,103 @@ from .runtime import MemoryBackendRegistry
 
 
 SEMANTIC_FUTURE_TRACE_SCHEMA_VERSION = 1
+
+
+class SemanticFeedbackContract(StrEnum):
+    DISABLED = "disabled"
+    SM01_TSV_V1 = "sm01_tsv_v1"
+
+
+@dataclass(frozen=True, slots=True)
+class SemanticFeedbackResolution:
+    used_artifact_ids: tuple[str, ...]
+    outcome_status: OperationStatus
+    outcome_reason_code: str | None
+    reuse_signal_observed: bool
+    eligible: bool
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "outcome_status", OperationStatus(self.outcome_status))
+        if type(self.reuse_signal_observed) is not bool or type(self.eligible) is not bool:
+            raise TypeError("semantic feedback flags must be bool")
+
+
+class SemanticFeedbackResolver:
+    """Resolve pre-registered deployment signals without grader evidence."""
+
+    def __init__(
+        self,
+        contract: SemanticFeedbackContract,
+        *,
+        family_id: str,
+        stage: str,
+    ) -> None:
+        self.contract = SemanticFeedbackContract(contract)
+        self.family_id = family_id
+        self.stage = stage
+        if self.contract == SemanticFeedbackContract.SM01_TSV_V1 and (
+            family_id != "SM01_preference_adoption"
+        ):
+            raise ValueError("SM01 feedback contract requires the SM01 family")
+
+    @staticmethod
+    def _has_tsv_reuse_signal(value: object) -> bool:
+        if not isinstance(value, str) or not value.strip():
+            return False
+        rows = []
+        for line in value.splitlines():
+            stripped = line.strip().strip("`")
+            if not stripped or "\t" not in stripped:
+                continue
+            fields = tuple(field.strip() for field in stripped.split("\t"))
+            if len(fields) == 4:
+                rows.append(fields)
+        header_index = next((
+            index
+            for index, row in enumerate(rows)
+            if tuple(field.casefold() for field in row)
+            == ("owner", "priority", "task", "due_date")
+        ), None)
+        return header_index is not None and any(
+            all(field for field in row)
+            for row in rows[header_index + 1:]
+        )
+
+    def resolve(
+        self,
+        future: "SemanticFutureEvidence",
+        result: Mapping[str, object],
+    ) -> SemanticFeedbackResolution:
+        if self.contract == SemanticFeedbackContract.DISABLED:
+            raise ValueError("disabled semantic feedback contract cannot resolve")
+        eligible = self.stage in {"eval_near", "eval_far"}
+        if not eligible or len(future.memory_artifact_ids) > 1:
+            return SemanticFeedbackResolution(
+                (),
+                OperationStatus.NONE,
+                "observation_censored",
+                False,
+                False,
+            )
+        reuse = self._has_tsv_reuse_signal(result.get("final_response"))
+        completed = result.get("completed") is True
+        used = (
+            future.memory_artifact_ids
+            if reuse
+            and future.injection_artifact_id is not None
+            and len(future.memory_artifact_ids) == 1
+            else ()
+        )
+        if not completed:
+            status = OperationStatus.FAILED
+            reason = "task_incomplete"
+        elif not reuse:
+            status = OperationStatus.FAILED
+            reason = "reuse_signal_absent"
+        else:
+            status = OperationStatus.SUCCESS
+            reason = None
+        return SemanticFeedbackResolution(used, status, reason, reuse, True)
 
 
 def _canonical_json(value: object) -> str:
