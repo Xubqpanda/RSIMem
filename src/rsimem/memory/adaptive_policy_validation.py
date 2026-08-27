@@ -210,6 +210,56 @@ class AdaptiveValidationSplit:
             "split_digest": self.split_digest,
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "AdaptiveValidationSplit":
+        expected = {
+            "schema_version",
+            "split_schema",
+            "split_id",
+            "dataset_id",
+            "dataset_payload_digest",
+            "config_digest",
+            "strategy",
+            "training_example_ids",
+            "validation_example_ids",
+            "validation_membership",
+            "training_episode_ids",
+            "validation_episode_ids",
+            "training_task_ids",
+            "validation_task_ids",
+            "training_cutoff_example_id",
+            "observation_cutoff_operation_id",
+            "split_digest",
+        }
+        if not isinstance(value, Mapping) or set(value) != expected:
+            raise ValueError("malformed adaptive validation split")
+        try:
+            return cls(
+                split_id=value["split_id"],
+                dataset_id=value["dataset_id"],
+                dataset_payload_digest=value["dataset_payload_digest"],
+                config_digest=value["config_digest"],
+                strategy=AdaptiveSplitStrategy(value["strategy"]),
+                training_example_ids=tuple(value["training_example_ids"]),
+                validation_example_ids=tuple(value["validation_example_ids"]),
+                validation_membership=tuple(
+                    tuple(item) for item in value["validation_membership"]
+                ),
+                training_episode_ids=tuple(value["training_episode_ids"]),
+                validation_episode_ids=tuple(value["validation_episode_ids"]),
+                training_task_ids=tuple(value["training_task_ids"]),
+                validation_task_ids=tuple(value["validation_task_ids"]),
+                training_cutoff_example_id=value["training_cutoff_example_id"],
+                observation_cutoff_operation_id=(
+                    value["observation_cutoff_operation_id"]
+                ),
+                split_digest=value["split_digest"],
+                split_schema=value["split_schema"],
+                schema_version=value["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed adaptive validation split") from exc
+
 
 class TimeOrderedAdaptiveSplitter:
     def split(

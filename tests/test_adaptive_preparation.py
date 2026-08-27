@@ -7,7 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adaptive_preparation import prepare_adaptive_policy
+from rsimem.adaptive_preparation import (
+    load_offline_adaptive_preparation,
+    prepare_adaptive_policy,
+)
 from rsimem.feedback_preparation import (
     FEEDBACK_PREPARATION_SCHEMA_VERSION,
     _digest,
@@ -181,6 +184,20 @@ def test_adaptive_preparation_persists_validated_retrieval_only_policy(
     for forbidden in ('"score"', '"grader"', '"answer"', '"expectation"'):
         assert forbidden not in serialized
     assert not (output / "adaptive-config.json").exists()
+    loaded = load_offline_adaptive_preparation(output)
+    assert loaded.manifest == report
+    assert loaded.artifact == snapshot.artifacts[0]
+    assert loaded.split.split_id == report["splitId"]
+    assert loaded.decision.decision_id == report["decisionId"]
+
+    split_path = output / "validation-split.json"
+    original_split = split_path.read_text(encoding="utf-8")
+    split = json.loads(original_split)
+    split["validation_example_ids"] = split["training_example_ids"]
+    split_path.write_text(json.dumps(split), encoding="utf-8")
+    with pytest.raises(ValueError, match="file digest mismatch"):
+        load_offline_adaptive_preparation(output)
+    split_path.write_text(original_split, encoding="utf-8")
 
 
 def test_adaptive_preparation_rejects_active_or_ambiguous_output(
