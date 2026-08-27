@@ -2100,9 +2100,23 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     if sequence.mode == "episodes":
         if args.agent.startswith("hermes") or args.agent in {"nanobot", "zeroclaw"}:
             persistence_backend = make_persistence_backend(args.agent)
-    if getattr(args, "compare_no_persistence", False) and persistence_backend is None:
+    persistence_variant = getattr(args, "persistence_variant", None)
+    if (
+        getattr(args, "compare_no_persistence", False)
+        and persistence_variant not in {None, "paired"}
+    ):
         raise SystemExit(
-            "--compare-no-persistence is only supported for hermes/nanobot/zeroclaw episode runs"
+            "--compare-no-persistence conflicts with an unpaired --persistence-variant"
+        )
+    if persistence_variant == "paired":
+        args.compare_no_persistence = True
+    needs_persistence_backend = (
+        getattr(args, "compare_no_persistence", False)
+        or persistence_variant == "without_persistence"
+    )
+    if needs_persistence_backend and persistence_backend is None:
+        raise SystemExit(
+            "persistence variants are only supported for hermes/nanobot/zeroclaw episode runs"
         )
     if persistence_backend is not None and runtime_mode == "container" and sequence.mode == "episodes":
         raise SystemExit(
@@ -2122,7 +2136,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     else:
         trace_root = _make_trace_dir(cfg.defaults.trace_dir, f"{args.agent}_{sequence.name}")
 
-    variants = [("with_persistence", True)]
+    variants = (
+        [("without_persistence", False)]
+        if persistence_variant == "without_persistence"
+        else [("with_persistence", True)]
+    )
     if getattr(args, "compare_no_persistence", False):
         variants.append(("without_persistence", False))
 
@@ -3411,6 +3429,12 @@ def main(argv: list[str] | None = None) -> None:
     p_evolve.add_argument("--sandbox-tools", action="store_true", help="Inject sandbox tools without Docker")
     p_evolve.add_argument("--proxy", default=None, help="HTTP proxy URL for model/judge API traffic")
     p_evolve.add_argument("--compare-no-persistence", action="store_true", help="Run paired with-persistence and without-persistence variants for supported self-evolve agents")
+    p_evolve.add_argument(
+        "--persistence-variant",
+        choices=["with_persistence", "without_persistence", "paired"],
+        default=None,
+        help="Run one explicit persistence state or the legacy paired comparison",
+    )
     p_evolve.add_argument("--reflection-off", action="store_true", help="§15 reflection_off control: disable Hermes reflection on this run")
     p_evolve.add_argument("--background-review-wait-s", type=float, default=None, help="Wait time after Hermes finishes so background memory/skill review can flush")
     p_evolve.add_argument(
