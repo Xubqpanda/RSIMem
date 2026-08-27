@@ -636,3 +636,15 @@ def test_lifecycle_usage_preserves_all_raw_request_buckets() -> None:
         "duration_ms": 250,
         "storage_bytes": 64,
     }
+
+
+def test_plan_exit_evidence_and_usage_schema_mismatch_fail_closed() -> None:
+    fixture = run_sm01_preference_fixture()
+    plan = fixture.plans[0]
+
+    with pytest.raises(ValueError, match="writeback plan schema version"):
+        replace(plan, schema_version=2)
+    with pytest.raises(ValueError, match="exit evidence schema version"):
+        replace(plan.exit_evidence, schema_version=2)
+    with pytest.raises(ValueError, match="raw resource usage schema version"):
+        RawResourceUsage(schema_version=2)
