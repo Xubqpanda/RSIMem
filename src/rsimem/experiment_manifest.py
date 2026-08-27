@@ -24,6 +24,7 @@ STATIC_UTILITY_METHOD_VARIANTS = (
     "static-rsimem",
     "static-utility-rsimem",
 )
+FEEDBACK_METHOD_VARIANTS = ("static-utility-rsimem",)
 ADAPTIVE_METHOD_VARIANTS = (
     "no-persistence",
     "native-hermes",
@@ -77,6 +78,7 @@ _KNOWN_MODES = frozenset((
     *EXECUTION_MODES,
     *STATIC_METHOD_VARIANTS,
     *STATIC_UTILITY_METHOD_VARIANTS,
+    *FEEDBACK_METHOD_VARIANTS,
     *ADAPTIVE_METHOD_VARIANTS,
 ))
 _ATTEMPT_STATUSES = {"running", "completed", "failed"}

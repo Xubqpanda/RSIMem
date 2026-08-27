@@ -15,6 +15,7 @@ from rsimem.memory_systems.mem0_flat import FrozenMem0UtilityGate
 from rsimem.memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
 from rsimem.experiment_manifest import (
     ADAPTIVE_METHOD_VARIANTS,
+    FEEDBACK_METHOD_VARIANTS,
     STATIC_METHOD_VARIANTS,
     STATIC_UTILITY_METHOD_VARIANTS,
     adaptive_method_execution_profile,
@@ -125,6 +126,9 @@ def test_execution_order_rotates_modes_across_replicates() -> None:
     assert execution_order(2, STATIC_UTILITY_METHOD_VARIANTS) == (
         "static-utility-rsimem",
         "static-rsimem",
+    )
+    assert execution_order(3, FEEDBACK_METHOD_VARIANTS) == (
+        "static-utility-rsimem",
     )
 
 
