@@ -1,5 +1,7 @@
 # Context Lifecycle Controller
 
+Phase 1 freezes the host-neutral lifecycle contracts at `LIFECYCLE_CONTRACT_SCHEMA_VERSION=1`. The accepted interface and evidence paths are summarized in [`phase1_acceptance_20260827.md`](phase1_acceptance_20260827.md). Phase 2 extensions must reject schema mismatch and preserve the v1 source, provenance, revision, safety, and idempotency semantics rather than silently reinterpret existing plans.
+
 ## Purpose
 
 The lifecycle controller is the decision layer between an agent's active context and the typed memory runtime. It evaluates context candidates at explicit lifecycle boundaries and produces one joint signal for context retention and future memory writeback.

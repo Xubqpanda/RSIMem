@@ -16,7 +16,7 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind an explicit opt-in mode. Direct native remains the default, and no RSIMem ingestor, real writeback mutation, static policy, or adaptive policy is active yet. The active implementation scope is now semantic-first: Mem0 flat policy logic over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
-Phase 1A environment/configuration freeze, Phase 1B deterministic read-path equivalence, and Phase 1C live matched SM01 read-path validation are complete. Phase 1D real Hermes lifecycle dry-run integration is the active gate; all Phase 2 implementation remains blocked until Phase 1 is frozen.
+Phase 1A-1E are complete and the lifecycle contract is frozen at schema v1. Phase 2A fixed semantic routing and ingestion contracts are the active milestone; no compiler or real RSIMem mutation is enabled yet.
 
 ## Completed Work
 
@@ -140,18 +140,18 @@ establish a nondeterminism tolerance.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `114 passed`.
+- [x] Pass all RSIMem tests: `116 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `385 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Real Hermes Lifecycle Dry-Run Wiring**
+### **Current: Phase 2A Fixed Semantic Ingestion Contract**
 
-The Phase 1C live matched gate passed on three order-rotated, independently unseeded replicates per mode. The dated report is [`matched_phase1c_20260827.md`](matched_phase1c_20260827.md). The immediate objective is Phase 1D: wire snapshot collection, lifecycle evaluation, and validated dry-run plans into explicit real Hermes task-completion and session-end events without memory mutation or context eviction.
+The Phase 1C live matched gate passed on three order-rotated, independently unseeded replicates per mode. Phase 1D/1E lifecycle acceptance passed on the frozen v1 contract; the dated report is [`phase1_acceptance_20260827.md`](phase1_acceptance_20260827.md). The immediate objective is Phase 2A: freeze a semantic-only external `ingest(experience)` boundary and policy registry without invoking a compiler or backend mutation.
 
-The deterministic Phase 1D path is now wired behind the default-disabled lifecycle configuration. A PAST-Bench `HermesAdapter.step()` execution fixture emits explicit task-completed and session-end boundaries, projects persisted `state.db` rows into stable snapshots, binds evaluation to a host-selected policy identity, and reserves content-free dry-run plans with persistent receipts. Injected evaluator calls use the Hermes recorded-request path with enforced timeout and raw usage accounting; evaluator and pre-snapshot host failures produce strict content-free rejection evidence. Both memory and lifecycle JSONL files are automatically validated and joined by the ledger. Phase 1D remains open until the same path passes a real-provider Hermes acceptance run on the current revision.
+The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
 - [x] Define an experiment configuration that selects one backend for each memory kind and defaults to native Hermes behavior.
 - [x] Add a factory that constructs the selected registry and runtime from an isolated experiment home.
