@@ -61,6 +61,18 @@ class UtilityTarget(StrEnum):
     RETRIEVAL = "retrieval"
 
 
+MEM0_UTILITY_PARAMETER_IDS = {
+    UtilityTarget.GENERATION: "parameter.mem0.extraction_accept_threshold",
+    UtilityTarget.INTERNAL_OPERATION: (
+        "parameter.mem0.internal_operation_accept_threshold"
+    ),
+    UtilityTarget.RETRIEVAL: "parameter.mem0.retrieval_accept_threshold",
+}
+MEM0_CONSOLIDATION_UPDATE_PARAMETER_ID = (
+    "parameter.mem0.consolidation_update_threshold"
+)
+
+
 class UtilityDisposition(StrEnum):
     ACCEPT = "accept"
     DEFER = "defer"

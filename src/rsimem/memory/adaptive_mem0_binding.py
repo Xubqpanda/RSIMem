@@ -23,6 +23,8 @@ from .feedback_dataset import (
     DELAYED_FEEDBACK_WINDOW_VERSION,
 )
 from .utility import (
+    MEM0_CONSOLIDATION_UPDATE_PARAMETER_ID,
+    MEM0_UTILITY_PARAMETER_IDS,
     STATIC_UTILITY_FEATURE_SCHEMA,
     STATIC_UTILITY_POLICY_VERSION,
     StaticUtilityPolicy,
@@ -52,6 +54,34 @@ class TrustedAdaptiveMem0Parameter:
         ):
             raise ValueError("trusted adaptive Mem0 baseline must be in [0,1]")
         object.__setattr__(self, "baseline_value", float(self.baseline_value))
+
+
+TRUSTED_ADAPTIVE_MEM0_PARAMETERS = (
+    TrustedAdaptiveMem0Parameter(
+        parameter_id=MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.GENERATION],
+        name=AdaptiveParameterName.EXTRACTION_ACCEPT_THRESHOLD,
+        prompt_ref="mem0-flat.generation",
+        baseline_value=0.35,
+    ),
+    TrustedAdaptiveMem0Parameter(
+        parameter_id=MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.INTERNAL_OPERATION],
+        name=AdaptiveParameterName.INTERNAL_OPERATION_ACCEPT_THRESHOLD,
+        prompt_ref="mem0-flat.internal-operation",
+        baseline_value=0.35,
+    ),
+    TrustedAdaptiveMem0Parameter(
+        parameter_id=MEM0_CONSOLIDATION_UPDATE_PARAMETER_ID,
+        name=AdaptiveParameterName.CONSOLIDATION_UPDATE_THRESHOLD,
+        prompt_ref="mem0-flat.consolidation-update",
+        baseline_value=0.35,
+    ),
+    TrustedAdaptiveMem0Parameter(
+        parameter_id=MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.RETRIEVAL],
+        name=AdaptiveParameterName.RETRIEVAL_ACCEPT_THRESHOLD,
+        prompt_ref="mem0-flat.retrieval",
+        baseline_value=0.35,
+    ),
+)
 
 
 @dataclass(frozen=True, slots=True)

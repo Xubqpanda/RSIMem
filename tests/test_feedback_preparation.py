@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -15,7 +16,9 @@ from rsimem.memory.feedback_dataset import JsonDelayedFeedbackDatasetStore
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     AtomicOperationRecorder,
+    OperationGraph,
 )
+from rsimem.memory.utility import MEM0_UTILITY_PARAMETER_IDS, UtilityTarget
 from rsimem.memory_systems.mem0_flat import FrozenMem0UtilityGate
 from rsimem.memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
 from test_experiment_manifest import _manifest_kwargs
@@ -55,6 +58,27 @@ def _batch(tmp_path: Path, exposure: str = "used") -> Path:
         utility_gate=FrozenMem0UtilityGate(),
     ).descriptor.policy_version
     graph = _graph(exposure, policy_version=base_policy)
+    source_parameter = "parameter.fact"
+    retrieval_parameter = MEM0_UTILITY_PARAMETER_IDS[UtilityTarget.RETRIEVAL]
+    graph = OperationGraph(
+        tuple(
+            replace(artifact, artifact_id=retrieval_parameter)
+            if artifact.artifact_id == source_parameter
+            else artifact
+            for artifact in graph.artifacts
+        ),
+        tuple(
+            replace(
+                operation,
+                input_artifact_ids=tuple(
+                    retrieval_parameter if value == source_parameter else value
+                    for value in operation.input_artifact_ids
+                ),
+            )
+            for operation in graph.operations
+        ),
+        graph.mutations,
+    )
     sink = AppendOnlyOperationEvidenceLog()
     recorder = AtomicOperationRecorder(sink)
     for artifact in graph.artifacts:
