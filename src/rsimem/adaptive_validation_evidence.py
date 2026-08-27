@@ -40,7 +40,7 @@ from .memory.adaptive_matched_validation import (
 )
 
 
-MATCHED_RESOURCE_COST_SCHEMA = "matched-token-request-storage-v1"
+MATCHED_RESOURCE_USAGE_SCHEMA = "matched-raw-resource-usage-v2"
 _METHOD_VARIANTS = {
     "static-rsimem": MatchedPolicyVariant.STATIC,
     "proposal-rsimem": MatchedPolicyVariant.PROPOSAL,
@@ -189,11 +189,11 @@ def assemble_matched_validation_observations(
         or any(character not in "0123456789abcdef" for character in task_digest)
     ):
         raise ValueError("matched validation task input digest is invalid")
-    cost_identity = {
-        "schema": MATCHED_RESOURCE_COST_SCHEMA,
+    budget_identity = {
+        "schema": MATCHED_RESOURCE_USAGE_SCHEMA,
         "budget": manifest["configuration"]["budget"],
     }
-    budget_id = f"budget.{_digest(cost_identity)[:40]}"
+    budget_id = f"budget.{_digest(budget_identity)[:40]}"
     model_digest = _digest(manifest["configuration"]["model"])
     batch_manifest_digest = _file_digest(manifest_path)
     membership = dict(preparation.split.validation_membership)
@@ -240,16 +240,11 @@ def assemble_matched_validation_observations(
             expected_policy_version=expected_policy,
         )
         resource_identity = {
-            "schema": MATCHED_RESOURCE_COST_SCHEMA,
+            "schema": MATCHED_RESOURCE_USAGE_SCHEMA,
             "usage": usage,
             "storageBytes": derived.resources.storage_bytes,
             "sourceLogs": source_logs,
         }
-        lifecycle_cost = float(
-            1
-            + sum(usage[field] for field in _USAGE_FIELDS)
-            + derived.resources.storage_bytes
-        )
         evidence_cutoff = len(manifest["configuration"]["budget"]["tasks"])
         source = {
             "observationId": "pending",
@@ -291,7 +286,6 @@ def assemble_matched_validation_observations(
             variant=variant,
             policy_version=expected_policy,
             label=derived.label,
-            lifecycle_cost=lifecycle_cost,
             stability_failure=False,
             uncertainty=0.0,
             evidence_id=evidence_id,

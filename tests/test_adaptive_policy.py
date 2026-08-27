@@ -16,6 +16,10 @@ from rsimem.memory.adaptive_policy import (
     AdaptiveTrainingConfig,
     DeterministicAdaptivePolicyLearner,
 )
+from rsimem.memory.adaptation_contract import (
+    AdaptiveArtifactKind,
+    require_extraction_prompt_artifact,
+)
 from rsimem.memory.attribution import DeterministicFirstAttributor
 from rsimem.memory.feedback_dataset import evaluate_feedback_dataset_stage_gate
 from test_feedback_dataset import _dataset, _graph
@@ -75,6 +79,8 @@ def test_positive_feedback_produces_deterministic_bounded_artifact() -> None:
     assert first.label_schema == dataset.config.label_schema
     assert first.training_seed == config.seed
     assert first.objective == ADAPTIVE_POLICY_OBJECTIVE
+    assert first.artifact_kind == AdaptiveArtifactKind.LEGACY_THRESHOLD_EXPERIMENT
+    assert "raw_resource_usage" not in ADAPTIVE_POLICY_FEATURES
     assert first.regularization == config.l2_regularization
     assert first.training_config_digest == config.digest
     assert first.prompt_refs == ("mem0-flat.retrieval",)
@@ -90,6 +96,27 @@ def test_positive_feedback_produces_deterministic_bounded_artifact() -> None:
 
     different_seed = learner.learn(dataset, gate, replace(config, seed=18))
     assert different_seed.artifact_id != first.artifact_id
+
+
+def test_legacy_threshold_contract_cannot_bind_extraction_runtime() -> None:
+    _, dataset, gate = _accepted("used")
+    config = _config(dataset)
+    artifact = DeterministicAdaptivePolicyLearner().learn(dataset, gate, config)
+
+    for payload in (config.payload(), artifact.payload()):
+        serialized = json.dumps(payload, sort_keys=True)
+        for forbidden in (
+            "raw_resource_usage",
+            "cost_weight",
+            "maximum_cost_ratio",
+            "lifecycleCostUnits",
+        ):
+            assert forbidden not in serialized
+    with pytest.raises(ValueError, match="extraction prompt artifact"):
+        require_extraction_prompt_artifact(artifact)
+    require_extraction_prompt_artifact({
+        "artifact_kind": AdaptiveArtifactKind.EXTRACTION_PROMPT.value,
+    })
 
 
 def test_negative_feedback_only_uses_matching_failure_subgraph() -> None:

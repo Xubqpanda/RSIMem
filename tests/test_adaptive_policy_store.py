@@ -223,6 +223,25 @@ def test_store_rejects_root_change_after_restart(tmp_path) -> None:
         changed_roots.snapshot()
 
 
+def test_store_rejects_legacy_v1_schema(tmp_path) -> None:
+    dataset, _ = _artifact(seed=41)
+    path = tmp_path / "legacy-v1.json"
+    path.write_text(json.dumps({
+        "schema_version": 1,
+        "trusted_root_policy_versions": [dataset.config.policy_version],
+        "artifacts": {},
+        "records": {},
+        "transitions": {},
+        "active_policy_version": None,
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unsupported adaptive policy store schema"):
+        JsonAdaptivePolicyStore(
+            path,
+            trusted_root_policy_versions=(dataset.config.policy_version,),
+        ).snapshot()
+
+
 def test_store_rejects_missing_or_reordered_transition_history(tmp_path) -> None:
     dataset, artifact = _artifact(seed=50)
     path = tmp_path / "policies.json"

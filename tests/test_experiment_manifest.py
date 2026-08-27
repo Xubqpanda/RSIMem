@@ -6,6 +6,9 @@ from pathlib import Path
 import pytest
 
 from rsimem.adaptive_activation import activate_adaptive_policy
+from rsimem.memory.adaptive_policy_store import (
+    ADAPTIVE_POLICY_STORE_SCHEMA_VERSION,
+)
 from rsimem.experiment_manifest import (
     ADAPTIVE_METHOD_VARIANTS,
     ADAPTIVE_VALIDATION_METHOD_VARIANTS,
@@ -350,7 +353,7 @@ def test_resolved_adaptive_policy_profile_binds_real_active_store(
         encoding="utf-8",
     )
     empty_store.write_text(json.dumps({
-        "schema_version": 1,
+        "schema_version": ADAPTIVE_POLICY_STORE_SCHEMA_VERSION,
         "trusted_root_policy_versions": [
             preparation.artifact.parent_policy_version
         ],

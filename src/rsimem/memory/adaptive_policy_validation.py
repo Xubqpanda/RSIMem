@@ -1,4 +1,4 @@
-"""Held-out validation and lifecycle coordination for adaptive policies."""
+"""Held-out validation for the legacy retrieval-threshold experiment."""
 
 from __future__ import annotations
 
@@ -35,10 +35,10 @@ from .feedback_dataset import (
 )
 
 
-ADAPTIVE_VALIDATION_SCHEMA_VERSION = 1
-ADAPTIVE_SPLIT_SCHEMA = "semantic-adaptive-time-split-v1"
-ADAPTIVE_CRITERIA_VERSION = "semantic-adaptive-acceptance-v1"
-ADAPTIVE_DECISION_SCHEMA = "semantic-adaptive-validation-decision-v1"
+ADAPTIVE_VALIDATION_SCHEMA_VERSION = 2
+ADAPTIVE_SPLIT_SCHEMA = "legacy-semantic-threshold-time-split-v2"
+ADAPTIVE_CRITERIA_VERSION = "legacy-semantic-threshold-acceptance-v2"
+ADAPTIVE_DECISION_SCHEMA = "legacy-semantic-threshold-validation-decision-v2"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _REASON_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -362,11 +362,10 @@ class TimeOrderedAdaptiveSplitter:
 @dataclass(frozen=True, slots=True)
 class AdaptiveAcceptanceCriteria:
     minimum_quality_delta: float = 0.0
-    maximum_cost_delta: float = 0.15
+    maximum_mean_parameter_shift: float = 0.15
     maximum_stability_delta: float = 0.25
     maximum_uncertainty: float = 0.75
     minimum_validation_examples: int = 1
-    resource_cost_cap: float = 100_000.0
     allow_fallback_parameters: bool = False
     criteria_version: str = ADAPTIVE_CRITERIA_VERSION
     schema_version: int = ADAPTIVE_VALIDATION_SCHEMA_VERSION
@@ -377,19 +376,20 @@ class AdaptiveAcceptanceCriteria:
         if self.criteria_version != ADAPTIVE_CRITERIA_VERSION:
             raise ValueError("adaptive acceptance criteria identity is not frozen")
         quality = _finite(self.minimum_quality_delta, "minimum quality delta")
-        cost = _finite(self.maximum_cost_delta, "maximum cost delta")
+        parameter_shift = _finite(
+            self.maximum_mean_parameter_shift,
+            "maximum mean parameter shift",
+        )
         stability = _finite(
             self.maximum_stability_delta,
             "maximum stability delta",
         )
         uncertainty = _finite(self.maximum_uncertainty, "maximum uncertainty")
-        cap = _finite(self.resource_cost_cap, "resource cost cap")
         if (
             not -1.0 <= quality <= 1.0
-            or not 0.0 <= cost <= 1.0
+            or not 0.0 <= parameter_shift <= 1.0
             or not 0.0 <= stability <= 1.0
             or not 0.0 <= uncertainty <= 1.0
-            or cap <= 0
         ):
             raise ValueError("adaptive acceptance criteria bounds are invalid")
         if (
@@ -400,10 +400,13 @@ class AdaptiveAcceptanceCriteria:
         if type(self.allow_fallback_parameters) is not bool:
             raise TypeError("allow fallback parameters must be bool")
         object.__setattr__(self, "minimum_quality_delta", quality)
-        object.__setattr__(self, "maximum_cost_delta", cost)
+        object.__setattr__(
+            self,
+            "maximum_mean_parameter_shift",
+            parameter_shift,
+        )
         object.__setattr__(self, "maximum_stability_delta", stability)
         object.__setattr__(self, "maximum_uncertainty", uncertainty)
-        object.__setattr__(self, "resource_cost_cap", cap)
 
     @property
     def digest(self) -> str:
@@ -414,11 +417,10 @@ class AdaptiveAcceptanceCriteria:
             "schema_version": self.schema_version,
             "criteria_version": self.criteria_version,
             "minimum_quality_delta": self.minimum_quality_delta,
-            "maximum_cost_delta": self.maximum_cost_delta,
+            "maximum_mean_parameter_shift": self.maximum_mean_parameter_shift,
             "maximum_stability_delta": self.maximum_stability_delta,
             "maximum_uncertainty": self.maximum_uncertainty,
             "minimum_validation_examples": self.minimum_validation_examples,
-            "resource_cost_cap": self.resource_cost_cap,
             "allow_fallback_parameters": self.allow_fallback_parameters,
         }
 
@@ -430,19 +432,15 @@ class AdaptiveValidationMetrics:
     parent_quality: float | None
     proposal_quality: float | None
     quality_delta: float | None
-    observed_lifecycle_cost: float
-    proposal_change_cost: float
-    cost_delta: float
+    mean_parameter_shift: float
     stability_delta: float
     uncertainty: float
-    missing_resource_count: int
     fallback_parameter_count: int
 
     def __post_init__(self) -> None:
         if any(type(value) is not int or value < 0 for value in (
             self.validation_example_count,
             self.resolved_comparison_count,
-            self.missing_resource_count,
             self.fallback_parameter_count,
         )):
             raise ValueError("adaptive validation counts are invalid")
@@ -456,9 +454,7 @@ class AdaptiveValidationMetrics:
             if value is not None and not -1.0 <= _finite(value, "quality metric") <= 1.0:
                 raise ValueError("adaptive quality metric is out of range")
         for name in (
-            "observed_lifecycle_cost",
-            "proposal_change_cost",
-            "cost_delta",
+            "mean_parameter_shift",
             "stability_delta",
             "uncertainty",
         ):
@@ -473,12 +469,9 @@ class AdaptiveValidationMetrics:
             "parent_quality": self.parent_quality,
             "proposal_quality": self.proposal_quality,
             "quality_delta": self.quality_delta,
-            "observed_lifecycle_cost": self.observed_lifecycle_cost,
-            "proposal_change_cost": self.proposal_change_cost,
-            "cost_delta": self.cost_delta,
+            "mean_parameter_shift": self.mean_parameter_shift,
             "stability_delta": self.stability_delta,
             "uncertainty": self.uncertainty,
-            "missing_resource_count": self.missing_resource_count,
             "fallback_parameter_count": self.fallback_parameter_count,
         }
 
@@ -580,34 +573,6 @@ class AdaptiveValidationDecision:
         }
 
 
-def _resource_cost(dataset: DelayedFeedbackDataset, ids: set[str], cap: float) -> tuple[float, int]:
-    total = 0
-    missing = 0
-    for example in dataset.examples:
-        if example.example_id not in ids:
-            continue
-        usage = example.resources
-        for name in (
-            "input_tokens",
-            "output_tokens",
-            "cache_read_tokens",
-            "cache_write_tokens",
-            "reasoning_tokens",
-            "duration_ms",
-        ):
-            value = getattr(usage, name)
-            if value is None:
-                missing += 1
-            else:
-                total += value
-        total += (
-            usage.model_requests
-            + usage.retry_count
-            + usage.storage_bytes
-        )
-    return min(1.0, total / cap), missing
-
-
 class AdaptivePolicyValidator:
     """Replay one predeclared acceptance decision without official scores."""
 
@@ -672,12 +637,7 @@ class AdaptivePolicyValidator:
             if parent_quality is not None and proposal_quality is not None
             else None
         )
-        observed_cost, missing_resources = _resource_cost(
-            dataset,
-            validation_ids,
-            criteria.resource_cost_cap,
-        )
-        change_cost = sum(
+        mean_parameter_shift = sum(
             abs(update.delta) for update in artifact.parameters
         ) / len(artifact.parameters)
         stability = max(abs(update.delta) for update in artifact.parameters)
@@ -685,15 +645,9 @@ class AdaptivePolicyValidator:
         propensity_uncertainty = (
             missing_propensity / len(validation_ids) if validation_ids else 1.0
         )
-        resource_uncertainty = (
-            min(1.0, missing_resources / (len(validation_ids) * 5))
-            if validation_ids
-            else 1.0
-        )
         uncertainty = max(
             sample_uncertainty,
             propensity_uncertainty,
-            resource_uncertainty,
         )
         fallback_count = sum(
             update.fallback_reason != AdaptiveFallbackReason.NONE
@@ -711,12 +665,9 @@ class AdaptivePolicyValidator:
             quality_delta=(
                 None if quality_delta is None else round(quality_delta, 12)
             ),
-            observed_lifecycle_cost=round(observed_cost, 12),
-            proposal_change_cost=round(change_cost, 12),
-            cost_delta=round(change_cost, 12),
+            mean_parameter_shift=round(mean_parameter_shift, 12),
             stability_delta=round(stability, 12),
             uncertainty=round(uncertainty, 12),
-            missing_resource_count=missing_resources,
             fallback_parameter_count=fallback_count,
         )
         reasons = []
@@ -724,8 +675,8 @@ class AdaptivePolicyValidator:
             reasons.append("insufficient_validation")
         if quality_delta is None or quality_delta < criteria.minimum_quality_delta:
             reasons.append("quality_regression")
-        if change_cost > criteria.maximum_cost_delta:
-            reasons.append("cost_regression")
+        if mean_parameter_shift > criteria.maximum_mean_parameter_shift:
+            reasons.append("parameter_shift_exceeded")
         if stability > criteria.maximum_stability_delta:
             reasons.append("stability_regression")
         if uncertainty > criteria.maximum_uncertainty:
@@ -876,12 +827,9 @@ class JsonAdaptiveValidationDecisionStore:
             "parent_quality",
             "proposal_quality",
             "quality_delta",
-            "observed_lifecycle_cost",
-            "proposal_change_cost",
-            "cost_delta",
+            "mean_parameter_shift",
             "stability_delta",
             "uncertainty",
-            "missing_resource_count",
             "fallback_parameter_count",
         }
         if set(value["metrics"]) != metric_fields:

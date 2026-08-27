@@ -217,7 +217,9 @@ def test_validation_acceptance_is_replayable_and_uses_same_heldout_evidence() ->
     assert decision.validation_example_ids == split.validation_example_ids
     assert decision.metrics.quality_delta is not None
     assert decision.metrics.quality_delta > 0
-    assert decision.metrics.cost_delta <= criteria.maximum_cost_delta
+    assert decision.metrics.mean_parameter_shift <= (
+        criteria.maximum_mean_parameter_shift
+    )
     assert decision.metrics.stability_delta <= criteria.maximum_stability_delta
     assert decision.metrics.uncertainty <= criteria.maximum_uncertainty
     assert validator.replay_matches(
@@ -229,7 +231,16 @@ def test_validation_acceptance_is_replayable_and_uses_same_heldout_evidence() ->
         criteria,
     )
     serialized = json.dumps(decision.payload(), sort_keys=True)
-    for forbidden in ('"score"', '"grader"', '"expectation"', '"answer"'):
+    for forbidden in (
+        '"score"',
+        '"grader"',
+        '"expectation"',
+        '"answer"',
+        '"observed_lifecycle_cost"',
+        '"resource_cost_cap"',
+        '"maximum_cost_delta"',
+        '"missing_resource_count"',
+    ):
         assert forbidden not in serialized
     assert set(inspect.signature(validator.evaluate).parameters) == {
         "artifact",
