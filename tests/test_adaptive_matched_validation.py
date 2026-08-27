@@ -121,6 +121,14 @@ def test_matched_validation_replay_activation_restart_and_runtime_binding(
 ) -> None:
     dataset, split, artifact, store, offline = _offline_validated(tmp_path)
     observations = _observations(artifact, split)
+    assert tuple(
+        MatchedPolicyObservation.from_payload(value.payload())
+        for value in observations
+    ) == observations
+    malformed_observation = observations[0].payload()
+    malformed_observation["unknown"] = True
+    with pytest.raises(ValueError, match="malformed matched policy observation"):
+        MatchedPolicyObservation.from_payload(malformed_observation)
     criteria = MatchedAcceptanceCriteria()
     validator = MatchedAdaptivePolicyValidator()
     decision = validator.evaluate(artifact, split, observations, criteria)

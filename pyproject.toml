@@ -14,6 +14,7 @@ rsimem-audit = "rsimem.audit:main"
 rsimem-preflight = "rsimem.preflight:main"
 rsimem-analyze-matched = "rsimem.matched_analysis:main"
 rsimem-prepare-adaptive = "rsimem.adaptive_preparation:main"
+rsimem-activate-adaptive = "rsimem.adaptive_activation:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
