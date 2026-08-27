@@ -8,7 +8,7 @@ import re
 from dataclasses import dataclass, field
 from string import Template
 from types import MappingProxyType
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol, runtime_checkable
 
 from ...lifecycle import RawResourceUsage
 
@@ -248,6 +248,11 @@ class CompletionResult:
         }
 
 
+@runtime_checkable
+class CompletionClient(Protocol):
+    def complete(self, prompt: RenderedPrompt) -> CompletionResult: ...
+
+
 class FakeCompletionClient:
     """Deterministic completion client for prompt contract tests only."""
 
@@ -400,11 +405,12 @@ def _prompt(
     *,
     model_profile: str,
     policy_version: str,
+    version: str = "v1",
     excluded_instruction_codes: tuple[str, ...] = (),
 ) -> PromptTemplate:
     artifact = PromptArtifact(
         prompt_id=prompt_id,
-        version="v1",
+        version=version,
         template_digest=_digest_text(template),
         input_schema=input_schema,
         output_schema=output_schema,
@@ -465,3 +471,70 @@ def build_prompt_catalog(
     INTERNAL_OPERATION_PROMPT,
     SEMANTIC_RETRIEVAL_SCORER_PROMPT,
 ) = build_prompt_catalog()
+
+
+_POLICY_FACT_EXTRACTION_TEMPLATE = """Extract minimal durable semantic memory candidates from a completed agent experience.
+Keep only user-supplied facts, preferences, rules, or constraints that can help a future task.
+Assistant acknowledgements, tool output, transcripts, failures, credentials, machine paths, temporary requests, unresolved claims, and example text are not memories.
+Each candidate must be independently understandable and contain no conversation wrapper.
+Use only the supplied source messages and deterministic exit evidence. Return exactly one JSON object with a facts string list and no other fields.
+
+Source messages JSON:
+$source_messages
+
+Exit evidence JSON:
+$exit_evidence
+"""
+
+_POLICY_INTERNAL_OPERATION_TEMPLATE = """Compare each new durable semantic fact with the trusted related-memory candidates.
+Return exactly one operation for every fact. Choose ADD for new information, UPDATE for a more current replacement, DELETE only when the new evidence explicitly withdraws an existing memory, and NONE for duplicates.
+UPDATE and DELETE may reference only a supplied candidate_id with mutable=true. ADD and NONE must use null candidate_id.
+Do not invent backend names, artifact IDs, revisions, candidate IDs, facts, or text. Return exactly one JSON object with an operations list. Every operation object must contain only fact_index, action, and candidate_id.
+
+New facts JSON:
+$new_facts
+
+Related-memory candidates JSON:
+$related_memories
+"""
+
+
+def build_policy_prompt_catalog(
+    *,
+    model_profile: str = "semantic-ingestion-default-v1",
+    policy_version: str = "mem0-flat-v2",
+) -> tuple[PromptTemplate, PromptTemplate]:
+    return (
+        _prompt(
+            "mem0-flat.fact-extraction",
+            _POLICY_FACT_EXTRACTION_TEMPLATE,
+            FACT_EXTRACTION_INPUT_SCHEMA,
+            FACT_EXTRACTION_OUTPUT_SCHEMA,
+            "FACT_RETRIEVAL_PROMPT",
+            model_profile=model_profile,
+            policy_version=policy_version,
+            version="v2",
+            excluded_instruction_codes=(
+                "answer-source-fabrication",
+                "assistant-claim-extraction",
+                "dynamic-wall-clock-date",
+                "prompt-secrecy-answer-rule",
+            ),
+        ),
+        _prompt(
+            "mem0-flat.internal-operation",
+            _POLICY_INTERNAL_OPERATION_TEMPLATE,
+            INTERNAL_OPERATION_INPUT_SCHEMA,
+            INTERNAL_OPERATION_OUTPUT_SCHEMA,
+            "DEFAULT_UPDATE_MEMORY_PROMPT",
+            model_profile=model_profile,
+            policy_version=policy_version,
+            version="v2",
+        ),
+    )
+
+
+(
+    POLICY_FACT_EXTRACTION_PROMPT,
+    POLICY_INTERNAL_OPERATION_PROMPT,
+) = build_policy_prompt_catalog()

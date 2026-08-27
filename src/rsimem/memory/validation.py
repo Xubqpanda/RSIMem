@@ -35,6 +35,7 @@ _SEMANTIC_METADATA_FIELDS = {
     "temporal_validity",
     "source_execution_id",
     "source_operation_id",
+    "replaces_artifact_id",
 }
 _PROMPT_INJECTION_PATTERNS = (
     re.compile(r"(?i)ignore\s+(?:all\s+)?(?:previous|prior)\s+instructions?"),
@@ -736,6 +737,8 @@ class MutationValidator:
                 trusted_context.provenance.operation_id
             ),
         }
+        if action == InternalMemoryAction.UPDATE:
+            expected_metadata["replaces_artifact_id"] = candidate.target_artifact_id
         for key, value in expected_metadata.items():
             if metadata.get(key) != value:
                 _append_reason(reasons, "semantic_metadata_mismatch")

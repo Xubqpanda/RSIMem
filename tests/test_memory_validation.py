@@ -206,6 +206,8 @@ def _candidate(
             if action in {InternalMemoryAction.ADD, InternalMemoryAction.UPDATE}
             else {}
         )
+        if action == InternalMemoryAction.UPDATE:
+            metadata["replaces_artifact_id"] = target_artifact_id
     return UntrustedMemoryCandidate(
         candidate_id="candidate.fixture",
         action=action,
