@@ -120,6 +120,76 @@ def summarize_ingestion_usage(ledger: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def summarize_static_utility(ledger: list[dict[str, Any]]) -> dict[str, Any]:
+    """Reconcile content-free utility decisions and frozen policy identity."""
+
+    events = [
+        event for event in ledger if event.get("kind") == "static_utility_decisions"
+    ]
+    by_execution: dict[str, str] = {}
+    unique: list[dict[str, Any]] = []
+    for event in events:
+        data = event.get("data")
+        if not isinstance(data, dict):
+            raise ValueError("static utility ledger event requires data")
+        execution_id = data.get("executionId")
+        decisions = data.get("decisions")
+        if not isinstance(execution_id, str) or not execution_id:
+            raise ValueError("static utility ledger event requires executionId")
+        if (
+            not isinstance(decisions, list)
+            or data.get("decisionCount") != len(decisions)
+        ):
+            raise ValueError("static utility decision count is inconsistent")
+        canonical = json.dumps(
+            data,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        existing = by_execution.get(execution_id)
+        if existing is not None:
+            if existing != canonical:
+                raise ValueError(
+                    f"conflicting static utility execution: {execution_id}"
+                )
+            continue
+        by_execution[execution_id] = canonical
+        unique.append(data)
+
+    targets = Counter()
+    dispositions = Counter()
+    gate_digests = set()
+    gate_versions = set()
+    feature_schemas = set()
+    policy_versions = set()
+    decision_count = 0
+    for data in unique:
+        gate_digests.add(str(data.get("gateDigest") or ""))
+        gate_versions.add(str(data.get("gateVersion") or ""))
+        feature_schemas.add(str(data.get("featureSchemaVersion") or ""))
+        for decision in data["decisions"]:
+            if not isinstance(decision, dict):
+                raise ValueError("static utility decision must be an object")
+            targets.update((str(decision.get("target")),))
+            dispositions.update((str(decision.get("disposition")),))
+            policy_versions.add(str(decision.get("policy_version") or ""))
+            decision_count += 1
+    return {
+        "events": len(events),
+        "uniqueExecutions": len(unique),
+        "duplicateViews": len(events) - len(unique),
+        "decisionCount": decision_count,
+        "targets": dict(targets),
+        "dispositions": dict(dispositions),
+        "gateDigests": sorted(gate_digests - {""}),
+        "gateVersions": sorted(gate_versions - {""}),
+        "featureSchemas": sorted(feature_schemas - {""}),
+        "policyVersions": sorted(policy_versions - {""}),
+        "executionIds": sorted(by_execution),
+    }
+
+
 def audit_run(run_dir: Path) -> dict[str, Any]:
     """Return a privacy-safe reconciliation report for one completed run."""
     run_dir = run_dir.resolve()
@@ -202,6 +272,34 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
 
     ledger_calls = [event for event in ledger if event.get("kind") == "model_call_usage"]
     ingestion_usage = summarize_ingestion_usage(ledger)
+    utility_usage = summarize_static_utility(ledger)
+    ingestion_events = [
+        event.get("data", {})
+        for event in ledger
+        if event.get("kind") == "memory_ingestion"
+        and isinstance(event.get("data"), dict)
+    ]
+    expected_utility_executions = {
+        str(data.get("executionId"))
+        for data in ingestion_events
+        if data.get("featureSchemaVersion")
+        == "semantic-static-utility-features-v1"
+    }
+    observed_utility_executions = set(utility_usage["executionIds"])
+    if expected_utility_executions != observed_utility_executions:
+        issues.append({
+            "kind": "static_utility_ingestion_join_mismatch",
+            "expectedExecutions": len(expected_utility_executions),
+            "observedExecutions": len(observed_utility_executions),
+        })
+    for field, issue_kind in (
+        ("gateDigests", "static_utility_gate_changed_within_run"),
+        ("gateVersions", "static_utility_gate_version_changed_within_run"),
+        ("featureSchemas", "static_utility_feature_schema_changed_within_run"),
+        ("policyVersions", "static_utility_policy_changed_within_run"),
+    ):
+        if len(utility_usage[field]) > 1:
+            issues.append({"kind": issue_kind, "count": len(utility_usage[field])})
     billing_ids = [event.get("data", {}).get("billingExecutionId") for event in ledger_calls]
     billing_ids = [value for value in billing_ids if isinstance(value, str) and value]
     if len(set(billing_ids)) != totals["requests"]:
@@ -284,6 +382,11 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         "ledgerUniqueBillingCalls": len(set(billing_ids)),
         "ledgerDuplicateViews": len(ledger_calls) - len(set(billing_ids)),
         "ingestionUsage": ingestion_usage,
+        "staticUtility": {
+            key: value
+            for key, value in utility_usage.items()
+            if key != "executionIds"
+        },
         "projectionChecks": len(projection_checks),
         "projectionMismatches": projection_mismatches,
         "adapterNativeBypasses": adapter_bypasses,
