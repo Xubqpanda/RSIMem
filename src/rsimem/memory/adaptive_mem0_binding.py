@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import math
 
 from ..memory_systems.mem0_flat.utility_gate import FrozenMem0UtilityGate
 from .adaptive_policy import (
+    ADAPTIVE_POLICY_ARTIFACT_SCHEMA,
+    ADAPTIVE_POLICY_OBJECTIVE,
+    ADAPTIVE_POLICY_SCHEMA_VERSION,
     FIXED_INVOCATION_BOUNDARY,
     FIXED_SEMANTIC_ROUTE,
     AdaptiveParameterName,
@@ -13,6 +17,11 @@ from .adaptive_policy import (
 from .adaptive_policy_store import JsonAdaptivePolicyStore
 from .adaptive_policy_validation import AdaptiveValidationDecision
 from .adaptive_matched_validation import MatchedValidationDecision
+from .feedback_dataset import (
+    DELAYED_FEEDBACK_DATASET_VERSION,
+    DELAYED_FEEDBACK_LABEL_SCHEMA,
+    DELAYED_FEEDBACK_WINDOW_VERSION,
+)
 from .utility import (
     STATIC_UTILITY_FEATURE_SCHEMA,
     STATIC_UTILITY_POLICY_VERSION,
@@ -20,6 +29,29 @@ from .utility import (
     UtilityDecision,
     UtilityTarget,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class TrustedAdaptiveMem0Parameter:
+    """Runtime-owned identity for one threshold the learner may update."""
+
+    parameter_id: str
+    name: AdaptiveParameterName
+    prompt_ref: str
+    baseline_value: float
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "name", AdaptiveParameterName(self.name))
+        if not self.parameter_id.strip() or not self.prompt_ref.strip():
+            raise ValueError("trusted adaptive Mem0 parameter identity is incomplete")
+        if (
+            not isinstance(self.baseline_value, (int, float))
+            or isinstance(self.baseline_value, bool)
+            or not math.isfinite(float(self.baseline_value))
+            or not 0.0 <= float(self.baseline_value) <= 1.0
+        ):
+            raise ValueError("trusted adaptive Mem0 baseline must be in [0,1]")
+        object.__setattr__(self, "baseline_value", float(self.baseline_value))
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,26 +155,68 @@ def audit_adaptive_mem0_loop(
 class ActiveAdaptiveMem0Binder:
     """Apply only allowlisted threshold values from the unique active artifact."""
 
+    def __init__(
+        self,
+        trusted_parameters: tuple[TrustedAdaptiveMem0Parameter, ...],
+    ) -> None:
+        self.trusted_parameters = tuple(trusted_parameters)
+        parameter_ids = tuple(item.parameter_id for item in self.trusted_parameters)
+        parameter_names = tuple(item.name for item in self.trusted_parameters)
+        if (
+            not self.trusted_parameters
+            or len(parameter_ids) != len(set(parameter_ids))
+            or len(parameter_names) != len(set(parameter_names))
+        ):
+            raise ValueError("trusted adaptive Mem0 parameters must be unique")
+
     def bind(
         self,
         store: JsonAdaptivePolicyStore,
         base_gate: FrozenMem0UtilityGate = FrozenMem0UtilityGate(),
+        *,
+        expected_parent_policy_version: str,
     ) -> AdaptiveMem0Binding:
+        if not expected_parent_policy_version.strip():
+            raise ValueError("adaptive Mem0 parent policy identity is required")
         active = store.snapshot().active
         if active is None:
             return AdaptiveMem0Binding(
                 gate=base_gate,
                 adaptive=False,
-                actual_policy_version=base_gate.policy.policy_version,
+                actual_policy_version=expected_parent_policy_version,
                 artifact_id=None,
                 parameter_names=(),
             )
         if (
-            active.route_backend != FIXED_SEMANTIC_ROUTE
+            active.schema_version != ADAPTIVE_POLICY_SCHEMA_VERSION
+            or active.artifact_schema != ADAPTIVE_POLICY_ARTIFACT_SCHEMA
+            or active.parent_policy_version != expected_parent_policy_version
+            or active.route_backend != FIXED_SEMANTIC_ROUTE
             or active.invocation_boundary != FIXED_INVOCATION_BOUNDARY
             or active.feature_schema != STATIC_UTILITY_FEATURE_SCHEMA
+            or active.label_schema != DELAYED_FEEDBACK_LABEL_SCHEMA
+            or active.dataset_version != DELAYED_FEEDBACK_DATASET_VERSION
+            or active.window_version != DELAYED_FEEDBACK_WINDOW_VERSION
+            or active.objective != ADAPTIVE_POLICY_OBJECTIVE
         ):
-            raise ValueError("active adaptive artifact changes the fixed semantic route")
+            raise ValueError("active adaptive artifact changes the frozen runtime contract")
+
+        trusted = {
+            item.parameter_id: item
+            for item in self.trusted_parameters
+        }
+        names = tuple(update.name for update in active.parameters)
+        if len(names) != len(set(names)):
+            raise ValueError("active adaptive Mem0 parameter names must be unique")
+        for update, prompt_ref in zip(active.parameters, active.prompt_refs):
+            owner = trusted.get(update.parameter_id)
+            if (
+                owner is None
+                or owner.name != update.name
+                or owner.prompt_ref != prompt_ref
+                or owner.baseline_value != update.baseline_value
+            ):
+                raise ValueError("active adaptive Mem0 parameter is not runtime-owned")
 
         runtime_policy = replace(
             base_gate.policy,
@@ -180,6 +254,8 @@ class ActiveAdaptiveMem0Binder:
                 and update_policy is not None
                 else target_policies.get(target, runtime_policy)
             )
+            if base_policy.accept_threshold != update.baseline_value:
+                raise ValueError("active adaptive Mem0 baseline differs from runtime")
             policy = replace(
                 base_policy,
                 policy_version=active.policy_version,

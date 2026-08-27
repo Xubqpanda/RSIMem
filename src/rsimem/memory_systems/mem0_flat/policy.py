@@ -350,6 +350,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         fact_prompt: PromptTemplate = POLICY_FACT_EXTRACTION_PROMPT,
         operation_prompt: PromptTemplate = POLICY_INTERNAL_OPERATION_PROMPT,
         policy_version: str | None = None,
+        descriptor_policy_version: str | None = None,
         framework_version: str = "mem0-flat-framework-v1",
         feature_schema_version: str = "semantic-fact-features-v1",
         operation_recorder: AtomicOperationRecorder | None = None,
@@ -369,6 +370,8 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             bound_policy_version = (
                 f"{bound_policy_version}.utility.{utility_gate.digest[:16]}"
             )
+        if descriptor_policy_version is not None:
+            bound_policy_version = descriptor_policy_version
         self._descriptor = SemanticPolicyDescriptor(
             provider="mem0_flat",
             policy_version=bound_policy_version,

@@ -8,6 +8,12 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ..lifecycle import DryRunStatus, HermesLifecycleDryRunResult, PlanMemoryAction
+from .adaptive_mem0_binding import (
+    ActiveAdaptiveMem0Binder,
+    AdaptiveMem0Binding,
+    TrustedAdaptiveMem0Parameter,
+)
+from .adaptive_policy_store import JsonAdaptivePolicyStore
 from .backends import build_hermes_native_registry
 from .contracts import MemoryExperience, MemoryKind, MemoryMessage, MemoryObserver
 from .executor import TransactionalMutationExecutor
@@ -115,18 +121,49 @@ class StaticSemanticWritebackRuntime:
         observer: MemoryObserver | None = None,
         ingestion_observer: Any | None = None,
         utility_gate: FrozenMem0UtilityGate | None = None,
+        adaptive_policy_store: JsonAdaptivePolicyStore | None = None,
+        adaptive_parameters: tuple[TrustedAdaptiveMem0Parameter, ...] = (),
     ) -> None:
         self.hermes_home = hermes_home.expanduser().resolve()
         self.registry = build_hermes_native_registry(self.hermes_home)
         self.receipts = JsonMutationReceiptStore(mutation_receipt_path)
         self.operation_log = AppendOnlyOperationEvidenceLog(operation_evidence_path)
         self.operation_recorder = AtomicOperationRecorder(self.operation_log)
-        self.utility_gate = utility_gate
-        self.policy = Mem0FlatSemanticPolicy(
+        base_gate = utility_gate
+        if adaptive_policy_store is not None and base_gate is None:
+            base_gate = FrozenMem0UtilityGate()
+        base_policy = Mem0FlatSemanticPolicy(
             completion_client,
             operation_recorder=self.operation_recorder,
-            utility_gate=utility_gate,
+            utility_gate=base_gate,
         )
+        self.adaptive_binding: AdaptiveMem0Binding | None = None
+        if adaptive_policy_store is None:
+            self.utility_gate = base_gate
+            self.policy = base_policy
+        else:
+            self.adaptive_binding = ActiveAdaptiveMem0Binder(
+                adaptive_parameters
+            ).bind(
+                adaptive_policy_store,
+                base_gate or FrozenMem0UtilityGate(),
+                expected_parent_policy_version=(
+                    base_policy.descriptor.policy_version
+                ),
+            )
+            self.utility_gate = self.adaptive_binding.gate
+            self.policy = (
+                Mem0FlatSemanticPolicy(
+                    completion_client,
+                    operation_recorder=self.operation_recorder,
+                    utility_gate=self.utility_gate,
+                    descriptor_policy_version=(
+                        self.adaptive_binding.actual_policy_version
+                    ),
+                )
+                if self.adaptive_binding.adaptive
+                else base_policy
+            )
         self.candidates = FlatSemanticCandidateReader(
             self.registry,
             ownership=self.receipts,
