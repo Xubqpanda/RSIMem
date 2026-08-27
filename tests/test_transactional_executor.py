@@ -224,6 +224,8 @@ def _request(
             "source_execution_id": execution_id,
             "source_operation_id": operation_id,
         }
+        if action == InternalMemoryAction.UPDATE:
+            metadata["replaces_artifact_id"] = target.artifact_id
         category = SemanticMemoryCategory.PREFERENCE
         scope = MemoryScope.USER
         validity = TemporalValidity.DURABLE

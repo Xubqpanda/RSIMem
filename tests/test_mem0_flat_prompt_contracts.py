@@ -16,6 +16,8 @@ from rsimem.memory_systems.mem0_flat import (
     MEMBASE_SOURCE_DIGEST,
     PROMPT_CONTRACT_SCHEMA_VERSION,
     SEMANTIC_RETRIEVAL_SCORER_PROMPT,
+    POLICY_FACT_EXTRACTION_PROMPT,
+    POLICY_INTERNAL_OPERATION_PROMPT,
     FakeCompletionClient,
     PromptTemplate,
     build_prompt_catalog,
@@ -133,3 +135,19 @@ def test_default_prompt_constants_are_stable_catalog_members() -> None:
         INTERNAL_OPERATION_PROMPT,
         SEMANTIC_RETRIEVAL_SCORER_PROMPT,
     ) == build_prompt_catalog()
+
+
+def test_policy_v2_prompts_preserve_v1_contract_and_narrow_memory_ownership() -> None:
+    fact = POLICY_FACT_EXTRACTION_PROMPT
+    operation = POLICY_INTERNAL_OPERATION_PROMPT
+    assert fact.artifact.version == operation.artifact.version == "v2"
+    assert fact.artifact.policy_version == operation.artifact.policy_version == "mem0-flat-v2"
+    assert fact.artifact.input_schema == FACT_EXTRACTION_PROMPT.artifact.input_schema
+    assert operation.artifact.output_schema == INTERNAL_OPERATION_PROMPT.artifact.output_schema
+    lowered = fact.template.lower()
+    assert "user-supplied facts" in lowered
+    assert "assistant acknowledgements" in lowered
+    assert "temporary requests" in lowered
+    assert "publicly available sources" not in lowered
+    assert "answer-source-fabrication" in fact.artifact.source.excluded_instruction_codes
+    assert "assistant-claim-extraction" in fact.artifact.source.excluded_instruction_codes
