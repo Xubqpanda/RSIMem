@@ -37,11 +37,12 @@ from rsimem.memory.operation_graph import (
     OperationStatus,
     materialize_operation_graph,
 )
+from rsimem.memory.utility import STATIC_UTILITY_FEATURE_SCHEMA
 
 
 PRIVATE_MEMORY = "The private user prefers a four-column TSV."
 POLICY_VERSION = "mem0-flat.utility.fixture"
-FEATURE_SCHEMA = "semantic-static-utility-features-v1"
+FEATURE_SCHEMA = STATIC_UTILITY_FEATURE_SCHEMA
 
 
 def _sha(value: str) -> str:
@@ -985,6 +986,62 @@ def test_stage_gate_rebuilds_audits_and_binds_frozen_config() -> None:
         "example_identity_mismatch",
         "label_evidence_mismatch",
     } <= set(tampered.issues)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "issue"),
+    (
+        ("feature_schema", "feature-drift-v1", "feature_schema_not_frozen"),
+        ("label_schema", "label-drift-v1", "label_schema_not_frozen"),
+        ("dataset_version", "dataset-drift-v1", "dataset_version_not_frozen"),
+        ("window_version", "window-drift-v1", "window_version_not_frozen"),
+    ),
+)
+def test_stage_gate_rejects_consistent_frozen_schema_drift(
+    field,
+    value,
+    issue,
+) -> None:
+    graph = _graph("used")
+    base = _dataset(graph)
+    config = replace(base.config, **{field: value})
+    window = (
+        FeedbackObservationWindow.create(graph, complete=True, version=value)
+        if field == "window_version"
+        else base.window
+    )
+    dataset = DelayedFeedbackDatasetBuilder(config).build(graph, window)
+
+    gate = evaluate_feedback_dataset_stage_gate(
+        dataset,
+        graph,
+        expected_config=config,
+    )
+
+    assert gate.ok is False
+    assert issue in gate.issues
+
+
+def test_stage_gate_rejects_route_policy_and_window_binding_drift() -> None:
+    graph = _graph("used")
+    dataset = _dataset(graph)
+
+    policy_gate = evaluate_feedback_dataset_stage_gate(
+        dataset,
+        graph,
+        expected_config=replace(dataset.config, policy_version="policy-drift-v1"),
+    )
+    assert policy_gate.ok is False
+    assert "frozen_config_mismatch" in policy_gate.issues
+    assert "rebuild_failed" in policy_gate.issues
+
+    window_gate = evaluate_feedback_dataset_stage_gate(
+        dataset,
+        graph,
+        expected_config=replace(dataset.config, window_version="window-drift-v1"),
+    )
+    assert window_gate.ok is False
+    assert "window_config_mismatch" in window_gate.issues
 
 
 def test_immediate_failure_attribution_cannot_determine_delayed_label() -> None:
