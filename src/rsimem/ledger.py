@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import threading
 from typing import Any, Iterable
 
@@ -52,6 +53,69 @@ _MEMORY_RUNTIME_ATTRIBUTE_FIELDS = {
     "surface",
 }
 _RSIMEM_EXECUTION_MODES = {"native+ledger", "native+adapter+ledger"}
+_LIFECYCLE_EVENT_KINDS = {
+    "context_snapshot",
+    "evaluation_accepted",
+    "evaluation_rejected",
+    "boundary_rejected",
+    "plan_created",
+    "plan_rejected",
+    "plan_validated",
+    "dry_run_mutation",
+    "dry_run_duplicate",
+}
+_LIFECYCLE_SNAPSHOT_DATA_FIELDS = {
+    "segmentCount",
+    "activeSegmentCount",
+    "protectedSegmentCount",
+    "toolClosureCount",
+    "openToolClosureCount",
+    "totalTokens",
+    "taskState",
+    "lifecycleState",
+}
+_LIFECYCLE_EVALUATION_DATA_FIELDS = {
+    "evaluationId",
+    "trigger",
+    "evaluator",
+    "policyVersion",
+    "status",
+    "reasonCodes",
+}
+_LIFECYCLE_BOUNDARY_DATA_FIELDS = {
+    "evaluationId",
+    "boundaryId",
+    "trigger",
+    "status",
+    "reasonCodes",
+}
+_LIFECYCLE_PLAN_DATA_FIELDS = {
+    "evaluationId",
+    "planId",
+    "mutationId",
+    "contextAction",
+    "memoryAction",
+    "memoryKind",
+    "targetBackend",
+    "targetArtifactId",
+    "compilerVersion",
+    "sourceSegmentCount",
+    "status",
+    "reasonCodes",
+    "resources",
+}
+_LIFECYCLE_RESOURCE_FIELDS = {
+    "inputTokens",
+    "outputTokens",
+    "cacheReadTokens",
+    "cacheWriteTokens",
+    "reasoningTokens",
+    "modelRequests",
+    "retryCount",
+    "durationMs",
+    "storageBytes",
+}
+_MACHINE_REASON_CODE = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
 
 
 def _json_hash(value: Any, *, length: int = 24) -> str:
@@ -102,13 +166,57 @@ def _validate_memory_runtime_event(value: dict[str, Any], source_path: Path) -> 
         raise ValueError(f"invalid RSIMem execution mode in {source_path}")
 
 
+def _validate_lifecycle_contract_event(value: dict[str, Any], source_path: Path) -> None:
+    if set(value) != _MEMORY_RUNTIME_EVENT_FIELDS:
+        raise ValueError(f"invalid RSIMem lifecycle event fields in {source_path}")
+    if value.get("source") != {"type": "rsimem_lifecycle_contract"}:
+        raise ValueError(f"invalid RSIMem lifecycle event source in {source_path}")
+    kind = value.get("kind")
+    if kind not in _LIFECYCLE_EVENT_KINDS:
+        raise ValueError(f"invalid RSIMem lifecycle event kind in {source_path}")
+    snapshot_id = value.get("snapshotId")
+    if kind == "boundary_rejected":
+        if snapshot_id is not None:
+            raise ValueError(f"pre-snapshot lifecycle rejection has snapshotId in {source_path}")
+    elif not isinstance(snapshot_id, str) or not snapshot_id:
+        raise ValueError(f"RSIMem lifecycle event requires snapshotId in {source_path}")
+
+    data = value.get("data")
+    expected_fields = (
+        _LIFECYCLE_SNAPSHOT_DATA_FIELDS
+        if kind == "context_snapshot"
+        else _LIFECYCLE_EVALUATION_DATA_FIELDS
+        if kind in {"evaluation_accepted", "evaluation_rejected"}
+        else _LIFECYCLE_BOUNDARY_DATA_FIELDS
+        if kind == "boundary_rejected"
+        else _LIFECYCLE_PLAN_DATA_FIELDS
+    )
+    if not isinstance(data, dict) or set(data) != expected_fields:
+        raise ValueError(f"invalid RSIMem lifecycle event data fields in {source_path}")
+    reason_codes = data.get("reasonCodes", [])
+    if not isinstance(reason_codes, list) or any(
+        not isinstance(code, str) or not _MACHINE_REASON_CODE.fullmatch(code)
+        for code in reason_codes
+    ):
+        raise ValueError(f"invalid RSIMem lifecycle reason codes in {source_path}")
+    if kind not in {
+        "context_snapshot",
+        "evaluation_accepted",
+        "evaluation_rejected",
+        "boundary_rejected",
+    }:
+        resources = data.get("resources")
+        if not isinstance(resources, dict) or set(resources) != _LIFECYCLE_RESOURCE_FIELDS:
+            raise ValueError(f"invalid RSIMem lifecycle resources in {source_path}")
+
+
 def load_episode_lifecycle_events(comparison_path: Path) -> tuple[dict[str, Any], ...]:
     """Load content-free RSIMem evidence adjacent to comparison-owned traces."""
 
     comparison_path = comparison_path.resolve()
     root = comparison_path.parent
     comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
-    evidence_identities: dict[Path, set[tuple[Any, ...]]] = {}
+    evidence_identities: dict[Path, tuple[str, set[tuple[Any, ...]]]] = {}
     for variant in ("with_persistence", "without_persistence"):
         payload = comparison.get(variant, {})
         episodes = payload.get("episodes", []) if isinstance(payload, dict) else []
@@ -119,26 +227,34 @@ def load_episode_lifecycle_events(comparison_path: Path) -> tuple[dict[str, Any]
             if not trace_value:
                 continue
             trace_path = resolve_comparison_evidence_path(trace_value, root)
-            evidence_path = (
-                trace_path.resolve().parent
-                / "artifacts"
-                / "rsimem_memory_events.jsonl"
-            )
-            evidence_identities.setdefault(evidence_path, set()).add((
+            identity = (
                 root.name,
                 variant,
                 str(episode.get("trace_id") or ""),
                 episode.get("task_id"),
                 episode.get("family_id"),
                 episode.get("stage"),
-            ))
+            )
+            artifacts = trace_path.resolve().parent / "artifacts"
+            for evidence_name, evidence_type in (
+                ("rsimem_memory_events.jsonl", "memory"),
+                ("rsimem_lifecycle_events.jsonl", "lifecycle"),
+            ):
+                evidence_path = artifacts / evidence_name
+                registered_type, identities = evidence_identities.setdefault(
+                    evidence_path,
+                    (evidence_type, set()),
+                )
+                if registered_type != evidence_type:
+                    raise ValueError("conflicting RSIMem evidence path type")
+                identities.add(identity)
 
     events: list[dict[str, Any]] = []
     events_by_id: dict[str, str] = {}
     for evidence_path in sorted(evidence_identities, key=str):
         if not evidence_path.exists():
             continue
-        allowed_identities = evidence_identities[evidence_path]
+        evidence_type, allowed_identities = evidence_identities[evidence_path]
         for line_number, line in enumerate(
             evidence_path.read_text(encoding="utf-8").splitlines(),
             start=1,
@@ -155,7 +271,10 @@ def load_episode_lifecycle_events(comparison_path: Path) -> tuple[dict[str, Any]
                 raise ValueError(
                     f"RSIMem evidence must be an object at {evidence_path}:{line_number}"
                 )
-            _validate_memory_runtime_event(value, evidence_path)
+            if evidence_type == "memory":
+                _validate_memory_runtime_event(value, evidence_path)
+            else:
+                _validate_lifecycle_contract_event(value, evidence_path)
             identity = (
                 value.get("runId"),
                 value.get("variant"),

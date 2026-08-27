@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -18,6 +19,7 @@ from rsimem.lifecycle import (
     HermesMessage,
     HermesSnapshotCollector,
     TaskLifecycleState,
+    run_sm01_preference_fixture,
 )
 from rsimem.memory import MemoryEvent, MemoryEventKind, MemoryKind
 
@@ -29,6 +31,12 @@ def _runtime_evidence_path(comparison: Path) -> Path:
     data = json.loads(comparison.read_text(encoding="utf-8"))
     trace = Path(data["with_persistence"]["episodes"][0]["trace"])
     return trace.parent / "artifacts" / "rsimem_memory_events.jsonl"
+
+
+def _lifecycle_evidence_path(comparison: Path) -> Path:
+    payload = json.loads(comparison.read_text(encoding="utf-8"))
+    trace = Path(payload["with_persistence"]["episodes"][0]["trace"])
+    return trace.parent / "artifacts" / "rsimem_lifecycle_events.jsonl"
 
 
 def _fixture(tmp_path: Path) -> Path:
@@ -225,6 +233,44 @@ def test_auto_loads_strict_projection_check_evidence(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="projection result"):
+        load_episode_lifecycle_events(comparison)
+
+
+def test_auto_loads_strict_lifecycle_contract_evidence(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    observer = LifecycleLedgerObserver(
+        variant="with_persistence",
+        trace_id="trace-1",
+        family_id="family-1",
+        stage="learn",
+    )
+    fixture = run_sm01_preference_fixture()
+    snapshot = replace(
+        fixture.snapshot,
+        run_id=comparison.parent.name,
+        episode_id="learn",
+        session_id="session-1",
+        task_id="task-1",
+        provenance=replace(
+            fixture.snapshot.provenance,
+            run_id=comparison.parent.name,
+            episode_id="learn",
+            session_id="session-1",
+            task_id="task-1",
+        ),
+    )
+    observer.record_snapshot(snapshot)
+    event = json.loads(json.dumps(observer.events[0]))
+    path = _lifecycle_evidence_path(comparison)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+    assert load_episode_lifecycle_events(comparison) == (event,)
+    assert build_events(comparison)[-1] == event
+
+    event["data"]["rawContext"] = "private text"
+    path.write_text(json.dumps(event) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="lifecycle event data fields"):
         load_episode_lifecycle_events(comparison)
 
 
