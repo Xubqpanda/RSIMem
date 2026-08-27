@@ -18,6 +18,11 @@ from .ingestion import (
     SemanticIngestRequest,
     SemanticIngestionCoordinator,
 )
+from .operation_graph import (
+    AtomicOperationRecorder,
+    OperationKind,
+    OperationSpec,
+)
 from .validation import TrustedValidationContext, ValidationProvenance
 from ..memory_systems.mem0_flat.policy import (
     FlatSemanticCandidateReader,
@@ -75,12 +80,21 @@ class SemanticWritebackLoop:
         candidates: FlatSemanticCandidateReader,
         executor: TransactionalMutationExecutor,
         observer: MemoryObserver | None = None,
+        operation_recorder: AtomicOperationRecorder | None = None,
     ) -> None:
         self.coordinator = coordinator
         self.policy = policy
         self.candidates = candidates
         self.executor = executor
         self.observer = observer
+        self.operation_recorder = operation_recorder
+        if operation_recorder is not None:
+            if policy.operation_recorder not in {None, operation_recorder}:
+                raise ValueError("semantic loop policy uses a different operation recorder")
+            if executor.operation_recorder not in {None, operation_recorder}:
+                raise ValueError("semantic loop executor uses a different operation recorder")
+            policy.operation_recorder = operation_recorder
+            executor.operation_recorder = operation_recorder
 
     def run(
         self,
@@ -113,6 +127,7 @@ class SemanticWritebackLoop:
             )
 
         executions = []
+        operation_trace = self.policy.operation_trace(request.idempotency_key)
         for index, operation in enumerate(ingestion.operations):
             source = request.provenance.source
             provenance = ValidationProvenance(
@@ -131,6 +146,43 @@ class SemanticWritebackLoop:
                 self.policy,
                 provenance,
             )
+            evidence_input_ids: tuple[str, ...] = ()
+            evidence_proposal_ids: tuple[str, ...] = ()
+            if self.operation_recorder is not None and operation_trace is not None:
+                proposal_id = (
+                    operation_trace.proposal_artifact_ids[index]
+                    if index < len(operation_trace.proposal_artifact_ids)
+                    else None
+                )
+                values = []
+                if proposal_id is not None:
+                    values.append(proposal_id)
+                if (
+                    operation.target_artifact_id is not None
+                    and operation.target_artifact_id
+                    in operation_trace.related_artifact_ids
+                ):
+                    values.append(operation.target_artifact_id)
+                evidence_input_ids = tuple(values)
+                parents = (
+                    (operation_trace.decision_operation_id,)
+                    if operation_trace.decision_operation_id is not None
+                    else (operation_trace.extraction_operation_id,)
+                )
+                resolution_spec = OperationSpec(
+                    operation.operation_id,
+                    OperationKind.TARGET_RESOLUTION,
+                    operation_trace.context,
+                    parents,
+                    evidence_input_ids,
+                )
+                with self.operation_recorder.operation_scope(resolution_spec) as scope:
+                    scope.complete()
+                evidence_proposal_ids = (
+                    (operation_trace.decision_operation_id,)
+                    if operation_trace.decision_operation_id is not None
+                    else (operation.operation_id,)
+                )
             if self.observer is not None:
                 self.observer.record(MemoryEvent(
                     MemoryEventKind.MUTATION_REQUESTED,
@@ -158,6 +210,8 @@ class SemanticWritebackLoop:
                 ),
                 current_source_digest=ingestion.source_digest,
                 trigger=request.trigger,
+                evidence_input_artifact_ids=evidence_input_ids,
+                evidence_proposal_operation_ids=evidence_proposal_ids,
             ))
             executions.append(result)
             if self.observer is not None:
