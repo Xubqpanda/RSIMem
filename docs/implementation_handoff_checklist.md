@@ -984,14 +984,20 @@ PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根
 
 - Dataset contract：新增版本化 observation window、四类 delayed utility label、content-free provenance、artifact-specific exposure join、raw resource/retry evidence 和 immutable JSON store。即时 extraction/decision attribution 只保留为 provenance，只有 retrieval、injection、use、tool behavior、downstream outcome、supersession 和 recovery 可以决定 delayed failure label。
 - Exposure contract：显式记录 opportunity、candidate inclusion、policy filtering、deterministic/logged/missing propensity；需要 propensity correction 的 estimator 对 missing 或 zero propensity fail closed。Dataset report 输出 observation、opportunity、candidate、filter、missing propensity、label/exposure count 和 censoring rate。
-- Commits：`9930fee`、`5305318`、`7ae15e8`、`19b34d6`、`f0ff3f5`。Focused feedback/SM01/future-trace/attribution tests `30 passed`；full RSIMem `282 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check`、diff check 和 source credential-shape scan 通过。
-- 已知限制：当前 propensity 是 deterministic fixture eligibility evidence，不是由随机化 logging policy 估计的因果 propensity。2I.3 的冻结版本与阶段级 replay/leakage gate 尚未独立关闭，adaptive learner 保持 disabled。
+- Commits：`9930fee`、`5305318`、`7ae15e8`、`19b34d6`、`f0ff3f5`、`8a673b3`、`97a291b`、`45fcfda`、`a72b996`。Focused feedback/SM01/future-trace/attribution tests `49 passed`；full RSIMem `290 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check`、diff check 和 source credential-shape scan 通过。
+- 已知限制：当前 propensity 是 deterministic fixture eligibility evidence，不是由随机化 logging policy 估计的因果 propensity。2I 只关闭 delayed-feedback dataset gate；adaptive learner 仍保持 disabled，属于 2J。
 
 ### 2I.3 阶段闸门
 
-- □ Feedback dataset 可重建、可审计、无 leakage。
-- □ Utility label 与 official score 严格隔离。
-- □ Static policy、feature schema 和 label schema 冻结版本。
+- √ Feedback dataset 可重建、可审计、无 leakage。
+- √ Utility label 与 official score 严格隔离。
+- √ Static policy、feature schema 和 label schema 冻结版本。
+
+2I.3 验收记录：
+
+- Stage gate 使用冻结 config digest 独立重建 dataset，要求 canonical dataset identity 完全一致，并重新执行 referential-integrity、future-leakage 和 content-surface audit。
+- Feature/policy/label/window identity 变化、label 篡改、example identity 篡改或 rebuild 失败均 fail closed；gate report 只包含稳定 ID、digest、计数、状态和 issue code。
+- 最终验证：full RSIMem `290 passed`；PAST-Bench `387 passed, 2 skipped`；compileall、`pip check`、diff check 和 tracked-source credential scan 通过。
 
 ## 21. 第二阶段 2J：Adaptive Memory Policy
 
