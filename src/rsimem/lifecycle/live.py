@@ -272,17 +272,37 @@ class HermesLifecycleDryRunRuntime:
         if existing is not None:
             return existing
 
+        self.observer.record_snapshot(snapshot)
         request = snapshot_to_evaluation_request(
             snapshot,
             evaluation_id=evaluation_id,
             trigger=trigger,
             turn_index=sum(1 for row in rows if row.get("role") == "user"),
         )
-        evaluation = self._controller.evaluate(request, force=True)
+        try:
+            evaluation = self._controller.evaluate(request, force=True)
+        except Exception as exc:
+            self.observer.record_evaluation(
+                snapshot,
+                evaluation_id=evaluation_id,
+                trigger=trigger.value,
+                evaluator=self._controller.evaluator.name,
+                policy_version=self.config.policy_version,
+                status="rejected",
+                reason_codes=(f"evaluator_{type(exc).__name__.lower()}",),
+            )
+            raise
         assert evaluation is not None
         if evaluation.policy_version != self.config.policy_version:
             evaluation = replace(evaluation, policy_version=self.config.policy_version)
-        self.observer.record_snapshot(snapshot)
+        self.observer.record_evaluation(
+            snapshot,
+            evaluation_id=evaluation_id,
+            trigger=trigger.value,
+            evaluator=evaluation.evaluator,
+            policy_version=evaluation.policy_version,
+            status="accepted",
+        )
         plans = self._coordinator.create_plans(snapshot, evaluation)
         receipts = tuple(self._coordinator.dry_run(plan, snapshot) for plan in plans)
         result = HermesLifecycleDryRunResult(snapshot, evaluation, plans, receipts)
