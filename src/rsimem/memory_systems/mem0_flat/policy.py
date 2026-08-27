@@ -340,7 +340,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             policy_version=bound_policy_version,
             framework_version=framework_version,
             prompt_version=(
-                f"{fact_prompt.artifact.version}+{operation_prompt.artifact.version}."
+                f"{fact_prompt.artifact.version}.{operation_prompt.artifact.version}."
                 f"{fact_prompt.artifact.template_digest[:8]}."
                 f"{operation_prompt.artifact.template_digest[:8]}"
             ),
@@ -678,7 +678,10 @@ def _classify(content: str) -> SemanticMemoryCategory:
     lowered = content.casefold()
     if re.search(r"\b(?:never|must not|cannot|avoid)\b", lowered):
         return SemanticMemoryCategory.CONSTRAINT
-    if re.search(r"\b(?:prefer|preference|favorite|always use|likes?|dislikes?)\b", lowered):
+    if re.search(
+        r"(?:^(?:please\s+)?use\b|\b(?:prefer|preference|favorite|always use|likes?|dislikes?)\b)",
+        lowered,
+    ):
         return SemanticMemoryCategory.PREFERENCE
     if re.search(r"\b(?:must|should|required|rule)\b", lowered):
         return SemanticMemoryCategory.RULE
