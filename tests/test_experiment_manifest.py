@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from rsimem.experiment_manifest import (
+    STATIC_METHOD_VARIANTS,
     execution_order,
     initialize_batch_manifest,
     load_manifest,
@@ -81,6 +82,16 @@ def test_execution_order_rotates_modes_across_replicates() -> None:
         "native+ledger",
     )
     assert execution_order(4) == execution_order(1)
+    assert execution_order(1, STATIC_METHOD_VARIANTS) == (
+        "no-persistence",
+        "native-hermes",
+        "static-rsimem",
+    )
+    assert execution_order(2, STATIC_METHOD_VARIANTS) == (
+        "native-hermes",
+        "static-rsimem",
+        "no-persistence",
+    )
 
 
 def test_manifest_records_effective_configuration_and_attempt_order(tmp_path: Path) -> None:
@@ -122,6 +133,32 @@ def test_manifest_records_effective_configuration_and_attempt_order(tmp_path: Pa
         "runName": "r02_native_ledger",
         "status": "completed",
     }]
+
+
+def test_manifest_schedules_static_method_variants(tmp_path: Path) -> None:
+    path = tmp_path / "static-methods.json"
+    initialize_batch_manifest(
+        path,
+        **_manifest_kwargs(),
+        execution_modes=STATIC_METHOD_VARIANTS,
+    )
+    value = load_manifest(path)
+    assert value["configuration"]["executionModes"] == list(
+        STATIC_METHOD_VARIANTS
+    )
+    assert value["executionOrderByReplicate"]["2"] == [
+        "native-hermes",
+        "static-rsimem",
+        "no-persistence",
+    ]
+    record_attempt(
+        path,
+        replicate=1,
+        ordinal=1,
+        mode="no-persistence",
+        run_name="r01_no_persistence",
+        status="running",
+    )
 
 
 def test_manifest_fails_closed_for_missing_field_unknown_mode_and_dirty_benchmark(

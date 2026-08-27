@@ -15,6 +15,12 @@ EXECUTION_MODES = (
     "native+ledger",
     "native+adapter+ledger",
 )
+STATIC_METHOD_VARIANTS = (
+    "no-persistence",
+    "native-hermes",
+    "static-rsimem",
+)
+_KNOWN_MODES = frozenset((*EXECUTION_MODES, *STATIC_METHOD_VARIANTS))
 _ATTEMPT_STATUSES = {"running", "completed", "failed"}
 _REQUIRED_CONFIGURATION = {
     "taskFamily",
@@ -39,11 +45,20 @@ _REQUIRED_REVISIONS = {
 }
 
 
-def execution_order(replicate: int) -> tuple[str, ...]:
+def execution_order(
+    replicate: int,
+    modes: tuple[str, ...] = EXECUTION_MODES,
+) -> tuple[str, ...]:
     if replicate < 1:
         raise ValueError("replicate must be positive")
-    offset = (replicate - 1) % len(EXECUTION_MODES)
-    return EXECUTION_MODES[offset:] + EXECUTION_MODES[:offset]
+    if (
+        not modes
+        or len(modes) != len(set(modes))
+        or any(mode not in _KNOWN_MODES for mode in modes)
+    ):
+        raise ValueError("execution modes must be unique known modes")
+    offset = (replicate - 1) % len(modes)
+    return modes[offset:] + modes[:offset]
 
 
 def _canonical_digest(value: Any) -> str:
@@ -354,7 +369,7 @@ def validate_manifest(value: Any) -> dict[str, Any]:
     ):
         raise ValueError("manifest persistence isolation is invalid")
     modes = configuration.get("executionModes")
-    if not isinstance(modes, list) or not modes or any(mode not in EXECUTION_MODES for mode in modes):
+    if not isinstance(modes, list) or not modes or any(mode not in _KNOWN_MODES for mode in modes):
         raise ValueError("manifest contains an unknown execution mode")
     if len(set(modes)) != len(modes):
         raise ValueError("manifest contains duplicate execution modes")
@@ -376,8 +391,7 @@ def validate_manifest(value: Any) -> dict[str, Any]:
     expected_modes = tuple(modes)
     for replicate in range(1, value["replicates"] + 1):
         order = schedule.get(str(replicate))
-        rotated = execution_order(replicate)
-        expected = [mode for mode in rotated if mode in expected_modes]
+        expected = list(execution_order(replicate, expected_modes))
         if order != expected:
             raise ValueError("manifest execution schedule is invalid")
     _validate_attempts(value)
@@ -419,6 +433,7 @@ def initialize_batch_manifest(
     past_bench_commit: str,
     past_bench_tree: str,
     past_bench_dirty: bool,
+    execution_modes: tuple[str, ...] = EXECUTION_MODES,
 ) -> str:
     if replicates < 1:
         raise ValueError("replicates must be positive")
@@ -432,7 +447,7 @@ def initialize_batch_manifest(
         "judge": judge,
         "budget": budget,
         "environment": environment,
-        "executionModes": list(EXECUTION_MODES),
+        "executionModes": list(execution_modes),
         "persistenceIsolation": persistence_isolation,
         "adapterFailurePolicy": "fail_closed",
         "adapterProjectionVerification": adapter_projection_verification,
@@ -446,7 +461,7 @@ def initialize_batch_manifest(
         "pastBenchDirty": past_bench_dirty,
     }
     schedule = {
-        str(replicate): list(execution_order(replicate))
+        str(replicate): list(execution_order(replicate, execution_modes))
         for replicate in range(1, replicates + 1)
     }
     identity_payload = {
@@ -492,7 +507,7 @@ def next_attempt_name(
 
 
 def _validate_slot(value: dict[str, Any], replicate: int, ordinal: int, mode: str) -> None:
-    if mode not in EXECUTION_MODES:
+    if mode not in value["configuration"]["executionModes"]:
         raise ValueError("attempt mode is invalid")
     expected_order = value["executionOrderByReplicate"].get(str(replicate))
     if expected_order is None or ordinal < 1 or ordinal > len(expected_order):
