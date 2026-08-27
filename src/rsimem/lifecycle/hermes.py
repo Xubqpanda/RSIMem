@@ -225,6 +225,192 @@ class HermesSnapshotCollector:
         return tuple(closures)
 
 
+class HermesStateSnapshotCollector:
+    """Project persisted Hermes ``state.db`` message rows into a snapshot.
+
+    Hermes' in-memory conversation dictionaries do not carry stable message
+    identities. The persisted row ID is therefore the authoritative source
+    identity at lifecycle boundaries. Structured tool calls are expanded into
+    their own segments so call/result closure can be validated explicitly.
+    """
+
+    def __init__(self, collector: HermesSnapshotCollector | None = None) -> None:
+        self._collector = collector or HermesSnapshotCollector()
+
+    def collect(
+        self,
+        rows: Sequence[Mapping[str, Any]],
+        *,
+        run_id: str,
+        episode_id: str,
+        session_id: str,
+        task_id: str,
+        task_state: TaskLifecycleState,
+        lifecycle_state: str,
+        source_ref: str,
+    ) -> ContextSnapshot:
+        messages = self._project_rows(rows)
+        return self._collector.collect(
+            messages,
+            run_id=run_id,
+            episode_id=episode_id,
+            session_id=session_id,
+            task_id=task_id,
+            current_turn_id=None,
+            task_state=task_state,
+            lifecycle_state=lifecycle_state,
+            source_ref=source_ref,
+        )
+
+    @classmethod
+    def _project_rows(
+        cls,
+        rows: Sequence[Mapping[str, Any]],
+    ) -> tuple[HermesMessage, ...]:
+        if not rows:
+            raise ValueError("Hermes state snapshot requires persisted messages")
+
+        messages: list[HermesMessage] = []
+        seen_row_ids: set[int] = set()
+        seen_tool_calls: set[str] = set()
+        seen_tool_results: set[str] = set()
+        current_turn_id: str | None = None
+
+        for row in rows:
+            row_id = row.get("id")
+            if type(row_id) is not int or row_id < 1:
+                raise ValueError("Hermes state message requires a positive integer row ID")
+            if row_id in seen_row_ids:
+                raise ValueError("Hermes state message row IDs must be unique")
+            seen_row_ids.add(row_id)
+
+            role = row.get("role")
+            if not isinstance(role, str) or not role.strip():
+                raise ValueError("Hermes state message role must not be empty")
+            role = role.strip()
+            if role == "user":
+                current_turn_id = f"turn_db_{row_id}"
+            if current_turn_id is None:
+                current_turn_id = f"turn_preamble_{row_id}"
+
+            content = row.get("content")
+            if content is not None and not isinstance(content, str):
+                raise ValueError("Hermes state message content must be text or null")
+            content = content or ""
+            tool_call_id = row.get("tool_call_id")
+            if tool_call_id is not None and (
+                not isinstance(tool_call_id, str) or not tool_call_id.strip()
+            ):
+                raise ValueError("Hermes tool result ID must be non-empty text")
+
+            if role == "tool":
+                if not tool_call_id:
+                    raise ValueError("Hermes tool result has no matching call ID")
+                if tool_call_id in seen_tool_results:
+                    raise ValueError("Hermes tool call may have only one result")
+                seen_tool_results.add(tool_call_id)
+                projected_content = content if content.strip() else "[empty tool result]"
+                messages.append(HermesMessage(
+                    message_id=f"db:{row_id}:tool-result:{tool_call_id}",
+                    role=role,
+                    content=projected_content,
+                    turn_id=current_turn_id,
+                    token_count=cls._token_count(row, projected_content),
+                    kind=SegmentKind.TOOL_RESULT,
+                    completed=True,
+                    tool_call_id=tool_call_id,
+                    metadata=cls._token_metadata(row),
+                ))
+            elif content.strip():
+                messages.append(HermesMessage(
+                    message_id=f"db:{row_id}:message",
+                    role=role,
+                    content=content,
+                    turn_id=current_turn_id,
+                    token_count=cls._token_count(row, content),
+                    completed=True,
+                    metadata=cls._token_metadata(row),
+                ))
+
+            for call in cls._tool_calls(row):
+                call_id = call.get("id")
+                function = call.get("function")
+                if (
+                    not isinstance(call_id, str)
+                    or not call_id.strip()
+                    or not isinstance(function, Mapping)
+                ):
+                    raise ValueError("Hermes tool call requires stable ID and function")
+                if call_id in seen_tool_calls:
+                    raise ValueError("Hermes tool call IDs must be unique")
+                seen_tool_calls.add(call_id)
+                call_content = json.dumps(
+                    {"function": dict(function)},
+                    ensure_ascii=True,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                messages.append(HermesMessage(
+                    message_id=f"db:{row_id}:tool-call:{call_id}",
+                    role="assistant",
+                    content=call_content,
+                    turn_id=current_turn_id,
+                    token_count=cls._estimate_tokens(call_content),
+                    kind=SegmentKind.TOOL_CALL,
+                    completed=True,
+                    tool_call_id=call_id,
+                    metadata={"token_count_source": "deterministic_estimate"},
+                ))
+
+        orphan_results = seen_tool_results - seen_tool_calls
+        open_calls = seen_tool_calls - seen_tool_results
+        if orphan_results:
+            raise ValueError("Hermes tool result has no matching call")
+        if open_calls:
+            raise ValueError("Hermes snapshot contains an open tool call")
+        if not messages:
+            raise ValueError("Hermes state snapshot has no projectable messages")
+        return tuple(messages)
+
+    @staticmethod
+    def _tool_calls(row: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
+        value = row.get("tool_calls")
+        if value is None or value == "":
+            return ()
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except json.JSONDecodeError as exc:
+                raise ValueError("Hermes tool_calls JSON is malformed") from exc
+        if not isinstance(value, list) or any(not isinstance(item, Mapping) for item in value):
+            raise ValueError("Hermes tool_calls must be a list of objects")
+        return tuple(value)
+
+    @classmethod
+    def _token_count(cls, row: Mapping[str, Any], content: str) -> int:
+        value = row.get("token_count")
+        if value is None:
+            return cls._estimate_tokens(content)
+        if type(value) is not int or value < 0:
+            raise ValueError("Hermes message token_count must be a non-negative integer")
+        return value
+
+    @staticmethod
+    def _token_metadata(row: Mapping[str, Any]) -> Mapping[str, str]:
+        return {
+            "token_count_source": (
+                "hermes_state" if row.get("token_count") is not None
+                else "deterministic_estimate"
+            )
+        }
+
+    @staticmethod
+    def _estimate_tokens(content: str) -> int:
+        # Hermes persists no per-message usage by default. Keep the fallback
+        # explicit and deterministic instead of representing unknown as zero.
+        return max(1, (len(content.encode("utf-8")) + 3) // 4)
+
+
 def snapshot_to_evaluation_request(
     snapshot: ContextSnapshot,
     *,

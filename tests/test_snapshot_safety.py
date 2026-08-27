@@ -9,6 +9,7 @@ from rsimem.lifecycle import (
     EvaluationTrigger,
     HermesMessage,
     HermesSnapshotCollector,
+    HermesStateSnapshotCollector,
     TaskLifecycleState,
     WritebackAction,
     WritebackCoordinator,
@@ -98,3 +99,98 @@ def test_old_unresolved_segment_is_protected_during_active_task() -> None:
         ),
     )
     assert WritebackCoordinator().create_plans(snapshot, evaluation) == ()
+
+
+def test_persisted_hermes_rows_have_stable_ids_and_closed_tools() -> None:
+    rows = (
+        {"id": 11, "role": "user", "content": "Use TSV output.", "token_count": None},
+        {
+            "id": 12,
+            "role": "assistant",
+            "content": "I will inspect the task.",
+            "token_count": 6,
+            "tool_calls": [{
+                "id": "call-1",
+                "function": {"name": "read_file", "arguments": '{"path":"task"}'},
+            }],
+        },
+        {
+            "id": 13,
+            "role": "tool",
+            "content": "task contents",
+            "tool_call_id": "call-1",
+            "token_count": None,
+        },
+        {"id": 14, "role": "assistant", "content": "Done.", "token_count": 2},
+    )
+    collector = HermesStateSnapshotCollector()
+    kwargs = {
+        "run_id": "run",
+        "episode_id": "episode",
+        "session_id": "session",
+        "task_id": "task",
+        "task_state": TaskLifecycleState.COMPLETED,
+        "lifecycle_state": "task_completed",
+        "source_ref": "hermes_state:session:test",
+    }
+
+    first = collector.collect(rows, **kwargs)
+    replay = collector.collect(rows, **kwargs)
+    extended = collector.collect(
+        (*rows, {"id": 15, "role": "user", "content": "Thanks.", "token_count": 1}),
+        **kwargs,
+    )
+
+    assert first.snapshot_id == replay.snapshot_id
+    assert first.context_revision == replay.context_revision
+    assert [item.segment_id for item in first.segments] == [
+        item.segment_id for item in replay.segments
+    ]
+    assert [item.segment_id for item in first.segments] == [
+        item.segment_id for item in extended.segments[: len(first.segments)]
+    ]
+    assert first.context_revision != extended.context_revision
+    assert first.current_turn_id is None
+    assert first.total_token_count == sum(item.token_count for item in first.segments)
+    assert first.segments[0].metadata["token_count_source"] == "deterministic_estimate"
+    assert len(first.tool_closures) == 1
+    assert first.tool_closures[0].closed
+
+
+@pytest.mark.parametrize(
+    ("rows", "error"),
+    [
+        (
+            ({"id": 1, "role": "tool", "content": "orphan", "tool_call_id": "x"},),
+            "no matching call",
+        ),
+        (
+            ({
+                "id": 1,
+                "role": "assistant",
+                "content": "calling",
+                "tool_calls": [{"id": "x", "function": {"name": "tool", "arguments": "{}"}}],
+            },),
+            "open tool call",
+        ),
+        (
+            (
+                {"id": 1, "role": "user", "content": "one"},
+                {"id": 1, "role": "assistant", "content": "duplicate"},
+            ),
+            "row IDs must be unique",
+        ),
+    ],
+)
+def test_persisted_hermes_rows_fail_closed(rows, error: str) -> None:
+    with pytest.raises(ValueError, match=error):
+        HermesStateSnapshotCollector().collect(
+            rows,
+            run_id="run",
+            episode_id="episode",
+            session_id="session",
+            task_id="task",
+            task_state=TaskLifecycleState.COMPLETED,
+            lifecycle_state="task_completed",
+            source_ref="hermes_state:session:test",
+        )
