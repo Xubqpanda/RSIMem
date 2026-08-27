@@ -667,6 +667,43 @@ class LifecycleLedgerObserver:
             },
         )
 
+    def record_utility_decisions(
+        self,
+        request: Any,
+        result: Any,
+        evidence: Mapping[str, Any],
+    ) -> None:
+        """Persist frozen utility decisions without policy input content."""
+
+        if result.idempotency_key != request.idempotency_key:
+            raise ValueError("utility evidence does not match ingestion request")
+        if evidence.get("request_id") != request.idempotency_key:
+            raise ValueError("utility evidence request identity is invalid")
+        decisions = evidence.get("decisions")
+        if not isinstance(decisions, list) or not all(
+            isinstance(item, dict) for item in decisions
+        ):
+            raise ValueError("utility evidence decisions must be objects")
+        provenance = request.provenance.source
+        self._append(
+            kind="static_utility_decisions",
+            run_id=provenance.run_id,
+            episode_id=provenance.episode_id,
+            session_id=provenance.session_id,
+            task_id=provenance.task_id,
+            snapshot_id=provenance.snapshot_id,
+            data={
+                "executionId": result.execution_id,
+                "operationIds": [item.operation_id for item in result.operations],
+                "requestId": request.idempotency_key,
+                "gateVersion": evidence.get("gate_version"),
+                "gateDigest": evidence.get("gate_digest"),
+                "featureSchemaVersion": evidence.get("feature_schema"),
+                "decisionCount": len(decisions),
+                "decisions": decisions,
+            },
+        )
+
     def write(self, output_path: Path) -> None:
         with self._lock:
             output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -5,6 +5,7 @@ from dataclasses import replace
 
 import pytest
 
+from rsimem.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import (
     DryRunStatus,
     EvaluationTrigger,
@@ -23,6 +24,7 @@ from rsimem.memory.operation_graph import audit_operation_evidence
 from rsimem.memory.receipts import MutationReceiptStatus
 from rsimem.memory_systems.mem0_flat import (
     FakeCompletionClient,
+    FrozenMem0UtilityGate,
     POLICY_FACT_EXTRACTION_PROMPT,
     POLICY_INTERNAL_OPERATION_PROMPT,
 )
@@ -90,8 +92,54 @@ def test_static_config_is_default_disabled_and_strict() -> None:
         "timeout_seconds": 12,
         "max_output_tokens": 512,
     }).mode == StaticSemanticWritebackMode.STATIC
+    utility = StaticSemanticWritebackConfig.from_mapping({
+        "mode": "static_utility",
+    })
+    assert utility.enabled is True
+    assert utility.utility_enabled is True
     with pytest.raises(ValueError, match="unknown static semantic"):
         StaticSemanticWritebackConfig.from_mapping({"provider_seed": 7})
+
+
+def test_static_utility_runtime_preserves_boundary_and_invocation_count(
+    tmp_path,
+) -> None:
+    lifecycle = _lifecycle(tmp_path)
+    client = _client()
+    gate = FrozenMem0UtilityGate()
+    observer = LifecycleLedgerObserver(
+        variant="static-utility",
+        trace_id="trace-static",
+        output_path=tmp_path / "episode" / "lifecycle.jsonl",
+    )
+    runtime = StaticSemanticWritebackRuntime(
+        tmp_path / "hermes-home",
+        client,
+        operation_evidence_path=tmp_path / "episode" / "operations.jsonl",
+        mutation_receipt_path=tmp_path / "hermes-home" / "rsimem-receipts.json",
+        ingestion_observer=observer,
+        utility_gate=gate,
+    )
+
+    result = runtime.process(lifecycle)[0]
+
+    assert result.writeback.logical_exit is True
+    execution = result.writeback.executions[0]
+    assert execution.context_exit.physical_rewrite is False
+    assert execution.context_exit.saved_tokens is None
+    assert len(client.calls) == 2
+    request_id = result.writeback.ingestion.idempotency_key
+    assert [item.target.value for item in gate.decisions(request_id)] == [
+        "generation",
+        "internal_operation",
+    ]
+    utility_events = [
+        item for item in observer.events if item["kind"] == "static_utility_decisions"
+    ]
+    assert len(utility_events) == 1
+    assert utility_events[0]["data"]["decisionCount"] == 2
+    assert PREFERENCE not in json.dumps(utility_events[0], sort_keys=True)
+    runtime.close()
 
 
 def test_static_runtime_commits_restart_duplicate_and_emits_content_free_evidence(

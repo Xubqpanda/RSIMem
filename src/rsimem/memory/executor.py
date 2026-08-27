@@ -133,6 +133,7 @@ class ContextExitReport:
     physical_rewrite: bool
     source_retained: bool
     reason_code: str
+    saved_tokens: int | None = None
 
     def __post_init__(self) -> None:
         values = (
@@ -147,6 +148,8 @@ class ContextExitReport:
             raise ValueError("context exit reason_code must be machine-readable")
         if self.physical_rewrite:
             raise ValueError("physical context rewrite is disabled")
+        if self.saved_tokens is not None:
+            raise ValueError("disabled physical rewrite cannot report saved tokens")
         if self.logical_exit and self.source_retained:
             raise ValueError("logical exit cannot retain the same source")
 
@@ -196,6 +199,7 @@ class MutationExecutionResult:
                 "physical_rewrite": self.context_exit.physical_rewrite,
                 "source_retained": self.context_exit.source_retained,
                 "reason_code": self.context_exit.reason_code,
+                "saved_tokens": self.context_exit.saved_tokens,
             },
         }
 

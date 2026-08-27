@@ -28,6 +28,7 @@ from ..memory_systems.mem0_flat.policy import (
     Mem0FlatSemanticPolicy,
 )
 from ..memory_systems.mem0_flat.prompts import CompletionClient
+from ..memory_systems.mem0_flat.utility_gate import FrozenMem0UtilityGate
 
 
 STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION = 1
@@ -36,6 +37,7 @@ STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION = 1
 class StaticSemanticWritebackMode(StrEnum):
     DISABLED = "disabled"
     STATIC = "static"
+    STATIC_UTILITY = "static_utility"
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +56,11 @@ class StaticSemanticWritebackConfig:
 
     @property
     def enabled(self) -> bool:
-        return self.mode == StaticSemanticWritebackMode.STATIC
+        return self.mode != StaticSemanticWritebackMode.DISABLED
+
+    @property
+    def utility_enabled(self) -> bool:
+        return self.mode == StaticSemanticWritebackMode.STATIC_UTILITY
 
     @classmethod
     def from_mapping(
@@ -108,15 +114,18 @@ class StaticSemanticWritebackRuntime:
         mutation_receipt_path: Path,
         observer: MemoryObserver | None = None,
         ingestion_observer: Any | None = None,
+        utility_gate: FrozenMem0UtilityGate | None = None,
     ) -> None:
         self.hermes_home = hermes_home.expanduser().resolve()
         self.registry = build_hermes_native_registry(self.hermes_home)
         self.receipts = JsonMutationReceiptStore(mutation_receipt_path)
         self.operation_log = AppendOnlyOperationEvidenceLog(operation_evidence_path)
         self.operation_recorder = AtomicOperationRecorder(self.operation_log)
+        self.utility_gate = utility_gate
         self.policy = Mem0FlatSemanticPolicy(
             completion_client,
             operation_recorder=self.operation_recorder,
+            utility_gate=utility_gate,
         )
         self.candidates = FlatSemanticCandidateReader(
             self.registry,
@@ -210,6 +219,20 @@ class StaticSemanticWritebackRuntime:
             )
             if self.ingestion_observer is not None and writeback.ingestion is not None:
                 self.ingestion_observer.record_ingestion(request, writeback.ingestion)
+                if self.utility_gate is not None:
+                    record_utility = getattr(
+                        self.ingestion_observer,
+                        "record_utility_decisions",
+                        None,
+                    )
+                    if callable(record_utility):
+                        record_utility(
+                            request,
+                            writeback.ingestion,
+                            self.utility_gate.observer_evidence(
+                                request.idempotency_key
+                            ),
+                        )
             result = StaticSemanticBoundaryResult(
                 snapshot.snapshot_id,
                 lifecycle.evaluation.evaluation_id,

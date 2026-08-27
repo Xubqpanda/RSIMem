@@ -284,6 +284,7 @@ def test_add_update_delete_none_and_duplicate_restart_paths(tmp_path) -> None:
     assert added.context_exit.natural_exit is True
     assert added.context_exit.logical_exit is True
     assert added.context_exit.physical_rewrite is False
+    assert added.context_exit.saved_tokens is None
     assert added.context_exit.source_retained is False
     receipt = store.all()[0]
     assert receipt.status == MutationReceiptStatus.COMMITTED
