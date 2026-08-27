@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # ── V2 ability-grouped schema (Self-Evolve-Tasks-V2 Design Architecture §4) ──
@@ -431,6 +431,70 @@ class SelfEvolveEpisode(BaseModel):
         return self
 
 
+class RSIMemAdaptiveParameterConfig(BaseModel):
+    """Runtime-owned adaptive parameter transported without learned content."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    parameter_id: str
+    name: Literal[
+        "extraction_accept_threshold",
+        "internal_operation_accept_threshold",
+        "consolidation_update_threshold",
+        "retrieval_accept_threshold",
+    ]
+    prompt_ref: str
+    baseline_value: float = Field(ge=0.0, le=1.0)
+
+    @field_validator("parameter_id", "prompt_ref")
+    @classmethod
+    def _nonempty_identity(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("adaptive parameter identity must not be empty")
+        return value
+
+
+class RSIMemAdaptiveWritebackConfig(BaseModel):
+    """Strict transport contract for an attempt-local adaptive policy store."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    adaptive_policy_store_path: str
+    adaptive_trusted_roots: list[str]
+    adaptive_parameters: list[RSIMemAdaptiveParameterConfig]
+
+    @field_validator("adaptive_policy_store_path")
+    @classmethod
+    def _attempt_local_store(cls, value: str) -> str:
+        path = Path(value.strip())
+        if not value.strip() or path.is_absolute() or ".." in path.parts:
+            raise ValueError("adaptive policy store must be relative to Hermes home")
+        return path.as_posix()
+
+    @field_validator("adaptive_trusted_roots")
+    @classmethod
+    def _trusted_roots(cls, value: list[str]) -> list[str]:
+        if not value or any(not item.strip() for item in value):
+            raise ValueError("adaptive trusted roots must not be empty")
+        if len(value) != len(set(value)):
+            raise ValueError("adaptive trusted roots must be unique")
+        return value
+
+    @field_validator("adaptive_parameters")
+    @classmethod
+    def _parameters(
+        cls,
+        value: list[RSIMemAdaptiveParameterConfig],
+    ) -> list[RSIMemAdaptiveParameterConfig]:
+        if not value:
+            raise ValueError("adaptive parameters must not be empty")
+        identities = [(item.parameter_id, item.name) for item in value]
+        if len(identities) != len(set(identities)):
+            raise ValueError("adaptive parameters must be unique")
+        return value
+
+
 class HermesPersistenceConfig(BaseModel):
     """Hermes-specific persistence knobs for the evaluation harness."""
 
@@ -469,9 +533,20 @@ class HermesPersistenceConfig(BaseModel):
         "disabled",
         "static",
         "static_utility",
+        "adaptive_utility",
     ] = "disabled"
     rsimem_semantic_writeback_timeout_seconds: float = 30.0
     rsimem_semantic_writeback_max_output_tokens: int = 4096
+    rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | None = None
+
+    @model_validator(mode="after")
+    def _validate_adaptive_writeback_pair(self):
+        selected = self.rsimem_semantic_writeback_mode == "adaptive_utility"
+        if selected and self.rsimem_adaptive_config is None:
+            raise ValueError("adaptive semantic writeback requires adaptive config")
+        if not selected and self.rsimem_adaptive_config is not None:
+            raise ValueError("adaptive config requires adaptive_utility mode")
+        return self
 
 
 class SelfEvolveTaskRef(BaseModel):

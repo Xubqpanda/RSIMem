@@ -17,6 +17,7 @@ from typing import Any
 
 from ..models.content import TextBlock
 from ..models.scoring import compute_task_score, is_pass
+from ..models.self_evolve import RSIMemAdaptiveWritebackConfig
 from ..models.task import Prompt, TaskDefinition
 from ..models.trace import TraceMessage
 from ..trace.reader import load_trace
@@ -48,6 +49,7 @@ def build_hermes_extra_body(
     rsimem_semantic_writeback_mode: str = "disabled",
     rsimem_semantic_writeback_timeout_seconds: float = 30.0,
     rsimem_semantic_writeback_max_output_tokens: int = 4096,
+    rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | dict | None = None,
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -60,11 +62,28 @@ def build_hermes_extra_body(
     semantic_writeback_mode = (
         rsimem_semantic_writeback_mode if persistence_enabled else "disabled"
     )
-    if semantic_writeback_mode in {"static", "static_utility"}:
+    semantic_writeback = {
+        "mode": semantic_writeback_mode,
+        "timeout_seconds": rsimem_semantic_writeback_timeout_seconds,
+        "max_output_tokens": rsimem_semantic_writeback_max_output_tokens,
+    }
+    if semantic_writeback_mode in {"static", "static_utility", "adaptive_utility"}:
         if rsimem_mode != "native+ledger":
             raise ValueError("static semantic writeback requires native+ledger mode")
         if rsimem_lifecycle_evaluator_mode == "disabled":
             raise ValueError("static semantic writeback requires lifecycle evaluation")
+        if semantic_writeback_mode == "adaptive_utility":
+            if rsimem_adaptive_config is None:
+                raise ValueError("adaptive semantic writeback requires adaptive config")
+            adaptive = RSIMemAdaptiveWritebackConfig.model_validate(
+                rsimem_adaptive_config
+            )
+            semantic_writeback.update(adaptive.model_dump(
+                mode="json",
+                exclude={"schema_version"},
+            ))
+        elif rsimem_adaptive_config is not None:
+            raise ValueError("adaptive config requires adaptive_utility mode")
         enabled_toolsets = [
             toolset for toolset in enabled_toolsets if toolset != "memory"
         ]
@@ -102,11 +121,7 @@ def build_hermes_extra_body(
                     "timeout_seconds": rsimem_lifecycle_timeout_seconds,
                     "max_output_tokens": rsimem_lifecycle_max_output_tokens,
                 },
-                "semantic_writeback": {
-                    "mode": semantic_writeback_mode,
-                    "timeout_seconds": rsimem_semantic_writeback_timeout_seconds,
-                    "max_output_tokens": rsimem_semantic_writeback_max_output_tokens,
-                },
+                "semantic_writeback": semantic_writeback,
             },
         }
     }
@@ -542,6 +557,7 @@ class HermesPersistenceBackend(PersistenceBackend):
             rsimem_semantic_writeback_max_output_tokens=(
                 sequence.hermes.rsimem_semantic_writeback_max_output_tokens
             ),
+            rsimem_adaptive_config=sequence.hermes.rsimem_adaptive_config,
         )
 
     def snapshot_before(self, state_root: Path, *, include_contents: bool = False) -> dict[str, Any]:

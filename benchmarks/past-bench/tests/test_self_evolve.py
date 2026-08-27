@@ -7,7 +7,11 @@ import yaml
 
 from past_bench.models.content import TextBlock
 from past_bench.models.message import Message
-from past_bench.models.self_evolve import SelfEvolveEpisode, SelfEvolveSequenceDefinition
+from past_bench.models.self_evolve import (
+    RSIMemAdaptiveWritebackConfig,
+    SelfEvolveEpisode,
+    SelfEvolveSequenceDefinition,
+)
 from past_bench.models.tool import ToolEndpoint, ToolSpec
 from past_bench.models.trace import TraceMessage
 from past_bench.graders.self_evolve_helpers import compute_self_evolve_mechanism_scores
@@ -34,6 +38,20 @@ from past_bench.runtime.protocol import RuntimeConfigPayload, RuntimeModelConfig
 from past_bench.runtime.registry import AgentSpec
 
 _MISSING_TOOL = object()
+
+
+def _adaptive_config() -> dict:
+    return {
+        "schema_version": 1,
+        "adaptive_policy_store_path": ".rsimem/adaptive-policies.json",
+        "adaptive_trusted_roots": ["mem0-flat.static-policy-v1"],
+        "adaptive_parameters": [{
+            "parameter_id": "parameter.retrieval",
+            "name": "retrieval_accept_threshold",
+            "prompt_ref": "mem0-flat.retrieval",
+            "baseline_value": 0.35,
+        }],
+    }
 
 
 def _rsimem_adapter_request(tmp_path: Path, rsimem: dict) -> StartSessionRequest:
@@ -182,6 +200,84 @@ def test_static_semantic_writeback_isolated_from_native_and_no_persistence(
         )
 
 
+def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
+    tmp_path: Path,
+) -> None:
+    common = {
+        "home_dir": tmp_path / "home",
+        "artifacts_dir": tmp_path / "artifacts",
+        "memory_enabled": True,
+        "user_profile_enabled": True,
+        "skills_enabled": True,
+        "session_search_enabled": True,
+        "memory_nudge_interval": 1,
+        "memory_flush_min_turns": 1,
+        "skill_creation_nudge_interval": 1,
+        "background_review_wait_s": 0.0,
+        "rsimem_mode": "native+ledger",
+        "rsimem_lifecycle_evaluator_mode": "deterministic",
+        "rsimem_semantic_writeback_mode": "adaptive_utility",
+    }
+    enabled = build_hermes_extra_body(
+        persistence_enabled=True,
+        rsimem_adaptive_config=_adaptive_config(),
+        **common,
+    )["hermes"]
+    writeback = enabled["rsimem"]["semantic_writeback"]
+    assert writeback["mode"] == "adaptive_utility"
+    assert writeback["adaptive_policy_store_path"] == (
+        ".rsimem/adaptive-policies.json"
+    )
+    assert writeback["adaptive_trusted_roots"] == ["mem0-flat.static-policy-v1"]
+    assert writeback["adaptive_parameters"] == _adaptive_config()[
+        "adaptive_parameters"
+    ]
+    assert "schema_version" not in writeback
+    assert "memory" not in enabled["enabled_toolsets"]
+
+    disabled = build_hermes_extra_body(
+        persistence_enabled=False,
+        rsimem_adaptive_config=_adaptive_config(),
+        **common,
+    )["hermes"]["rsimem"]["semantic_writeback"]
+    assert disabled == {
+        "mode": "disabled",
+        "timeout_seconds": 30.0,
+        "max_output_tokens": 4096,
+    }
+
+    with pytest.raises(ValueError, match="requires adaptive config"):
+        build_hermes_extra_body(persistence_enabled=True, **common)
+    with pytest.raises(ValueError, match=r"native\+ledger"):
+        build_hermes_extra_body(
+            persistence_enabled=True,
+            rsimem_adaptive_config=_adaptive_config(),
+            **{**common, "rsimem_mode": "native+adapter+ledger"},
+        )
+    with pytest.raises(ValueError, match="requires lifecycle"):
+        build_hermes_extra_body(
+            persistence_enabled=True,
+            rsimem_adaptive_config=_adaptive_config(),
+            **{**common, "rsimem_lifecycle_evaluator_mode": "disabled"},
+        )
+    with pytest.raises(ValueError, match="requires adaptive_utility"):
+        build_hermes_extra_body(
+            persistence_enabled=True,
+            rsimem_adaptive_config=_adaptive_config(),
+            **{**common, "rsimem_semantic_writeback_mode": "static_utility"},
+        )
+
+    malformed = {**_adaptive_config(), "unknown": True}
+    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
+        RSIMemAdaptiveWritebackConfig.model_validate(malformed)
+    escaped = {
+        **_adaptive_config(),
+        "adaptive_policy_store_path": "../adaptive-policies.json",
+    }
+    with pytest.raises(ValueError, match="relative to Hermes home"):
+        RSIMemAdaptiveWritebackConfig.model_validate(escaped)
+
+
 def test_sequence_validates_rsimem_execution_config(tmp_path: Path):
     manifest = tmp_path / "sequence.yaml"
     task_dir = tmp_path / "tasks" / "T_demo"
@@ -213,6 +309,25 @@ def test_sequence_validates_rsimem_execution_config(tmp_path: Path):
     with pytest.raises(ValueError, match="rsimem_mode"):
         SelfEvolveSequenceDefinition.from_yaml(manifest)
 
+    adaptive = yaml.safe_load(manifest.read_text(encoding="utf-8"))
+    adaptive["hermes"]["rsimem_mode"] = "native+ledger"
+    adaptive["hermes"]["rsimem_semantic_writeback_mode"] = "adaptive_utility"
+    adaptive["hermes"]["rsimem_adaptive_config"] = _adaptive_config()
+    manifest.write_text(yaml.safe_dump(adaptive), encoding="utf-8")
+    sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
+    assert sequence.hermes.rsimem_adaptive_config is not None
+
+    adaptive["hermes"].pop("rsimem_adaptive_config")
+    manifest.write_text(yaml.safe_dump(adaptive), encoding="utf-8")
+    with pytest.raises(ValueError, match="requires adaptive config"):
+        SelfEvolveSequenceDefinition.from_yaml(manifest)
+
+    adaptive["hermes"]["rsimem_semantic_writeback_mode"] = "static_utility"
+    adaptive["hermes"]["rsimem_adaptive_config"] = _adaptive_config()
+    manifest.write_text(yaml.safe_dump(adaptive), encoding="utf-8")
+    with pytest.raises(ValueError, match="requires adaptive_utility"):
+        SelfEvolveSequenceDefinition.from_yaml(manifest)
+
 
 def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None:
     manifest = tmp_path / "sequence.yaml"
@@ -230,6 +345,11 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
         encoding="utf-8",
     )
     sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
+    adaptive_config = tmp_path / "adaptive.json"
+    adaptive_config.write_text(
+        json.dumps(_adaptive_config()),
+        encoding="utf-8",
+    )
 
     _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
         agent="hermes-luna",
@@ -241,9 +361,10 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
         rsimem_lifecycle_compiler_version="uncompiled-v0",
         rsimem_lifecycle_timeout_seconds=15.0,
         rsimem_lifecycle_max_output_tokens=2048,
-        rsimem_semantic_writeback_mode="static_utility",
+        rsimem_semantic_writeback_mode="adaptive_utility",
         rsimem_semantic_writeback_timeout_seconds=20.0,
         rsimem_semantic_writeback_max_output_tokens=1024,
+        rsimem_adaptive_config=str(adaptive_config),
     ))
 
     assert sequence.hermes.rsimem_mode == "native+adapter+ledger"
@@ -254,15 +375,64 @@ def test_cli_rsimem_override_is_explicit_and_hermes_only(tmp_path: Path) -> None
     assert sequence.hermes.rsimem_lifecycle_compiler_version == "uncompiled-v0"
     assert sequence.hermes.rsimem_lifecycle_timeout_seconds == 15.0
     assert sequence.hermes.rsimem_lifecycle_max_output_tokens == 2048
-    assert sequence.hermes.rsimem_semantic_writeback_mode == "static_utility"
+    assert sequence.hermes.rsimem_semantic_writeback_mode == "adaptive_utility"
     assert sequence.hermes.rsimem_semantic_writeback_timeout_seconds == 20.0
     assert sequence.hermes.rsimem_semantic_writeback_max_output_tokens == 1024
+    assert sequence.hermes.rsimem_adaptive_config is not None
+    assert sequence.hermes.rsimem_adaptive_config.adaptive_policy_store_path == (
+        ".rsimem/adaptive-policies.json"
+    )
 
     with pytest.raises(SystemExit, match="Hermes agent"):
         _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
             agent="nanobot",
             rsimem_mode="native+ledger",
             rsimem_adapter_failure_policy=None,
+        ))
+
+
+def test_cli_adaptive_override_rejects_missing_or_mismatched_config(
+    tmp_path: Path,
+) -> None:
+    manifest = tmp_path / "sequence.yaml"
+    task_dir = tmp_path / "tasks" / "T_demo"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.yaml").write_text(
+        "task_id: demo\ntask_name: Demo\nprompt:\n  text: hi\n",
+        encoding="utf-8",
+    )
+    manifest.write_text(
+        yaml.safe_dump({
+            "name": "rsimem-adaptive-cli",
+            "episodes": [{"task": "tasks/T_demo", "cluster_id": "cluster-a"}],
+        }),
+        encoding="utf-8",
+    )
+    sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
+    with pytest.raises(SystemExit, match="requires adaptive config"):
+        _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
+            agent="hermes-luna",
+            rsimem_semantic_writeback_mode="adaptive_utility",
+        ))
+
+    config_path = tmp_path / "adaptive.json"
+    config_path.write_text(json.dumps(_adaptive_config()), encoding="utf-8")
+    sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
+    with pytest.raises(SystemExit, match="requires adaptive_utility"):
+        _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
+            agent="hermes-luna",
+            rsimem_semantic_writeback_mode="static_utility",
+            rsimem_adaptive_config=str(config_path),
+        ))
+
+    invalid_path = tmp_path / "invalid.json"
+    invalid_path.write_text('{"schema_version": 1}', encoding="utf-8")
+    sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
+    with pytest.raises(SystemExit, match="invalid RSIMem adaptive config"):
+        _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
+            agent="hermes-luna",
+            rsimem_semantic_writeback_mode="adaptive_utility",
+            rsimem_adaptive_config=str(invalid_path),
         ))
 
 
@@ -313,6 +483,65 @@ def test_hermes_adapter_activates_and_closes_opt_in_rsimem_bridge(
     assert captured["kwargs"]["experiment_variant"] == "with_persistence"
     assert captured["agent"] is agent
     assert captured["closed"] is True
+
+
+def test_hermes_adapter_parses_adaptive_writeback_transport(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import rsimem.hermes_past_bridge as bridge_module
+
+    captured = {}
+
+    class Bridge:
+        def __init__(self, home, config, **kwargs):
+            captured.update(home=home, config=config, kwargs=kwargs)
+
+        def attach(self, agent):
+            captured["agent"] = agent
+
+        def close(self):
+            return None
+
+    monkeypatch.setattr(bridge_module, "HermesPastBenchBridge", Bridge)
+    request = _rsimem_adapter_request(tmp_path, {
+        "mode": "native+ledger",
+        "evidence_path": str(tmp_path / "artifacts" / "events.jsonl"),
+        "lifecycle": {
+            "evaluator_mode": "deterministic",
+            "policy_version": "adaptive-fixture-v1",
+            "compiler_version": "uncompiled-v0",
+        },
+        "semantic_writeback": {
+            "mode": "adaptive_utility",
+            "timeout_seconds": 30.0,
+            "max_output_tokens": 4096,
+            **{
+                key: value
+                for key, value in _adaptive_config().items()
+                if key != "schema_version"
+            },
+        },
+    })
+    adapter = HermesAdapter(AgentSpec(name="hermes", adapter="hermes"), request)
+    try:
+        agent = object()
+        adapter._activate_rsimem_bridge(
+            agent,
+            request.model.extra_body["hermes"],
+            tmp_path / "home",
+        )
+    finally:
+        adapter.close("test")
+
+    writeback = captured["kwargs"]["static_writeback_config"]
+    assert writeback.adaptive_enabled is True
+    assert writeback.adaptive_policy_store_path == (
+        ".rsimem/adaptive-policies.json"
+    )
+    assert writeback.adaptive_trusted_roots == ("mem0-flat.static-policy-v1",)
+    assert writeback.adaptive_parameters[0].parameter_id == "parameter.retrieval"
+    assert captured["agent"] is agent
 
 
 def test_hermes_adapter_keeps_native_default_and_rejects_evidence_escape(
