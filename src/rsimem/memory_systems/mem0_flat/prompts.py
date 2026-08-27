@@ -170,6 +170,7 @@ class RenderedPrompt:
     input_digest: str
     text: str = field(repr=False)
     input_references: tuple[tuple[str, str], ...] = ()
+    binding_fingerprint: str | None = None
 
     def __post_init__(self) -> None:
         if not _IDENTIFIER.fullmatch(self.render_id):
@@ -183,6 +184,10 @@ class RenderedPrompt:
             for key, value in self.input_references
         ):
             raise ValueError("rendered prompt input references are invalid")
+        if self.binding_fingerprint is not None and (
+            _IDENTIFIER.fullmatch(self.binding_fingerprint) is None
+        ):
+            raise ValueError("rendered prompt binding fingerprint is invalid")
 
     def observer_evidence(self) -> dict[str, object]:
         return {
@@ -194,6 +199,7 @@ class RenderedPrompt:
             "render_id": self.render_id,
             "input_digest": self.input_digest,
             "input_references": dict(self.input_references),
+            "binding_fingerprint": self.binding_fingerprint,
         }
 
 
@@ -201,12 +207,17 @@ class RenderedPrompt:
 class PromptTemplate:
     artifact: PromptArtifact
     template: str = field(repr=False)
+    binding_fingerprint: str | None = None
 
     def __post_init__(self) -> None:
         if not self.template.strip():
             raise ValueError("prompt template must not be empty")
         if _digest_text(self.template) != self.artifact.template_digest:
             raise ValueError("prompt artifact digest does not match template")
+        if self.binding_fingerprint is not None and (
+            _IDENTIFIER.fullmatch(self.binding_fingerprint) is None
+        ):
+            raise ValueError("prompt template binding fingerprint is invalid")
         placeholders = {
             match.group("named") or match.group("braced")
             for match in Template.pattern.finditer(self.template)
@@ -243,6 +254,7 @@ class PromptTemplate:
             input_digest,
             text,
             input_references,
+            self.binding_fingerprint,
         )
 
 
@@ -501,11 +513,13 @@ def build_prompt_catalog(
 ) = build_prompt_catalog()
 
 
-_POLICY_FACT_EXTRACTION_TEMPLATE = """Extract minimal durable semantic memory candidates from a completed agent experience.
+POLICY_FACT_EXTRACTION_ROOT_BODY = """Extract minimal durable semantic memory candidates from a completed agent experience.
 Keep only user-supplied facts, preferences, rules, or constraints that can help a future task.
 Assistant acknowledgements, tool output, transcripts, failures, credentials, machine paths, temporary requests, unresolved claims, and example text are not memories.
 Each candidate must be independently understandable and contain no conversation wrapper.
-Use only the supplied source messages and deterministic exit evidence. Return exactly one JSON object with a facts string list and no other fields.
+Use only the supplied source messages and deterministic exit evidence. Return exactly one JSON object with a facts string list and no other fields."""
+
+POLICY_FACT_EXTRACTION_FROZEN_WRAPPER = """$policy_body
 
 Source messages JSON:
 $source_messages
@@ -516,6 +530,23 @@ $source_projection_digest
 Exit evidence JSON:
 $exit_evidence
 """
+
+
+def compile_policy_fact_extraction_template(policy_body: str) -> str:
+    if not isinstance(policy_body, str) or not policy_body.strip():
+        raise ValueError("extraction policy body must not be empty")
+    if "$" in policy_body:
+        raise ValueError("extraction policy body cannot contain placeholders")
+    return POLICY_FACT_EXTRACTION_FROZEN_WRAPPER.replace(
+        "$policy_body",
+        policy_body,
+        1,
+    )
+
+
+_POLICY_FACT_EXTRACTION_TEMPLATE = compile_policy_fact_extraction_template(
+    POLICY_FACT_EXTRACTION_ROOT_BODY
+)
 
 _POLICY_INTERNAL_OPERATION_TEMPLATE = """Compare each new durable semantic fact with the trusted related-memory candidates.
 Return exactly one operation for every fact. Choose ADD for new information, UPDATE for a more current replacement, DELETE only when the new evidence explicitly withdraws an existing memory, and NONE for duplicates.

@@ -192,6 +192,9 @@ def test_static_utility_runtime_preserves_boundary_and_invocation_count(
     assert execution.context_exit.physical_rewrite is False
     assert execution.context_exit.saved_tokens is None
     assert len(client.calls) == 2
+    assert client.calls[0]["binding_fingerprint"] == (
+        runtime.extraction_binding.binding_id
+    )
     request_id = result.writeback.ingestion.idempotency_key
     assert [item.target.value for item in gate.decisions(request_id)] == [
         "generation",
@@ -342,6 +345,20 @@ def test_completed_snapshot_compiles_once_without_eviction_plan(tmp_path) -> Non
     )
     assert len(source_artifacts) == 1
     assert source_artifacts[0].content_digest == projection_digest
+    component_artifacts = {
+        artifact.artifact_id: artifact for artifact in graph.artifacts
+        if artifact.kind == ArtifactKind.POLICY_PARAMETER
+    }
+    manifest = runtime.policy.semantic_manifest
+    assert component_artifacts[manifest.extraction_component_id].content_digest == (
+        manifest.extraction_component_digest
+    )
+    assert component_artifacts[manifest.update_component_id].content_digest == (
+        manifest.update_component_digest
+    )
+    assert component_artifacts[manifest.retrieval_component_id].content_digest == (
+        manifest.retrieval_component_digest
+    )
     assert len(client.calls) == 2
     context_exit = first[0].writeback.executions[0].context_exit
     assert context_exit.physical_rewrite is False

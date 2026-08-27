@@ -44,6 +44,10 @@ from ...memory.operation_graph import (
     build_artifact_id,
     build_operation_id,
 )
+from ...memory.prompt_components import (
+    PromptBindingFingerprint,
+    SemanticPolicyManifest,
+)
 from ...memory.validation import (
     SemanticMemoryCategory,
     TargetOwnershipResolver,
@@ -360,17 +364,56 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         feature_schema_version: str = "semantic-fact-features-v1",
         operation_recorder: AtomicOperationRecorder | None = None,
         utility_gate: FrozenMem0UtilityGate | None = None,
+        extraction_binding: PromptBindingFingerprint | None = None,
     ) -> None:
-        if fact_prompt.artifact.policy_version != operation_prompt.artifact.policy_version:
-            raise ValueError("Mem0 prompt policy versions must match")
+        if fact_prompt.artifact.model_profile != operation_prompt.artifact.model_profile:
+            raise ValueError("Mem0 prompt model profiles must match")
+        if extraction_binding is not None and (
+            fact_prompt.binding_fingerprint != extraction_binding.binding_id
+            or fact_prompt.artifact.template_digest
+            != extraction_binding.rendered_template_digest
+        ):
+            raise ValueError("Mem0 extraction binding does not match fact prompt")
         self.completion_client = completion_client
         self.retrieval = retrieval
         self.fact_prompt = fact_prompt
         self.operation_prompt = operation_prompt
         self.operation_recorder = operation_recorder
         self.utility_gate = utility_gate
-        base_policy_version = policy_version or fact_prompt.artifact.policy_version
-        bound_policy_version = f"{base_policy_version}.{retrieval.digest[:16]}"
+        self.extraction_binding = extraction_binding
+        extraction_component_id = (
+            extraction_binding.artifact_id
+            if extraction_binding is not None
+            else f"prompt-component.extraction.{fact_prompt.artifact.template_digest[:24]}"
+        )
+        extraction_component_digest = (
+            extraction_binding.artifact_body_digest
+            if extraction_binding is not None
+            else fact_prompt.artifact.template_digest
+        )
+        self.semantic_manifest = SemanticPolicyManifest.create(
+            route="hermes-native-semantic",
+            boundary="task-completed-v1",
+            backend="hermes-native-semantic",
+            framework_version=framework_version,
+            model_profile=fact_prompt.artifact.model_profile,
+            extraction_component_id=extraction_component_id,
+            extraction_component_digest=extraction_component_digest,
+            update_component_id=(
+                "prompt-component.update."
+                f"{operation_prompt.artifact.template_digest[:24]}"
+            ),
+            update_component_digest=operation_prompt.artifact.template_digest,
+            retrieval_component_id=(
+                f"retrieval-config.{retrieval.version}.{retrieval.digest[:16]}"
+            ),
+            retrieval_component_digest=retrieval.digest,
+        )
+        bound_policy_version = self.semantic_manifest.composite_policy_version
+        if policy_version is not None:
+            bound_policy_version = (
+                f"{bound_policy_version}.variant.{_sha(policy_version)[:16]}"
+            )
         if utility_gate is not None:
             bound_policy_version = (
                 f"{bound_policy_version}.utility.{utility_gate.digest[:16]}"
@@ -382,9 +425,7 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             policy_version=bound_policy_version,
             framework_version=framework_version,
             prompt_version=(
-                f"{fact_prompt.artifact.version}.{operation_prompt.artifact.version}."
-                f"{fact_prompt.artifact.template_digest[:8]}."
-                f"{operation_prompt.artifact.template_digest[:8]}"
+                f"semantic-components.{self.semantic_manifest.composite_digest[:24]}"
             ),
             feature_schema_version=(
                 utility_gate.feature_schema
@@ -565,10 +606,15 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
             operation.complete(output_artifact_ids=(source.artifact_id,))
         prompt_parameter = self._record_parameter_artifact(
             context,
-            logical_name=f"{self.fact_prompt.artifact.prompt_id}.template",
-            content_digest=self.fact_prompt.artifact.template_digest,
+            logical_name=self.semantic_manifest.extraction_component_id,
+            content_digest=self.semantic_manifest.extraction_component_digest,
             revision=self.fact_prompt.artifact.version,
-            provenance_ref=self.fact_prompt.artifact.prompt_id,
+            provenance_ref=(
+                self.extraction_binding.binding_id
+                if self.extraction_binding is not None
+                else self.fact_prompt.artifact.prompt_id
+            ),
+            artifact_id=self.semantic_manifest.extraction_component_id,
         )
         generation_parameter = self._record_utility_parameter(
             context,
@@ -748,10 +794,11 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         if self.operation_recorder is not None and trace_state is not None:
             retrieval_parameter = self._record_parameter_artifact(
                 trace_state[0],
-                logical_name=f"{self.retrieval.version}.parameters",
-                content_digest=self.retrieval.digest,
+                logical_name=self.semantic_manifest.retrieval_component_id,
+                content_digest=self.semantic_manifest.retrieval_component_digest,
                 revision=self.retrieval.version,
                 provenance_ref=self.retrieval.version,
+                artifact_id=self.semantic_manifest.retrieval_component_id,
             )
             retrieval_utility_parameter = self._record_utility_parameter(
                 trace_state[0],
@@ -845,10 +892,11 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         if self.operation_recorder is not None and trace_state is not None:
             decision_parameter = self._record_parameter_artifact(
                 trace_state[0],
-                logical_name=f"{self.operation_prompt.artifact.prompt_id}.template",
-                content_digest=self.operation_prompt.artifact.template_digest,
+                logical_name=self.semantic_manifest.update_component_id,
+                content_digest=self.semantic_manifest.update_component_digest,
                 revision=self.operation_prompt.artifact.version,
                 provenance_ref=self.operation_prompt.artifact.prompt_id,
+                artifact_id=self.semantic_manifest.update_component_id,
             )
             internal_utility_parameter = self._record_utility_parameter(
                 trace_state[0],
