@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
+import re
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,7 +30,8 @@ from .live_writeback import StaticSemanticBoundaryResult
 from ..memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
 
 
-EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION = 1
+EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION = 2
+LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION = 1
 
 
 def _canonical(value: object) -> str:
@@ -97,7 +100,11 @@ class ExtractionSourceRecord:
     session_id: str
     task_id: str
     compilation_id: str
+    extraction_artifact_id: str
+    extraction_artifact_digest: str
+    extraction_output_digest: str
     source: ExtractionSourceEvidence
+    content_digest: str
     schema_version: int = EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -111,8 +118,20 @@ class ExtractionSourceRecord:
             self.session_id,
             self.task_id,
             self.compilation_id,
+            self.extraction_artifact_id,
         )):
             raise ValueError("extraction source record identity is incomplete")
+        for value in (
+            self.extraction_artifact_digest,
+            self.extraction_output_digest,
+            self.content_digest,
+        ):
+            if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+                raise ValueError("extraction source fingerprint must be sha256")
+        if self.content_digest != hashlib.sha256(
+            _canonical(self.identity_payload()).encode("utf-8")
+        ).hexdigest():
+            raise ValueError("extraction source record digest mismatch")
 
     @property
     def record_id(self) -> str:
@@ -128,8 +147,14 @@ class ExtractionSourceRecord:
 
     def payload(self) -> dict[str, object]:
         return {
-            "schema_version": self.schema_version,
             "record_id": self.record_id,
+            **self.identity_payload(),
+            "content_digest": self.content_digest,
+        }
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
             "family_id": self.family_id,
             "stage": self.stage,
             "run_id": self.run_id,
@@ -137,8 +162,56 @@ class ExtractionSourceRecord:
             "session_id": self.session_id,
             "task_id": self.task_id,
             "compilation_id": self.compilation_id,
+            "extraction_artifact_id": self.extraction_artifact_id,
+            "extraction_artifact_digest": self.extraction_artifact_digest,
+            "extraction_output_digest": self.extraction_output_digest,
             "source": self.source.payload(),
         }
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        family_id: str,
+        stage: str,
+        run_id: str,
+        episode_id: str,
+        session_id: str,
+        task_id: str,
+        compilation_id: str,
+        extraction_artifact_id: str,
+        extraction_artifact_digest: str,
+        extraction_output_digest: str,
+        source: ExtractionSourceEvidence,
+    ) -> "ExtractionSourceRecord":
+        identity = {
+            "schema_version": EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION,
+            "family_id": family_id,
+            "stage": stage,
+            "run_id": run_id,
+            "episode_id": episode_id,
+            "session_id": session_id,
+            "task_id": task_id,
+            "compilation_id": compilation_id,
+            "extraction_artifact_id": extraction_artifact_id,
+            "extraction_artifact_digest": extraction_artifact_digest,
+            "extraction_output_digest": extraction_output_digest,
+            "source": source.payload(),
+        }
+        return cls(
+            family_id,
+            stage,
+            run_id,
+            episode_id,
+            session_id,
+            task_id,
+            compilation_id,
+            extraction_artifact_id,
+            extraction_artifact_digest,
+            extraction_output_digest,
+            source,
+            hashlib.sha256(_canonical(identity).encode("utf-8")).hexdigest(),
+        )
 
     @classmethod
     def from_payload(cls, value: object) -> "ExtractionSourceRecord":
@@ -152,7 +225,11 @@ class ExtractionSourceRecord:
             "session_id",
             "task_id",
             "compilation_id",
+            "extraction_artifact_id",
+            "extraction_artifact_digest",
+            "extraction_output_digest",
             "source",
+            "content_digest",
         }
         if not isinstance(value, dict) or set(value) != fields:
             raise ValueError("malformed extraction source record")
@@ -172,7 +249,11 @@ class ExtractionSourceRecord:
             value["session_id"],
             value["task_id"],
             value["compilation_id"],
+            value["extraction_artifact_id"],
+            value["extraction_artifact_digest"],
+            value["extraction_output_digest"],
             ExtractionSourceEvidence.from_payload(value["source"]),
+            value["content_digest"],
             schema_version=value["schema_version"],
         )
 
@@ -296,6 +377,260 @@ class JsonExtractionFeedbackDatasetLog:
                 if prior is not None:
                     if prior != serialized:
                         raise ValueError("conflicting extraction feedback dataset")
+                    return False
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    handle.write(serialized + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                return True
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+@dataclass(frozen=True, slots=True)
+class LiveExtractionFeedbackRecord:
+    record_id: str
+    family_id: str
+    stage: str
+    run_id: str
+    trace_id: str
+    episode_id: str
+    session_id: str
+    task_id: str
+    deployment_observation_id: str
+    source_record_id: str
+    opportunity_operation_id: str
+    use_operation_id: str
+    outcome_operation_id: str
+    dataset: ExtractionFeedbackDataset
+    schema_version: int = LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION:
+            raise ValueError("unsupported live extraction feedback schema")
+        for value in (
+            self.record_id,
+            self.family_id,
+            self.stage,
+            self.run_id,
+            self.trace_id,
+            self.episode_id,
+            self.session_id,
+            self.task_id,
+            self.deployment_observation_id,
+            self.source_record_id,
+            self.opportunity_operation_id,
+            self.use_operation_id,
+            self.outcome_operation_id,
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError("live extraction feedback identity is incomplete")
+        primary = next(
+            (example for example in self.dataset.examples if example.primary),
+            None,
+        )
+        if primary is None or (
+            primary.opportunity_operation_id != self.opportunity_operation_id
+            or primary.use_operation_id != self.use_operation_id
+            or primary.outcome_operation_id != self.outcome_operation_id
+        ):
+            raise ValueError("live feedback operation join differs from dataset")
+        identity_digest = hashlib.sha256(
+            _canonical(self.identity_payload()).encode("utf-8")
+        ).hexdigest()
+        expected = f"live-extraction-feedback.{identity_digest[:40]}"
+        if self.record_id != expected:
+            raise ValueError("live extraction feedback record ID mismatch")
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "family_id": self.family_id,
+            "stage": self.stage,
+            "run_id": self.run_id,
+            "trace_id": self.trace_id,
+            "episode_id": self.episode_id,
+            "session_id": self.session_id,
+            "task_id": self.task_id,
+            "deployment_observation_id": self.deployment_observation_id,
+            "source_record_id": self.source_record_id,
+            "opportunity_operation_id": self.opportunity_operation_id,
+            "use_operation_id": self.use_operation_id,
+            "outcome_operation_id": self.outcome_operation_id,
+            "dataset_id": self.dataset.dataset_id,
+            "source_projection_digest": self.dataset.source_projection_digest,
+            "contract_digest": self.dataset.contract_digest,
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            **self.identity_payload(),
+            "record_id": self.record_id,
+            "dataset": self.dataset.payload(),
+        }
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        family_id: str,
+        stage: str,
+        run_id: str,
+        trace_id: str,
+        episode_id: str,
+        session_id: str,
+        task_id: str,
+        deployment_observation_id: str,
+        source_record_id: str,
+        opportunity_operation_id: str,
+        use_operation_id: str,
+        outcome_operation_id: str,
+        dataset: ExtractionFeedbackDataset,
+    ) -> "LiveExtractionFeedbackRecord":
+        identity = {
+            "schema_version": LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION,
+            "family_id": family_id,
+            "stage": stage,
+            "run_id": run_id,
+            "trace_id": trace_id,
+            "episode_id": episode_id,
+            "session_id": session_id,
+            "task_id": task_id,
+            "deployment_observation_id": deployment_observation_id,
+            "source_record_id": source_record_id,
+            "opportunity_operation_id": opportunity_operation_id,
+            "use_operation_id": use_operation_id,
+            "outcome_operation_id": outcome_operation_id,
+            "dataset_id": dataset.dataset_id,
+            "source_projection_digest": dataset.source_projection_digest,
+            "contract_digest": dataset.contract_digest,
+        }
+        record_id = (
+            "live-extraction-feedback."
+            + hashlib.sha256(_canonical(identity).encode("utf-8")).hexdigest()[:40]
+        )
+        return cls(
+            record_id,
+            family_id,
+            stage,
+            run_id,
+            trace_id,
+            episode_id,
+            session_id,
+            task_id,
+            deployment_observation_id,
+            source_record_id,
+            opportunity_operation_id,
+            use_operation_id,
+            outcome_operation_id,
+            dataset,
+        )
+
+    @classmethod
+    def from_payload(cls, value: object) -> "LiveExtractionFeedbackRecord":
+        identity_fields = {
+            "schema_version",
+            "family_id",
+            "stage",
+            "run_id",
+            "trace_id",
+            "episode_id",
+            "session_id",
+            "task_id",
+            "deployment_observation_id",
+            "source_record_id",
+            "opportunity_operation_id",
+            "use_operation_id",
+            "outcome_operation_id",
+            "dataset_id",
+            "source_projection_digest",
+            "contract_digest",
+        }
+        if not isinstance(value, dict) or set(value) != identity_fields | {
+            "record_id",
+            "dataset",
+        }:
+            raise ValueError("malformed live extraction feedback record")
+        try:
+            dataset = ExtractionFeedbackDataset.from_payload(value["dataset"])
+            if (
+                value["dataset_id"] != dataset.dataset_id
+                or value["source_projection_digest"]
+                != dataset.source_projection_digest
+                or value["contract_digest"] != dataset.contract_digest
+            ):
+                raise ValueError("live feedback dataset identity mismatch")
+            return cls(
+                value["record_id"],
+                value["family_id"],
+                value["stage"],
+                value["run_id"],
+                value["trace_id"],
+                value["episode_id"],
+                value["session_id"],
+                value["task_id"],
+                value["deployment_observation_id"],
+                value["source_record_id"],
+                value["opportunity_operation_id"],
+                value["use_operation_id"],
+                value["outcome_operation_id"],
+                dataset,
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed live extraction feedback record") from exc
+
+
+class JsonLiveExtractionFeedbackRecordLog:
+    def __init__(self, path: Path) -> None:
+        self.path = path.expanduser().resolve()
+        self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+
+    def _read_unlocked(self) -> tuple[LiveExtractionFeedbackRecord, ...]:
+        if not self.path.exists():
+            return ()
+        records = []
+        identities: dict[str, str] = {}
+        for line in self.path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                record = LiveExtractionFeedbackRecord.from_payload(json.loads(line))
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                raise ValueError("malformed live extraction feedback log") from exc
+            canonical = _canonical(record.payload())
+            prior = identities.get(record.record_id)
+            if prior is not None and prior != canonical:
+                raise ValueError("conflicting live extraction feedback record")
+            if prior is None:
+                records.append(record)
+            identities[record.record_id] = canonical
+        return tuple(records)
+
+    def records(self) -> tuple[LiveExtractionFeedbackRecord, ...]:
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
+            try:
+                return self._read_unlocked()
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def append(self, record: LiveExtractionFeedbackRecord) -> bool:
+        serialized = _canonical(record.payload())
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                existing = self._read_unlocked()
+                current = next(
+                    (value for value in existing if value.record_id == record.record_id),
+                    None,
+                )
+                if current is not None:
+                    if _canonical(current.payload()) != serialized:
+                        raise ValueError("conflicting live extraction feedback record")
                     return False
                 self.path.parent.mkdir(parents=True, exist_ok=True)
                 with self.path.open("a", encoding="utf-8") as handle:
@@ -452,13 +787,29 @@ class Mem0FlatExtractionSourceProjector:
         trace = policy.operation_trace(ingestion.idempotency_key)
         assert trace is not None
         context = trace.context
-        return ExtractionSourceRecord(
-            family_id,
-            stage,
-            context.run_id,
-            context.episode_id,
-            context.session_id,
-            context.task_id,
-            boundary.compilation_id,
-            source,
+        extraction_output_digest = hashlib.sha256(_canonical([
+                {
+                    "fact_id": fact.fact_id,
+                    "content_digest": fact.content_digest,
+                    "accepted": fact.accepted,
+                    "reason_code": fact.reason_code,
+                }
+                for fact in trace.fact_extractions
+            ]).encode("utf-8")).hexdigest()
+        return ExtractionSourceRecord.create(
+            family_id=family_id,
+            stage=stage,
+            run_id=context.run_id,
+            episode_id=context.episode_id,
+            session_id=context.session_id,
+            task_id=context.task_id,
+            compilation_id=boundary.compilation_id,
+            extraction_artifact_id=(
+                policy.semantic_manifest.extraction_component_id
+            ),
+            extraction_artifact_digest=(
+                policy.semantic_manifest.extraction_component_digest
+            ),
+            extraction_output_digest=extraction_output_digest,
+            source=source,
         )

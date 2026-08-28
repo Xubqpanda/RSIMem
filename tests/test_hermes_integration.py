@@ -1265,14 +1265,18 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
     )
     operations = {operation.kind: operation for operation in graph.operations}
     feedback_path = tmp_path / "eval" / "rsimem_extraction_feedback.jsonl"
-    datasets = [
+    records = [
         json.loads(line)
         for line in feedback_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert len(datasets) == 1
+    assert len(records) == 1
+    assert records[0]["run_id"] == "run-feedback-sequence"
+    assert records[0]["episode_id"] == "episode-feedback-eval"
+    assert records[0]["task_id"] == "SM01_EVAL_NEAR_001"
+    dataset = records[0]["dataset"]
     primary = next(
-        example for example in datasets[0]["examples"] if example["primary"]
+        example for example in dataset["examples"] if example["primary"]
     )
     assert primary["label"] == "useful"
     assert primary["opportunity_operation_id"] == operations[

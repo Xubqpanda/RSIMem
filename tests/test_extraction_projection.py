@@ -197,6 +197,11 @@ def test_source_record_store_is_restart_safe_and_fails_closed(tmp_path) -> None:
             stage="learn_a",
             available_semantic_keys=(TSV_KEY,),
         )
+        assert record.extraction_artifact_digest == (
+            runtime.policy.semantic_manifest.extraction_component_digest
+        )
+        with pytest.raises(ValueError, match="record digest mismatch"):
+            replace(record, extraction_output_digest="0" * 64)
         store = JsonExtractionSourceRecordStore(path)
         assert store.append(record) is True
         assert JsonExtractionSourceRecordStore(path).append(record) is False

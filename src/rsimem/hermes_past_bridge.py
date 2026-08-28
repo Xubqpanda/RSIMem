@@ -54,8 +54,9 @@ from .memory.extraction_feedback import (
     detect_source_semantic_keys,
 )
 from .memory.extraction_projection import (
-    JsonExtractionFeedbackDatasetLog,
+    JsonLiveExtractionFeedbackRecordLog,
     JsonExtractionSourceRecordStore,
+    LiveExtractionFeedbackRecord,
     Mem0FlatExtractionSourceProjector,
 )
 from .memory.operation_graph import OperationContext
@@ -309,6 +310,7 @@ class HermesPastBenchBridge:
         self.config = config
         self.evidence_path = evidence_path.expanduser().resolve()
         self._run_id = run_id
+        self._trace_id = trace_id
         self._episode_id = episode_id
         self._session_id = session_id
         self._task_id = task_id
@@ -463,7 +465,7 @@ class HermesPastBenchBridge:
                 self.extraction_feedback_builder = ExtractionFeedbackBuilder(
                     feedback_registry
                 )
-                self.extraction_feedback_log = JsonExtractionFeedbackDatasetLog(
+                self.extraction_feedback_log = JsonLiveExtractionFeedbackRecordLog(
                     self.evidence_path.with_name(
                         "rsimem_extraction_feedback.jsonl"
                     )
@@ -705,7 +707,23 @@ class HermesPastBenchBridge:
                     outcome.outcome_operation_id,
                 ),
             )
-            self.extraction_feedback_log.append(dataset)
+            self.extraction_feedback_log.append(
+                LiveExtractionFeedbackRecord.create(
+                    family_id=self._family_id,
+                    stage=observation.stage,
+                    run_id=self._run_id,
+                    trace_id=self._trace_id,
+                    episode_id=self._episode_id,
+                    session_id=self._session_id,
+                    task_id=self._task_id,
+                    deployment_observation_id=observation.observation_id,
+                    source_record_id=record.record_id,
+                    opportunity_operation_id=future.query_operation_id,
+                    use_operation_id=outcome.use_operation_id,
+                    outcome_operation_id=outcome.outcome_operation_id,
+                    dataset=dataset,
+                )
+            )
 
     def _semantic_deployment_observation(
         self,

@@ -406,7 +406,7 @@ def test_feedback_dataset_log_is_idempotent_and_fails_closed(tmp_path) -> None:
     log = JsonExtractionFeedbackDatasetLog(path)
     assert log.append(dataset) is True
     assert JsonExtractionFeedbackDatasetLog(path).append(dataset) is False
-    with pytest.raises(ValueError, match="conflicting extraction feedback"):
+    with pytest.raises(ValueError, match="dataset ID mismatch"):
         log.append(replace(
             dataset,
             source_projection_digest=_sha("different source"),

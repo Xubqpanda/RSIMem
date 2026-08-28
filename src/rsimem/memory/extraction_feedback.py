@@ -700,6 +700,22 @@ class ExtractionFeedbackExample:
         _require_unique(self.artifact_ids, "feedback artifact IDs")
         _require_unique(self.reason_codes, "feedback reason codes")
         _require_digest(self.contract_digest, "feedback contract digest")
+        expected_primary = _stable_id("feedback-unit", {
+            "source_id": self.source_id,
+            "extraction_set_id": self.extraction_set_id,
+            "future_opportunity_id": self.future_opportunity_id,
+        })
+        if self.primary_unit_id != expected_primary:
+            raise ValueError("feedback primary unit ID mismatch")
+        expected_example = _stable_id("feedback-example", {
+            "primary_unit_id": self.primary_unit_id,
+            "level": self.level.value,
+            "fact_id": self.fact_id,
+            "label": self.label.value,
+            "contract_digest": self.contract_digest,
+        })
+        if self.example_id != expected_example:
+            raise ValueError("feedback example ID mismatch")
 
 
 @dataclass(frozen=True, slots=True)
@@ -718,6 +734,13 @@ class ExtractionFeedbackDataset:
         _require_unique(ids, "feedback example IDs")
         if sum(value.primary for value in self.examples) != 1:
             raise ValueError("feedback dataset requires exactly one primary unit")
+        expected = _stable_id("extraction-feedback", {
+            "source_projection_digest": self.source_projection_digest,
+            "contract_digest": self.contract_digest,
+            "examples": list(ids),
+        })
+        if self.dataset_id != expected:
+            raise ValueError("extraction feedback dataset ID mismatch")
 
     def payload(self) -> dict[str, object]:
         return {
@@ -746,6 +769,90 @@ class ExtractionFeedbackDataset:
                 "contract_digest": example.contract_digest,
             } for example in self.examples],
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionFeedbackDataset":
+        fields = {
+            "schema_version",
+            "dataset_id",
+            "source_projection_digest",
+            "contract_digest",
+            "examples",
+        }
+        example_fields = {
+            "example_id",
+            "primary_unit_id",
+            "level",
+            "primary",
+            "label",
+            "source_id",
+            "extraction_set_id",
+            "future_opportunity_id",
+            "fact_id",
+            "semantic_key",
+            "artifact_ids",
+            "exposure_mode",
+            "opportunity_operation_id",
+            "use_operation_id",
+            "outcome_operation_id",
+            "attribution_confidence",
+            "reason_codes",
+            "contract_digest",
+        }
+        if (
+            not isinstance(value, dict)
+            or set(value) != fields
+            or type(value["schema_version"]) is not int
+            or not isinstance(value["examples"], list)
+        ):
+            raise ValueError("malformed extraction feedback dataset")
+        examples = []
+        for item in value["examples"]:
+            if not isinstance(item, dict) or set(item) != example_fields:
+                raise ValueError("malformed extraction feedback example")
+            artifact_ids = item["artifact_ids"]
+            reason_codes = item["reason_codes"]
+            if (
+                not isinstance(artifact_ids, list)
+                or any(not isinstance(entry, str) for entry in artifact_ids)
+                or not isinstance(reason_codes, list)
+                or any(not isinstance(entry, str) for entry in reason_codes)
+            ):
+                raise ValueError("malformed extraction feedback collections")
+            try:
+                examples.append(ExtractionFeedbackExample(
+                    example_id=item["example_id"],
+                    primary_unit_id=item["primary_unit_id"],
+                    level=item["level"],
+                    primary=item["primary"],
+                    label=item["label"],
+                    source_id=item["source_id"],
+                    extraction_set_id=item["extraction_set_id"],
+                    future_opportunity_id=item["future_opportunity_id"],
+                    fact_id=item["fact_id"],
+                    semantic_key=item["semantic_key"],
+                    artifact_ids=tuple(artifact_ids),
+                    exposure_mode=item["exposure_mode"],
+                    opportunity_operation_id=item["opportunity_operation_id"],
+                    use_operation_id=item["use_operation_id"],
+                    outcome_operation_id=item["outcome_operation_id"],
+                    attribution_confidence=item["attribution_confidence"],
+                    reason_codes=tuple(reason_codes),
+                    contract_digest=item["contract_digest"],
+                    schema_version=value["schema_version"],
+                ))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("malformed extraction feedback example") from exc
+        try:
+            return cls(
+                value["dataset_id"],
+                value["source_projection_digest"],
+                value["contract_digest"],
+                tuple(examples),
+                schema_version=value["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction feedback dataset") from exc
 
 
 class ExtractionFeedbackBuilder:
