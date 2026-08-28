@@ -200,6 +200,80 @@ class ProcessFeedback:
 
 
 @dataclass(frozen=True, slots=True)
+class PolicyHypothesis:
+    """A constrained N+1 proposal derived from past content-free feedback."""
+
+    hypothesis_id: str
+    parent_artifact_id: str
+    candidate_artifact_id: str
+    target_layer: PolicyLayer
+    feedback_ids: tuple[str, ...]
+    reason_codes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "target_layer", PolicyLayer(self.target_layer))
+        for value, name in (
+            (self.hypothesis_id, "policy hypothesis ID"),
+            (self.parent_artifact_id, "hypothesis parent artifact ID"),
+            (self.candidate_artifact_id, "hypothesis candidate artifact ID"),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must not be empty")
+        if self.parent_artifact_id == self.candidate_artifact_id:
+            raise ValueError("hypothesis parent and candidate artifacts must differ")
+        for values, name in (
+            (self.feedback_ids, "hypothesis feedback IDs"),
+            (self.reason_codes, "hypothesis reason codes"),
+        ):
+            values = tuple(values)
+            if not values or len(values) != len(set(values)) or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                raise ValueError(f"{name} must be unique non-empty strings")
+            attribute = {
+                "hypothesis feedback IDs": "feedback_ids",
+                "hypothesis reason codes": "reason_codes",
+            }[name]
+            object.__setattr__(self, attribute, values)
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        parent_artifact_id: str,
+        candidate_artifact_id: str,
+        target_layer: PolicyLayer,
+        feedback_ids: Sequence[str],
+        reason_codes: Sequence[str] = ("feedback_bound_candidate",),
+    ) -> "PolicyHypothesis":
+        identity = {
+            "parent_artifact_id": parent_artifact_id,
+            "candidate_artifact_id": candidate_artifact_id,
+            "target_layer": PolicyLayer(target_layer).value,
+            "feedback_ids": list(feedback_ids),
+            "reason_codes": list(reason_codes),
+        }
+        return cls(
+            f"hypothesis.{content_digest(identity)[:40]}",
+            parent_artifact_id,
+            candidate_artifact_id,
+            target_layer,
+            tuple(feedback_ids),
+            tuple(reason_codes),
+        )
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "hypothesis_id": self.hypothesis_id,
+            "parent_artifact_id": self.parent_artifact_id,
+            "candidate_artifact_id": self.candidate_artifact_id,
+            "target_layer": self.target_layer.value,
+            "feedback_ids": list(self.feedback_ids),
+            "reason_codes": list(self.reason_codes),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class LayerIntervention:
     case_id: str
     target_layer: PolicyLayer
@@ -212,6 +286,7 @@ class LayerIntervention:
     feedback: FeedbackChain = FeedbackChain()
     reason_codes: tuple[str, ...] = ()
     process_feedback: ProcessFeedback | None = None
+    hypothesis: PolicyHypothesis | None = None
 
     def __post_init__(self) -> None:
         if not self.case_id.strip():
@@ -260,6 +335,12 @@ class LayerIntervention:
             object.__setattr__(self, "process_feedback", process_feedback)
         elif self.process_feedback is not None:
             raise ValueError("process feedback cannot be present when process_signal is false")
+        if self.process_signal:
+            hypothesis = self.hypothesis or self._derive_hypothesis()
+            self._validate_hypothesis(hypothesis)
+            object.__setattr__(self, "hypothesis", hypothesis)
+        elif self.hypothesis is not None:
+            raise ValueError("policy hypothesis requires process signal")
 
     def _validate_feedback(self, outcome: FeasibilityOutcome) -> None:
         if outcome == FeasibilityOutcome.USEFUL and not self.feedback.complete_useful:
@@ -314,6 +395,32 @@ class LayerIntervention:
             or value.observed_after_digest != candidate.output_digest
         ):
             raise ValueError("process feedback does not match replay decisions")
+
+    def _derive_hypothesis(self) -> PolicyHypothesis:
+        feedback_ids = self.feedback.ids
+        if not feedback_ids and self.process_feedback is not None:
+            feedback_ids = (self.process_feedback.feedback_id,)
+        return PolicyHypothesis.create(
+            parent_artifact_id=self.parent_artifact.artifact_id,
+            candidate_artifact_id=self.candidate_artifact.artifact_id,
+            target_layer=self.target_layer,
+            feedback_ids=feedback_ids,
+        )
+
+    def _validate_hypothesis(self, value: PolicyHypothesis) -> None:
+        if not isinstance(value, PolicyHypothesis):
+            raise ValueError("policy hypothesis has the wrong type")
+        if (
+            value.parent_artifact_id != self.parent_artifact.artifact_id
+            or value.candidate_artifact_id != self.candidate_artifact.artifact_id
+            or value.target_layer != self.target_layer
+        ):
+            raise ValueError("policy hypothesis does not match intervention artifacts")
+        allowed_feedback = set(self.feedback.ids)
+        if self.process_feedback is not None:
+            allowed_feedback.add(self.process_feedback.feedback_id)
+        if not set(value.feedback_ids).issubset(allowed_feedback):
+            raise ValueError("policy hypothesis feedback is not bound to intervention")
 
     @property
     def parent_decision(self) -> PolicyDecision | None:
@@ -380,6 +487,7 @@ class LayerIntervention:
                 if self.process_feedback is not None
                 else None
             ),
+            "hypothesis_id": self.hypothesis.hypothesis_id if self.hypothesis else None,
         }
 
 
@@ -407,6 +515,7 @@ class FeasibilityEvidenceRecord:
             "parent_lineage_id", "candidate_lineage_id", "parent_audit_ok",
             "candidate_audit_ok", "process_signal", "outcome", "feedback_ids",
             "reason_codes", "intervention_fingerprint", "process_feedback_id",
+            "hypothesis_id",
         }
         if set(payload) != required:
             raise ValueError("malformed feasibility replay payload")
@@ -419,6 +528,11 @@ class FeasibilityEvidenceRecord:
             or not payload["process_feedback_id"].strip()
         ):
             raise ValueError("feasibility process feedback ID is invalid")
+        if payload["hypothesis_id"] is not None and (
+            not isinstance(payload["hypothesis_id"], str)
+            or not payload["hypothesis_id"].strip()
+        ):
+            raise ValueError("feasibility hypothesis ID is invalid")
         for field in ("parent_decision_ids", "candidate_decision_ids", "feedback_ids", "reason_codes"):
             values = payload[field]
             if not isinstance(values, list) or len(values) != len(set(values)) or any(
@@ -720,6 +834,7 @@ __all__ = [
     "FeasibilityStatus",
     "FeedbackChain",
     "ProcessFeedback",
+    "PolicyHypothesis",
     "LayerIntervention",
     "FeasibilityEvidenceRecord",
     "JsonFeasibilityEvidenceLedger",
