@@ -520,9 +520,9 @@ class HermesPastBenchBridge:
                 )
                 self.extraction_optimizer_capture_log = (
                     JsonExtractionOptimizerCaptureLog(
-                        Path(hermes_home)
-                        / ".rsimem"
-                        / "extraction_optimizer_capture.jsonl"
+                        self.evidence_path.with_name(
+                            "extraction_optimizer_capture.jsonl"
+                        )
                     )
                 )
             else:
