@@ -114,11 +114,15 @@ def test_formal_feedback_preflight_builds_manifest_before_provider_call(
 ) -> None:
     family = _family(tmp_path)
     registry, run = _agent_files(tmp_path)
-    revisions = iter((
-        CleanRepositoryRevision("rsimem-commit", "rsimem-tree"),
-        CleanRepositoryRevision("past-commit", "past-tree"),
-    ))
-    monkeypatch.setattr(preflight, "resolve_clean_repository", lambda _: next(revisions))
+    monkeypatch.setattr(
+        preflight,
+        "resolve_clean_repository",
+        lambda path: (
+            CleanRepositoryRevision("past-commit", "past-tree")
+            if Path(path).name == "past"
+            else CleanRepositoryRevision("rsimem-commit", "rsimem-tree")
+        ),
+    )
     manifest_path = tmp_path / "output" / "batch_manifest.json"
 
     experiment_id = preflight.initialize_formal_feedback_batch(
@@ -150,6 +154,37 @@ def test_formal_feedback_preflight_builds_manifest_before_provider_call(
     assert manifest["modelProfile"]["resolved"]["providerBaseUrl"] == (
         "https://provider.invalid/v1"
     )
+
+    resumed = preflight.initialize_formal_feedback_batch(
+        manifest_path=manifest_path,
+        batch_registry_path=tmp_path / "batch-registry.json",
+        batch_id="formal-feedback.fixture-v1",
+        rsimem_root=tmp_path,
+        past_bench_root=tmp_path / "past",
+        family_root=family,
+        agent_registry_path=registry,
+        run_config_path=run,
+        experiment_config_path=ROOT / "configs/extraction_feedback_sm01.json",
+    )
+    assert resumed == experiment_id
+
+    run.write_text(
+        "runtime:\n  mode: local\n  temperature: 0.2\n"
+        "judge:\n  enabled: false\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="identity drifted"):
+        preflight.initialize_formal_feedback_batch(
+            manifest_path=manifest_path,
+            batch_registry_path=tmp_path / "batch-registry.json",
+            batch_id="formal-feedback.fixture-v1",
+            rsimem_root=tmp_path,
+            past_bench_root=tmp_path / "past",
+            family_root=family,
+            agent_registry_path=registry,
+            run_config_path=run,
+            experiment_config_path=ROOT / "configs/extraction_feedback_sm01.json",
+        )
 
 
 def test_preflight_rejects_wrong_family_before_manifest_creation(

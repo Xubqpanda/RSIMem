@@ -651,10 +651,8 @@ def _load_registry(path: Path) -> dict[str, Any]:
     return registry
 
 
-def initialize_extraction_batch_manifest(
-    path: Path,
+def build_extraction_batch_manifest(
     *,
-    registry_path: Path,
     batch_id: str,
     phase: str,
     replicates: int,
@@ -674,7 +672,7 @@ def initialize_extraction_batch_manifest(
     persistence_profile_digest: str,
     rsimem_revision: CleanRepositoryRevision,
     past_bench_revision: CleanRepositoryRevision,
-) -> str:
+) -> dict[str, Any]:
     _require_identifier(batch_id, "extraction batch ID")
     if phase not in EXTRACTION_PHASES:
         raise ValueError("unknown extraction experiment phase")
@@ -766,6 +764,55 @@ def initialize_extraction_batch_manifest(
     identity.pop("attemptHistory")
     value["experimentId"] = _digest(identity)
     validate_extraction_manifest(value)
+    return value
+
+
+def initialize_extraction_batch_manifest(
+    path: Path,
+    *,
+    registry_path: Path,
+    batch_id: str,
+    phase: str,
+    replicates: int,
+    family_id: str,
+    task_template_group_id: str,
+    task_manifest_digest: str,
+    parent_policy: SemanticPolicyManifest,
+    active_policy: SemanticPolicyManifest,
+    matched_policy: MatchedSemanticPolicyManifest | None,
+    feedback_contract: FamilyFeedbackContract,
+    acceptance_criteria: ExtractionAcceptanceCriteria,
+    model_profile_id: str,
+    resolved_model_profile: dict[str, Any],
+    request_budget_id: str,
+    resolved_request_budget: dict[str, Any],
+    persistence_profile_id: str,
+    persistence_profile_digest: str,
+    rsimem_revision: CleanRepositoryRevision,
+    past_bench_revision: CleanRepositoryRevision,
+) -> str:
+    value = build_extraction_batch_manifest(
+        batch_id=batch_id,
+        phase=phase,
+        replicates=replicates,
+        family_id=family_id,
+        task_template_group_id=task_template_group_id,
+        task_manifest_digest=task_manifest_digest,
+        parent_policy=parent_policy,
+        active_policy=active_policy,
+        matched_policy=matched_policy,
+        feedback_contract=feedback_contract,
+        acceptance_criteria=acceptance_criteria,
+        model_profile_id=model_profile_id,
+        resolved_model_profile=resolved_model_profile,
+        request_budget_id=request_budget_id,
+        resolved_request_budget=resolved_request_budget,
+        persistence_profile_id=persistence_profile_id,
+        persistence_profile_digest=persistence_profile_digest,
+        rsimem_revision=rsimem_revision,
+        past_bench_revision=past_bench_revision,
+    )
+    split_role = value["split"]["role"]
 
     manifest_path = path.expanduser().resolve()
     registry = registry_path.expanduser().resolve()
@@ -802,6 +849,39 @@ def initialize_extraction_batch_manifest(
         _write_json(registry, current)
         _load_registry(registry)
     return value["experimentId"]
+
+
+def resume_extraction_batch_manifest(
+    path: Path,
+    *,
+    registry_path: Path,
+    expected: dict[str, Any],
+) -> str:
+    """Resume one registered batch only when immutable identity is unchanged."""
+
+    expected = validate_extraction_manifest(expected)
+    manifest = load_extraction_manifest(path)
+    if manifest["experimentId"] != expected["experimentId"]:
+        raise ValueError("resumed extraction batch identity drifted")
+    registry = registry_path.expanduser().resolve()
+    with _exclusive_lock(registry.with_suffix(registry.suffix + ".lock")):
+        current = _load_registry(registry)
+        entries = [
+            entry for entry in current["entries"]
+            if entry["batchId"] == manifest["batchId"]
+        ]
+        if len(entries) != 1 or entries[0]["experimentId"] != manifest["experimentId"]:
+            raise ValueError("resumed extraction batch is not uniquely registered")
+        entry = entries[0]
+        revisions = manifest["revisions"]
+        if (
+            entry["rsimemCommit"] != revisions["rsimem"]["commit"]
+            or entry["rsimemTree"] != revisions["rsimem"]["tree"]
+            or entry["pastBenchCommit"] != revisions["pastBench"]["commit"]
+            or entry["pastBenchTree"] != revisions["pastBench"]["tree"]
+        ):
+            raise ValueError("resumed extraction batch revision registry drifted")
+    return manifest["experimentId"]
 
 
 def next_extraction_attempt_name(
