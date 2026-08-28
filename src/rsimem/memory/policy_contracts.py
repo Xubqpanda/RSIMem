@@ -543,11 +543,11 @@ class AdmissionDecision(PolicyDecision):
             raise ValueError("filtered facts must be candidates")
         if set(self.accepted_fact_ids).intersection(self.filtered_fact_ids):
             raise ValueError("a fact cannot be both accepted and filtered")
-        if self.mutation_kind == MutationKind.UPDATE:
+        if self.mutation_kind in {MutationKind.UPDATE, MutationKind.DELETE}:
             if not self.update_supported:
-                raise ValueError("backend does not support update")
+                raise ValueError("backend does not support update/target mutation")
             if not self.target_artifact_ids or not self.backend_revision:
-                raise ValueError("update admission requires target artifacts and backend revision")
+                raise ValueError("target admission requires target artifacts and backend revision")
         elif self.target_artifact_ids:
             raise ValueError("only update admission may carry target artifacts")
         if type(self.update_supported) is not bool:
