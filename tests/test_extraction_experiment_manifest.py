@@ -85,9 +85,19 @@ def _inputs(tmp_path: Path, *, phase: str = "validation") -> dict[str, object]:
         ).contract,
         "acceptance_criteria": _criteria(),
         "model_profile_id": "fixture-model-v1",
-        "model_profile_digest": "6" * 64,
+        "resolved_model_profile": {
+            "agentProfile": "hermes-luna",
+            "modelId": "gpt-fixture",
+            "providerBaseUrl": "https://provider.invalid/v1",
+            "temperature": 0.0,
+            "semanticIngestionProfileId": "fixture-model-v1",
+        },
         "request_budget_id": "past-task-budget.fixture-v1",
-        "request_budget_digest": "7" * 64,
+        "resolved_request_budget": {
+            "taskManifestDigest": "4" * 64,
+            "maxTurns": 20,
+            "timeoutSeconds": 300,
+        },
         "persistence_profile_id": "per-attempt-isolation-v1",
         "persistence_profile_digest": "8" * 64,
         "rsimem_revision": CleanRepositoryRevision("rsimem-commit", "rsimem-tree"),
@@ -215,6 +225,12 @@ def test_validation_manifest_records_matched_extraction_only_identity(
         (
             lambda value: value["modelProfile"].__setitem__("profileId", "other-model-v1"),
             "model profile disagree",
+        ),
+        (
+            lambda value: value["modelProfile"]["resolved"].__setitem__(
+                "modelId", "drifted-model"
+            ),
+            "model profile digest mismatch",
         ),
         (
             lambda value: value["feedbackContract"].__setitem__(
