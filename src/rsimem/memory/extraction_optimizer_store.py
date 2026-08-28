@@ -20,7 +20,7 @@ from .extraction_optimizer_corpus import (
 from .prompt_components import canonical_json
 
 
-EXTRACTION_OPTIMIZER_STORE_SCHEMA = "extraction-optimizer-corpus-store-v1"
+EXTRACTION_OPTIMIZER_STORE_SCHEMA = "extraction-optimizer-corpus-store-v2"
 
 
 class JsonExtractionOptimizerCorpusStore:

@@ -7,6 +7,7 @@ import pytest
 
 from rsimem.memory.extraction_feedback import (
     AttributionConfidence,
+    ExposureMode,
     ExtractionFeedbackLabel,
     ExtractionFeedbackLevel,
     FactDisposition,
@@ -106,6 +107,10 @@ def _example(
         primary_unit_id="feedback-unit.primary-v1",
         level=ExtractionFeedbackLevel.EXTRACTION_SET,
         primary=True,
+        feedback_fact_id=None,
+        feedback_semantic_key=None,
+        feedback_artifact_ids=("artifact.memory-v1",),
+        exposure_mode=ExposureMode.EAGER_SYSTEM_PROMPT,
         label=label,
         attribution_confidence=AttributionConfidence.HIGH,
         reason_codes=("explicit_memory_use", "successful_outcome"),
@@ -144,6 +149,10 @@ def test_corpus_identity_is_canonical_and_covers_content_and_split() -> None:
     assert ExtractionOptimizerCorpus.from_payload(
         json.loads(json.dumps(first.payload()))
     ) == first
+    legacy = first.payload()
+    legacy["schema_version"] = 1
+    with pytest.raises(ValueError, match="malformed extraction optimizer corpus"):
+        ExtractionOptimizerCorpus.from_payload(legacy)
     changed = ExtractionOptimizerCorpus.create(
         batch_id="batch.validation-v1",
         attempt_id="attempt.001",

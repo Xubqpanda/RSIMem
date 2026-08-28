@@ -299,6 +299,13 @@ def test_builder_exactly_joins_content_and_content_free_evidence() -> None:
     assert examples[0].audit_join.artifacts[0].mutation_ids == (
         "mutation.persist-v1",
     )
+    fact_example = next(
+        value for value in examples
+        if value.level.value == "fact"
+    )
+    assert fact_example.feedback_fact_id == "fact.preference-v1"
+    assert fact_example.feedback_semantic_key == TSV_KEY
+    assert fact_example.feedback_artifact_ids == ("artifact.memory-v1",)
     replay = ExtractionOptimizerCorpusBuilder().build_examples(
         projection=projection,
         source_record=source,
