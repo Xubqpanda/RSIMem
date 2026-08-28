@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
 import math
+import os
 import re
+import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
+from typing import Mapping
 
 from .extraction_feedback import ExtractionFeedbackLabel, ExtractionSetStatus
 
@@ -770,3 +776,174 @@ class ExtractionPromptMatchedValidator:
             values["pair_ids"],
             values["observation_ids"],
         )
+
+
+class JsonExtractionValidationDecisionStore:
+    """Immutable extraction validation decisions keyed by logical identity."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root.expanduser().resolve()
+
+    @contextmanager
+    def _lock(self, operation: int):
+        self.root.mkdir(parents=True, exist_ok=True)
+        with (self.root / ".extraction-validation.lock").open(
+            "a+",
+            encoding="utf-8",
+        ) as lock:
+            fcntl.flock(lock.fileno(), operation)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def put(self, decision: ExtractionValidationDecision) -> tuple[Path, bool]:
+        path = self.root / f"{decision.decision_id}.json"
+        canonical = _canonical(decision.payload()) + "\n"
+        with self._lock(fcntl.LOCK_EX):
+            if path.exists():
+                if path.read_text(encoding="utf-8") != canonical:
+                    raise ValueError("extraction validation decision conflicts with its ID")
+                return path, False
+            file_descriptor, temporary = tempfile.mkstemp(
+                prefix=".extraction-validation.",
+                dir=self.root,
+            )
+            try:
+                with os.fdopen(file_descriptor, "w", encoding="utf-8") as handle:
+                    handle.write(canonical)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, path)
+                directory = os.open(self.root, os.O_RDONLY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
+            except BaseException:
+                try:
+                    os.unlink(temporary)
+                except OSError:
+                    pass
+                raise
+        return path, True
+
+    @staticmethod
+    def _metrics(value: object) -> ExtractionQualityMetrics:
+        fields = {
+            "completed_source_count",
+            "useful_count",
+            "harmful_count",
+            "missed_count",
+            "unresolved_count",
+            "censored_count",
+            "nonempty_count",
+            "empty_count",
+            "missed_assessable_count",
+            "resolved_useful_rate",
+            "observed_harmful_rate",
+            "nonempty_coverage",
+            "empty_extraction_rate",
+            "high_confidence_missed_rate",
+            "safety_failure_count",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed extraction validation metrics")
+        try:
+            return ExtractionQualityMetrics(**value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction validation metrics") from exc
+
+    @classmethod
+    def _parse(cls, value: object) -> ExtractionValidationDecision:
+        fields = {
+            "schema_version",
+            "decision_schema",
+            "decision_id",
+            "accepted",
+            "split_id",
+            "parent_artifact_id",
+            "proposal_artifact_id",
+            "criteria_digest",
+            "parent_metrics",
+            "proposal_metrics",
+            "useful_rate_delta",
+            "harmful_rate_delta",
+            "missed_rate_delta",
+            "changed_extraction_count",
+            "reason_codes",
+            "pair_ids",
+            "observation_ids",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed extraction validation decision")
+        try:
+            reason_codes = value["reason_codes"]
+            pair_ids = value["pair_ids"]
+            observation_ids = value["observation_ids"]
+            if not all(isinstance(items, list) for items in (
+                reason_codes,
+                pair_ids,
+                observation_ids,
+            )):
+                raise TypeError("decision collections must be lists")
+            return ExtractionValidationDecision(
+                decision_id=value["decision_id"],
+                accepted=value["accepted"],
+                split_id=value["split_id"],
+                parent_artifact_id=value["parent_artifact_id"],
+                proposal_artifact_id=value["proposal_artifact_id"],
+                criteria_digest=value["criteria_digest"],
+                parent_metrics=cls._metrics(value["parent_metrics"]),
+                proposal_metrics=cls._metrics(value["proposal_metrics"]),
+                useful_rate_delta=value["useful_rate_delta"],
+                harmful_rate_delta=value["harmful_rate_delta"],
+                missed_rate_delta=value["missed_rate_delta"],
+                changed_extraction_count=value["changed_extraction_count"],
+                reason_codes=tuple(reason_codes),
+                pair_ids=tuple(pair_ids),
+                observation_ids=tuple(observation_ids),
+                decision_schema=value["decision_schema"],
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction validation decision") from exc
+
+    def get(self, decision_id: str) -> ExtractionValidationDecision | None:
+        _require_id(decision_id, "extraction validation decision ID")
+        path = self.root / f"{decision_id}.json"
+        with self._lock(fcntl.LOCK_SH):
+            if not path.exists():
+                return None
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError("malformed extraction validation decision JSON") from exc
+            decision = self._parse(payload)
+            if decision.decision_id != decision_id:
+                raise ValueError("extraction validation decision filename mismatch")
+            return decision
+
+
+class ExtractionValidationReplay:
+    """Require a stored decision to equal a fresh raw-observation evaluation."""
+
+    def verify(
+        self,
+        decision: ExtractionValidationDecision,
+        *,
+        split: ExtractionPromptValidationSplit,
+        observations: tuple[ExtractionValidationObservation, ...],
+        parent_artifact_id: str,
+        proposal_artifact_id: str,
+        criteria: ExtractionAcceptanceCriteria,
+    ) -> None:
+        replay = ExtractionPromptMatchedValidator().evaluate(
+            split=split,
+            observations=observations,
+            parent_artifact_id=parent_artifact_id,
+            proposal_artifact_id=proposal_artifact_id,
+            criteria=criteria,
+        )
+        if replay != decision:
+            raise ValueError("extraction validation decision replay mismatch")

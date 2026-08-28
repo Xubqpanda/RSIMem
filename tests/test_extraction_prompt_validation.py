@@ -14,6 +14,8 @@ from rsimem.memory.extraction_prompt_validation import (
     ExtractionPromptMatchedValidator,
     ExtractionPromptValidationSplit,
     ExtractionQualityMetrics,
+    ExtractionValidationReplay,
+    JsonExtractionValidationDecisionStore,
     ExtractionSplitAssignment,
     ExtractionValidationObservation,
     ExtractionValidationSplitRole,
@@ -392,3 +394,76 @@ def test_validation_contract_has_no_score_cost_or_fake_uncertainty_surface() -> 
     }
     with pytest.raises(ValueError, match="strictly positive"):
         replace(_criteria(), minimum_useful_rate_delta=0.0)
+
+
+def test_validation_decision_store_and_raw_observation_replay(tmp_path) -> None:
+    observations = _pairs(
+        (
+            ExtractionFeedbackLabel.USEFUL,
+            ExtractionFeedbackLabel.HARMFUL,
+            ExtractionFeedbackLabel.UNRESOLVED,
+        ),
+        (
+            ExtractionFeedbackLabel.USEFUL,
+            ExtractionFeedbackLabel.USEFUL,
+            ExtractionFeedbackLabel.UNRESOLVED,
+        ),
+    )
+    split = _split()
+    criteria = _criteria()
+    decision = ExtractionPromptMatchedValidator().evaluate(
+        split=split,
+        observations=observations,
+        parent_artifact_id=PARENT,
+        proposal_artifact_id=PROPOSAL,
+        criteria=criteria,
+    )
+    store = JsonExtractionValidationDecisionStore(tmp_path / "decisions")
+    path, created = store.put(decision)
+    assert created is True
+    assert JsonExtractionValidationDecisionStore(
+        tmp_path / "decisions"
+    ).put(decision) == (path, False)
+    restored = JsonExtractionValidationDecisionStore(
+        tmp_path / "decisions"
+    ).get(decision.decision_id)
+    assert restored == decision
+    ExtractionValidationReplay().verify(
+        restored,
+        split=split,
+        observations=observations,
+        parent_artifact_id=PARENT,
+        proposal_artifact_id=PROPOSAL,
+        criteria=criteria,
+    )
+    serialized = path.read_text(encoding="utf-8")
+    assert not any(value in serialized for value in (
+        "task_score",
+        "cost_weight",
+        "maximum_cost_ratio",
+        "uncertainty",
+        "grader",
+        "answer_key",
+    ))
+
+    changed = list(observations)
+    changed[1] = _observation(
+        ExtractionValidationVariant.PROPOSAL,
+        1,
+        ExtractionFeedbackLabel.HARMFUL,
+    )
+    with pytest.raises(ValueError, match="replay mismatch"):
+        ExtractionValidationReplay().verify(
+            restored,
+            split=split,
+            observations=tuple(changed),
+            parent_artifact_id=PARENT,
+            proposal_artifact_id=PROPOSAL,
+            criteria=criteria,
+        )
+
+    path.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed extraction validation"):
+        store.get(decision.decision_id)
+    with pytest.raises(ValueError, match="conflicts with its ID"):
+        store.put(decision)
