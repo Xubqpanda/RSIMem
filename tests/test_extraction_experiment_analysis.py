@@ -68,6 +68,7 @@ def _feedback(
     source_record_id: str,
     method: str,
     artifact_id: str,
+    run_id: str | None = None,
 ) -> LiveExtractionFeedbackRecord:
     future = FutureMemoryEvidence(
         f"opportunity.{method}",
@@ -103,7 +104,7 @@ def _feedback(
     return LiveExtractionFeedbackRecord.create(
         family_id="SM01_preference_adoption",
         stage="eval_near",
-        run_id=f"run.{method}",
+        run_id=run_id or f"run.{method}",
         trace_id=f"trace.{method}",
         episode_id=f"episode.{method}",
         session_id=f"session.{method}",
@@ -125,12 +126,13 @@ def _run_evidence(
     extraction_artifact_digest: str,
     output_digest: str,
     memory_artifact_id: str,
+    run_id: str | None = None,
 ) -> None:
     source = _source(method, memory_artifact_id)
     source_record = ExtractionSourceRecord.create(
         family_id="SM01_preference_adoption",
         stage="learn_a",
-        run_id=f"run.{method}",
+        run_id=run_id or f"run.{method}",
         episode_id=f"episode.learn.{method}",
         session_id=f"session.learn.{method}",
         task_id="task.learn",
@@ -154,6 +156,7 @@ def _run_evidence(
         source_record_id=source_record.record_id,
         method=method,
         artifact_id=memory_artifact_id,
+        run_id=run_id,
     )
     JsonLiveExtractionFeedbackRecordLog(
         run / "02_eval" / "artifacts" / "rsimem_extraction_feedback.jsonl"
@@ -270,6 +273,7 @@ def _batch(tmp_path: Path, *, changed: bool) -> Path:
                 if adaptive and changed
                 else "artifact.parent"
             ),
+            run_id=run_name,
         )
         record_extraction_attempt(
             root / "batch_manifest.json",

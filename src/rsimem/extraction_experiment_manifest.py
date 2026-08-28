@@ -329,7 +329,7 @@ def _validate_feedback_contract(value: object, family_id: str) -> dict[str, Any]
     return wrapper
 
 
-def _validate_criteria(value: object) -> dict[str, Any]:
+def _validate_criteria(value: object) -> ExtractionAcceptanceCriteria:
     payload = _require_exact(value, {
         "minimumMatchedPairs",
         "minimumResolvedExamples",
@@ -359,7 +359,7 @@ def _validate_criteria(value: object) -> dict[str, Any]:
     )
     if payload["criteriaDigest"] != criteria.digest:
         raise ValueError("extraction acceptance criteria digest mismatch")
-    return payload
+    return criteria
 
 
 def _validate_attempt_history(value: dict[str, Any]) -> None:
@@ -539,7 +539,7 @@ def validate_extraction_manifest(value: object) -> dict[str, Any]:
         raise ValueError("active extraction artifact mapping mismatch")
 
     _validate_feedback_contract(manifest["feedbackContract"], split["familyId"])
-    criteria = _validate_criteria(manifest["acceptanceCriteria"])
+    _validate_criteria(manifest["acceptanceCriteria"])
     objective = _require_exact(manifest["objective"], {
         "schema", "primaryUnit", "resolvedDenominator",
     }, "extraction objective")
@@ -627,6 +627,13 @@ def load_extraction_manifest_for_phase(
     if manifest["phase"] != required_phase:
         raise ValueError("extraction manifest cannot be used for this phase")
     return manifest
+
+
+def extraction_acceptance_criteria_from_manifest(
+    value: object,
+) -> ExtractionAcceptanceCriteria:
+    manifest = validate_extraction_manifest(value)
+    return _validate_criteria(manifest["acceptanceCriteria"])
 
 
 def _load_registry(path: Path) -> dict[str, Any]:
