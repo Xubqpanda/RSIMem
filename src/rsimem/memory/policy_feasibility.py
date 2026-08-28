@@ -91,6 +91,115 @@ class FeedbackChain:
 
 
 @dataclass(frozen=True, slots=True)
+class ProcessFeedback:
+    """Content-free before/after evidence for one layer intervention."""
+
+    feedback_id: str
+    event_id: str
+    source_revision: str
+    target_layer: PolicyLayer
+    parent_decision_id: str
+    candidate_decision_id: str
+    parent_execution_receipt_ids: tuple[str, ...] = ()
+    candidate_execution_receipt_ids: tuple[str, ...] = ()
+    observed_before_digest: str = ""
+    observed_after_digest: str = ""
+    reason_codes: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "target_layer", PolicyLayer(self.target_layer))
+        for value, name in (
+            (self.feedback_id, "process feedback ID"),
+            (self.event_id, "process feedback event ID"),
+            (self.source_revision, "process feedback source revision"),
+            (self.parent_decision_id, "process feedback parent decision ID"),
+            (self.candidate_decision_id, "process feedback candidate decision ID"),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must not be empty")
+        for value, name in (
+            (self.observed_before_digest, "process feedback before digest"),
+            (self.observed_after_digest, "process feedback after digest"),
+        ):
+            if not isinstance(value, str) or len(value) != 64 or any(
+                char not in "0123456789abcdef" for char in value
+            ):
+                raise ValueError(f"{name} must be sha256")
+        for values, name in (
+            (self.parent_execution_receipt_ids, "parent execution receipts"),
+            (self.candidate_execution_receipt_ids, "candidate execution receipts"),
+            (self.reason_codes, "process feedback reason codes"),
+        ):
+            values = tuple(values)
+            if len(values) != len(set(values)) or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                raise ValueError(f"{name} must be unique non-empty strings")
+            attribute = {
+                "parent execution receipts": "parent_execution_receipt_ids",
+                "candidate execution receipts": "candidate_execution_receipt_ids",
+                "process feedback reason codes": "reason_codes",
+            }[name]
+            object.__setattr__(self, attribute, values)
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        event_id: str,
+        source_revision: str,
+        target_layer: PolicyLayer,
+        parent_decision_id: str,
+        candidate_decision_id: str,
+        parent_execution_receipt_ids: Sequence[str] = (),
+        candidate_execution_receipt_ids: Sequence[str] = (),
+        observed_before_digest: str,
+        observed_after_digest: str,
+        reason_codes: Sequence[str] = (),
+    ) -> "ProcessFeedback":
+        identity = {
+            "event_id": event_id,
+            "source_revision": source_revision,
+            "target_layer": PolicyLayer(target_layer).value,
+            "parent_decision_id": parent_decision_id,
+            "candidate_decision_id": candidate_decision_id,
+            "parent_execution_receipt_ids": list(parent_execution_receipt_ids),
+            "candidate_execution_receipt_ids": list(candidate_execution_receipt_ids),
+            "observed_before_digest": observed_before_digest,
+            "observed_after_digest": observed_after_digest,
+            "reason_codes": list(reason_codes),
+        }
+        return cls(
+            f"process-feedback.{content_digest(identity)[:40]}",
+            event_id,
+            source_revision,
+            target_layer,
+            parent_decision_id,
+            candidate_decision_id,
+            tuple(parent_execution_receipt_ids),
+            tuple(candidate_execution_receipt_ids),
+            observed_before_digest,
+            observed_after_digest,
+            tuple(reason_codes),
+        )
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "feedback_id": self.feedback_id,
+            "event_id": self.event_id,
+            "source_revision": self.source_revision,
+            "target_layer": self.target_layer.value,
+            "parent_decision_id": self.parent_decision_id,
+            "candidate_decision_id": self.candidate_decision_id,
+            "parent_execution_receipt_ids": list(self.parent_execution_receipt_ids),
+            "candidate_execution_receipt_ids": list(self.candidate_execution_receipt_ids),
+            "observed_before_digest": self.observed_before_digest,
+            "observed_after_digest": self.observed_after_digest,
+            "reason_codes": list(self.reason_codes),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class LayerIntervention:
     case_id: str
     target_layer: PolicyLayer
@@ -102,6 +211,7 @@ class LayerIntervention:
     outcome: FeasibilityOutcome
     feedback: FeedbackChain = FeedbackChain()
     reason_codes: tuple[str, ...] = ()
+    process_feedback: ProcessFeedback | None = None
 
     def __post_init__(self) -> None:
         if not self.case_id.strip():
@@ -144,6 +254,12 @@ class LayerIntervention:
         self._validate_feedback(outcome)
         if self.action_changed is False:
             raise ValueError("candidate must change the target-layer decision fingerprint")
+        if self.process_signal:
+            process_feedback = self.process_feedback or self._derive_process_feedback()
+            self._validate_process_feedback(process_feedback)
+            object.__setattr__(self, "process_feedback", process_feedback)
+        elif self.process_feedback is not None:
+            raise ValueError("process feedback cannot be present when process_signal is false")
 
     def _validate_feedback(self, outcome: FeasibilityOutcome) -> None:
         if outcome == FeasibilityOutcome.USEFUL and not self.feedback.complete_useful:
@@ -154,6 +270,50 @@ class LayerIntervention:
             self.feedback.complete_useful or self.feedback.complete_missed
         ):
             raise ValueError("unresolved/censored feedback cannot carry a complete reward chain")
+
+    def _derive_process_feedback(self) -> ProcessFeedback:
+        parent = self.parent_decision
+        candidate = self.candidate_decision
+        if parent is None or candidate is None:
+            raise ValueError("process feedback requires target-layer decisions")
+        return ProcessFeedback.create(
+            event_id=self.parent.event.event_id,
+            source_revision=self.parent.event.source_revision,
+            target_layer=self.target_layer,
+            parent_decision_id=parent.decision_id,
+            candidate_decision_id=candidate.decision_id,
+            parent_execution_receipt_ids=tuple(
+                decision.execution_receipt_id
+                for decision in self.parent.decisions
+                if decision.execution_receipt_id
+            ),
+            candidate_execution_receipt_ids=tuple(
+                decision.execution_receipt_id
+                for decision in self.candidate.decisions
+                if decision.execution_receipt_id
+            ),
+            observed_before_digest=parent.output_digest,
+            observed_after_digest=candidate.output_digest,
+            reason_codes=("decision_observed",),
+        )
+
+    def _validate_process_feedback(self, value: ProcessFeedback) -> None:
+        if not isinstance(value, ProcessFeedback):
+            raise ValueError("process feedback has the wrong type")
+        parent = self.parent_decision
+        candidate = self.candidate_decision
+        if parent is None or candidate is None:
+            raise ValueError("process feedback requires target-layer decisions")
+        if (
+            value.event_id != self.parent.event.event_id
+            or value.source_revision != self.parent.event.source_revision
+            or value.target_layer != self.target_layer
+            or value.parent_decision_id != parent.decision_id
+            or value.candidate_decision_id != candidate.decision_id
+            or value.observed_before_digest != parent.output_digest
+            or value.observed_after_digest != candidate.output_digest
+        ):
+            raise ValueError("process feedback does not match replay decisions")
 
     @property
     def parent_decision(self) -> PolicyDecision | None:
@@ -215,6 +375,11 @@ class LayerIntervention:
             "feedback_ids": list(self.feedback.ids),
             "reason_codes": list(self.reason_codes),
             "intervention_fingerprint": self.intervention_fingerprint,
+            "process_feedback_id": (
+                self.process_feedback.feedback_id
+                if self.process_feedback is not None
+                else None
+            ),
         }
 
 
@@ -241,7 +406,7 @@ class FeasibilityEvidenceRecord:
             "candidate_source_revision", "parent_decision_ids", "candidate_decision_ids",
             "parent_lineage_id", "candidate_lineage_id", "parent_audit_ok",
             "candidate_audit_ok", "process_signal", "outcome", "feedback_ids",
-            "reason_codes", "intervention_fingerprint",
+            "reason_codes", "intervention_fingerprint", "process_feedback_id",
         }
         if set(payload) != required:
             raise ValueError("malformed feasibility replay payload")
@@ -249,6 +414,11 @@ class FeasibilityEvidenceRecord:
             raise ValueError("feasibility replay case ID must not be empty")
         if payload["target_layer"] not in {layer.value for layer in PolicyLayer}:
             raise ValueError("feasibility replay target layer is invalid")
+        if payload["process_feedback_id"] is not None and (
+            not isinstance(payload["process_feedback_id"], str)
+            or not payload["process_feedback_id"].strip()
+        ):
+            raise ValueError("feasibility process feedback ID is invalid")
         for field in ("parent_decision_ids", "candidate_decision_ids", "feedback_ids", "reason_codes"):
             values = payload[field]
             if not isinstance(values, list) or len(values) != len(set(values)) or any(
@@ -540,6 +710,7 @@ __all__ = [
     "FeasibilityOutcome",
     "FeasibilityStatus",
     "FeedbackChain",
+    "ProcessFeedback",
     "LayerIntervention",
     "FeasibilityEvidenceRecord",
     "JsonFeasibilityEvidenceLedger",
