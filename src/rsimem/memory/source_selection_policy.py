@@ -148,6 +148,37 @@ class DeterministicSourceSelectionPolicy:
     def select_source(self, snapshot: ContextSnapshot, event: TriggerEvent, *, previous_segment_ids: Sequence[str] = ()) -> SourceSelectionDecision:
         return self.select(snapshot, event, previous_segment_ids=previous_segment_ids)
 
+    def skip(
+        self,
+        snapshot: ContextSnapshot,
+        event: TriggerEvent,
+        *,
+        reason: str = "trigger_not_run",
+    ) -> SourceSelectionDecision:
+        """Record an explicit non-selection when trigger policy did not RUN."""
+
+        if event.source_revision != snapshot.context_revision:
+            raise ValueError("source selection event revision does not match snapshot")
+        safety = SafetyBoundary(
+            active_segment_ids=snapshot.active_segment_ids,
+            current_turn_id=snapshot.current_turn_id,
+            current_turn_segment_ids=tuple(
+                segment.segment_id
+                for segment in snapshot.segments
+                if snapshot.current_turn_id is not None and segment.turn_id == snapshot.current_turn_id
+            ),
+            tool_closures=tuple(closure.segment_ids for closure in snapshot.tool_closures),
+        )
+        return self._decision(
+            snapshot,
+            event,
+            safety,
+            selected=(),
+            skipped=tuple(segment.segment_id for segment in snapshot.segments),
+            rejected=(),
+            reason=reason,
+        )
+
     def _decision(self, snapshot: ContextSnapshot, event: TriggerEvent, safety: SafetyBoundary, *, selected: tuple[str, ...], skipped: tuple[str, ...], rejected: tuple[str, ...], reason: str) -> SourceSelectionDecision:
         source_payload = {
             "snapshot_id": snapshot.snapshot_id,
