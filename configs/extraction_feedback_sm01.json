@@ -1,0 +1,28 @@
+{
+  "acceptanceCriteria": {
+    "maximumCandidateSelections": 1,
+    "maximumEmptyRate": 0.5,
+    "maximumHarmfulRateDelta": 0.0,
+    "maximumMissedRateDelta": 0.0,
+    "maximumProposalGenerations": 1,
+    "minimumCoverageRatio": 0.8,
+    "minimumMatchedPairs": 3,
+    "minimumResolvedExamples": 2,
+    "minimumUsefulRateDelta": 0.05,
+    "proposalBudgetId": "extraction-proposal.sm01-pilot-v1",
+    "requiredMetrics": [
+      "harmful_rate",
+      "missed_rate"
+    ]
+  },
+  "familyId": "SM01_preference_adoption",
+  "persistenceProfileId": "per-attempt-empty-home-v1",
+  "replicates": 3,
+  "requestBudgetId": "past-sm01-default-budget-v1",
+  "schemaVersion": 1,
+  "semanticWriteback": {
+    "maxOutputTokens": 4096,
+    "timeoutSeconds": 30.0
+  },
+  "taskTemplateGroupId": "sm01-pipeline-pilot-train-v1"
+}

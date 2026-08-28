@@ -76,6 +76,22 @@ def _require_exact(value: object, fields: set[str], name: str) -> dict[str, Any]
     return value
 
 
+def _reject_sensitive_fields(value: object, path: str = "model profile") -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise ValueError(f"{path} keys must be strings")
+            normalized = key.casefold().replace("-", "").replace("_", "")
+            if any(marker in normalized for marker in (
+                "apikey", "credential", "password", "secret", "accesstoken",
+            )):
+                raise ValueError(f"{path} cannot contain credentials")
+            _reject_sensitive_fields(item, f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            _reject_sensitive_fields(item, f"{path}[{index}]")
+
+
 def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -534,14 +550,29 @@ def validate_extraction_manifest(value: object) -> dict[str, Any]:
     }:
         raise ValueError("formal extraction objective is invalid")
 
-    model = _require_exact(manifest["modelProfile"], {"profileId", "profileDigest"}, "model profile")
+    model = _require_exact(
+        manifest["modelProfile"], {"profileId", "profileDigest", "resolved"},
+        "model profile",
+    )
     _require_identifier(model["profileId"], "model profile ID")
     _require_digest(model["profileDigest"], "model profile digest")
+    if not isinstance(model["resolved"], dict) or not model["resolved"]:
+        raise ValueError("resolved model profile must be a non-empty object")
+    _reject_sensitive_fields(model["resolved"])
+    if model["profileDigest"] != _digest(model["resolved"]):
+        raise ValueError("resolved model profile digest mismatch")
     if parent.model_profile != model["profileId"] or active.model_profile != model["profileId"]:
         raise ValueError("semantic policy and model profile disagree")
-    budget = _require_exact(manifest["requestBudget"], {"budgetId", "budgetDigest"}, "request budget")
+    budget = _require_exact(
+        manifest["requestBudget"], {"budgetId", "budgetDigest", "resolved"},
+        "request budget",
+    )
     _require_identifier(budget["budgetId"], "request budget ID")
     _require_digest(budget["budgetDigest"], "request budget digest")
+    if not isinstance(budget["resolved"], dict) or not budget["resolved"]:
+        raise ValueError("resolved request budget must be a non-empty object")
+    if budget["budgetDigest"] != _digest(budget["resolved"]):
+        raise ValueError("resolved request budget digest mismatch")
     isolation = _require_exact(
         manifest["persistenceIsolation"],
         {"profileId", "profileDigest", "strategy"},
@@ -636,9 +667,9 @@ def initialize_extraction_batch_manifest(
     feedback_contract: FamilyFeedbackContract,
     acceptance_criteria: ExtractionAcceptanceCriteria,
     model_profile_id: str,
-    model_profile_digest: str,
+    resolved_model_profile: dict[str, Any],
     request_budget_id: str,
-    request_budget_digest: str,
+    resolved_request_budget: dict[str, Any],
     persistence_profile_id: str,
     persistence_profile_digest: str,
     rsimem_revision: CleanRepositoryRevision,
@@ -712,11 +743,13 @@ def initialize_extraction_batch_manifest(
         "acceptanceCriteria": _criteria_payload(acceptance_criteria),
         "modelProfile": {
             "profileId": model_profile_id,
-            "profileDigest": model_profile_digest,
+            "profileDigest": _digest(resolved_model_profile),
+            "resolved": resolved_model_profile,
         },
         "requestBudget": {
             "budgetId": request_budget_id,
-            "budgetDigest": request_budget_digest,
+            "budgetDigest": _digest(resolved_request_budget),
+            "resolved": resolved_request_budget,
         },
         "persistenceIsolation": {
             "profileId": persistence_profile_id,
