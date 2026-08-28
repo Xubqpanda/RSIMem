@@ -67,6 +67,7 @@ from .policy_contracts import (
 from .trigger_policy import (
     SUPPORTED_TRIGGER_TYPES,
     DeterministicTriggerPolicy,
+    HermesTriggerEventAdapter,
     HostTriggerAdapter,
     TriggerObservation,
     TriggerPolicyConfig,
@@ -146,6 +147,7 @@ __all__ = [
     "validate_policy_episode",
     "SUPPORTED_TRIGGER_TYPES",
     "DeterministicTriggerPolicy",
+    "HermesTriggerEventAdapter",
     "HostTriggerAdapter",
     "TriggerObservation",
     "TriggerPolicyConfig",
