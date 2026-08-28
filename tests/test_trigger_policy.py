@@ -119,3 +119,27 @@ def test_hermes_snapshot_adapter_preserves_revision_and_marks_missing_pressure()
     assert pressure.supported is False
     assert pressure.metadata["unsupported_reason"] == "context_tokens_unobserved"
     assert DeterministicTriggerPolicy().decide(pressure).decision.reason_codes == ("unsupported_trigger",)
+
+    session_end = adapter.from_snapshot(Snapshot(), "session_end")
+    assert session_end.supported is True
+    turn_without_index = adapter.from_snapshot(Snapshot(), "turn_interval")
+    assert turn_without_index.supported is False
+    tool_without_observation = adapter.from_snapshot(Snapshot(), "tool_boundary")
+    assert tool_without_observation.supported is False
+    manual_without_authorization = adapter.from_snapshot(Snapshot(), "manual")
+    assert manual_without_authorization.supported is False
+    tool = adapter.from_snapshot(
+        Snapshot(), "tool_boundary", tool_boundary_observed=True,
+    )
+    assert tool.supported is True
+    manual = adapter.from_snapshot(
+        Snapshot(), "manual", manual_authorized=True,
+    )
+    assert manual.supported is True
+
+    class FailedSnapshot(Snapshot):
+        task_state = "failed"
+
+    failed = adapter.from_snapshot(FailedSnapshot(), "task_completed")
+    assert failed.supported is False
+    assert DeterministicTriggerPolicy().decide(failed).decision.reason_codes == ("unsupported_trigger",)

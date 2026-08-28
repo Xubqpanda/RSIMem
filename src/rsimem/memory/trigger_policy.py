@@ -260,6 +260,8 @@ class HermesTriggerEventAdapter(HostTriggerAdapter):
         *,
         context_tokens: int | None = None,
         turn_index: int | None = None,
+        tool_boundary_observed: bool | None = None,
+        manual_authorized: bool = False,
     ) -> TriggerEvent:
         try:
             source_revision = str(snapshot.context_revision)
@@ -271,19 +273,40 @@ class HermesTriggerEventAdapter(HostTriggerAdapter):
             raise ValueError("Hermes trigger requires a context snapshot") from exc
         if not source_revision.strip() or not snapshot_id.strip():
             raise ValueError("Hermes trigger snapshot identity is incomplete")
-        supported = True
+        normalized_event = event_type.strip()
+        supported = normalized_event in SUPPORTED_TRIGGER_TYPES
         metadata: dict[str, Any] = {
             "snapshot_id": snapshot_id,
             "task_state": task_state,
         }
-        if event_type == "context_pressure":
+        if normalized_event == "task_completed":
+            supported = task_state in {"completed", "TaskLifecycleState.COMPLETED"}
+            if not supported:
+                metadata["unsupported_reason"] = "task_not_completed"
+        elif normalized_event == "session_end":
+            supported = task_state not in {"active", "TaskLifecycleState.ACTIVE"}
+            if not supported:
+                metadata["unsupported_reason"] = "session_task_still_active"
+        elif normalized_event == "context_pressure":
             if context_tokens is None:
                 supported = False
                 metadata["unsupported_reason"] = "context_tokens_unobserved"
             else:
                 metadata["context_tokens"] = context_tokens
+        elif normalized_event == "turn_interval":
+            supported = turn_index is not None
+            if not supported:
+                metadata["unsupported_reason"] = "turn_index_unobserved"
+        elif normalized_event == "tool_boundary":
+            supported = tool_boundary_observed is True
+            if not supported:
+                metadata["unsupported_reason"] = "tool_boundary_unobserved"
+        elif normalized_event == "manual":
+            supported = manual_authorized is True
+            if not supported:
+                metadata["unsupported_reason"] = "manual_authorization_unobserved"
         return self.event(
-            event_type,
+            normalized_event,
             source_revision=source_revision,
             payload={
                 "snapshot_id": snapshot_id,
