@@ -566,20 +566,20 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 功能需求：
 
-- □ Runtime通过 `slot_id -> MemoryPromptAdapter` registry解析唯一ACTIVE extraction artifact，由adapter组合frozen wrapper并注入真实policy factory。
-- □ 对开发者暴露的一行适配入口等价于显式注册一个slot，例如`prompt_slot("mem0-flat.semantic.extraction", default=..., schemas=...)`；该便利API必须落到同一adapter contract，不能使用全局monkey-patch。
-- □ Static N和adaptive N+1使用相同completion client、model profile、update prompt、retrieval config和backend。
-- □ 每次extraction operation记录actual extraction artifact ID/version/body digest、wrapper digest和render input digest。
-- □ Extracted fact、mutation和persisted memory lineage回连actual artifact。
-- □ Audit输出`eligible -> rendered -> changed extraction -> changed artifact -> future exposure -> use/outcome` funnel。
+- √ Runtime通过 `slot_id -> MemoryPromptAdapter` registry解析唯一ACTIVE extraction artifact，由adapter组合frozen wrapper并注入真实policy factory。
+- √ 对开发者暴露的一行适配入口等价于显式注册一个slot，例如`prompt_slot("mem0-flat.semantic.extraction", default=..., schemas=...)`；该便利API必须落到同一adapter contract，不能使用全局monkey-patch。
+- √ Static N和adaptive N+1使用相同completion client、model profile、update prompt、retrieval config和backend。
+- √ 每次extraction operation记录actual extraction artifact ID/version/body digest、wrapper digest和render input digest。
+- √ Extracted fact、mutation和persisted memory lineage回连actual artifact。
+- √ Audit输出`eligible -> rendered -> changed extraction -> changed artifact -> future exposure -> use/outcome` funnel。
 
 测试与验收：
 
-- □ Config声明N+1但runtime加载N时fail closed。
-- □ Store中的slot ID、adapter owner、contract digest、wrapper digest或schema digest任一不匹配时，在extraction model调用前fail closed到明确配置的root policy；formal adaptive run不得静默fallback后继续标记为adaptive。
-- □ N/N+1产生相同extraction时记录no intervention，不伪装成changed decision。
-- □ N+1改变extraction但update/retrieval/component identity漂移时matched audit失败。
-- □ Restart后actual artifact fingerprint保持一致。
+- √ Config声明N+1但runtime加载N时fail closed。
+- √ Store中的slot ID、adapter owner、contract digest、wrapper digest或schema digest任一不匹配时，在extraction model调用前fail closed到明确配置的root policy；formal adaptive run不得静默fallback后继续标记为adaptive。
+- √ N/N+1产生相同extraction时记录no intervention，不伪装成changed decision。
+- √ N+1改变extraction但update/retrieval/component identity漂移时matched audit失败。
+- √ Restart后actual artifact fingerprint保持一致。
 
 ### 2G：Deterministic End-To-End Gate
 
@@ -698,16 +698,18 @@ bash -n scripts/*.sh
 
 ## 10. 当前执行入口
 
-当前实现入口位于 **Stage 2F：Runtime Prompt Binding 与 Activation Fingerprint**，
-但Stage 2E的真实PAST validation run仍保持未完成。Stage 1A-1H、
+当前实现入口已返回 **Stage 2E：独立 PAST-Bench live matched validation trial**。
+Stage 2E的真实PAST validation run仍保持未完成。Stage 1A-1H、
 Stage 2A、Stage 2B、Stage 2C 和 Stage 2D 已经通过，低成本 live plain-parent acceptance 记录在
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
 Stage 2D只证明candidate通过静态安全、deterministic extraction suite和独立historical
 split offline gate；其accepted状态只能进入matched trial，不代表production activation。
 Stage 2E的decision、trial-only config、content-free evidence assembler、atomic activation、
-rejection、restart和rollback contract已经通过deterministic验收；真实candidate run必须先由
-Stage 2F把ACTIVE extraction artifact绑定到实际prompt调用边界。Stage 2F完成后必须返回
-Stage 2E执行独立matched validation batch，不能直接进入Stage 2G或production final run。
+rejection、restart和rollback contract已经通过deterministic验收。Stage 2F也已完成
+deterministic runtime binding、PAST validation-only transport、activation fingerprint和
+matched drift gate；验收记录见
+[`extraction_stage2f_acceptance_20260828.md`](extraction_stage2f_acceptance_20260828.md)。
+当前必须执行Stage 2E独立matched validation batch，不能直接进入Stage 2G或production final run。
 后续顺序仍严格按照：
 
 ```text
