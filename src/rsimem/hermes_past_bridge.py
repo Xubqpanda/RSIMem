@@ -664,10 +664,10 @@ class HermesPastBenchBridge:
         ).contract
         if observation.stage not in contract.opportunity.eligible_stages:
             return
-        records = self.extraction_source_store.candidates(
-            family_id=self._family_id,
-            artifact_ids=future.memory_artifact_ids,
-            opportunity_semantic_keys=contract.opportunity.memory_scope_keys,
+        records = tuple(
+            record
+            for record in self.extraction_source_store.records()
+            if record.family_id == self._family_id
         )
         for record in records:
             keys_by_artifact: dict[str, list[str]] = {}
