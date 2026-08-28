@@ -27,6 +27,7 @@ from rsimem.memory.policy_feasibility import (
     LayerIntervention,
     JsonFeasibilityEvidenceLedger,
     PolicyHypothesis,
+    feedback_chain_from_extraction_example,
     build_feasibility_report,
     validate_feasibility_case,
 )
@@ -376,6 +377,80 @@ def test_process_feedback_tampering_is_rejected() -> None:
     payload["observed_after_digest"] = "0" * 64
     with pytest.raises(ValueError, match="ID mismatch|malformed"):
         type(case.process_feedback).from_payload(payload)
+
+
+def test_real_extraction_feedback_examples_project_only_resolved_primary_chain() -> None:
+    from rsimem.memory.extraction_feedback import (
+        ExtractionFeedbackBuilder,
+        ExtractionFeedbackLabel,
+        ExtractionFeedbackLevel,
+        ExtractionSourceEvidence,
+        ExtractedFactEvidence,
+        FactDisposition,
+        FutureMemoryEvidence,
+        ArtifactSemanticBinding,
+        DeploymentObservation,
+        ExposureMode,
+        ObservableToolEvent,
+        default_feedback_contract_registry,
+    )
+    import hashlib
+
+    digest = hashlib.sha256(b"source").hexdigest()
+    source = ExtractionSourceEvidence(
+        "source.real",
+        digest,
+        "extraction-set.real",
+        "nonempty",
+        ("preference.summary.tsv",),
+        (ExtractedFactEvidence(
+            "fact.real", ("preference.summary.tsv",), FactDisposition.PERSISTED,
+            artifact_id="artifact.real",
+        ),),
+    )
+    future = FutureMemoryEvidence(
+        "opportunity.real",
+        ExposureMode.EAGER_SYSTEM_PROMPT,
+        (ArtifactSemanticBinding("artifact.real", "preference.summary.tsv"),),
+        "operation.opportunity",
+        "operation.injection",
+    )
+    observation = DeploymentObservation(
+        "observation.real",
+        "SM01_preference_adoption",
+        "eval_near",
+        "task.real",
+        hashlib.sha256(b"current").hexdigest(),
+        (),
+        ("preference.summary.tsv",),
+        "owner\tpriority\ttask\tdue_date\nA\thigh\tShip\t2026/09/01",
+        (ObservableToolEvent("tool.real", "notes_share", True, recipient_ids=("owner",)),),
+        True,
+    )
+    dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+        source, observation, future,
+    )
+    primary = next(item for item in dataset.examples if item.primary)
+    chain = feedback_chain_from_extraction_example(primary)
+    assert primary.label is ExtractionFeedbackLabel.USEFUL
+    assert primary.level is ExtractionFeedbackLevel.EXTRACTION_SET
+    assert chain.complete_useful
+    assert chain.opportunity_id == future.future_opportunity_id
+
+    unresolved = next(
+        item for item in ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+            source,
+            observation.__class__(
+                observation.observation_id, observation.family_id, observation.stage,
+                observation.task_id, observation.current_input_projection_digest,
+                observation.current_input_semantic_keys, observation.task_semantic_keys,
+                "ordinary prose", observation.tool_events, observation.completed,
+            ),
+            future,
+        ).examples if item.primary
+    )
+    assert unresolved.label is ExtractionFeedbackLabel.UNRESOLVED
+    assert feedback_chain_from_extraction_example(unresolved).ids == ()
 
 
 def _layer_artifact(layer: PolicyLayer, version: str, kind: PolicyArtifactKind) -> PolicyArtifactIdentity:
