@@ -1,20 +1,66 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 
 import pytest
 
+from rsimem.lifecycle import RawResourceUsage
+from rsimem.memory.extraction_policy_artifact import (
+    ExtractionGenerationProvenance,
+    ExtractionPolicyRule,
+    ExtractionPromptPolicyArtifact,
+    ExtractionRuleEdit,
+    ExtractionRuleEditAction,
+    serialize_extraction_prompt_artifact,
+)
 from rsimem.memory.prompt_components import (
     PromptAdapterRegistry,
     PromptComponentArtifact,
 )
 from rsimem.memory_systems.mem0_flat import (
+    MEM0_FLAT_EXTRACTION_MAX_BODY_CHARS,
     MEM0_FLAT_EXTRACTION_SLOT,
     MEM0_FLAT_EXTRACTION_SLOT_ID,
+    POLICY_FACT_EXTRACTION_FROZEN_WRAPPER,
+    POLICY_FACT_EXTRACTION_ROOT_BODY,
     FakeCompletionClient,
     Mem0FlatPromptAdapter,
     Mem0FlatSemanticPolicy,
+    compile_policy_fact_extraction_template,
 )
+
+
+EXPECTED_ROOT_COMPONENT_ID = (
+    "prompt-component.9058cc5994f5ee77da51e21131aa0198be48d148"
+)
+
+
+class _FakeExtractionArtifactLoader:
+    def load(self, artifact: ExtractionPromptPolicyArtifact) -> tuple[str, str]:
+        component = artifact.to_prompt_component(MEM0_FLAT_EXTRACTION_SLOT)
+        rendered = POLICY_FACT_EXTRACTION_FROZEN_WRAPPER.replace(
+            "$policy_body",
+            component.policy_body,
+            1,
+        )
+        return component.artifact_id, rendered
+
+
+def _generation_provenance() -> ExtractionGenerationProvenance:
+    return ExtractionGenerationProvenance(
+        optimizer_model="optimizer-model-v1",
+        optimizer_config_digest="4" * 64,
+        training_corpus_id="corpus-v1",
+        training_cutoff="cutoff-v1",
+        proposal_request_digest="5" * 64,
+        completion_digest="6" * 64,
+        usage=RawResourceUsage(
+            input_tokens=10,
+            output_tokens=2,
+            model_requests=1,
+        ),
+    )
 
 
 def _bound_policy(
@@ -112,4 +158,123 @@ def test_mem0_policy_rejects_unbound_or_mismatched_extraction_fingerprint() -> N
             FakeCompletionClient({}),
             fact_prompt=replace(template, binding_fingerprint=None),
             extraction_binding=binding,
+        )
+
+
+def test_mem0_adapter_exports_reloadable_exact_root_policy() -> None:
+    adapter = Mem0FlatPromptAdapter()
+    root_component = adapter.root_artifact(MEM0_FLAT_EXTRACTION_SLOT_ID)
+    root_policy = adapter.export_root_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID
+    )
+
+    assert root_policy.compiled_body == POLICY_FACT_EXTRACTION_ROOT_BODY
+    assert root_policy.max_body_chars == MEM0_FLAT_EXTRACTION_MAX_BODY_CHARS
+    assert tuple(rule.rule_id for rule in root_policy.spec.rules) == (
+        "durable-candidates",
+        "future-useful-scope",
+        "source-safety-exclusions",
+        "standalone-candidates",
+        "output-schema",
+    )
+    assert tuple(rule.rule_id for rule in root_policy.spec.rules if rule.protected) == (
+        "source-safety-exclusions",
+        "output-schema",
+    )
+    assert root_component.artifact_id == EXPECTED_ROOT_COMPONENT_ID
+    assert root_component.body_digest == root_policy.body_digest
+
+    loaded = ExtractionPromptPolicyArtifact.from_payload(json.loads(
+        serialize_extraction_prompt_artifact(root_policy)
+    ))
+    fingerprint = adapter.bind_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID,
+        loaded,
+    )
+    assert fingerprint.artifact_id == EXPECTED_ROOT_COMPONENT_ID
+    assert adapter.bound_template(fingerprint).template == (
+        compile_policy_fact_extraction_template(POLICY_FACT_EXTRACTION_ROOT_BODY)
+    )
+
+    fake_component_id, fake_rendered = _FakeExtractionArtifactLoader().load(loaded)
+    assert fake_component_id == EXPECTED_ROOT_COMPONENT_ID
+    assert fake_rendered == adapter.bound_template(fingerprint).template
+
+
+def test_mem0_adapter_binds_rich_child_without_changing_frozen_components() -> None:
+    adapter = Mem0FlatPromptAdapter()
+    root = adapter.export_root_policy_artifact(MEM0_FLAT_EXTRACTION_SLOT_ID)
+    child = ExtractionPromptPolicyArtifact.create_child(
+        parent=root,
+        policy_version="candidate-v2",
+        edits=(ExtractionRuleEdit(
+            "edit.expand-durable-scope",
+            ExtractionRuleEditAction.REPLACE,
+            "future-useful-scope",
+            ExtractionPolicyRule(
+                "future-useful-scope",
+                "Keep user-supplied durable facts, preferences, rules, and constraints "
+                "that can help a future task.",
+            ),
+        ),),
+        generation_provenance=_generation_provenance(),
+    )
+
+    root_binding = adapter.bind_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID,
+        root,
+    )
+    child_binding = adapter.bind_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID,
+        child,
+    )
+    root_policy = Mem0FlatSemanticPolicy(
+        FakeCompletionClient({}),
+        fact_prompt=adapter.bound_template(root_binding),
+        extraction_binding=root_binding,
+    )
+    child_policy = Mem0FlatSemanticPolicy(
+        FakeCompletionClient({}),
+        fact_prompt=adapter.bound_template(child_binding),
+        extraction_binding=child_binding,
+    )
+
+    assert child_binding.artifact_body_digest == child.body_digest
+    assert root_policy.semantic_manifest.extraction_component_digest != (
+        child_policy.semantic_manifest.extraction_component_digest
+    )
+    assert root_policy.semantic_manifest.update_component_digest == (
+        child_policy.semantic_manifest.update_component_digest
+    )
+    assert root_policy.semantic_manifest.retrieval_component_digest == (
+        child_policy.semantic_manifest.retrieval_component_digest
+    )
+
+
+def test_mem0_policy_artifact_bridge_fails_closed_on_contract_drift() -> None:
+    adapter = Mem0FlatPromptAdapter()
+    root = adapter.export_root_policy_artifact(MEM0_FLAT_EXTRACTION_SLOT_ID)
+    wrong_slot = replace(
+        MEM0_FLAT_EXTRACTION_SLOT,
+        frozen_wrapper_digest="9" * 64,
+    )
+    wrong_artifact = ExtractionPromptPolicyArtifact.create_root(
+        slot=wrong_slot,
+        policy_version="root-v1",
+        spec=root.spec,
+        max_body_chars=MEM0_FLAT_EXTRACTION_MAX_BODY_CHARS,
+        source_provenance="fixture-wrong-wrapper",
+    )
+
+    with pytest.raises(KeyError, match="unknown Mem0-flat prompt slot"):
+        adapter.export_root_policy_artifact("other.semantic.extraction")
+    with pytest.raises(ValueError, match="runtime slot"):
+        adapter.bind_policy_artifact(
+            MEM0_FLAT_EXTRACTION_SLOT_ID,
+            wrong_artifact,
+        )
+    with pytest.raises(TypeError, match="wrong type"):
+        adapter.bind_policy_artifact(
+            MEM0_FLAT_EXTRACTION_SLOT_ID,
+            adapter.root_artifact(MEM0_FLAT_EXTRACTION_SLOT_ID),  # type: ignore[arg-type]
         )

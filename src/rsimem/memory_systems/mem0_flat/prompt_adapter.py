@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+from ...memory.extraction_policy_artifact import (
+    ExtractionPolicyRule,
+    ExtractionPolicySpec,
+    ExtractionPromptPolicyArtifact,
+)
 from ...memory.prompt_components import (
     MemoryPromptAdapter,
     PromptBindingFingerprint,
@@ -26,6 +31,8 @@ from .prompts import (
 MEM0_FLAT_PROMPT_ADAPTER_ID = "mem0-flat-prompt-adapter-v1"
 MEM0_FLAT_EXTRACTION_SLOT_ID = "mem0-flat.semantic.extraction"
 MEM0_FLAT_EXTRACTION_MAX_BODY_CHARS = 8_000
+MEM0_FLAT_EXTRACTION_ROOT_POLICY_VERSION = "root-v1"
+MEM0_FLAT_EXTRACTION_ROOT_SOURCE = "pinned-membase-mem0-root"
 
 
 def _schema_digest(name: str) -> str:
@@ -51,15 +58,38 @@ MEM0_FLAT_EXTRACTION_SLOT = PromptSlotDescriptor(
 )
 
 
+_ROOT_RULES = (
+    ("durable-candidates", False),
+    ("future-useful-scope", False),
+    ("source-safety-exclusions", True),
+    ("standalone-candidates", False),
+    ("output-schema", True),
+)
+
+
+def _root_policy_spec() -> ExtractionPolicySpec:
+    lines = tuple(POLICY_FACT_EXTRACTION_ROOT_BODY.splitlines())
+    if len(lines) != len(_ROOT_RULES):
+        raise ValueError("Mem0-flat root extraction policy shape changed")
+    return ExtractionPolicySpec(tuple(
+        ExtractionPolicyRule(rule_id, text, protected=protected)
+        for (rule_id, protected), text in zip(_ROOT_RULES, lines, strict=True)
+    ))
+
+
 class Mem0FlatPromptAdapter(MemoryPromptAdapter):
     adapter_id = MEM0_FLAT_PROMPT_ADAPTER_ID
 
     def __init__(self) -> None:
-        self._root = PromptComponentArtifact.create(
+        self._root_policy = ExtractionPromptPolicyArtifact.create_root(
             slot=MEM0_FLAT_EXTRACTION_SLOT,
-            version="root-v1",
-            policy_body=POLICY_FACT_EXTRACTION_ROOT_BODY,
-            source_provenance="pinned-membase-mem0-root",
+            policy_version=MEM0_FLAT_EXTRACTION_ROOT_POLICY_VERSION,
+            spec=_root_policy_spec(),
+            max_body_chars=MEM0_FLAT_EXTRACTION_MAX_BODY_CHARS,
+            source_provenance=MEM0_FLAT_EXTRACTION_ROOT_SOURCE,
+        )
+        self._root = self._root_policy.to_prompt_component(
+            MEM0_FLAT_EXTRACTION_SLOT
         )
         self._templates: dict[str, PromptTemplate] = {}
 
@@ -69,6 +99,24 @@ class Mem0FlatPromptAdapter(MemoryPromptAdapter):
     def root_artifact(self, slot_id: str) -> PromptComponentArtifact:
         self._require_slot(slot_id)
         return self._root
+
+    def export_root_policy_artifact(
+        self,
+        slot_id: str,
+    ) -> ExtractionPromptPolicyArtifact:
+        self._require_slot(slot_id)
+        return self._root_policy
+
+    def bind_policy_artifact(
+        self,
+        slot_id: str,
+        artifact: ExtractionPromptPolicyArtifact,
+    ) -> PromptBindingFingerprint:
+        self._require_slot(slot_id)
+        if not isinstance(artifact, ExtractionPromptPolicyArtifact):
+            raise TypeError("Mem0-flat extraction policy artifact has the wrong type")
+        component = artifact.to_prompt_component(MEM0_FLAT_EXTRACTION_SLOT)
+        return self.bind(slot_id, component)
 
     def validate_replacement(
         self,
