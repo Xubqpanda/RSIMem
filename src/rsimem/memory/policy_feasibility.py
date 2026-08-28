@@ -136,6 +136,47 @@ def feedback_chain_from_extraction_example(
     return FeedbackChain()
 
 
+def build_extraction_feedback_interventions(
+    examples: Iterable[ExtractionFeedbackExample],
+    *,
+    parent: PolicyReplayResult,
+    candidate: PolicyReplayResult,
+    parent_artifact: PolicyArtifactIdentity,
+    candidate_artifact: PolicyArtifactIdentity,
+    case_id_prefix: str = "case.feedback",
+) -> tuple["LayerIntervention", ...]:
+    """Create extraction interventions from primary strict-feedback examples.
+
+    Non-primary fact/source projections are deliberately ignored here; they
+    remain available to the owner-controlled corpus and diagnostics but cannot
+    be counted as independent policy opportunities.
+    """
+
+    if not isinstance(case_id_prefix, str) or not case_id_prefix.strip():
+        raise ValueError("feasibility case ID prefix must not be empty")
+    result: list[LayerIntervention] = []
+    seen: set[str] = set()
+    for example in examples:
+        if not isinstance(example, ExtractionFeedbackExample):
+            raise TypeError("extraction feasibility examples have the wrong type")
+        if not example.primary:
+            continue
+        if example.example_id in seen:
+            raise ValueError("extraction feasibility example IDs must be unique")
+        seen.add(example.example_id)
+        result.append(LayerIntervention.from_extraction_feedback(
+            case_id=f"{case_id_prefix}.{example.example_id}",
+            parent=parent,
+            candidate=candidate,
+            parent_artifact=parent_artifact,
+            candidate_artifact=candidate_artifact,
+            example=example,
+        ))
+    if not result:
+        raise ValueError("extraction feasibility requires at least one primary example")
+    return tuple(result)
+
+
 @dataclass(frozen=True, slots=True)
 class ProcessFeedback:
     """Content-free before/after evidence for one layer intervention."""
@@ -1022,6 +1063,7 @@ __all__ = [
     "FeasibilityStatus",
     "FeedbackChain",
     "feedback_chain_from_extraction_example",
+    "build_extraction_feedback_interventions",
     "ProcessFeedback",
     "PolicyHypothesis",
     "LayerIntervention",
