@@ -1053,7 +1053,7 @@ class SemanticIngestionCoordinator:
         source_digest: str,
     ) -> MemoryIngestResult:
         resolved: list[InternalMemoryOperation] = []
-        seen: set[tuple[InternalMemoryAction, str | None]] = set()
+        seen: set[tuple[InternalMemoryAction, str]] = set()
         candidate_values = tuple(candidates.candidates(request))
         candidate_ids = [item.candidate_id for item in candidate_values]
         if len(candidate_ids) != len(set(candidate_ids)):
@@ -1074,10 +1074,17 @@ class SemanticIngestionCoordinator:
                     raise ValueError("semantic policy proposed an unknown candidate")
                 if available.get(proposal.candidate_id) != target:
                     raise ValueError("semantic candidate ownership or revision is stale")
-            identity = (proposal.action, target.artifact_id if target else None)
-            if identity in seen:
-                raise ValueError("semantic policy proposed a duplicate operation")
-            seen.add(identity)
+            identity = (
+                (proposal.action, proposal.new_content_digest)
+                if proposal.action == InternalMemoryAction.ADD
+                else (proposal.action, target.artifact_id)
+                if target is not None
+                else None
+            )
+            if identity is not None:
+                if identity in seen:
+                    raise ValueError("semantic policy proposed a duplicate operation")
+                seen.add(identity)
             operation_payload = {
                 "execution_id": execution_id,
                 "ordinal": index,
