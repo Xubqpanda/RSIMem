@@ -8,7 +8,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 
 from .hermes_integration import (
     HermesAdapterExecutionError,
@@ -682,6 +682,92 @@ class HermesPastBenchBridge:
             ))
             if self.extraction_source_store is not None:
                 raise
+
+    def on_session_end(self, *, task_state: TaskLifecycleState = TaskLifecycleState.COMPLETED) -> None:
+        """Observe a real session-end boundary without opening writeback."""
+
+        self._observe_shadow_host_boundary(
+            EvaluationTrigger.SESSION_END,
+            task_state=TaskLifecycleState(task_state),
+        )
+
+    def on_turn_interval(self, *, turn_index: int) -> None:
+        """Observe a turn interval; this boundary is shadow-only in 2B."""
+
+        self._observe_shadow_host_boundary(
+            EvaluationTrigger.TURN_INTERVAL,
+            task_state=TaskLifecycleState.ACTIVE,
+            turn_index=turn_index,
+        )
+
+    def on_tool_boundary(self, *, turn_index: int | None = None) -> None:
+        """Observe a tool boundary, preserving any open tool closure."""
+
+        self._observe_shadow_host_boundary(
+            EvaluationTrigger.TOOL_BOUNDARY,
+            task_state=TaskLifecycleState.ACTIVE,
+            turn_index=turn_index,
+            tool_boundary_observed=True,
+            allow_open_tool_closure=True,
+        )
+
+    def on_context_pressure(self, *, context_tokens: int) -> None:
+        """Observe context pressure from a host-provided token count."""
+
+        self._observe_shadow_host_boundary(
+            EvaluationTrigger.CONTEXT_PRESSURE,
+            task_state=TaskLifecycleState.ACTIVE,
+            context_tokens=context_tokens,
+        )
+
+    def on_manual_trigger(self) -> None:
+        """Observe an explicitly authorized manual boundary."""
+
+        self._observe_shadow_host_boundary(
+            EvaluationTrigger.MANUAL,
+            task_state=TaskLifecycleState.ACTIVE,
+            manual_authorized=True,
+        )
+
+    def _observe_shadow_host_boundary(
+        self,
+        trigger: EvaluationTrigger,
+        *,
+        task_state: TaskLifecycleState,
+        turn_index: int | None = None,
+        context_tokens: int | None = None,
+        tool_boundary_observed: bool = False,
+        manual_authorized: bool = False,
+        allow_open_tool_closure: bool = False,
+    ) -> None:
+        agent = self._agent
+        if agent is None:
+            raise ValueError("Hermes shadow boundary requires an attached agent")
+        session_db = getattr(agent, "_session_db", None)
+        native_session_id = str(getattr(agent, "session_id", "") or "")
+        if session_db is None or not native_session_id:
+            raise ValueError("Hermes shadow boundary requires a persisted native session")
+        rows = session_db.get_messages(native_session_id)
+        snapshot = self._snapshot_collector.collect(
+            rows,
+            run_id=self._run_id,
+            episode_id=self._episode_id,
+            session_id=self._session_id,
+            task_id=self._task_id,
+            task_state=task_state,
+            lifecycle_state=trigger.value,
+            source_ref=f"hermes_state:session:{native_session_id}",
+            allow_open_tool_closure=allow_open_tool_closure,
+        )
+        event = self._trigger_adapter.from_snapshot(
+            snapshot,
+            trigger.value,
+            context_tokens=context_tokens,
+            turn_index=turn_index,
+            tool_boundary_observed=tool_boundary_observed,
+            manual_authorized=manual_authorized,
+        )
+        self._observe_policy_boundary(snapshot, event)
 
     def _collect_completed_snapshot(self) -> ContextSnapshot:
         agent = self._agent

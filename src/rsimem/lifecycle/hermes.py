@@ -251,8 +251,11 @@ class HermesStateSnapshotCollector:
         task_state: TaskLifecycleState,
         lifecycle_state: str,
         source_ref: str,
+        allow_open_tool_closure: bool = False,
     ) -> ContextSnapshot:
-        messages = self._project_rows(rows)
+        if type(allow_open_tool_closure) is not bool:
+            raise TypeError("allow_open_tool_closure must be bool")
+        messages = self._project_rows(rows, allow_open_tool_closure=allow_open_tool_closure)
         return self._collector.collect(
             messages,
             run_id=run_id,
@@ -269,6 +272,8 @@ class HermesStateSnapshotCollector:
     def _project_rows(
         cls,
         rows: Sequence[Mapping[str, Any]],
+        *,
+        allow_open_tool_closure: bool = False,
     ) -> tuple[HermesMessage, ...]:
         if not rows:
             raise ValueError("Hermes state snapshot requires persisted messages")
@@ -369,7 +374,7 @@ class HermesStateSnapshotCollector:
         open_calls = seen_tool_calls - seen_tool_results
         if orphan_results:
             raise ValueError("Hermes tool result has no matching call")
-        if open_calls:
+        if open_calls and not allow_open_tool_closure:
             raise ValueError("Hermes snapshot contains an open tool call")
         if not messages:
             raise ValueError("Hermes state snapshot has no projectable messages")
