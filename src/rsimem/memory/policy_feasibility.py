@@ -26,6 +26,23 @@ from .extraction_feedback import (
     ExtractionFeedbackLabel,
     ExtractionFeedbackLevel,
 )
+
+
+def _require_nonempty(value: object, name: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a non-empty string")
+    return value
+
+
+def _normalize_strings(values: object, name: str, *, allow_empty: bool = False) -> tuple[str, ...]:
+    if not isinstance(values, (tuple, list)):
+        raise ValueError(f"{name} must be a list or tuple of strings")
+    result = tuple(values)
+    if any(not isinstance(value, str) or not value.strip() for value in result):
+        raise ValueError(f"{name} must contain unique non-empty strings")
+    if (not allow_empty and not result) or len(result) != len(set(result)):
+        raise ValueError(f"{name} must contain unique non-empty strings")
+    return result
 from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpusExample,
     OptimizerComponentOwnership,
@@ -292,8 +309,7 @@ class ProcessFeedback:
             (self.parent_decision_id, "process feedback parent decision ID"),
             (self.candidate_decision_id, "process feedback candidate decision ID"),
         ):
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{name} must not be empty")
+            _require_nonempty(value, name)
         for value, name in (
             (self.observed_before_digest, "process feedback before digest"),
             (self.observed_after_digest, "process feedback after digest"),
@@ -307,11 +323,14 @@ class ProcessFeedback:
             (self.candidate_execution_receipt_ids, "candidate execution receipts"),
             (self.reason_codes, "process feedback reason codes"),
         ):
-            values = tuple(values)
-            if len(values) != len(set(values)) or any(
-                not isinstance(value, str) or not value.strip() for value in values
-            ):
-                raise ValueError(f"{name} must be unique non-empty strings")
+            values = _normalize_strings(
+                values,
+                name,
+                allow_empty=name in {
+                    "parent execution receipts",
+                    "candidate execution receipts",
+                },
+            )
             attribute = {
                 "parent execution receipts": "parent_execution_receipt_ids",
                 "candidate execution receipts": "candidate_execution_receipt_ids",
@@ -443,19 +462,14 @@ class PolicyHypothesis:
             (self.parent_artifact_id, "hypothesis parent artifact ID"),
             (self.candidate_artifact_id, "hypothesis candidate artifact ID"),
         ):
-            if not isinstance(value, str) or not value.strip():
-                raise ValueError(f"{name} must not be empty")
+            _require_nonempty(value, name)
         if self.parent_artifact_id == self.candidate_artifact_id:
             raise ValueError("hypothesis parent and candidate artifacts must differ")
         for values, name in (
             (self.feedback_ids, "hypothesis feedback IDs"),
             (self.reason_codes, "hypothesis reason codes"),
         ):
-            values = tuple(values)
-            if not values or len(values) != len(set(values)) or any(
-                not isinstance(value, str) or not value.strip() for value in values
-            ):
-                raise ValueError(f"{name} must be unique non-empty strings")
+            values = _normalize_strings(values, name)
             attribute = {
                 "hypothesis feedback IDs": "feedback_ids",
                 "hypothesis reason codes": "reason_codes",
@@ -566,17 +580,17 @@ class OptimizerHypothesisProjection:
         ):
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must not be empty")
-        if self.candidate_artifact_id is not None and not self.candidate_artifact_id.strip():
-            raise ValueError("optimizer candidate artifact ID must not be empty")
-        if len(self.evidence_example_ids) != len(set(self.evidence_example_ids)) or any(
-            not isinstance(value, str) or not value.strip()
-            for value in self.evidence_example_ids
-        ):
-            raise ValueError("optimizer projection evidence IDs are invalid")
-        if not self.reason_codes or len(self.reason_codes) != len(set(self.reason_codes)) or any(
-            not isinstance(value, str) or not value.strip() for value in self.reason_codes
-        ):
-            raise ValueError("optimizer projection reason codes are invalid")
+        if self.candidate_artifact_id is not None:
+            _require_nonempty(self.candidate_artifact_id, "optimizer candidate artifact ID")
+        object.__setattr__(self, "evidence_example_ids", _normalize_strings(
+            self.evidence_example_ids,
+            "optimizer projection evidence IDs",
+            allow_empty=True,
+        ))
+        object.__setattr__(self, "reason_codes", _normalize_strings(
+            self.reason_codes,
+            "optimizer projection reason codes",
+        ))
         if self.decision is OptimizerHypothesisDecision.NO_PROPOSAL and self.candidate_artifact_id is not None:
             raise ValueError("NO_PROPOSAL projection cannot carry a candidate")
         if self.decision is OptimizerHypothesisDecision.PROPOSE and self.candidate_artifact_id is None:
