@@ -1,0 +1,772 @@
+"""Prompt-oriented matched validation for extraction policy artifacts."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import re
+from dataclasses import dataclass
+from enum import StrEnum
+
+from .extraction_feedback import ExtractionFeedbackLabel, ExtractionSetStatus
+
+
+EXTRACTION_VALIDATION_SCHEMA_VERSION = 1
+EXTRACTION_VALIDATION_SCHEMA = "extraction-prompt-validation-v1"
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_REQUIRED_METRICS = {"harmful_rate", "missed_rate"}
+
+
+def _canonical(value: object) -> str:
+    return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+
+def _digest(value: object) -> str:
+    return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def _require_id(value: str, name: str) -> None:
+    if not isinstance(value, str) or _IDENTIFIER.fullmatch(value) is None:
+        raise ValueError(f"{name} must be a stable identifier")
+
+
+def _require_digest(value: str, name: str) -> None:
+    if not isinstance(value, str) or _DIGEST.fullmatch(value) is None:
+        raise ValueError(f"{name} must be sha256")
+
+
+def _finite(value: float, name: str) -> float:
+    normalized = float(value)
+    if not math.isfinite(normalized):
+        raise ValueError(f"{name} must be finite")
+    return normalized
+
+
+class ExtractionValidationVariant(StrEnum):
+    PARENT = "parent"
+    PROPOSAL = "proposal"
+
+
+class ExtractionValidationSplitRole(StrEnum):
+    TRAIN = "train"
+    VALIDATION = "validation"
+    FINAL = "final"
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionSplitAssignment:
+    role: ExtractionValidationSplitRole
+    family_id: str
+    task_template_group_id: str
+    task_manifest_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "role", ExtractionValidationSplitRole(self.role))
+        _require_id(self.family_id, "split family ID")
+        _require_id(self.task_template_group_id, "task template group ID")
+        _require_digest(self.task_manifest_digest, "task manifest digest")
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionPromptValidationSplit:
+    split_id: str
+    assignments: tuple[ExtractionSplitAssignment, ...]
+    schema_version: int = EXTRACTION_VALIDATION_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        _require_id(self.split_id, "extraction validation split ID")
+        if self.schema_version != EXTRACTION_VALIDATION_SCHEMA_VERSION:
+            raise ValueError("unsupported extraction validation split schema")
+        if not self.assignments:
+            raise ValueError("extraction validation split requires assignments")
+        groups: dict[tuple[str, str], ExtractionValidationSplitRole] = {}
+        manifests: dict[str, ExtractionValidationSplitRole] = {}
+        for assignment in self.assignments:
+            group = (assignment.family_id, assignment.task_template_group_id)
+            previous_group = groups.get(group)
+            if previous_group is not None:
+                raise ValueError("task template group appears more than once")
+            groups[group] = assignment.role
+            previous_manifest = manifests.get(assignment.task_manifest_digest)
+            if previous_manifest is not None and previous_manifest != assignment.role:
+                raise ValueError("task manifest digest crosses validation split roles")
+            manifests[assignment.task_manifest_digest] = assignment.role
+
+    def permits(self, observation: "ExtractionValidationObservation") -> bool:
+        return any(
+            assignment.role == ExtractionValidationSplitRole.VALIDATION
+            and assignment.family_id == observation.family_id
+            and assignment.task_template_group_id
+            == observation.task_template_group_id
+            and assignment.task_manifest_digest == observation.task_manifest_digest
+            for assignment in self.assignments
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionValidationObservation:
+    observation_id: str
+    pair_id: str
+    variant: ExtractionValidationVariant
+    replicate: int
+    family_id: str
+    task_template_group_id: str
+    task_id: str
+    run_id: str
+    episode_id: str
+    extraction_set_id: str
+    task_manifest_digest: str
+    model_profile_digest: str
+    budget_id: str
+    persistence_state_digest: str
+    extraction_artifact_id: str
+    extraction_artifact_digest: str
+    extraction_output_digest: str
+    label: ExtractionFeedbackLabel
+    extraction_status: ExtractionSetStatus
+    missed_assessable: bool
+    schema_failure_count: int = 0
+    safety_failure_count: int = 0
+    prompt_leakage_failure_count: int = 0
+    native_writer_failure_count: int = 0
+    schema_version: int = EXTRACTION_VALIDATION_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != EXTRACTION_VALIDATION_SCHEMA_VERSION:
+            raise ValueError("unsupported extraction validation observation schema")
+        object.__setattr__(self, "variant", ExtractionValidationVariant(self.variant))
+        object.__setattr__(self, "label", ExtractionFeedbackLabel(self.label))
+        object.__setattr__(
+            self,
+            "extraction_status",
+            ExtractionSetStatus(self.extraction_status),
+        )
+        for value, name in (
+            (self.observation_id, "validation observation ID"),
+            (self.pair_id, "validation pair ID"),
+            (self.family_id, "validation family ID"),
+            (self.task_template_group_id, "task template group ID"),
+            (self.task_id, "validation task ID"),
+            (self.run_id, "validation run ID"),
+            (self.episode_id, "validation episode ID"),
+            (self.extraction_set_id, "validation extraction set ID"),
+            (self.budget_id, "validation budget ID"),
+            (self.extraction_artifact_id, "extraction artifact ID"),
+        ):
+            _require_id(value, name)
+        for value, name in (
+            (self.task_manifest_digest, "task manifest digest"),
+            (self.model_profile_digest, "model profile digest"),
+            (self.persistence_state_digest, "persistence state digest"),
+            (self.extraction_artifact_digest, "extraction artifact digest"),
+            (self.extraction_output_digest, "extraction output digest"),
+        ):
+            _require_digest(value, name)
+        if type(self.replicate) is not int or self.replicate < 1:
+            raise ValueError("validation replicate must be positive")
+        if type(self.missed_assessable) is not bool:
+            raise TypeError("validation missed-assessable flag must be bool")
+        for count in (
+            self.schema_failure_count,
+            self.safety_failure_count,
+            self.prompt_leakage_failure_count,
+            self.native_writer_failure_count,
+        ):
+            if type(count) is not int or count < 0:
+                raise ValueError("validation failure counts must be non-negative")
+        pair_identity = self.pair_identity_payload()
+        if self.pair_id != f"extraction-pair.{_digest(pair_identity)[:40]}":
+            raise ValueError("extraction validation pair ID mismatch")
+        identity = {
+            **pair_identity,
+            "variant": self.variant.value,
+            "run_id": self.run_id,
+            "episode_id": self.episode_id,
+            "task_id": self.task_id,
+            "extraction_set_id": self.extraction_set_id,
+            "extraction_artifact_id": self.extraction_artifact_id,
+            "extraction_artifact_digest": self.extraction_artifact_digest,
+            "extraction_output_digest": self.extraction_output_digest,
+            "label": self.label.value,
+            "extraction_status": self.extraction_status.value,
+            "missed_assessable": self.missed_assessable,
+            "failure_counts": list(self.failure_counts),
+        }
+        if self.observation_id != f"extraction-observation.{_digest(identity)[:40]}":
+            raise ValueError("extraction validation observation ID mismatch")
+
+    @property
+    def failure_counts(self) -> tuple[int, int, int, int]:
+        return (
+            self.schema_failure_count,
+            self.safety_failure_count,
+            self.prompt_leakage_failure_count,
+            self.native_writer_failure_count,
+        )
+
+    def pair_identity_payload(self) -> dict[str, object]:
+        return {
+            "replicate": self.replicate,
+            "family_id": self.family_id,
+            "task_template_group_id": self.task_template_group_id,
+            "task_id": self.task_id,
+            "task_manifest_digest": self.task_manifest_digest,
+            "model_profile_digest": self.model_profile_digest,
+            "budget_id": self.budget_id,
+            "persistence_state_digest": self.persistence_state_digest,
+        }
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        variant: ExtractionValidationVariant,
+        replicate: int,
+        family_id: str,
+        task_template_group_id: str,
+        task_id: str,
+        run_id: str,
+        episode_id: str,
+        extraction_set_id: str,
+        task_manifest_digest: str,
+        model_profile_digest: str,
+        budget_id: str,
+        persistence_state_digest: str,
+        extraction_artifact_id: str,
+        extraction_artifact_digest: str,
+        extraction_output_digest: str,
+        label: ExtractionFeedbackLabel,
+        extraction_status: ExtractionSetStatus,
+        missed_assessable: bool,
+        failure_counts: tuple[int, int, int, int] = (0, 0, 0, 0),
+    ) -> "ExtractionValidationObservation":
+        pair_identity = {
+            "replicate": replicate,
+            "family_id": family_id,
+            "task_template_group_id": task_template_group_id,
+            "task_id": task_id,
+            "task_manifest_digest": task_manifest_digest,
+            "model_profile_digest": model_profile_digest,
+            "budget_id": budget_id,
+            "persistence_state_digest": persistence_state_digest,
+        }
+        pair_id = f"extraction-pair.{_digest(pair_identity)[:40]}"
+        identity = {
+            **pair_identity,
+            "variant": ExtractionValidationVariant(variant).value,
+            "run_id": run_id,
+            "episode_id": episode_id,
+            "task_id": task_id,
+            "extraction_set_id": extraction_set_id,
+            "extraction_artifact_id": extraction_artifact_id,
+            "extraction_artifact_digest": extraction_artifact_digest,
+            "extraction_output_digest": extraction_output_digest,
+            "label": ExtractionFeedbackLabel(label).value,
+            "extraction_status": ExtractionSetStatus(extraction_status).value,
+            "missed_assessable": missed_assessable,
+            "failure_counts": list(failure_counts),
+        }
+        return cls(
+            f"extraction-observation.{_digest(identity)[:40]}",
+            pair_id,
+            variant,
+            replicate,
+            family_id,
+            task_template_group_id,
+            task_id,
+            run_id,
+            episode_id,
+            extraction_set_id,
+            task_manifest_digest,
+            model_profile_digest,
+            budget_id,
+            persistence_state_digest,
+            extraction_artifact_id,
+            extraction_artifact_digest,
+            extraction_output_digest,
+            label,
+            extraction_status,
+            missed_assessable,
+            *failure_counts,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionQualityMetrics:
+    completed_source_count: int
+    useful_count: int
+    harmful_count: int
+    missed_count: int
+    unresolved_count: int
+    censored_count: int
+    nonempty_count: int
+    empty_count: int
+    missed_assessable_count: int
+    resolved_useful_rate: float | None
+    observed_harmful_rate: float | None
+    nonempty_coverage: float | None
+    empty_extraction_rate: float | None
+    high_confidence_missed_rate: float | None
+    safety_failure_count: int
+
+    def __post_init__(self) -> None:
+        counts = (
+            self.completed_source_count,
+            self.useful_count,
+            self.harmful_count,
+            self.missed_count,
+            self.unresolved_count,
+            self.censored_count,
+            self.nonempty_count,
+            self.empty_count,
+            self.missed_assessable_count,
+            self.safety_failure_count,
+        )
+        if any(type(value) is not int or value < 0 for value in counts):
+            raise ValueError("extraction quality counts must be non-negative integers")
+        if self.completed_source_count != sum((
+            self.useful_count,
+            self.harmful_count,
+            self.missed_count,
+            self.unresolved_count,
+            self.censored_count,
+        )):
+            raise ValueError("extraction quality label counts do not cover sources")
+        if self.nonempty_count > self.completed_source_count or (
+            self.empty_count > self.completed_source_count
+        ) or self.missed_assessable_count > self.completed_source_count:
+            raise ValueError("extraction quality denominator counts are invalid")
+        ratios = (
+            self.resolved_useful_rate,
+            self.observed_harmful_rate,
+            self.nonempty_coverage,
+            self.empty_extraction_rate,
+            self.high_confidence_missed_rate,
+        )
+        if any(
+            value is not None
+            and (not math.isfinite(value) or not 0 <= value <= 1)
+            for value in ratios
+        ):
+            raise ValueError("extraction quality ratios must be probabilities or unknown")
+        expected_ratios = (
+            (
+                self.useful_count / self.resolved_count
+                if self.resolved_count
+                else None
+            ),
+            (
+                self.harmful_count / self.nonempty_count
+                if self.nonempty_count
+                else None
+            ),
+            (
+                self.nonempty_count / self.completed_source_count
+                if self.completed_source_count
+                else None
+            ),
+            (
+                self.empty_count / self.completed_source_count
+                if self.completed_source_count
+                else None
+            ),
+            (
+                self.missed_count / self.missed_assessable_count
+                if self.missed_assessable_count
+                else None
+            ),
+        )
+        if ratios != expected_ratios:
+            raise ValueError("extraction quality ratios do not match counts")
+
+    @classmethod
+    def from_observations(
+        cls,
+        observations: tuple[ExtractionValidationObservation, ...],
+    ) -> "ExtractionQualityMetrics":
+        total = len(observations)
+        counts = {
+            label: sum(value.label == label for value in observations)
+            for label in ExtractionFeedbackLabel
+        }
+        nonempty = sum(
+            value.extraction_status == ExtractionSetStatus.NONEMPTY
+            for value in observations
+        )
+        empty = sum(
+            value.extraction_status == ExtractionSetStatus.EMPTY
+            for value in observations
+        )
+        assessable = sum(value.missed_assessable for value in observations)
+        resolved = (
+            counts[ExtractionFeedbackLabel.USEFUL]
+            + counts[ExtractionFeedbackLabel.HARMFUL]
+        )
+        return cls(
+            total,
+            counts[ExtractionFeedbackLabel.USEFUL],
+            counts[ExtractionFeedbackLabel.HARMFUL],
+            counts[ExtractionFeedbackLabel.MISSED],
+            counts[ExtractionFeedbackLabel.UNRESOLVED],
+            counts[ExtractionFeedbackLabel.CENSORED],
+            nonempty,
+            empty,
+            assessable,
+            (
+                counts[ExtractionFeedbackLabel.USEFUL] / resolved
+                if resolved
+                else None
+            ),
+            (
+                counts[ExtractionFeedbackLabel.HARMFUL] / nonempty
+                if nonempty
+                else None
+            ),
+            nonempty / total if total else None,
+            empty / total if total else None,
+            (
+                counts[ExtractionFeedbackLabel.MISSED] / assessable
+                if assessable
+                else None
+            ),
+            sum(sum(value.failure_counts) for value in observations),
+        )
+
+    @property
+    def resolved_count(self) -> int:
+        return self.useful_count + self.harmful_count
+
+    def payload(self) -> dict[str, object]:
+        return {
+            field: getattr(self, field)
+            for field in self.__dataclass_fields__
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionAcceptanceCriteria:
+    minimum_matched_pairs: int
+    minimum_resolved_examples: int
+    minimum_useful_rate_delta: float
+    maximum_harmful_rate_delta: float
+    minimum_coverage_ratio: float
+    maximum_empty_rate: float
+    maximum_missed_rate_delta: float
+    required_metrics: tuple[str, ...] = ("harmful_rate",)
+    proposal_budget_id: str = "proposal-budget.default-v1"
+
+    def __post_init__(self) -> None:
+        if type(self.minimum_matched_pairs) is not int or self.minimum_matched_pairs < 1:
+            raise ValueError("minimum matched pairs must be positive")
+        if (
+            type(self.minimum_resolved_examples) is not int
+            or self.minimum_resolved_examples < 1
+        ):
+            raise ValueError("minimum resolved examples must be positive")
+        values = {
+            "minimum_useful_rate_delta": _finite(
+                self.minimum_useful_rate_delta,
+                "minimum useful-rate delta",
+            ),
+            "maximum_harmful_rate_delta": _finite(
+                self.maximum_harmful_rate_delta,
+                "maximum harmful-rate delta",
+            ),
+            "minimum_coverage_ratio": _finite(
+                self.minimum_coverage_ratio,
+                "minimum coverage ratio",
+            ),
+            "maximum_empty_rate": _finite(
+                self.maximum_empty_rate,
+                "maximum empty rate",
+            ),
+            "maximum_missed_rate_delta": _finite(
+                self.maximum_missed_rate_delta,
+                "maximum missed-rate delta",
+            ),
+        }
+        if values["minimum_useful_rate_delta"] <= 0:
+            raise ValueError("minimum useful-rate delta must be strictly positive")
+        if values["maximum_harmful_rate_delta"] < 0 or values[
+            "maximum_missed_rate_delta"
+        ] < 0:
+            raise ValueError("maximum quality regressions must be non-negative")
+        if not 0 <= values["minimum_coverage_ratio"] <= 1:
+            raise ValueError("minimum coverage ratio must be between zero and one")
+        if not 0 <= values["maximum_empty_rate"] <= 1:
+            raise ValueError("maximum empty rate must be between zero and one")
+        if (
+            len(self.required_metrics) != len(set(self.required_metrics))
+            or set(self.required_metrics) - _REQUIRED_METRICS
+        ):
+            raise ValueError("required extraction validation metrics are invalid")
+        _require_id(self.proposal_budget_id, "proposal budget ID")
+        for name, value in values.items():
+            object.__setattr__(self, name, value)
+
+    @property
+    def digest(self) -> str:
+        return _digest({
+            "minimum_matched_pairs": self.minimum_matched_pairs,
+            "minimum_resolved_examples": self.minimum_resolved_examples,
+            "minimum_useful_rate_delta": self.minimum_useful_rate_delta,
+            "maximum_harmful_rate_delta": self.maximum_harmful_rate_delta,
+            "minimum_coverage_ratio": self.minimum_coverage_ratio,
+            "maximum_empty_rate": self.maximum_empty_rate,
+            "maximum_missed_rate_delta": self.maximum_missed_rate_delta,
+            "required_metrics": list(self.required_metrics),
+            "proposal_budget_id": self.proposal_budget_id,
+        })
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionValidationDecision:
+    decision_id: str
+    accepted: bool
+    split_id: str
+    parent_artifact_id: str
+    proposal_artifact_id: str
+    criteria_digest: str
+    parent_metrics: ExtractionQualityMetrics
+    proposal_metrics: ExtractionQualityMetrics
+    useful_rate_delta: float | None
+    harmful_rate_delta: float | None
+    missed_rate_delta: float | None
+    changed_extraction_count: int
+    reason_codes: tuple[str, ...]
+    pair_ids: tuple[str, ...]
+    observation_ids: tuple[str, ...]
+    decision_schema: str = EXTRACTION_VALIDATION_SCHEMA
+    schema_version: int = EXTRACTION_VALIDATION_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if (
+            self.schema_version != EXTRACTION_VALIDATION_SCHEMA_VERSION
+            or self.decision_schema != EXTRACTION_VALIDATION_SCHEMA
+        ):
+            raise ValueError("unsupported extraction validation decision schema")
+        for value in (
+            self.decision_id,
+            self.split_id,
+            self.parent_artifact_id,
+            self.proposal_artifact_id,
+        ):
+            _require_id(value, "extraction validation decision identity")
+        _require_digest(self.criteria_digest, "validation criteria digest")
+        if type(self.accepted) is not bool:
+            raise TypeError("validation acceptance must be bool")
+        if (
+            type(self.changed_extraction_count) is not int
+            or self.changed_extraction_count < 0
+        ):
+            raise ValueError("changed extraction count must be non-negative")
+        if not self.reason_codes:
+            raise ValueError("validation decision requires reason codes")
+        if len(self.pair_ids) != len(set(self.pair_ids)) or len(
+            self.observation_ids
+        ) != len(set(self.observation_ids)):
+            raise ValueError("validation decision evidence IDs must be unique")
+        for value in (*self.pair_ids, *self.observation_ids):
+            _require_id(value, "validation decision evidence ID")
+        for value in (
+            self.useful_rate_delta,
+            self.harmful_rate_delta,
+            self.missed_rate_delta,
+        ):
+            if value is not None and not math.isfinite(value):
+                raise ValueError("validation quality deltas must be finite or unknown")
+        if self.accepted != (self.reason_codes == ("extraction_validation_passed",)):
+            raise ValueError("validation acceptance and reason codes disagree")
+        expected = _digest(self.identity_payload())
+        if self.decision_id != f"extraction-validation.{expected[:40]}":
+            raise ValueError("extraction validation decision ID mismatch")
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "decision_schema": self.decision_schema,
+            "accepted": self.accepted,
+            "split_id": self.split_id,
+            "parent_artifact_id": self.parent_artifact_id,
+            "proposal_artifact_id": self.proposal_artifact_id,
+            "criteria_digest": self.criteria_digest,
+            "parent_metrics": self.parent_metrics.payload(),
+            "proposal_metrics": self.proposal_metrics.payload(),
+            "useful_rate_delta": self.useful_rate_delta,
+            "harmful_rate_delta": self.harmful_rate_delta,
+            "missed_rate_delta": self.missed_rate_delta,
+            "changed_extraction_count": self.changed_extraction_count,
+            "reason_codes": list(self.reason_codes),
+            "pair_ids": list(self.pair_ids),
+            "observation_ids": list(self.observation_ids),
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            **self.identity_payload(),
+            "decision_id": self.decision_id,
+        }
+
+
+class ExtractionPromptMatchedValidator:
+    def evaluate(
+        self,
+        *,
+        split: ExtractionPromptValidationSplit,
+        observations: tuple[ExtractionValidationObservation, ...],
+        parent_artifact_id: str,
+        proposal_artifact_id: str,
+        criteria: ExtractionAcceptanceCriteria,
+    ) -> ExtractionValidationDecision:
+        _require_id(parent_artifact_id, "parent extraction artifact ID")
+        _require_id(proposal_artifact_id, "proposal extraction artifact ID")
+        if parent_artifact_id == proposal_artifact_id:
+            raise ValueError("validation requires distinct extraction artifacts")
+        if not observations or len({value.observation_id for value in observations}) != len(
+            observations
+        ):
+            raise ValueError("validation observations must be nonempty and unique")
+        pairs: dict[str, dict[ExtractionValidationVariant, ExtractionValidationObservation]] = {}
+        for observation in observations:
+            if not split.permits(observation):
+                raise ValueError("observation is outside the validation split")
+            expected_artifact = (
+                parent_artifact_id
+                if observation.variant == ExtractionValidationVariant.PARENT
+                else proposal_artifact_id
+            )
+            if observation.extraction_artifact_id != expected_artifact:
+                raise ValueError("observation extraction artifact mismatch")
+            variants = pairs.setdefault(observation.pair_id, {})
+            if observation.variant in variants:
+                raise ValueError("validation pair contains a duplicate variant")
+            variants[observation.variant] = observation
+        if any(set(values) != set(ExtractionValidationVariant) for values in pairs.values()):
+            raise ValueError("validation requires complete parent/proposal pairs")
+        for values in pairs.values():
+            parent = values[ExtractionValidationVariant.PARENT]
+            proposal = values[ExtractionValidationVariant.PROPOSAL]
+            if parent.pair_identity_payload() != proposal.pair_identity_payload():
+                raise ValueError("validation pair identity differs")
+        changed_extraction_count = sum(
+            values[ExtractionValidationVariant.PARENT].extraction_output_digest
+            != values[ExtractionValidationVariant.PROPOSAL].extraction_output_digest
+            for values in pairs.values()
+        )
+
+        parent_values = tuple(
+            values[ExtractionValidationVariant.PARENT] for values in pairs.values()
+        )
+        proposal_values = tuple(
+            values[ExtractionValidationVariant.PROPOSAL] for values in pairs.values()
+        )
+        parent_metrics = ExtractionQualityMetrics.from_observations(parent_values)
+        proposal_metrics = ExtractionQualityMetrics.from_observations(proposal_values)
+
+        def delta(proposal: float | None, parent: float | None) -> float | None:
+            return None if proposal is None or parent is None else proposal - parent
+
+        useful_delta = delta(
+            proposal_metrics.resolved_useful_rate,
+            parent_metrics.resolved_useful_rate,
+        )
+        harmful_delta = delta(
+            proposal_metrics.observed_harmful_rate,
+            parent_metrics.observed_harmful_rate,
+        )
+        missed_delta = delta(
+            proposal_metrics.high_confidence_missed_rate,
+            parent_metrics.high_confidence_missed_rate,
+        )
+        reasons = []
+        if len(pairs) < criteria.minimum_matched_pairs:
+            reasons.append("insufficient_matched_pairs")
+        if proposal_metrics.resolved_count < criteria.minimum_resolved_examples:
+            reasons.append("insufficient_resolved_examples")
+        if useful_delta is None or useful_delta < criteria.minimum_useful_rate_delta:
+            reasons.append("useful_rate_not_improved")
+        if "harmful_rate" in criteria.required_metrics and harmful_delta is None:
+            reasons.append("harmful_rate_unknown")
+        elif (
+            harmful_delta is not None
+            and harmful_delta > criteria.maximum_harmful_rate_delta
+        ):
+            reasons.append("harmful_rate_regression")
+        parent_coverage = parent_metrics.nonempty_coverage
+        proposal_coverage = proposal_metrics.nonempty_coverage
+        if (
+            parent_coverage is None
+            or proposal_coverage is None
+            or proposal_coverage < parent_coverage * criteria.minimum_coverage_ratio
+        ):
+            reasons.append("coverage_collapse")
+        if (
+            proposal_metrics.empty_extraction_rate is None
+            or proposal_metrics.empty_extraction_rate > criteria.maximum_empty_rate
+        ):
+            reasons.append("empty_rate_exceeded")
+        if "missed_rate" in criteria.required_metrics and missed_delta is None:
+            reasons.append("missed_rate_unknown")
+        elif missed_delta is not None and missed_delta > criteria.maximum_missed_rate_delta:
+            reasons.append("missed_rate_regression")
+        if proposal_metrics.safety_failure_count:
+            reasons.append("safety_failure")
+        if changed_extraction_count == 0:
+            reasons.append("no_extraction_intervention")
+        accepted = not reasons
+        reason_codes = (
+            ("extraction_validation_passed",)
+            if accepted
+            else tuple(dict.fromkeys(reasons))
+        )
+        values = {
+            "accepted": accepted,
+            "split_id": split.split_id,
+            "parent_artifact_id": parent_artifact_id,
+            "proposal_artifact_id": proposal_artifact_id,
+            "criteria_digest": criteria.digest,
+            "parent_metrics": parent_metrics,
+            "proposal_metrics": proposal_metrics,
+            "useful_rate_delta": useful_delta,
+            "harmful_rate_delta": harmful_delta,
+            "missed_rate_delta": missed_delta,
+            "changed_extraction_count": changed_extraction_count,
+            "reason_codes": reason_codes,
+            "pair_ids": tuple(sorted(pairs)),
+            "observation_ids": tuple(sorted(
+                value.observation_id for value in observations
+            )),
+        }
+        identity = {
+            "schema_version": EXTRACTION_VALIDATION_SCHEMA_VERSION,
+            "decision_schema": EXTRACTION_VALIDATION_SCHEMA,
+            **{
+                key: (
+                    value.payload()
+                    if isinstance(value, ExtractionQualityMetrics)
+                    else list(value)
+                    if isinstance(value, tuple)
+                    else value
+                )
+                for key, value in values.items()
+            },
+        }
+        return ExtractionValidationDecision(
+            f"extraction-validation.{_digest(identity)[:40]}",
+            accepted,
+            split.split_id,
+            parent_artifact_id,
+            proposal_artifact_id,
+            criteria.digest,
+            parent_metrics,
+            proposal_metrics,
+            useful_delta,
+            harmful_delta,
+            missed_delta,
+            changed_extraction_count,
+            reason_codes,
+            values["pair_ids"],
+            values["observation_ids"],
+        )
