@@ -109,6 +109,17 @@ def test_non_projectable_host_roles_are_rejected_before_extraction() -> None:
     assert "seg.system" in decision.rejected_segment_ids
 
 
+def test_skip_records_no_selected_source() -> None:
+    snapshot = _snapshot(current="turn.3")
+    event = HostTriggerAdapter().event(
+        "session_end", source_revision=snapshot.context_revision, payload={"snapshot": snapshot.snapshot_id}
+    )
+    decision = DeterministicSourceSelectionPolicy().skip(snapshot, event)
+    assert decision.action.value == "SKIP"
+    assert decision.selected_segment_ids == ()
+    assert decision.reason_codes == ("trigger_not_run",)
+
+
 def test_projection_can_apply_audited_selection_without_splitting_closure() -> None:
     base = _snapshot(current=None)
     segments = tuple(item for item in base.segments if item.segment_id in {"seg.user", "seg.call", "seg.result"})
