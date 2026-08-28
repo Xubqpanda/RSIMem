@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from typing import Mapping
 
 from ..lifecycle import ContextSnapshot, SegmentKind, TaskLifecycleState
 from .contracts import MemoryExperience, MemoryMessage
@@ -70,6 +71,32 @@ class ExtractionSourceMessage:
             "tool_call_id": self.tool_call_id,
             "content_truncated": self.content_truncated,
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionSourceMessage":
+        fields = {
+            "segment_id",
+            "source_message_id",
+            "role",
+            "content",
+            "segment_kind",
+            "tool_call_id",
+            "content_truncated",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed extraction source message")
+        try:
+            return cls(
+                segment_id=value["segment_id"],
+                source_message_id=value["source_message_id"],
+                role=value["role"],
+                content=value["content"],
+                segment_kind=SegmentKind(value["segment_kind"]),
+                tool_call_id=value["tool_call_id"],
+                content_truncated=value["content_truncated"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction source message") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +170,65 @@ class ExtractionSourceProjection:
 
     def prompt_messages(self) -> list[dict[str, object]]:
         return [message.prompt_payload() for message in self.messages]
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "projection_id": self.projection_id,
+            "projection_digest": self.projection_digest,
+            **self.identity_payload(),
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionSourceProjection":
+        fields = {
+            "projection_id",
+            "projection_digest",
+            "schema_version",
+            "schema",
+            "snapshot_id",
+            "task_id",
+            "context_revision",
+            "messages",
+            "source_message_ids",
+            "source_segment_ids",
+            "omitted_segment_ids",
+            "truncated_segment_ids",
+            "max_content_chars",
+            "projected_content_chars",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed extraction source projection")
+        list_fields = (
+            "messages",
+            "source_message_ids",
+            "source_segment_ids",
+            "omitted_segment_ids",
+            "truncated_segment_ids",
+        )
+        if any(not isinstance(value[field], list) for field in list_fields):
+            raise ValueError("malformed extraction source projection collections")
+        try:
+            return cls(
+                projection_id=value["projection_id"],
+                snapshot_id=value["snapshot_id"],
+                task_id=value["task_id"],
+                context_revision=value["context_revision"],
+                messages=tuple(
+                    ExtractionSourceMessage.from_payload(item)
+                    for item in value["messages"]
+                ),
+                source_message_ids=tuple(value["source_message_ids"]),
+                source_segment_ids=tuple(value["source_segment_ids"]),
+                omitted_segment_ids=tuple(value["omitted_segment_ids"]),
+                truncated_segment_ids=tuple(value["truncated_segment_ids"]),
+                max_content_chars=value["max_content_chars"],
+                projected_content_chars=value["projected_content_chars"],
+                projection_digest=value["projection_digest"],
+                schema=value["schema"],
+                schema_version=value["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction source projection") from exc
 
     def to_experience(self, snapshot: ContextSnapshot) -> MemoryExperience:
         if (
