@@ -21,7 +21,8 @@ activation/rollback foundations are complete. The former Phase 2J/2K work is
 complete only as legacy retrieval-threshold infrastructure; extraction-prompt
 adaptation is pending. Stage 1, the Stage 2A extraction policy envelope, and
 the Stage 2B optimizer corpus, and the Stage 2C controlled rule editor are
-closed; Stage 2D is the active milestone.
+closed; Stage 2F deterministic runtime binding is closed, and the remaining
+Stage 2E live matched validation run is the active milestone.
 
 Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
@@ -290,23 +291,35 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 - [x] Persist matched decisions and rollback evidence; activation, rejection, restart, duplicate apply, crash recovery, operator rollback, and observed-safety rollback are deterministic and idempotent.
 - [ ] Run the real independent PAST-Bench parent/candidate validation batch after Stage 2F binds the candidate at the extraction prompt boundary.
 
+### Extraction-Prompt Stage 2F Runtime Binding And Fingerprint
+
+- [x] Load the validation-only ACTIVE candidate through the real extraction policy store and bind it at the Mem0-flat fact-extraction call boundary.
+- [x] Transport a content-free trial profile through PAST-Bench and revalidate an immutable attempt-local bundle without recording its machine source path.
+- [x] Expose `prompt_slot(...)` as a one-line explicit registry entry with no global patching or alternate validation path.
+- [x] Record rich policy, prompt component, binding, wrapper/schema, render input/output, semantic manifest, mutation, and persisted-artifact identities for every completed extraction.
+- [x] Fail closed on configured/loaded artifact mismatch and slot, adapter, wrapper, schema, update, retrieval, route, boundary, backend, framework, or model drift.
+- [x] Report no intervention separately when N and N+1 produce the same parsed extraction.
+- [x] Reproduce the same runtime binding fingerprint after restart.
+
+Detailed deterministic evidence is in [`extraction_stage2f_acceptance_20260828.md`](extraction_stage2f_acceptance_20260828.md). No live provider validation run or production activation is included in this milestone.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `527 passed`.
-- [x] Pass the vendored PAST-Bench regression suite: `394 passed, 2 skipped`.
+- [x] Pass all RSIMem tests: `546 passed`.
+- [x] Pass the vendored PAST-Bench regression suite: `397 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Extraction-Prompt Stage 2F (Unblocks The Remaining 2E Run)**
+### **Current: Extraction-Prompt Stage 2E Live Matched Validation**
 
 The first optimized component is the semantic fact-extraction prompt. Delayed
 deployment evidence may update prompt body N to N+1 while the operation prompt,
 retrieval configuration, route, invocation boundary, backend, and model profile
 remain frozen. Raw resources are reported separately from the method decision.
 
-The immediate objective is binding the validation-only ACTIVE extraction artifact to the actual Mem0-flat prompt call while freezing the completion client, model profile, update prompt, retrieval config, route, boundary, and backend. After that binding passes deterministic fingerprint tests, execution returns to Stage 2E for the real predeclared parent/proposal validation batch. Candidate artifacts remain proposals and production activation remains blocked until that live gate passes.
+Stage 2F now binds the validation-only ACTIVE extraction artifact to the actual Mem0-flat prompt call and records the complete activation fingerprint while freezing the completion client, model profile, update prompt, retrieval config, route, boundary, and backend. The immediate objective is the real predeclared parent/proposal validation batch. Candidate artifacts remain proposals and production activation remains blocked until that live gate passes.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -407,7 +420,7 @@ Acceptance criteria:
 9. [x] Implement the controlled extraction prompt optimizer with captured replay, provider adapter, evidence gating, and candidate leakage/safety rejection.
 10. [x] Implement static safety and held-out offline validation for extraction prompt candidates.
 11. [x] Implement the predeclared matched-trial contract, validation-only store, evidence assembler, activation, rejection, restart, and rollback gates.
-12. [ ] Bind the validation-only ACTIVE extraction artifact to the real Mem0-flat prompt call and record its runtime fingerprint.
+12. [x] Bind the validation-only ACTIVE extraction artifact to the real Mem0-flat prompt call and record its runtime fingerprint.
 13. [ ] Return to Stage 2E and run a predeclared matched static-extraction/adaptive-extraction SM01 batch.
 14. [ ] Produce dated extraction-method reports before making adaptation claims.
 
