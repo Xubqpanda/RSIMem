@@ -57,6 +57,7 @@ _MEMORY_RUNTIME_ATTRIBUTE_FIELDS = {
     "snapshot_id",
     "mutation_id",
     "receipt_id",
+    "writer_identity",
 }
 _MEMORY_RUNTIME_ID_ATTRIBUTES = {
     "execution_id",
@@ -64,6 +65,7 @@ _MEMORY_RUNTIME_ID_ATTRIBUTES = {
     "snapshot_id",
     "mutation_id",
     "receipt_id",
+    "writer_identity",
 }
 _RSIMEM_EXECUTION_MODES = {"native+ledger", "native+adapter+ledger"}
 _LIFECYCLE_EVENT_KINDS = {
@@ -221,6 +223,7 @@ def _validate_memory_runtime_event(value: dict[str, Any], source_path: Path) -> 
         raise ValueError(f"invalid RSIMem projection result in {source_path}")
     if any(
         key in attributes
+        and attributes[key] is not None
         and (
             not isinstance(attributes[key], str)
             or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}", attributes[key])
@@ -228,6 +231,15 @@ def _validate_memory_runtime_event(value: dict[str, Any], source_path: Path) -> 
         for key in _MEMORY_RUNTIME_ID_ATTRIBUTES
     ):
         raise ValueError(f"invalid RSIMem runtime operation identity in {source_path}")
+    if value.get("kind") == "mutation_committed":
+        action = attributes.get("action")
+        if not isinstance(attributes.get("mutation_id"), str) or not isinstance(
+            attributes.get("receipt_id"), str
+        ):
+            raise ValueError(f"incomplete committed mutation identity in {source_path}")
+        writer = attributes.get("writer_identity")
+        if (action == "none") != (writer is None):
+            raise ValueError(f"invalid committed mutation writer in {source_path}")
     if value.get("kind") == "projection_check" and (
         not isinstance(attributes.get("surface"), str)
         or not attributes["surface"]
