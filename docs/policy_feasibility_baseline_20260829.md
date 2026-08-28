@@ -4,6 +4,8 @@
 
 本文记录第三阶段 3A/3B 的第一份 deterministic/shadow feasibility evidence。它验证的是 decision 是否可观察、可控制、可回放，以及是否存在可归因的 process/outcome 反馈；它不是 PAST-Bench aggregate uplift，也不是在线 adaptive policy 实验。
 
+表中的 `useful/harmful/missed` 链使用 fixture-local 的不透明 evidence IDs 来演示 contract 和统计边界；它们不是从真实 Hermes deployment 或 SM01 strict resolver 读取的标签，不能直接进入正式 optimizer corpus 或效果结论。真实 corpus 接入后必须用已注册的 opportunity/use/outcome contract 替换这些 fixture 链，并保留 unresolved/censored。
+
 ## Fixture
 
 Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable preference（TSV 输出偏好）和一个 temporary formatting request。`DeterministicPolicyReplay` 在相同 event、snapshot revision、backend descriptor 和 lineage 下生成 parent/candidate。candidate artifact 只声明一个目标 policy layer；replay audit 必须先通过，才允许构造 `LayerIntervention`。
