@@ -1,0 +1,141 @@
+"""Generate and persist one extraction prompt proposal from a train corpus."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+from typing import Sequence
+
+from .memory.extraction_optimizer_contracts import FROZEN_EXTRACTION_OPTIMIZER_CONFIG
+from .memory.extraction_optimizer_provider import OpenAICompatibleExtractionOptimizerClient
+from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStore
+from .memory.extraction_policy_artifact import ExtractionPromptPolicyArtifact
+from .memory.extraction_policy_store import JsonExtractionPolicyStore
+from .memory.extraction_prompt_optimizer import (
+    ExtractionOptimizerDecision,
+    ExtractionOptimizerResult,
+    ExtractionPromptOptimizer,
+)
+from .memory.prompt_components import canonical_json, content_digest
+from .memory_systems.mem0_flat import (
+    MEM0_FLAT_EXTRACTION_SLOT,
+    MEM0_FLAT_EXTRACTION_SLOT_ID,
+    Mem0FlatPromptAdapter,
+)
+
+
+def _write_immutable(path: Path, value: object) -> None:
+    serialized = canonical_json(value) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        if path.read_text(encoding="utf-8") != serialized:
+            raise ValueError("proposal output conflicts with existing content")
+        return
+    path.write_text(serialized, encoding="utf-8")
+    path.chmod(0o600)
+
+
+def result_payload(result: ExtractionOptimizerResult) -> dict[str, object]:
+    return {
+        "schemaVersion": 1,
+        "resultSchema": "extraction-optimizer-result-v1",
+        "resultId": result.result_id,
+        "decision": result.decision.value,
+        "reasonCodes": list(result.reason_codes),
+        "request": {
+            "requestId": result.request.request_id,
+            "requestDigest": result.request.request_digest,
+            "parentArtifactId": result.request.parent_artifact_id,
+            "parentArtifactDigest": result.request.parent_artifact_digest,
+            "corpusId": result.request.corpus_id,
+            "corpusDigest": result.request.corpus_digest,
+            "optimizerConfigDigest": result.request.optimizer_config_digest,
+        },
+        "completionId": result.completion_id,
+        "edits": [value.payload() for value in result.edits],
+        "candidate": result.candidate.payload() if result.candidate else None,
+        "usage": result.usage.to_dict(),
+    }
+
+
+def prepare_extraction_proposal(
+    *,
+    corpus_store: JsonExtractionOptimizerCorpusStore,
+    output_root: Path,
+    client,
+) -> ExtractionOptimizerResult:
+    corpus = corpus_store.read_for_optimizer()
+    parent = Mem0FlatPromptAdapter().export_root_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID
+    )
+    result = ExtractionPromptOptimizer(
+        client,
+        config=FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+    ).propose(parent, corpus)
+    output = output_root.expanduser().resolve()
+    _write_immutable(output / "optimizer-result.json", result_payload(result))
+    _write_immutable(
+        output / "optimizer-request.json",
+        {
+            "requestId": result.request.request_id,
+            "requestDigest": result.request.request_digest,
+            "parentArtifactId": result.request.parent_artifact_id,
+            "parentArtifactDigest": result.request.parent_artifact_digest,
+            "corpusId": result.request.corpus_id,
+            "corpusDigest": result.request.corpus_digest,
+            "optimizerConfigDigest": result.request.optimizer_config_digest,
+            "primaryExampleIds": list(result.request.primary_example_ids),
+        },
+    )
+    if result.decision == ExtractionOptimizerDecision.PROPOSE:
+        assert result.candidate is not None
+        _write_immutable(
+            output / "candidate-artifact.json",
+            result.candidate.payload(),
+        )
+    return result
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("corpus_attempt_root", type=Path)
+    parser.add_argument("--owner-controlled-root", type=Path, required=True)
+    parser.add_argument("--attempt-id", required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--api-key-file", type=Path)
+    parser.add_argument("--base-url", default="https://coding.tu-zi.com/v1")
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    if args.api_key_file is None:
+        raise SystemExit("--api-key-file is required for provider execution")
+    api_key = args.api_key_file.read_text(encoding="utf-8").strip()
+    client = OpenAICompatibleExtractionOptimizerClient(
+        api_key=api_key,
+        base_url=args.base_url,
+    )
+    store = JsonExtractionOptimizerCorpusStore(
+        args.corpus_attempt_root,
+        owner_controlled_root=args.owner_controlled_root,
+        attempt_id=args.attempt_id,
+        split="train",
+    )
+    result = prepare_extraction_proposal(
+        corpus_store=store,
+        output_root=args.output,
+        client=client,
+    )
+    print(canonical_json({
+        "resultId": result.result_id,
+        "decision": result.decision.value,
+        "candidateArtifactId": (
+            result.candidate.artifact_id if result.candidate is not None else None
+        ),
+    }))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
