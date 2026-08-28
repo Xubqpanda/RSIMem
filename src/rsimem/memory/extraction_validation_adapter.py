@@ -74,10 +74,10 @@ class ExtractionValidationObservationAssembler:
             extraction_output_digest=source.extraction_output_digest,
             label=primary.label,
             extraction_status=source.source.status,
-            missed_assessable=(
-                True
-                if primary.label == ExtractionFeedbackLabel.MISSED
-                else None
-            ),
+            missed_assessable=primary.label in {
+                ExtractionFeedbackLabel.USEFUL,
+                ExtractionFeedbackLabel.HARMFUL,
+                ExtractionFeedbackLabel.MISSED,
+            },
             failure_counts=safety.failure_counts,
         )

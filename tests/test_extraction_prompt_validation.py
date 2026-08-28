@@ -642,7 +642,7 @@ def test_live_feedback_assembler_uses_persisted_identity_and_fingerprints(
     assert observation.extraction_artifact_id == source.extraction_artifact_id
     assert observation.extraction_output_digest == source.extraction_output_digest
     assert observation.label == ExtractionFeedbackLabel.USEFUL
-    assert observation.missed_assessable is None
+    assert observation.missed_assessable is True
 
     restored = LiveExtractionFeedbackRecord.from_payload(live.payload())
     assert restored == live

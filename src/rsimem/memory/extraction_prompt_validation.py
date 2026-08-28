@@ -230,6 +230,96 @@ class ExtractionValidationObservation:
             "persistence_state_digest": self.persistence_state_digest,
         }
 
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "observation_id": self.observation_id,
+            "pair_id": self.pair_id,
+            "variant": self.variant.value,
+            "replicate": self.replicate,
+            "family_id": self.family_id,
+            "task_template_group_id": self.task_template_group_id,
+            "task_id": self.task_id,
+            "run_id": self.run_id,
+            "episode_id": self.episode_id,
+            "extraction_set_id": self.extraction_set_id,
+            "task_manifest_digest": self.task_manifest_digest,
+            "model_profile_digest": self.model_profile_digest,
+            "budget_id": self.budget_id,
+            "persistence_state_digest": self.persistence_state_digest,
+            "extraction_artifact_id": self.extraction_artifact_id,
+            "extraction_artifact_digest": self.extraction_artifact_digest,
+            "extraction_output_digest": self.extraction_output_digest,
+            "label": self.label.value,
+            "extraction_status": self.extraction_status.value,
+            "missed_assessable": self.missed_assessable,
+            "failure_counts": list(self.failure_counts),
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionValidationObservation":
+        fields = {
+            "schema_version",
+            "observation_id",
+            "pair_id",
+            "variant",
+            "replicate",
+            "family_id",
+            "task_template_group_id",
+            "task_id",
+            "run_id",
+            "episode_id",
+            "extraction_set_id",
+            "task_manifest_digest",
+            "model_profile_digest",
+            "budget_id",
+            "persistence_state_digest",
+            "extraction_artifact_id",
+            "extraction_artifact_digest",
+            "extraction_output_digest",
+            "label",
+            "extraction_status",
+            "missed_assessable",
+            "failure_counts",
+        }
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != fields
+            or not isinstance(value["failure_counts"], list)
+            or len(value["failure_counts"]) != 4
+        ):
+            raise ValueError("malformed extraction validation observation")
+        try:
+            return cls(
+                observation_id=value["observation_id"],
+                pair_id=value["pair_id"],
+                variant=value["variant"],
+                replicate=value["replicate"],
+                family_id=value["family_id"],
+                task_template_group_id=value["task_template_group_id"],
+                task_id=value["task_id"],
+                run_id=value["run_id"],
+                episode_id=value["episode_id"],
+                extraction_set_id=value["extraction_set_id"],
+                task_manifest_digest=value["task_manifest_digest"],
+                model_profile_digest=value["model_profile_digest"],
+                budget_id=value["budget_id"],
+                persistence_state_digest=value["persistence_state_digest"],
+                extraction_artifact_id=value["extraction_artifact_id"],
+                extraction_artifact_digest=value["extraction_artifact_digest"],
+                extraction_output_digest=value["extraction_output_digest"],
+                label=value["label"],
+                extraction_status=value["extraction_status"],
+                missed_assessable=value["missed_assessable"],
+                schema_failure_count=value["failure_counts"][0],
+                safety_failure_count=value["failure_counts"][1],
+                prompt_leakage_failure_count=value["failure_counts"][2],
+                native_writer_failure_count=value["failure_counts"][3],
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction validation observation") from exc
+
     @classmethod
     def create(
         cls,
@@ -318,8 +408,11 @@ class ExtractionValidationSafetyEvidence:
     safety_failure_count: int
     prompt_leakage_failure_count: int
     native_writer_failure_count: int
+    schema_version: int = EXTRACTION_VALIDATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
+        if self.schema_version != EXTRACTION_VALIDATION_SCHEMA_VERSION:
+            raise ValueError("unsupported extraction validation safety evidence")
         for value in (
             self.evidence_id,
             self.live_feedback_record_id,
@@ -354,6 +447,56 @@ class ExtractionValidationSafetyEvidence:
             self.prompt_leakage_failure_count,
             self.native_writer_failure_count,
         )
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "evidence_id": self.evidence_id,
+            "live_feedback_record_id": self.live_feedback_record_id,
+            "source_record_id": self.source_record_id,
+            "audit_id": self.audit_id,
+            "audit_digest": self.audit_digest,
+            "evidence_cutoff_operation_id": self.evidence_cutoff_operation_id,
+            "complete": self.complete,
+            "failure_counts": list(self.failure_counts),
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionValidationSafetyEvidence":
+        fields = {
+            "schema_version",
+            "evidence_id",
+            "live_feedback_record_id",
+            "source_record_id",
+            "audit_id",
+            "audit_digest",
+            "evidence_cutoff_operation_id",
+            "complete",
+            "failure_counts",
+        }
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != fields
+            or not isinstance(value["failure_counts"], list)
+            or len(value["failure_counts"]) != 4
+        ):
+            raise ValueError("malformed extraction validation safety evidence")
+        try:
+            return cls(
+                value["evidence_id"],
+                value["live_feedback_record_id"],
+                value["source_record_id"],
+                value["audit_id"],
+                value["audit_digest"],
+                value["evidence_cutoff_operation_id"],
+                value["complete"],
+                *value["failure_counts"],
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(
+                "malformed extraction validation safety evidence"
+            ) from exc
 
     @classmethod
     def create(
