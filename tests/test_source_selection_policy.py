@@ -15,6 +15,7 @@ from rsimem.memory.source_selection_policy import (
     DeterministicSourceSelectionPolicy,
     SourceSelectionConfig,
 )
+from rsimem.memory.extraction_source import ExtractionSourceProjector
 from rsimem.memory.trigger_policy import HostTriggerAdapter
 
 
@@ -88,3 +89,42 @@ def test_revision_mismatch_fails_closed() -> None:
     event = HostTriggerAdapter().event("task_completed", source_revision="revision.other", payload={})
     with pytest.raises(ValueError, match="revision"):
         DeterministicSourceSelectionPolicy().select(snapshot, event)
+
+
+def test_non_projectable_host_roles_are_rejected_before_extraction() -> None:
+    base = _snapshot(current="turn.3")
+    system = SnapshotSegment(
+        "seg.system", "msg.system", "system", "host-only", "turn.0", 1, completed=True,
+    )
+    snapshot = ContextSnapshot(
+        base.run_id, base.episode_id, base.session_id, base.task_id, base.snapshot_id,
+        base.context_revision, (system, *base.segments), base.active_segment_ids,
+        base.current_turn_id, base.task_state, base.lifecycle_state, base.tool_closures,
+        base.total_token_count + 1, base.provenance,
+    )
+    event = HostTriggerAdapter().event(
+        "task_completed", source_revision=snapshot.context_revision, payload={"snapshot": snapshot.snapshot_id}
+    )
+    decision = DeterministicSourceSelectionPolicy().select(snapshot, event)
+    assert "seg.system" in decision.rejected_segment_ids
+
+
+def test_projection_can_apply_audited_selection_without_splitting_closure() -> None:
+    base = _snapshot(current=None)
+    segments = tuple(item for item in base.segments if item.segment_id in {"seg.user", "seg.call", "seg.result"})
+    snapshot = ContextSnapshot(
+        base.run_id, base.episode_id, base.session_id, base.task_id, base.snapshot_id,
+        base.context_revision, segments, (), None, base.task_state, base.lifecycle_state,
+        (base.tool_closures[0],), sum(item.token_count for item in segments), base.provenance,
+    )
+    projection = ExtractionSourceProjector().project(
+        snapshot,
+        selected_segment_ids=("seg.user", "seg.call", "seg.result"),
+    )
+    assert projection.source_segment_ids == ("seg.user", "seg.call", "seg.result")
+    assert projection.omitted_segment_ids == ()
+    with pytest.raises(ValueError, match="splits a tool closure"):
+        ExtractionSourceProjector().project(
+            snapshot,
+            selected_segment_ids=("seg.user", "seg.call"),
+        )

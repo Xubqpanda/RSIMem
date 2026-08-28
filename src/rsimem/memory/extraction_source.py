@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Mapping, Sequence
 
 from ..lifecycle import ContextSnapshot, SegmentKind, TaskLifecycleState
 from .contracts import MemoryExperience, MemoryMessage
@@ -268,7 +268,12 @@ class ExtractionSourceProjector:
             raise ValueError("extraction source content budget is invalid")
         self.max_content_chars = max_content_chars
 
-    def project(self, snapshot: ContextSnapshot) -> ExtractionSourceProjection:
+    def project(
+        self,
+        snapshot: ContextSnapshot,
+        *,
+        selected_segment_ids: Sequence[str] | None = None,
+    ) -> ExtractionSourceProjection:
         if snapshot.task_state != TaskLifecycleState.COMPLETED:
             raise ValueError("extraction source requires completed task")
         if snapshot.current_turn_id is not None or snapshot.active_segment_ids:
@@ -278,9 +283,31 @@ class ExtractionSourceProjector:
         if any(not closure.closed for closure in snapshot.tool_closures):
             raise ValueError("open tool closure cannot enter extraction source")
 
+        selected: set[str] | None = None
+        if selected_segment_ids is not None:
+            selected = set(selected_segment_ids)
+            if len(selected) != len(tuple(selected_segment_ids)):
+                raise ValueError("selected extraction source segment IDs must be unique")
+            all_ids = {segment.segment_id for segment in snapshot.segments}
+            if not selected.issubset(all_ids):
+                raise ValueError("selected extraction source segment is not in snapshot")
+            if selected.intersection(snapshot.protected_segment_ids):
+                raise ValueError("selected extraction source includes protected segment")
+            for closure in snapshot.tool_closures:
+                overlap = selected.intersection(closure.segment_ids)
+                if overlap and overlap != set(closure.segment_ids):
+                    raise ValueError("selected extraction source splits a tool closure")
+            selected_roles = {
+                segment.role
+                for segment in snapshot.segments
+                if segment.segment_id in selected
+            }
+            if selected_roles.difference(EXTRACTION_SOURCE_ALLOWED_ROLES):
+                raise ValueError("selected extraction source role is not allowed")
         allowed = tuple(
             segment for segment in snapshot.segments
             if segment.role in EXTRACTION_SOURCE_ALLOWED_ROLES
+            and (selected is None or segment.segment_id in selected)
         )
         if not allowed:
             raise ValueError("snapshot has no allowed extraction source messages")

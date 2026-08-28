@@ -144,6 +144,26 @@ def test_projection_and_request_identity_cover_add_remove_reorder_and_content() 
         assert request.idempotency_key != baseline_request.idempotency_key
 
 
+def test_selected_source_projection_enters_request_identity() -> None:
+    snapshot = _snapshot()
+    full = build_completed_task_semantic_ingest_request(
+        snapshot,
+        policy_version="policy-v1",
+        framework_version="framework-v1",
+    )
+    selected = build_completed_task_semantic_ingest_request(
+        snapshot,
+        policy_version="policy-v1",
+        framework_version="framework-v1",
+        selected_segment_ids=(snapshot.segments[1].segment_id,),
+    )
+    assert selected.source_projection.source_segment_ids == (
+        snapshot.segments[1].segment_id,
+    )
+    assert selected.provenance.source.segment_ids == selected.source_projection.source_segment_ids
+    assert selected.idempotency_key != full.idempotency_key
+
+
 def test_budget_truncation_keeps_tool_call_and_result_atomic() -> None:
     snapshot = _snapshot((
         HermesMessage("older", "user", "u" * 20, "turn-1", 5, completed=True),

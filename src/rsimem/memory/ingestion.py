@@ -452,11 +452,15 @@ def build_completed_task_semantic_ingest_request(
     policy_version: str,
     framework_version: str,
     router: FixedMemoryRouter | None = None,
+    selected_segment_ids: Sequence[str] | None = None,
 ) -> SemanticIngestRequest:
     """Build compilation directly from a trusted completed-task snapshot."""
 
     router = router or FixedMemoryRouter()
-    projection = ExtractionSourceProjector().project(snapshot)
+    projection = ExtractionSourceProjector().project(
+        snapshot,
+        selected_segment_ids=selected_segment_ids,
+    )
     if snapshot.task_state != TaskLifecycleState.COMPLETED:
         raise ValueError("semantic compilation requires completed task state")
     if snapshot.lifecycle_state != SemanticCompilationTrigger.TASK_COMPLETED.value:

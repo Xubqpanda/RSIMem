@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from ..lifecycle import (
     ContextSnapshot,
@@ -859,6 +859,8 @@ class StaticSemanticWritebackRuntime:
     def process_completed_snapshot(
         self,
         snapshot: ContextSnapshot,
+        *,
+        selected_segment_ids: Sequence[str] | None = None,
     ) -> tuple[StaticSemanticBoundaryResult, ...]:
         """Compile one trusted completed task without a lifecycle evaluator."""
 
@@ -868,6 +870,7 @@ class StaticSemanticWritebackRuntime:
             snapshot,
             policy_version=self.policy.descriptor.policy_version,
             framework_version=self.policy.descriptor.framework_version,
+            selected_segment_ids=selected_segment_ids,
         )
         self._source_projections[
             request.provenance.compilation_id
