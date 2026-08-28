@@ -29,6 +29,12 @@ as provider/infra failures and are excluded from optimizer input.
   `232b4f06a8573074663f86c0fff9afff9772415d`. Four of 34 agent calls succeeded
   and 30 failed with HTTP 503. All nine traces had incomplete model usage,
   semantic ingestion remained zero, and the attempt closed as `failed/audit`.
+- A minimal, non-corpus health probe subsequently succeeded once. The fresh
+  `feedback-sm01-20260828-v6` formal batch was therefore started from RSIMem
+  commit `20343441ae567d2fe27cfb10f62d4816b03f9b2f`, but sustained capacity did
+  not recover: three of 32 agent calls succeeded and 29 failed with HTTP 503.
+  All nine traces again had incomplete model usage, semantic ingestion remained
+  zero, and the attempt closed as `failed/audit`.
 
 For every completed authenticated provider-capacity attempt, source records,
 private optimizer captures, and live extraction-feedback records all remained
@@ -38,10 +44,11 @@ validation, or matched trial.
 ## Resume Gate
 
 Resume from a new clean detached worktree and a new immutable batch ID only after
-the frozen provider/model profile can complete the plain-parent sequence. A
-resumed batch must produce current source schema records, private capture joins,
-and at least the configured minimum actionable primary examples. The optimizer
-must return `NO_PROPOSAL` if the resolved-signal threshold remains unmet.
+the frozen provider/model profile has sustained capacity to complete the
+plain-parent sequence; a single successful probe is not sufficient. A resumed
+batch must produce current source schema records, private capture joins, and at
+least the configured minimum actionable primary examples. The optimizer must
+return `NO_PROPOSAL` if the resolved-signal threshold remains unmet.
 
 Provider capacity does not authorize changing the model profile, lowering the
 resolved-signal gate, reusing legacy schema-v2 evidence, or substituting a
