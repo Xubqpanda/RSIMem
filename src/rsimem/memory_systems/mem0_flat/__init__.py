@@ -25,6 +25,9 @@ from .prompts import (
     compile_policy_fact_extraction_template,
 )
 from .prompt_adapter import (
+    MEM0_FLAT_EXTRACTION_MAX_BODY_CHARS,
+    MEM0_FLAT_EXTRACTION_ROOT_POLICY_VERSION,
+    MEM0_FLAT_EXTRACTION_ROOT_SOURCE,
     MEM0_FLAT_EXTRACTION_SLOT,
     MEM0_FLAT_EXTRACTION_SLOT_ID,
     MEM0_FLAT_PROMPT_ADAPTER_ID,
@@ -68,6 +71,9 @@ __all__ = [
     "build_prompt_catalog",
     "build_policy_prompt_catalog",
     "compile_policy_fact_extraction_template",
+    "MEM0_FLAT_EXTRACTION_MAX_BODY_CHARS",
+    "MEM0_FLAT_EXTRACTION_ROOT_POLICY_VERSION",
+    "MEM0_FLAT_EXTRACTION_ROOT_SOURCE",
     "MEM0_FLAT_EXTRACTION_SLOT",
     "MEM0_FLAT_EXTRACTION_SLOT_ID",
     "MEM0_FLAT_PROMPT_ADAPTER_ID",

@@ -681,7 +681,11 @@ class ExtractionPromptPolicyArtifact:
             slot=slot,
             version=self.policy_version,
             policy_body=self.compiled_body,
-            source_provenance=f"extraction-policy:{self.artifact_id}",
+            source_provenance=(
+                self.source_provenance
+                if self.parent_artifact_id is None
+                else f"extraction-policy:{self.artifact_id}"
+            ),
         )
 
     @classmethod
