@@ -616,6 +616,19 @@ def load_extraction_manifest(path: Path) -> dict[str, Any]:
     return validate_extraction_manifest(value)
 
 
+def load_extraction_manifest_for_phase(
+    path: Path,
+    *,
+    required_phase: str,
+) -> dict[str, Any]:
+    if required_phase not in EXTRACTION_PHASES:
+        raise ValueError("unknown required extraction experiment phase")
+    manifest = load_extraction_manifest(path)
+    if manifest["phase"] != required_phase:
+        raise ValueError("extraction manifest cannot be used for this phase")
+    return manifest
+
+
 def _load_registry(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"schemaVersion": EXTRACTION_BATCH_REGISTRY_SCHEMA_VERSION, "entries": []}

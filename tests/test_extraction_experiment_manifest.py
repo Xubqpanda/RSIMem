@@ -14,6 +14,7 @@ from rsimem.extraction_experiment_manifest import (
     extraction_execution_profile,
     initialize_extraction_batch_manifest,
     load_extraction_manifest,
+    load_extraction_manifest_for_phase,
     next_extraction_attempt_name,
     record_extraction_attempt,
     resolve_clean_repository,
@@ -191,6 +192,15 @@ def test_validation_manifest_records_matched_extraction_only_identity(
         "primaryUnit": "completed-source-extraction-set-future-opportunity",
         "resolvedDenominator": "useful_set_count+harmful_set_count",
     }
+    assert load_extraction_manifest_for_phase(
+        inputs["path"],
+        required_phase="validation",
+    ) == manifest
+    with pytest.raises(ValueError, match="cannot be used for this phase"):
+        load_extraction_manifest_for_phase(
+            inputs["path"],
+            required_phase="final",
+        )
 
 
 @pytest.mark.parametrize(
