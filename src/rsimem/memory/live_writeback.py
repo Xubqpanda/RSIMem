@@ -30,6 +30,7 @@ from .contracts import MemoryExperience, MemoryKind, MemoryMessage, MemoryObserv
 from .executor import TransactionalMutationExecutor
 from .future_trace import SemanticFeedbackContract
 from .ingestion import (
+    ExtractionSourceProjection,
     SemanticIngestionCoordinator,
     SemanticIngestRequest,
     SemanticPolicyRegistry,
@@ -540,11 +541,18 @@ class StaticSemanticWritebackRuntime:
         self.ingestion_observer = ingestion_observer
         self._results: list[StaticSemanticBoundaryResult] = []
         self._results_by_compilation: dict[str, StaticSemanticBoundaryResult] = {}
+        self._source_projections: dict[str, ExtractionSourceProjection] = {}
         self._closed = False
 
     @property
     def results(self) -> tuple[StaticSemanticBoundaryResult, ...]:
         return tuple(self._results)
+
+    def source_projection_for(
+        self,
+        compilation_id: str,
+    ) -> ExtractionSourceProjection | None:
+        return self._source_projections.get(compilation_id)
 
     def process(
         self,
@@ -611,6 +619,9 @@ class StaticSemanticWritebackRuntime:
             policy_version=self.policy.descriptor.policy_version,
             framework_version=self.policy.descriptor.framework_version,
         )
+        self._source_projections[
+            request.provenance.compilation_id
+        ] = request.source_projection
         existing = self._results_by_compilation.get(
             request.provenance.compilation_id
         )

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
@@ -446,6 +446,99 @@ class ExtractionSourceEvidence:
         if self.status == ExtractionSetStatus.NONEMPTY and not self.facts:
             raise ValueError("nonempty extraction set requires facts")
 
+    def payload(self) -> dict[str, object]:
+        return {
+            "source_id": self.source_id,
+            "source_projection_digest": self.source_projection_digest,
+            "extraction_set_id": self.extraction_set_id,
+            "status": self.status.value,
+            "available_semantic_keys": list(self.available_semantic_keys),
+            "facts": [{
+                "fact_id": fact.fact_id,
+                "semantic_keys": list(fact.semantic_keys),
+                "disposition": fact.disposition.value,
+                "artifact_id": fact.artifact_id,
+                "quality_issue": (
+                    fact.quality_issue.value
+                    if fact.quality_issue is not None
+                    else None
+                ),
+            } for fact in self.facts],
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionSourceEvidence":
+        fields = {
+            "source_id",
+            "source_projection_digest",
+            "extraction_set_id",
+            "status",
+            "available_semantic_keys",
+            "facts",
+        }
+        if not isinstance(value, dict) or set(value) != fields:
+            raise ValueError("malformed extraction source evidence")
+        raw_facts = value["facts"]
+        available = value["available_semantic_keys"]
+        if not isinstance(raw_facts, list) or not isinstance(available, list):
+            raise ValueError("extraction source collections must be lists")
+        if any(not isinstance(item, str) for item in available) or any(
+            not isinstance(value[field], str)
+            for field in (
+                "source_id",
+                "source_projection_digest",
+                "extraction_set_id",
+                "status",
+            )
+        ):
+            raise ValueError("extraction source scalar fields are invalid")
+        fact_fields = {
+            "fact_id",
+            "semantic_keys",
+            "disposition",
+            "artifact_id",
+            "quality_issue",
+        }
+        facts = []
+        for item in raw_facts:
+            if not isinstance(item, dict) or set(item) != fact_fields:
+                raise ValueError("malformed extracted fact evidence")
+            semantic_keys = item["semantic_keys"]
+            if (
+                not isinstance(item["fact_id"], str)
+                or not isinstance(item["disposition"], str)
+                or not isinstance(semantic_keys, list)
+                or any(not isinstance(key, str) for key in semantic_keys)
+                or (
+                    item["artifact_id"] is not None
+                    and not isinstance(item["artifact_id"], str)
+                )
+                or (
+                    item["quality_issue"] is not None
+                    and not isinstance(item["quality_issue"], str)
+                )
+            ):
+                raise ValueError("extracted fact semantic keys must be a list")
+            facts.append(ExtractedFactEvidence(
+                item["fact_id"],
+                tuple(semantic_keys),
+                FactDisposition(item["disposition"]),
+                artifact_id=item["artifact_id"],
+                quality_issue=(
+                    ExtractionQualityIssue(item["quality_issue"])
+                    if item["quality_issue"] is not None
+                    else None
+                ),
+            ))
+        return cls(
+            value["source_id"],
+            value["source_projection_digest"],
+            value["extraction_set_id"],
+            ExtractionSetStatus(value["status"]),
+            tuple(available),
+            tuple(facts),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class MissedExtractionEvidence:
@@ -506,6 +599,21 @@ class ContractResolution:
             raise ValueError("explicit use requires an operation identity")
         if self.successful_outcome is not None and self.outcome_operation_id is None:
             raise ValueError("known outcome requires an operation identity")
+
+
+@dataclass(frozen=True, slots=True)
+class FeedbackOperationJoin:
+    opportunity_operation_id: str
+    use_operation_id: str
+    outcome_operation_id: str
+
+    def __post_init__(self) -> None:
+        for value in (
+            self.opportunity_operation_id,
+            self.use_operation_id,
+            self.outcome_operation_id,
+        ):
+            _require_id(value, "feedback operation join ID")
 
 
 @runtime_checkable
@@ -611,6 +719,34 @@ class ExtractionFeedbackDataset:
         if sum(value.primary for value in self.examples) != 1:
             raise ValueError("feedback dataset requires exactly one primary unit")
 
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "dataset_id": self.dataset_id,
+            "source_projection_digest": self.source_projection_digest,
+            "contract_digest": self.contract_digest,
+            "examples": [{
+                "example_id": example.example_id,
+                "primary_unit_id": example.primary_unit_id,
+                "level": example.level.value,
+                "primary": example.primary,
+                "label": example.label.value,
+                "source_id": example.source_id,
+                "extraction_set_id": example.extraction_set_id,
+                "future_opportunity_id": example.future_opportunity_id,
+                "fact_id": example.fact_id,
+                "semantic_key": example.semantic_key,
+                "artifact_ids": list(example.artifact_ids),
+                "exposure_mode": example.exposure_mode.value,
+                "opportunity_operation_id": example.opportunity_operation_id,
+                "use_operation_id": example.use_operation_id,
+                "outcome_operation_id": example.outcome_operation_id,
+                "attribution_confidence": example.attribution_confidence.value,
+                "reason_codes": list(example.reason_codes),
+                "contract_digest": example.contract_digest,
+            } for example in self.examples],
+        }
+
 
 class ExtractionFeedbackBuilder:
     def __init__(self, registry: FeedbackContractRegistry) -> None:
@@ -623,6 +759,7 @@ class ExtractionFeedbackBuilder:
         future: FutureMemoryEvidence,
         *,
         missed: tuple[MissedExtractionEvidence, ...] = (),
+        operation_join: FeedbackOperationJoin | None = None,
     ) -> ExtractionFeedbackDataset:
         contract, resolution = self.registry.resolve(observation, future)
         if observation.family_id != contract.family_id:
@@ -636,6 +773,18 @@ class ExtractionFeedbackBuilder:
         }
         if bound_keys - set(contract.opportunity.memory_scope_keys):
             raise ValueError("future memory evidence escapes contract scope")
+        if operation_join is not None:
+            if (
+                future.opportunity_operation_id
+                != operation_join.opportunity_operation_id
+            ):
+                raise ValueError("feedback opportunity operation join mismatch")
+            resolution = replace(
+                resolution,
+                opportunity_operation_id=operation_join.opportunity_operation_id,
+                use_operation_id=operation_join.use_operation_id,
+                outcome_operation_id=operation_join.outcome_operation_id,
+            )
         primary_id = _stable_id("feedback-unit", {
             "source_id": source.source_id,
             "extraction_set_id": source.extraction_set_id,
@@ -1088,6 +1237,51 @@ def detect_extracted_fact_semantic_keys(
         "SM01_preference_adoption",
         "SM05_weak_trigger_preference_adoption",
     } and tsv_rule:
+        keys.append("preference.summary.tsv")
+    if family_id == "SM05_weak_trigger_preference_adoption":
+        if "priorit" in value and any(token in value for token in (
+            "normaliz",
+            "low",
+            "medium",
+            "high",
+            "critical",
+        )):
+            keys.append("preference.priority.normalized")
+        if "yyyy/mm/dd" in value or "yyyy-mm-dd" in value:
+            keys.append("preference.date.yyyy_mm_dd")
+    if family_id == "SM02_constraint_retention" and (
+        "ava chen" in value or "ava_chen" in value
+    ) and any(phrase in value for phrase in (
+        "do not share",
+        "don't share",
+        "exclude",
+        "never share",
+        "must not share",
+    )):
+        keys.append("constraint.share.exclude_ava_chen")
+    return tuple(dict.fromkeys(keys))
+
+
+def detect_source_semantic_keys(
+    family_id: str,
+    source_contents: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Detect durable family rules in the bounded extraction source projection."""
+
+    value = "\n".join(source_contents).casefold()
+    keys = []
+    if family_id in {
+        "SM01_preference_adoption",
+        "SM05_weak_trigger_preference_adoption",
+    } and (
+        "tsv" in value or "tab-separated" in value
+    ) and any(token in value for token in (
+        "always",
+        "default",
+        "prefer",
+        "preference",
+        "use",
+    )):
         keys.append("preference.summary.tsv")
     if family_id == "SM05_weak_trigger_preference_adoption":
         if "priorit" in value and any(token in value for token in (

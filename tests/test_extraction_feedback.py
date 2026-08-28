@@ -23,6 +23,7 @@ from rsimem.memory.extraction_feedback import (
     ObservableToolEvent,
     default_feedback_contract_registry,
 )
+from rsimem.memory.extraction_projection import JsonExtractionFeedbackDatasetLog
 
 
 SM01 = "SM01_preference_adoption"
@@ -393,3 +394,24 @@ def test_feedback_observation_api_has_no_official_evaluation_surface() -> None:
     }
     assert len(digests) == 3
     assert len(parsers) == 3
+
+
+def test_feedback_dataset_log_is_idempotent_and_fails_closed(tmp_path) -> None:
+    dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+        _source((TSV_KEY,)),
+        _observation(SM01, (TSV_KEY,)),
+        _future((TSV_KEY,)),
+    )
+    path = tmp_path / "feedback.jsonl"
+    log = JsonExtractionFeedbackDatasetLog(path)
+    assert log.append(dataset) is True
+    assert JsonExtractionFeedbackDatasetLog(path).append(dataset) is False
+    with pytest.raises(ValueError, match="conflicting extraction feedback"):
+        log.append(replace(
+            dataset,
+            source_projection_digest=_sha("different source"),
+        ))
+
+    path.write_text('{"dataset_id":"partial"}\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed extraction feedback"):
+        JsonExtractionFeedbackDatasetLog(path).append(dataset)
