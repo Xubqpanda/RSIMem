@@ -28,6 +28,14 @@ from rsimem.memory.policy_feasibility import (
     validate_feasibility_case,
 )
 from rsimem.memory.policy_replay import DeterministicPolicyReplay
+from rsimem.memory.source_selection_policy import (
+    DeterministicSourceSelectionPolicy,
+    SourceSelectionConfig,
+)
+from rsimem.memory.trigger_policy import (
+    DeterministicTriggerPolicy,
+    TriggerPolicyConfig,
+)
 from rsimem.memory.trigger_policy import HostTriggerAdapter
 
 
@@ -251,3 +259,132 @@ def test_contradictory_complete_chain_cannot_be_marked_unresolved() -> None:
 def test_feedback_ids_must_be_non_empty_strings() -> None:
     with pytest.raises(ValueError, match="non-empty strings"):
         FeedbackChain(opportunity_id=" ")
+
+
+def _layer_artifact(layer: PolicyLayer, version: str, kind: PolicyArtifactKind) -> PolicyArtifactIdentity:
+    return PolicyArtifactIdentity.create(policy_version=version, kind=kind, layers=(layer,))
+
+
+def _event() -> tuple[ContextSnapshot, object]:
+    snapshot = _snapshot()
+    event = HostTriggerAdapter().event(
+        "task_completed",
+        source_revision=snapshot.context_revision,
+        payload={"snapshot_id": snapshot.snapshot_id, "fixture": "all_layers"},
+        session_id=snapshot.session_id,
+        task_id=snapshot.task_id,
+        turn_index=2,
+    )
+    return snapshot, event
+
+
+def _run_pair(layer: PolicyLayer):
+    snapshot, event = _event()
+    common = {
+        "backend": _backend(),
+        "candidate_fact_ids": ("fact.tsv_preference",),
+        "artifact_ids": ("artifact.tsv_preference", "artifact.secondary"),
+        "mutation_ids": ("mutation.parent",),
+    }
+    parent = DeterministicPolicyReplay().run(snapshot, event, **common)
+    if layer is PolicyLayer.TRIGGER:
+        candidate = DeterministicPolicyReplay(
+            trigger=DeterministicTriggerPolicy(
+                TriggerPolicyConfig(task_completed_enabled=False)
+            )
+        ).run(snapshot, event, **common)
+    elif layer is PolicyLayer.SOURCE_SELECTION:
+        candidate = DeterministicPolicyReplay(
+            source=DeterministicSourceSelectionPolicy(
+                SourceSelectionConfig(
+                    projection_mode="selected_completed_segments",
+                    selected_segment_ids=("segment.durable",),
+                )
+            )
+        ).run(snapshot, event, **common)
+    elif layer is PolicyLayer.EXTRACTION:
+        candidate = DeterministicPolicyReplay().run(
+            snapshot, event, **{**common, "candidate_fact_ids": ()}
+        )
+    elif layer is PolicyLayer.ADMISSION:
+        candidate = DeterministicPolicyReplay().run(
+            snapshot,
+            event,
+            **{
+                **common,
+                "existing_artifact_ids": ("fact.tsv_preference",),
+                "admission_update": True,
+                "target_artifact_ids": ("artifact.existing",),
+            },
+        )
+    elif layer is PolicyLayer.COMMIT:
+        candidate = DeterministicPolicyReplay().run(
+            snapshot, event, **{**common, "mutation_ids": ("mutation.candidate",)}
+        )
+    elif layer is PolicyLayer.EXPOSURE:
+        candidate = DeterministicPolicyReplay().run(
+            snapshot, event, **{**common, "artifact_ids": ("artifact.tsv_preference",)}
+        )
+    else:  # pragma: no cover - protects this fixture if PolicyLayer grows.
+        raise AssertionError(layer)
+    return parent, candidate
+
+
+def _layer_case(layer: PolicyLayer, outcome: FeasibilityOutcome) -> LayerIntervention:
+    parent, candidate = _run_pair(layer)
+    feedback = (
+        FeedbackChain("opportunity.layer", "use.layer", "outcome.layer")
+        if outcome is FeasibilityOutcome.USEFUL
+        else FeedbackChain(
+            source_id="source.layer",
+            demand_id="demand.layer",
+            absence_id="absence.layer",
+            outcome_id="outcome.layer",
+        )
+        if outcome is FeasibilityOutcome.MISSED
+        else FeedbackChain()
+    )
+    return LayerIntervention(
+        case_id=f"case.{layer.value}",
+        target_layer=layer,
+        parent=parent,
+        candidate=candidate,
+        parent_artifact=_layer_artifact(layer, f"fixed.{layer.value}.v1", PolicyArtifactKind.FIXED),
+        candidate_artifact=_layer_artifact(
+            layer,
+            f"adaptive.{layer.value}.candidate.v1",
+            PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE,
+        ),
+        process_signal=True,
+        outcome=outcome,
+        feedback=feedback,
+        reason_codes=(f"fixture_{layer.value}",),
+    )
+
+
+def test_deterministic_fixture_covers_all_six_layers() -> None:
+    cases = (
+        _layer_case(PolicyLayer.TRIGGER, FeasibilityOutcome.UNRESOLVED),
+        _layer_case(PolicyLayer.SOURCE_SELECTION, FeasibilityOutcome.MISSED),
+        _layer_case(PolicyLayer.EXTRACTION, FeasibilityOutcome.USEFUL),
+        _layer_case(PolicyLayer.EXTRACTION, FeasibilityOutcome.MISSED),
+        _layer_case(PolicyLayer.ADMISSION, FeasibilityOutcome.HARMFUL),
+        _layer_case(PolicyLayer.COMMIT, FeasibilityOutcome.USEFUL),
+        _layer_case(PolicyLayer.EXPOSURE, FeasibilityOutcome.USEFUL),
+    )
+    for case in cases:
+        validate_feasibility_case(case)
+        assert case.action_changed
+        assert case.parent.event == case.candidate.event
+        assert case.parent.lineage.trigger_event_id == case.candidate.lineage.trigger_event_id
+
+    report = build_feasibility_report(cases)
+    assert {item.layer for item in report.census if item.case_count} == set(PolicyLayer)
+    extraction = next(item for item in report.census if item.layer is PolicyLayer.EXTRACTION)
+    assert extraction.status is FeasibilityStatus.OPTIMIZATION_READY
+    assert all(
+        item.status in {FeasibilityStatus.OPTIMIZATION_READY, FeasibilityStatus.VALIDATION_ONLY}
+        for item in report.census
+        if item.case_count
+    )
+    assert report.ok
