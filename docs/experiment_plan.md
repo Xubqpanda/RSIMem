@@ -119,7 +119,9 @@ The stage passes when policy versions are reproducible and adaptive LightRSI can
 
 Threshold-oriented learner, validation, activation, rollback, and runtime
 binding gates are retained as legacy infrastructure. Extraction-owned feedback,
-prompt-oriented validation, and formal manifest/analyzer contracts are complete.
+prompt-oriented validation, formal manifest/analyzer contracts, and the Stage 1
+plain-parent live smoke are complete; see
+[`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md).
 Deployable extraction artifacts, optimizer-driven runtime binding, and matched
 live comparison remain Phase 2 work.
 
