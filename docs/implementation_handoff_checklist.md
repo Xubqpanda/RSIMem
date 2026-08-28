@@ -583,6 +583,8 @@ Adaptive final launcher要求 clean tree，但 static feedback launcher允许 di
 
 2B 当前实现记录：`HostTriggerAdapter`/`HermesTriggerEventAdapter` 对真实 snapshot identity、task state、turn index、tool boundary、pressure token 和 manual authorization 做显式 supported gate；`DeterministicTriggerPolicy` 保留 task-completed parent，其余事件 shadow-only。Hermes bridge 已持久化 trigger observation；正反与 replay fixture 位于 `tests/test_trigger_policy.py` 和 `tests/test_hermes_integration.py`。active/current/open-closure 到 semantic mutation 的跨层阻断仍需在 2C/2D 完整 runtime join 后验收。
 
+当前 replay/audit 记录：`JsonPolicyDecisionLedger` 已包含 `variant/traceId/familyId/stage`，`audit_policy_evidence` 校验 policy evidence 与 lifecycle snapshot 的身份 join；`DeterministicPolicyReplay` 可在无模型、无 backend mutation 的条件下重建六层 decision、lineage 和 mutation/injection receipt join。该 harness 是 deterministic feasibility 基线，不等同于六层 live adaptive policy。
+
 ### 2C：Source Selection 与 Context Projection Policy
 
 功能需求：
