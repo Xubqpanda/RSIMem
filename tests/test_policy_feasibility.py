@@ -530,6 +530,22 @@ def test_hypothesis_tampering_is_rejected() -> None:
         type(case.hypothesis).from_payload(payload)
 
 
+def test_feedback_and_hypothesis_collections_require_json_lists() -> None:
+    case = _case(
+        "case.collection_types",
+        FeasibilityOutcome.USEFUL,
+        FeedbackChain("opportunity.1", "use.1", "outcome.1"),
+    )
+    feedback = case.process_feedback.payload()
+    feedback["reason_codes"] = "decision_observed"
+    with pytest.raises(ValueError, match="malformed process feedback"):
+        type(case.process_feedback).from_payload(feedback)
+    hypothesis = case.hypothesis.payload()
+    hypothesis["feedback_ids"] = "foreign.feedback"
+    with pytest.raises(ValueError, match="malformed policy hypothesis"):
+        type(case.hypothesis).from_payload(hypothesis)
+
+
 def test_executable_feasibility_census_replays_and_persists(tmp_path) -> None:
     evidence = tmp_path / "fixture-evidence.jsonl"
     first = run_default_feasibility_census(evidence_path=evidence)
