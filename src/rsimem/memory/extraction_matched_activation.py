@@ -182,6 +182,8 @@ class ExtractionMatchedTrialDecision:
     parent_artifact_digest: str
     candidate_artifact_id: str
     candidate_artifact_digest: str
+    parent_runtime_artifact_id: str
+    candidate_runtime_artifact_id: str
     split_id: str
     criteria_digest: str
     quality_decision: ExtractionValidationDecision
@@ -204,6 +206,8 @@ class ExtractionMatchedTrialDecision:
             self.offline_decision_id,
             self.parent_artifact_id,
             self.candidate_artifact_id,
+            self.parent_runtime_artifact_id,
+            self.candidate_runtime_artifact_id,
             self.split_id,
         ):
             _require_id(value, "extraction matched decision identity")
@@ -223,9 +227,10 @@ class ExtractionMatchedTrialDecision:
         if (
             self.quality_decision.split_id != self.split_id
             or self.quality_decision.criteria_digest != self.criteria_digest
-            or self.quality_decision.parent_artifact_id != self.parent_artifact_id
+            or self.quality_decision.parent_artifact_id
+            != self.parent_runtime_artifact_id
             or self.quality_decision.proposal_artifact_id
-            != self.candidate_artifact_id
+            != self.candidate_runtime_artifact_id
         ):
             raise ValueError("matched trial quality decision join mismatch")
         if self.parent_ratios != extraction_ratio_evidence(
@@ -257,6 +262,8 @@ class ExtractionMatchedTrialDecision:
             "parent_artifact_digest": self.parent_artifact_digest,
             "candidate_artifact_id": self.candidate_artifact_id,
             "candidate_artifact_digest": self.candidate_artifact_digest,
+            "parent_runtime_artifact_id": self.parent_runtime_artifact_id,
+            "candidate_runtime_artifact_id": self.candidate_runtime_artifact_id,
             "split_id": self.split_id,
             "criteria_digest": self.criteria_digest,
             "quality_decision": self.quality_decision.payload(),
@@ -283,6 +290,8 @@ class ExtractionMatchedTrialDecision:
             "parent_artifact_digest",
             "candidate_artifact_id",
             "candidate_artifact_digest",
+            "parent_runtime_artifact_id",
+            "candidate_runtime_artifact_id",
             "split_id",
             "criteria_digest",
             "quality_decision",
@@ -310,6 +319,10 @@ class ExtractionMatchedTrialDecision:
                 parent_artifact_digest=value["parent_artifact_digest"],
                 candidate_artifact_id=value["candidate_artifact_id"],
                 candidate_artifact_digest=value["candidate_artifact_digest"],
+                parent_runtime_artifact_id=value["parent_runtime_artifact_id"],
+                candidate_runtime_artifact_id=value[
+                    "candidate_runtime_artifact_id"
+                ],
                 split_id=value["split_id"],
                 criteria_digest=value["criteria_digest"],
                 quality_decision=ExtractionValidationDecision.from_payload(
@@ -343,6 +356,8 @@ class ExtractionMatchedTrialEvaluator:
         split: ExtractionPromptValidationSplit,
         observations: tuple[ExtractionValidationObservation, ...],
         criteria: ExtractionAcceptanceCriteria,
+        parent_runtime_artifact_id: str | None = None,
+        candidate_runtime_artifact_id: str | None = None,
     ) -> ExtractionMatchedTrialDecision:
         if (
             offline_decision.status
@@ -368,6 +383,12 @@ class ExtractionMatchedTrialEvaluator:
             ExtractionValidationSplitRole
         ):
             raise ValueError("matched trial split roles are incomplete")
+        parent_runtime_id = parent_runtime_artifact_id or parent.artifact_id
+        candidate_runtime_id = candidate_runtime_artifact_id or candidate.artifact_id
+        _require_id(parent_runtime_id, "matched parent runtime artifact")
+        _require_id(candidate_runtime_id, "matched candidate runtime artifact")
+        if parent_runtime_id == candidate_runtime_id:
+            raise ValueError("matched trial runtime artifacts must differ")
         offline_quality = offline_decision.quality_decision
         if set(offline_quality.observation_ids) & {
             value.observation_id for value in observations
@@ -376,18 +397,19 @@ class ExtractionMatchedTrialEvaluator:
         }:
             raise ValueError("matched trial reuses offline validation evidence")
         for observation in observations:
-            expected_digest = (
-                parent.body_digest
-                if observation.extraction_artifact_id == parent.artifact_id
-                else candidate.body_digest
-            )
+            if observation.extraction_artifact_id == parent_runtime_id:
+                expected_digest = parent.body_digest
+            elif observation.extraction_artifact_id == candidate_runtime_id:
+                expected_digest = candidate.body_digest
+            else:
+                raise ValueError("matched trial observation artifact mismatch")
             if observation.extraction_artifact_digest != expected_digest:
                 raise ValueError("matched trial observation body digest mismatch")
         quality = ExtractionPromptMatchedValidator().evaluate(
             split=split,
             observations=observations,
-            parent_artifact_id=parent.artifact_id,
-            proposal_artifact_id=candidate.artifact_id,
+            parent_artifact_id=parent_runtime_id,
+            proposal_artifact_id=candidate_runtime_id,
             criteria=criteria,
         )
         status = (
@@ -407,6 +429,8 @@ class ExtractionMatchedTrialEvaluator:
             "parent_artifact_digest": parent.artifact_digest,
             "candidate_artifact_id": candidate.artifact_id,
             "candidate_artifact_digest": candidate.artifact_digest,
+            "parent_runtime_artifact_id": parent_runtime_id,
+            "candidate_runtime_artifact_id": candidate_runtime_id,
             "split_id": split.split_id,
             "criteria_digest": criteria.digest,
             "quality_decision": quality,
@@ -426,6 +450,10 @@ class ExtractionMatchedTrialEvaluator:
             "parent_artifact_digest": values["parent_artifact_digest"],
             "candidate_artifact_id": values["candidate_artifact_id"],
             "candidate_artifact_digest": values["candidate_artifact_digest"],
+            "parent_runtime_artifact_id": values["parent_runtime_artifact_id"],
+            "candidate_runtime_artifact_id": values[
+                "candidate_runtime_artifact_id"
+            ],
             "split_id": values["split_id"],
             "criteria_digest": values["criteria_digest"],
             "quality_decision": quality.payload(),
@@ -806,6 +834,8 @@ class ExtractionMatchedActivationCoordinator:
         split: ExtractionPromptValidationSplit,
         observations: tuple[ExtractionValidationObservation, ...],
         criteria: ExtractionAcceptanceCriteria,
+        parent_runtime_artifact_id: str | None = None,
+        candidate_runtime_artifact_id: str | None = None,
     ) -> ExtractionPolicyState:
         if parent != self.policy_store.trusted_root:
             raise ValueError("first extraction activation requires trusted root parent")
@@ -816,6 +846,8 @@ class ExtractionMatchedActivationCoordinator:
             split=split,
             observations=observations,
             criteria=criteria,
+            parent_runtime_artifact_id=parent_runtime_artifact_id,
+            candidate_runtime_artifact_id=candidate_runtime_artifact_id,
         )
         if replay != decision:
             raise ValueError("extraction matched activation replay mismatch")

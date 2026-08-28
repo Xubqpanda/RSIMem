@@ -110,6 +110,7 @@ def _matched_observation(
     label,
     *,
     changed=True,
+    artifact_id=None,
     artifact_digest=None,
     failure_counts=(0, 0, 0, 0),
 ):
@@ -129,7 +130,7 @@ def _matched_observation(
         model_profile_digest=text_digest("matched model profile"),
         budget_id="budget.matched-v1",
         persistence_state_digest=text_digest(f"matched-state-{replicate}"),
-        extraction_artifact_id=artifact.artifact_id,
+        extraction_artifact_id=artifact_id or artifact.artifact_id,
         extraction_artifact_digest=artifact_digest or artifact.body_digest,
         extraction_output_digest=text_digest(
             f"matched-output-{replicate}-"
@@ -572,3 +573,56 @@ def test_matched_activation_surface_has_no_score_or_cost_input() -> None:
         "latency",
         "storage_bytes",
     }
+
+
+def test_matched_trial_separates_policy_and_runtime_component_identity() -> None:
+    parent = _parent()
+    candidate = _candidate(parent=parent)
+    offline = _offline_decision(parent, candidate)
+    parent_runtime_id = parent.to_prompt_component(
+        MEM0_FLAT_EXTRACTION_SLOT
+    ).artifact_id
+    candidate_runtime_id = candidate.to_prompt_component(
+        MEM0_FLAT_EXTRACTION_SLOT
+    ).artifact_id
+    observations = []
+    parent_labels = (
+        ExtractionFeedbackLabel.USEFUL,
+        ExtractionFeedbackLabel.HARMFUL,
+        ExtractionFeedbackLabel.USEFUL,
+    )
+    for replicate, parent_label in enumerate(parent_labels, start=1):
+        observations.extend((
+            _matched_observation(
+                parent,
+                candidate,
+                ExtractionValidationVariant.PARENT,
+                replicate,
+                parent_label,
+                artifact_id=parent_runtime_id,
+            ),
+            _matched_observation(
+                parent,
+                candidate,
+                ExtractionValidationVariant.PROPOSAL,
+                replicate,
+                ExtractionFeedbackLabel.USEFUL,
+                artifact_id=candidate_runtime_id,
+            ),
+        ))
+    decision = ExtractionMatchedTrialEvaluator().evaluate(
+        parent=parent,
+        candidate=candidate,
+        offline_decision=offline,
+        split=_matched_split(),
+        observations=tuple(observations),
+        criteria=_criteria(),
+        parent_runtime_artifact_id=parent_runtime_id,
+        candidate_runtime_artifact_id=candidate_runtime_id,
+    )
+    assert decision.parent_artifact_id == parent.artifact_id
+    assert decision.candidate_artifact_id == candidate.artifact_id
+    assert decision.parent_runtime_artifact_id == parent_runtime_id
+    assert decision.candidate_runtime_artifact_id == candidate_runtime_id
+    assert decision.quality_decision.parent_artifact_id == parent_runtime_id
+    assert decision.quality_decision.proposal_artifact_id == candidate_runtime_id
