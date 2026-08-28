@@ -59,7 +59,7 @@ MEM0_FLAT_EXTRACTION_SLOT = PromptSlotDescriptor(
 
 
 _ROOT_RULES = (
-    ("durable-candidates", False),
+    ("durable-candidates", True),
     ("future-useful-scope", False),
     ("source-safety-exclusions", True),
     ("standalone-candidates", False),
