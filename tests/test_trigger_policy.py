@@ -119,6 +119,8 @@ def test_hermes_snapshot_adapter_preserves_revision_and_marks_missing_pressure()
     assert pressure.supported is False
     assert pressure.metadata["unsupported_reason"] == "context_tokens_unobserved"
     assert DeterministicTriggerPolicy().decide(pressure).decision.reason_codes == ("unsupported_trigger",)
+    with pytest.raises(ValueError, match="tokens"):
+        adapter.from_snapshot(Snapshot(), "context_pressure", context_tokens=-1)
 
     session_end = adapter.from_snapshot(Snapshot(), "session_end")
     assert session_end.supported is True

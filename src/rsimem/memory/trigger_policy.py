@@ -292,6 +292,8 @@ class HermesTriggerEventAdapter(HostTriggerAdapter):
                 supported = False
                 metadata["unsupported_reason"] = "context_tokens_unobserved"
             else:
+                if type(context_tokens) is not int or context_tokens < 0:
+                    raise ValueError("context pressure tokens must be a non-negative integer")
                 metadata["context_tokens"] = context_tokens
         elif normalized_event == "turn_interval":
             supported = turn_index is not None
