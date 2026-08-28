@@ -12,8 +12,10 @@ import yaml
 
 from .extraction_experiment_manifest import (
     CleanRepositoryRevision,
+    build_extraction_batch_manifest,
     initialize_extraction_batch_manifest,
     resolve_clean_repository,
+    resume_extraction_batch_manifest,
 )
 from .memory.extraction_feedback import default_feedback_contract_registry
 from .memory.extraction_prompt_validation import ExtractionAcceptanceCriteria
@@ -292,28 +294,44 @@ def initialize_formal_feedback_batch(
     contract = default_feedback_contract_registry().resolver(
         config["familyId"]
     ).contract
+    rsimem_revision = resolve_clean_repository(rsimem_root)
+    past_bench_revision = resolve_clean_repository(past_bench_root)
+    manifest_arguments = {
+        "registry_path": batch_registry_path,
+        "batch_id": batch_id,
+        "phase": "feedback",
+        "replicates": config["replicates"],
+        "family_id": config["familyId"],
+        "task_template_group_id": config["taskTemplateGroupId"],
+        "task_manifest_digest": task_profile["taskManifestDigest"],
+        "parent_policy": parent,
+        "active_policy": parent,
+        "matched_policy": None,
+        "feedback_contract": contract,
+        "acceptance_criteria": _acceptance_criteria(config),
+        "model_profile_id": parent.model_profile,
+        "resolved_model_profile": model_profile,
+        "request_budget_id": config["requestBudgetId"],
+        "resolved_request_budget": request_budget,
+        "persistence_profile_id": config["persistenceProfileId"],
+        "persistence_profile_digest": _digest(persistence),
+        "rsimem_revision": rsimem_revision,
+        "past_bench_revision": past_bench_revision,
+    }
+    build_arguments = {
+        key: value
+        for key, value in manifest_arguments.items()
+        if key != "registry_path"
+    }
+    if manifest_path.expanduser().resolve().exists():
+        return resume_extraction_batch_manifest(
+            manifest_path,
+            registry_path=batch_registry_path,
+            expected=build_extraction_batch_manifest(**build_arguments),
+        )
     return initialize_extraction_batch_manifest(
         manifest_path,
-        registry_path=batch_registry_path,
-        batch_id=batch_id,
-        phase="feedback",
-        replicates=config["replicates"],
-        family_id=config["familyId"],
-        task_template_group_id=config["taskTemplateGroupId"],
-        task_manifest_digest=task_profile["taskManifestDigest"],
-        parent_policy=parent,
-        active_policy=parent,
-        matched_policy=None,
-        feedback_contract=contract,
-        acceptance_criteria=_acceptance_criteria(config),
-        model_profile_id=parent.model_profile,
-        resolved_model_profile=model_profile,
-        request_budget_id=config["requestBudgetId"],
-        resolved_request_budget=request_budget,
-        persistence_profile_id=config["persistenceProfileId"],
-        persistence_profile_digest=_digest(persistence),
-        rsimem_revision=resolve_clean_repository(rsimem_root),
-        past_bench_revision=resolve_clean_repository(past_bench_root),
+        **manifest_arguments,
     )
 
 
