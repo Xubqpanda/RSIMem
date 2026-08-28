@@ -20,6 +20,7 @@ rsimem-assemble-adaptive-validation = "rsimem.adaptive_validation_evidence:main"
 rsimem-analyze-adaptive = "rsimem.adaptive_analysis:main"
 rsimem-preflight-extraction = "rsimem.extraction_experiment_preflight:main"
 rsimem-analyze-extraction = "rsimem.extraction_experiment_analysis:main"
+rsimem-prepare-extraction = "rsimem.extraction_preparation:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
