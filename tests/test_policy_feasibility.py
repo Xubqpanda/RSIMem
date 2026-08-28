@@ -20,10 +20,12 @@ from rsimem.memory.policy_contracts import (
     PolicyLayer,
 )
 from rsimem.memory.policy_feasibility import (
+    FeasibilityEvidenceRecord,
     FeedbackChain,
     FeasibilityOutcome,
     FeasibilityStatus,
     LayerIntervention,
+    JsonFeasibilityEvidenceLedger,
     build_feasibility_report,
     validate_feasibility_case,
 )
@@ -286,6 +288,43 @@ def test_report_rejects_duplicate_case_identity() -> None:
     )
     with pytest.raises(ValueError, match="case IDs must be unique"):
         build_feasibility_report((case, case))
+
+
+def test_feasibility_evidence_ledger_is_idempotent_across_restart(tmp_path) -> None:
+    case = _case(
+        "case.durable",
+        FeasibilityOutcome.USEFUL,
+        FeedbackChain("opportunity.1", "use.1", "outcome.1"),
+    )
+    path = tmp_path / "policy-feasibility.jsonl"
+    first = JsonFeasibilityEvidenceLedger(path)
+    record = first.record_case(case)
+    first.record(record)
+    assert FeasibilityEvidenceRecord.from_payload(record.payload()) == record
+
+    restarted = JsonFeasibilityEvidenceLedger(path)
+    assert restarted.records == (record,)
+    assert restarted.records[0].replay_payload == case.replay_payload
+    assert "The user prefers TSV output" not in path.read_text(encoding="utf-8")
+
+
+def test_feasibility_evidence_ledger_rejects_corruption_and_conflict(tmp_path) -> None:
+    case = _case(
+        "case.corruption",
+        FeasibilityOutcome.UNRESOLVED,
+        FeedbackChain(),
+    )
+    path = tmp_path / "policy-feasibility.jsonl"
+    ledger = JsonFeasibilityEvidenceLedger(path)
+    record = ledger.record_case(case)
+    payload = record.payload()
+    payload["replayPayload"] = dict(payload["replayPayload"])
+    payload["replayPayload"]["outcome"] = "useful"
+    with pytest.raises(ValueError, match="record ID mismatch|conflicting|malformed"):
+        FeasibilityEvidenceRecord.from_payload(payload)
+    path.write_text("not-json\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed feasibility evidence"):
+        JsonFeasibilityEvidenceLedger(path)
 
 
 def _layer_artifact(layer: PolicyLayer, version: str, kind: PolicyArtifactKind) -> PolicyArtifactIdentity:
