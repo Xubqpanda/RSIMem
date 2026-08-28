@@ -2,12 +2,30 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import fields, replace
+from pathlib import Path
 
 import pytest
 
+from rsimem.memory import extraction_prompt_validation as validation_module
 from rsimem.memory.extraction_feedback import (
+    ArtifactSemanticBinding,
+    DeploymentObservation,
+    ExposureMode,
+    ExtractedFactEvidence,
+    ExtractionFeedbackBuilder,
     ExtractionFeedbackLabel,
+    ExtractionSourceEvidence,
     ExtractionSetStatus,
+    FactDisposition,
+    FeedbackOperationJoin,
+    FutureMemoryEvidence,
+    ObservableToolEvent,
+    default_feedback_contract_registry,
+)
+from rsimem.memory.extraction_projection import (
+    ExtractionSourceRecord,
+    JsonLiveExtractionFeedbackRecordLog,
+    LiveExtractionFeedbackRecord,
 )
 from rsimem.memory.extraction_prompt_validation import (
     ExtractionAcceptanceCriteria,
@@ -18,8 +36,12 @@ from rsimem.memory.extraction_prompt_validation import (
     JsonExtractionValidationDecisionStore,
     ExtractionSplitAssignment,
     ExtractionValidationObservation,
+    ExtractionValidationSafetyEvidence,
     ExtractionValidationSplitRole,
     ExtractionValidationVariant,
+)
+from rsimem.memory.extraction_validation_adapter import (
+    ExtractionValidationObservationAssembler,
 )
 
 
@@ -51,7 +73,7 @@ def _observation(
     status: ExtractionSetStatus = ExtractionSetStatus.NONEMPTY,
     changed_output: bool | None = None,
     failure_counts: tuple[int, int, int, int] = (0, 0, 0, 0),
-    missed_assessable: bool = False,
+    missed_assessable: bool | None = None,
 ) -> ExtractionValidationObservation:
     proposal = variant == ExtractionValidationVariant.PROPOSAL
     return ExtractionValidationObservation.create(
@@ -75,7 +97,12 @@ def _observation(
         ),
         label=label,
         extraction_status=status,
-        missed_assessable=missed_assessable,
+        missed_assessable=(
+            True
+            if label == ExtractionFeedbackLabel.MISSED
+            and missed_assessable is None
+            else missed_assessable
+        ),
         failure_counts=failure_counts,
     )
 
@@ -94,6 +121,90 @@ def _criteria(**overrides) -> ExtractionAcceptanceCriteria:
     }
     values.update(overrides)
     return ExtractionAcceptanceCriteria(**values)
+
+
+def _live_evidence():
+    source = ExtractionSourceEvidence(
+        "source.validation",
+        _sha("source projection"),
+        "extraction-set.validation",
+        ExtractionSetStatus.NONEMPTY,
+        ("preference.summary.tsv",),
+        (ExtractedFactEvidence(
+            "fact.validation",
+            ("preference.summary.tsv",),
+            FactDisposition.PERSISTED,
+            artifact_id="memory.validation",
+        ),),
+    )
+    source_record = ExtractionSourceRecord.create(
+        family_id="SM01_preference_adoption",
+        stage="learn_a",
+        run_id="run.source",
+        episode_id="episode.source",
+        session_id="session.source",
+        task_id="SM01_LEARN_A_001",
+        compilation_id="compilation.validation",
+        extraction_artifact_id=PARENT,
+        extraction_artifact_digest=_sha(PARENT),
+        extraction_output_digest=_sha("extracted TSV preference"),
+        source=source,
+    )
+    deployment = DeploymentObservation(
+        "observation.validation",
+        "SM01_preference_adoption",
+        "eval_near",
+        "SM01_EVAL_001",
+        _sha("current input"),
+        (),
+        ("preference.summary.tsv",),
+        "owner\tpriority\ttask\tdue_date\nIris\tHigh\tShip\t2026/09/01",
+        (ObservableToolEvent(
+            "tool.share",
+            "notes_share",
+            True,
+            recipient_ids=("iris",),
+        ),),
+        True,
+    )
+    future = FutureMemoryEvidence(
+        "opportunity.validation",
+        ExposureMode.EAGER_SYSTEM_PROMPT,
+        (ArtifactSemanticBinding(
+            "memory.validation",
+            ("preference.summary.tsv",),
+        ),),
+        "operation.opportunity",
+        "operation.injection",
+    )
+    dataset = ExtractionFeedbackBuilder(
+        default_feedback_contract_registry()
+    ).build(
+        source,
+        deployment,
+        future,
+        operation_join=FeedbackOperationJoin(
+            "operation.opportunity",
+            "operation.use",
+            "operation.outcome",
+        ),
+    )
+    live = LiveExtractionFeedbackRecord.create(
+        family_id="SM01_preference_adoption",
+        stage="eval_near",
+        run_id="run.validation.parent",
+        trace_id="trace.validation.parent",
+        episode_id="episode.validation.parent",
+        session_id="session.validation.parent",
+        task_id="SM01_EVAL_001",
+        deployment_observation_id=deployment.observation_id,
+        source_record_id=source_record.record_id,
+        opportunity_operation_id="operation.opportunity",
+        use_operation_id="operation.use",
+        outcome_operation_id="operation.outcome",
+        dataset=dataset,
+    )
+    return source_record, live
 
 
 def _pairs(
@@ -394,6 +505,10 @@ def test_validation_contract_has_no_score_cost_or_fake_uncertainty_surface() -> 
     }
     with pytest.raises(ValueError, match="strictly positive"):
         replace(_criteria(), minimum_useful_rate_delta=0.0)
+    validation_source = Path(validation_module.__file__).read_text(encoding="utf-8")
+    assert "extraction_projection" not in validation_source
+    assert "hermes" not in validation_source.casefold()
+    assert "mem0" not in validation_source.casefold()
 
 
 def test_validation_decision_store_and_raw_observation_replay(tmp_path) -> None:
@@ -467,3 +582,113 @@ def test_validation_decision_store_and_raw_observation_replay(tmp_path) -> None:
         store.get(decision.decision_id)
     with pytest.raises(ValueError, match="conflicts with its ID"):
         store.put(decision)
+
+
+def test_live_feedback_assembler_uses_persisted_identity_and_fingerprints(
+    tmp_path,
+) -> None:
+    source, live = _live_evidence()
+    safety = ExtractionValidationSafetyEvidence.create(
+        live_feedback_record_id=live.record_id,
+        source_record_id=source.record_id,
+        audit_id="audit.validation.parent",
+        audit_digest=_sha("audit payload"),
+        evidence_cutoff_operation_id="operation.outcome",
+        complete=True,
+        schema_failure_count=0,
+        safety_failure_count=0,
+        prompt_leakage_failure_count=0,
+        native_writer_failure_count=0,
+    )
+    observation = ExtractionValidationObservationAssembler().assemble(
+        live_feedback=live,
+        source=source,
+        safety=safety,
+        variant=ExtractionValidationVariant.PARENT,
+        replicate=1,
+        task_template_group_id="SM01.report-template",
+        task_manifest_digest=_sha("SM01 report task manifest"),
+        model_profile_digest=_sha("model-profile"),
+        budget_id="budget.validation-v1",
+        persistence_state_digest=_sha("pre-state-1"),
+    )
+    assert observation.run_id == live.run_id
+    assert observation.episode_id == live.episode_id
+    assert observation.task_id == live.task_id
+    assert observation.extraction_set_id == source.source.extraction_set_id
+    assert observation.extraction_artifact_id == source.extraction_artifact_id
+    assert observation.extraction_output_digest == source.extraction_output_digest
+    assert observation.label == ExtractionFeedbackLabel.USEFUL
+    assert observation.missed_assessable is None
+
+    restored = LiveExtractionFeedbackRecord.from_payload(live.payload())
+    assert restored == live
+    log = JsonLiveExtractionFeedbackRecordLog(tmp_path / "live-feedback.jsonl")
+    assert log.append(live) is True
+    assert JsonLiveExtractionFeedbackRecordLog(
+        tmp_path / "live-feedback.jsonl"
+    ).append(live) is False
+    assert log.records() == (live,)
+    serialized = log.path.read_text(encoding="utf-8")
+    assert not any(value in serialized for value in (
+        "task_score",
+        "grader",
+        "answer_key",
+        "cost_weight",
+    ))
+
+    wrong_safety = ExtractionValidationSafetyEvidence.create(
+        live_feedback_record_id="live-extraction-feedback.other",
+        source_record_id=source.record_id,
+        audit_id="audit.validation.wrong",
+        audit_digest=_sha("wrong audit payload"),
+        evidence_cutoff_operation_id="operation.outcome",
+        complete=True,
+        schema_failure_count=0,
+        safety_failure_count=0,
+        prompt_leakage_failure_count=0,
+        native_writer_failure_count=0,
+    )
+    with pytest.raises(ValueError, match="safety evidence join mismatch"):
+        ExtractionValidationObservationAssembler().assemble(
+            live_feedback=live,
+            source=source,
+            safety=wrong_safety,
+            variant=ExtractionValidationVariant.PARENT,
+            replicate=1,
+            task_template_group_id="SM01.report-template",
+            task_manifest_digest=_sha("SM01 report task manifest"),
+            model_profile_digest=_sha("model-profile"),
+            budget_id="budget.validation-v1",
+            persistence_state_digest=_sha("pre-state-1"),
+        )
+
+    incomplete_safety = ExtractionValidationSafetyEvidence.create(
+        live_feedback_record_id=live.record_id,
+        source_record_id=source.record_id,
+        audit_id="audit.validation.incomplete",
+        audit_digest=_sha("incomplete audit payload"),
+        evidence_cutoff_operation_id="operation.outcome",
+        complete=False,
+        schema_failure_count=0,
+        safety_failure_count=0,
+        prompt_leakage_failure_count=0,
+        native_writer_failure_count=0,
+    )
+    with pytest.raises(ValueError, match="safety audit is incomplete"):
+        ExtractionValidationObservationAssembler().assemble(
+            live_feedback=live,
+            source=source,
+            safety=incomplete_safety,
+            variant=ExtractionValidationVariant.PARENT,
+            replicate=1,
+            task_template_group_id="SM01.report-template",
+            task_manifest_digest=_sha("SM01 report task manifest"),
+            model_profile_digest=_sha("model-profile"),
+            budget_id="budget.validation-v1",
+            persistence_state_digest=_sha("pre-state-1"),
+        )
+
+    log.path.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed live extraction feedback"):
+        log.records()

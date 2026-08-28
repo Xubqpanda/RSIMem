@@ -132,7 +132,7 @@ class ExtractionValidationObservation:
     extraction_output_digest: str
     label: ExtractionFeedbackLabel
     extraction_status: ExtractionSetStatus
-    missed_assessable: bool
+    missed_assessable: bool | None
     schema_failure_count: int = 0
     safety_failure_count: int = 0
     prompt_leakage_failure_count: int = 0
@@ -172,8 +172,14 @@ class ExtractionValidationObservation:
             _require_digest(value, name)
         if type(self.replicate) is not int or self.replicate < 1:
             raise ValueError("validation replicate must be positive")
-        if type(self.missed_assessable) is not bool:
-            raise TypeError("validation missed-assessable flag must be bool")
+        if self.missed_assessable is not None and type(
+            self.missed_assessable
+        ) is not bool:
+            raise TypeError("validation missed-assessable flag must be bool or unknown")
+        if self.label == ExtractionFeedbackLabel.MISSED and (
+            self.missed_assessable is not True
+        ):
+            raise ValueError("missed label requires assessable source evidence")
         for count in (
             self.schema_failure_count,
             self.safety_failure_count,
@@ -245,7 +251,7 @@ class ExtractionValidationObservation:
         extraction_output_digest: str,
         label: ExtractionFeedbackLabel,
         extraction_status: ExtractionSetStatus,
-        missed_assessable: bool,
+        missed_assessable: bool | None,
         failure_counts: tuple[int, int, int, int] = (0, 0, 0, 0),
     ) -> "ExtractionValidationObservation":
         pair_identity = {
@@ -300,6 +306,98 @@ class ExtractionValidationObservation:
 
 
 @dataclass(frozen=True, slots=True)
+class ExtractionValidationSafetyEvidence:
+    evidence_id: str
+    live_feedback_record_id: str
+    source_record_id: str
+    audit_id: str
+    audit_digest: str
+    evidence_cutoff_operation_id: str
+    complete: bool
+    schema_failure_count: int
+    safety_failure_count: int
+    prompt_leakage_failure_count: int
+    native_writer_failure_count: int
+
+    def __post_init__(self) -> None:
+        for value in (
+            self.evidence_id,
+            self.live_feedback_record_id,
+            self.source_record_id,
+            self.audit_id,
+            self.evidence_cutoff_operation_id,
+        ):
+            _require_id(value, "validation safety evidence ID")
+        _require_digest(self.audit_digest, "validation safety audit digest")
+        if type(self.complete) is not bool:
+            raise TypeError("validation safety completeness must be bool")
+        for value in self.failure_counts:
+            if type(value) is not int or value < 0:
+                raise ValueError("validation safety failure counts are invalid")
+        expected = _digest({
+            "live_feedback_record_id": self.live_feedback_record_id,
+            "source_record_id": self.source_record_id,
+            "audit_id": self.audit_id,
+            "audit_digest": self.audit_digest,
+            "evidence_cutoff_operation_id": self.evidence_cutoff_operation_id,
+            "complete": self.complete,
+            "failure_counts": list(self.failure_counts),
+        })
+        if self.evidence_id != f"validation-safety.{expected[:40]}":
+            raise ValueError("validation safety evidence ID mismatch")
+
+    @property
+    def failure_counts(self) -> tuple[int, int, int, int]:
+        return (
+            self.schema_failure_count,
+            self.safety_failure_count,
+            self.prompt_leakage_failure_count,
+            self.native_writer_failure_count,
+        )
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        live_feedback_record_id: str,
+        source_record_id: str,
+        audit_id: str,
+        audit_digest: str,
+        evidence_cutoff_operation_id: str,
+        complete: bool,
+        schema_failure_count: int,
+        safety_failure_count: int,
+        prompt_leakage_failure_count: int,
+        native_writer_failure_count: int,
+    ) -> "ExtractionValidationSafetyEvidence":
+        counts = (
+            schema_failure_count,
+            safety_failure_count,
+            prompt_leakage_failure_count,
+            native_writer_failure_count,
+        )
+        identity = {
+            "live_feedback_record_id": live_feedback_record_id,
+            "source_record_id": source_record_id,
+            "audit_id": audit_id,
+            "audit_digest": audit_digest,
+            "evidence_cutoff_operation_id": evidence_cutoff_operation_id,
+            "complete": complete,
+            "failure_counts": list(counts),
+        }
+        return cls(
+            f"validation-safety.{_digest(identity)[:40]}",
+            live_feedback_record_id,
+            source_record_id,
+            audit_id,
+            audit_digest,
+            evidence_cutoff_operation_id,
+            complete,
+            *counts,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ExtractionQualityMetrics:
     completed_source_count: int
     useful_count: int
@@ -310,6 +408,7 @@ class ExtractionQualityMetrics:
     nonempty_count: int
     empty_count: int
     missed_assessable_count: int
+    missed_assessability_complete: bool
     resolved_useful_rate: float | None
     observed_harmful_rate: float | None
     nonempty_coverage: float | None
@@ -344,6 +443,8 @@ class ExtractionQualityMetrics:
             self.empty_count > self.completed_source_count
         ) or self.missed_assessable_count > self.completed_source_count:
             raise ValueError("extraction quality denominator counts are invalid")
+        if type(self.missed_assessability_complete) is not bool:
+            raise TypeError("missed assessability completeness must be bool")
         ratios = (
             self.resolved_useful_rate,
             self.observed_harmful_rate,
@@ -380,7 +481,8 @@ class ExtractionQualityMetrics:
             ),
             (
                 self.missed_count / self.missed_assessable_count
-                if self.missed_assessable_count
+                if self.missed_assessability_complete
+                and self.missed_assessable_count
                 else None
             ),
         )
@@ -405,7 +507,10 @@ class ExtractionQualityMetrics:
             value.extraction_status == ExtractionSetStatus.EMPTY
             for value in observations
         )
-        assessable = sum(value.missed_assessable for value in observations)
+        assessability_complete = all(
+            value.missed_assessable is not None for value in observations
+        )
+        assessable = sum(value.missed_assessable is True for value in observations)
         resolved = (
             counts[ExtractionFeedbackLabel.USEFUL]
             + counts[ExtractionFeedbackLabel.HARMFUL]
@@ -420,6 +525,7 @@ class ExtractionQualityMetrics:
             nonempty,
             empty,
             assessable,
+            assessability_complete,
             (
                 counts[ExtractionFeedbackLabel.USEFUL] / resolved
                 if resolved
@@ -434,7 +540,7 @@ class ExtractionQualityMetrics:
             empty / total if total else None,
             (
                 counts[ExtractionFeedbackLabel.MISSED] / assessable
-                if assessable
+                if assessability_complete and assessable
                 else None
             ),
             sum(sum(value.failure_counts) for value in observations),
@@ -840,6 +946,7 @@ class JsonExtractionValidationDecisionStore:
             "nonempty_count",
             "empty_count",
             "missed_assessable_count",
+            "missed_assessability_complete",
             "resolved_useful_rate",
             "observed_harmful_rate",
             "nonempty_coverage",
