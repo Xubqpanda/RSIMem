@@ -118,6 +118,8 @@ def _criteria(**overrides) -> ExtractionAcceptanceCriteria:
         "maximum_missed_rate_delta": 0.0,
         "required_metrics": ("harmful_rate",),
         "proposal_budget_id": "proposal-budget.validation-v1",
+        "maximum_proposal_generations": 1,
+        "maximum_candidate_selections": 1,
     }
     values.update(overrides)
     return ExtractionAcceptanceCriteria(**values)
@@ -286,6 +288,25 @@ def test_equal_quality_and_no_intervention_cannot_activate() -> None:
     assert decision.accepted is False
     assert "useful_rate_not_improved" in decision.reason_codes
     assert "no_extraction_intervention" in decision.reason_codes
+
+
+def test_zero_resolved_evidence_cannot_activate() -> None:
+    observations = _pairs(
+        (ExtractionFeedbackLabel.UNRESOLVED,) * 3,
+        (ExtractionFeedbackLabel.CENSORED,) * 3,
+    )
+    decision = ExtractionPromptMatchedValidator().evaluate(
+        split=_split(),
+        observations=observations,
+        parent_artifact_id=PARENT,
+        proposal_artifact_id=PROPOSAL,
+        criteria=_criteria(),
+    )
+    assert decision.accepted is False
+    assert decision.parent_metrics.resolved_useful_rate is None
+    assert decision.proposal_metrics.resolved_useful_rate is None
+    assert "insufficient_resolved_examples" in decision.reason_codes
+    assert "useful_rate_not_improved" in decision.reason_codes
 
 
 def test_empty_collapse_and_safety_failure_override_quality() -> None:
@@ -505,6 +526,8 @@ def test_validation_contract_has_no_score_cost_or_fake_uncertainty_surface() -> 
     }
     with pytest.raises(ValueError, match="strictly positive"):
         replace(_criteria(), minimum_useful_rate_delta=0.0)
+    with pytest.raises(ValueError, match="budgets must be positive"):
+        replace(_criteria(), maximum_proposal_generations=0)
     validation_source = Path(validation_module.__file__).read_text(encoding="utf-8")
     assert "extraction_projection" not in validation_source
     assert "hermes" not in validation_source.casefold()

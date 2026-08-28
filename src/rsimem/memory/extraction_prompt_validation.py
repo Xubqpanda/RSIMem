@@ -568,6 +568,8 @@ class ExtractionAcceptanceCriteria:
     maximum_missed_rate_delta: float
     required_metrics: tuple[str, ...] = ("harmful_rate",)
     proposal_budget_id: str = "proposal-budget.default-v1"
+    maximum_proposal_generations: int = 1
+    maximum_candidate_selections: int = 1
 
     def __post_init__(self) -> None:
         if type(self.minimum_matched_pairs) is not int or self.minimum_matched_pairs < 1:
@@ -615,6 +617,13 @@ class ExtractionAcceptanceCriteria:
         ):
             raise ValueError("required extraction validation metrics are invalid")
         _require_id(self.proposal_budget_id, "proposal budget ID")
+        if (
+            type(self.maximum_proposal_generations) is not int
+            or self.maximum_proposal_generations < 1
+            or type(self.maximum_candidate_selections) is not int
+            or self.maximum_candidate_selections < 1
+        ):
+            raise ValueError("proposal generation and selection budgets must be positive")
         for name, value in values.items():
             object.__setattr__(self, name, value)
 
@@ -630,6 +639,8 @@ class ExtractionAcceptanceCriteria:
             "maximum_missed_rate_delta": self.maximum_missed_rate_delta,
             "required_metrics": list(self.required_metrics),
             "proposal_budget_id": self.proposal_budget_id,
+            "maximum_proposal_generations": self.maximum_proposal_generations,
+            "maximum_candidate_selections": self.maximum_candidate_selections,
         })
 
 
