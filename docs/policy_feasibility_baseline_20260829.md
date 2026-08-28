@@ -53,7 +53,7 @@ PYTHONPATH=src pytest -q tests/test_policy_feasibility.py tests/test_policy_repl
 22 passed
 
 .venv/bin/pytest -q tests
-629 passed
+630 passed
 
 cd benchmarks/past-bench && ../../.venv/bin/pytest -q
 397 passed, 2 skipped
