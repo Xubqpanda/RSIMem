@@ -650,12 +650,29 @@ class HermesPastBenchBridge:
             return
         try:
             snapshot = self._collect_completed_snapshot()
-            results = self.static_writeback.process_completed_snapshot(snapshot)
             trigger_event = self._trigger_adapter.from_snapshot(
                 snapshot,
                 EvaluationTrigger.TASK_COMPLETED.value,
                 turn_index=sum(
                     1 for segment in snapshot.segments if segment.role == "user"
+                ),
+            )
+            source_decision = next(
+                (
+                    item
+                    for item in self._source_selection_decisions
+                    if item.source_revision == snapshot.context_revision
+                    and item.trigger_event_id == trigger_event.event_id
+                ),
+                None,
+            )
+            results = self.static_writeback.process_completed_snapshot(
+                snapshot,
+                selected_segment_ids=(
+                    source_decision.selected_segment_ids
+                    if source_decision is not None
+                    and source_decision.action == DecisionAction.RUN
+                    else None
                 ),
             )
             for compiled in results:
