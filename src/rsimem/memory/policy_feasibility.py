@@ -21,6 +21,11 @@ from typing import Iterable, Mapping, Sequence
 
 from .policy_contracts import PolicyArtifactIdentity, PolicyLayer, PolicyDecision, content_digest
 from .policy_replay import PolicyReplayResult
+from .extraction_feedback import (
+    ExtractionFeedbackExample,
+    ExtractionFeedbackLabel,
+    ExtractionFeedbackLevel,
+)
 
 
 class FeasibilityOutcome(StrEnum):
@@ -88,6 +93,47 @@ class FeedbackChain:
             )
             if value is not None
         )
+
+
+def feedback_chain_from_extraction_example(
+    example: ExtractionFeedbackExample,
+) -> FeedbackChain:
+    """Project one strict extraction example into the feasibility chain.
+
+    Only resolved extraction-set labels are projected.  Fact-level labels and
+    unresolved/censored/harmful examples remain diagnostics because their
+    chain cannot, by itself, prove a policy-layer outcome.
+    """
+
+    if not isinstance(example, ExtractionFeedbackExample):
+        raise TypeError("feedback chain source must be an extraction feedback example")
+    if not example.primary or example.level is not ExtractionFeedbackLevel.EXTRACTION_SET:
+        return FeedbackChain()
+    if example.label is ExtractionFeedbackLabel.USEFUL:
+        if any(value is None for value in (
+            example.opportunity_operation_id,
+            example.use_operation_id,
+            example.outcome_operation_id,
+        )):
+            return FeedbackChain()
+        return FeedbackChain(
+            opportunity_id=example.future_opportunity_id,
+            use_id=example.use_operation_id,
+            outcome_id=example.outcome_operation_id,
+        )
+    if example.label is ExtractionFeedbackLabel.MISSED:
+        if any(value is None for value in (
+            example.opportunity_operation_id,
+            example.outcome_operation_id,
+        )):
+            return FeedbackChain()
+        return FeedbackChain(
+            source_id=example.source_id,
+            demand_id=example.future_opportunity_id,
+            absence_id=example.outcome_operation_id,
+            outcome_id=example.outcome_operation_id,
+        )
+    return FeedbackChain()
 
 
 @dataclass(frozen=True, slots=True)
@@ -887,6 +933,7 @@ __all__ = [
     "FeasibilityOutcome",
     "FeasibilityStatus",
     "FeedbackChain",
+    "feedback_chain_from_extraction_example",
     "ProcessFeedback",
     "PolicyHypothesis",
     "LayerIntervention",
