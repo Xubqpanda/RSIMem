@@ -30,13 +30,26 @@ class JsonExtractionOptimizerCorpusStore:
         self,
         attempt_root: Path,
         *,
+        owner_controlled_root: Path,
         attempt_id: str,
         split: OptimizerCorpusSplit,
     ) -> None:
         root = attempt_root.expanduser().resolve()
+        owner_root = owner_controlled_root.expanduser().resolve()
+        if owner_controlled_root.exists() and owner_controlled_root.is_symlink():
+            raise ValueError("optimizer owner-controlled root cannot be a symlink")
         if attempt_root.exists() and attempt_root.is_symlink():
             raise ValueError("optimizer attempt root cannot be a symlink")
+        try:
+            relative = root.relative_to(owner_root)
+        except ValueError as exc:
+            raise ValueError(
+                "optimizer attempt must be under its owner-controlled root"
+            ) from exc
+        if not relative.parts:
+            raise ValueError("optimizer attempt must be below its owner-controlled root")
         self.attempt_root = root
+        self.owner_controlled_root = owner_root
         self.attempt_id = attempt_id
         self.split = OptimizerCorpusSplit(split)
         self.private_root = root / "private" / "optimizer-corpus"
