@@ -795,6 +795,10 @@ class JsonFeasibilityEvidenceLedger:
         )
 
     def _load(self) -> None:
+        # Reload from the authoritative file rather than merging with a
+        # possibly stale in-memory cache.  If the file was removed or replaced
+        # between attempts, verification must fail closed.
+        self._records = {}
         if not self.path.exists():
             return
         for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
