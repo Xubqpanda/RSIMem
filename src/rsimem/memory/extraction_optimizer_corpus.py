@@ -19,8 +19,8 @@ from .optimizer_content_boundary import OptimizerUntrustedText
 from .prompt_components import content_digest
 
 
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 2
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v2"
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 3
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v3"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
@@ -331,13 +331,25 @@ class OptimizerDelayedEvidence:
 
 @dataclass(frozen=True, slots=True)
 class OptimizerAuditJoin:
+    family_id: str
     source_record_id: str
     source_record_digest: str
+    source_stage: str
+    source_run_id: str
+    source_episode_id: str
+    source_session_id: str
+    source_task_id: str
     source_projection_id: str
     source_projection_digest: str
     feedback_record_id: str
     feedback_dataset_id: str
     feedback_example_id: str
+    feedback_stage: str
+    feedback_run_id: str
+    feedback_trace_id: str
+    feedback_episode_id: str
+    feedback_session_id: str
+    feedback_task_id: str
     extraction_artifact_id: str
     extraction_artifact_digest: str
     extraction_output_digest: str
@@ -346,11 +358,23 @@ class OptimizerAuditJoin:
 
     def __post_init__(self) -> None:
         for value, name in (
+            (self.family_id, "optimizer family ID"),
             (self.source_record_id, "optimizer source record ID"),
+            (self.source_stage, "optimizer source stage"),
+            (self.source_run_id, "optimizer source run ID"),
+            (self.source_episode_id, "optimizer source episode ID"),
+            (self.source_session_id, "optimizer source session ID"),
+            (self.source_task_id, "optimizer source task ID"),
             (self.source_projection_id, "optimizer source projection ID"),
             (self.feedback_record_id, "optimizer feedback record ID"),
             (self.feedback_dataset_id, "optimizer feedback dataset ID"),
             (self.feedback_example_id, "optimizer feedback example ID"),
+            (self.feedback_stage, "optimizer feedback stage"),
+            (self.feedback_run_id, "optimizer feedback run ID"),
+            (self.feedback_trace_id, "optimizer feedback trace ID"),
+            (self.feedback_episode_id, "optimizer feedback episode ID"),
+            (self.feedback_session_id, "optimizer feedback session ID"),
+            (self.feedback_task_id, "optimizer feedback task ID"),
             (self.extraction_artifact_id, "optimizer extraction artifact ID"),
         ):
             _require_id(value, name)
@@ -369,13 +393,25 @@ class OptimizerAuditJoin:
 
     def payload(self) -> dict[str, object]:
         return {
+            "family_id": self.family_id,
             "source_record_id": self.source_record_id,
             "source_record_digest": self.source_record_digest,
+            "source_stage": self.source_stage,
+            "source_run_id": self.source_run_id,
+            "source_episode_id": self.source_episode_id,
+            "source_session_id": self.source_session_id,
+            "source_task_id": self.source_task_id,
             "source_projection_id": self.source_projection_id,
             "source_projection_digest": self.source_projection_digest,
             "feedback_record_id": self.feedback_record_id,
             "feedback_dataset_id": self.feedback_dataset_id,
             "feedback_example_id": self.feedback_example_id,
+            "feedback_stage": self.feedback_stage,
+            "feedback_run_id": self.feedback_run_id,
+            "feedback_trace_id": self.feedback_trace_id,
+            "feedback_episode_id": self.feedback_episode_id,
+            "feedback_session_id": self.feedback_session_id,
+            "feedback_task_id": self.feedback_task_id,
             "extraction_artifact_id": self.extraction_artifact_id,
             "extraction_artifact_digest": self.extraction_artifact_digest,
             "extraction_output_digest": self.extraction_output_digest,
@@ -386,9 +422,13 @@ class OptimizerAuditJoin:
     @classmethod
     def from_payload(cls, value: object) -> "OptimizerAuditJoin":
         payload = _strict(value, {
-            "source_record_id", "source_record_digest", "source_projection_id",
+            "family_id", "source_record_id", "source_record_digest",
+            "source_stage", "source_run_id", "source_episode_id",
+            "source_session_id", "source_task_id", "source_projection_id",
             "source_projection_digest", "feedback_record_id",
             "feedback_dataset_id", "feedback_example_id",
+            "feedback_stage", "feedback_run_id", "feedback_trace_id",
+            "feedback_episode_id", "feedback_session_id", "feedback_task_id",
             "extraction_artifact_id", "extraction_artifact_digest",
             "extraction_output_digest", "operation_ids", "artifacts",
         }, "optimizer audit join")
@@ -398,13 +438,25 @@ class OptimizerAuditJoin:
             raise ValueError("malformed optimizer audit join")
         try:
             return cls(
+                payload["family_id"],
                 payload["source_record_id"],
                 payload["source_record_digest"],
+                payload["source_stage"],
+                payload["source_run_id"],
+                payload["source_episode_id"],
+                payload["source_session_id"],
+                payload["source_task_id"],
                 payload["source_projection_id"],
                 payload["source_projection_digest"],
                 payload["feedback_record_id"],
                 payload["feedback_dataset_id"],
                 payload["feedback_example_id"],
+                payload["feedback_stage"],
+                payload["feedback_run_id"],
+                payload["feedback_trace_id"],
+                payload["feedback_episode_id"],
+                payload["feedback_session_id"],
+                payload["feedback_task_id"],
                 payload["extraction_artifact_id"],
                 payload["extraction_artifact_digest"],
                 payload["extraction_output_digest"],
