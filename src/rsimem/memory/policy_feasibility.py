@@ -360,6 +360,36 @@ class PolicyHypothesis:
             "reason_codes": list(self.reason_codes),
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "PolicyHypothesis":
+        fields = {
+            "hypothesis_id", "parent_artifact_id", "candidate_artifact_id",
+            "target_layer", "feedback_ids", "reason_codes",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed policy hypothesis")
+        try:
+            result = cls(
+                value["hypothesis_id"],
+                value["parent_artifact_id"],
+                value["candidate_artifact_id"],
+                value["target_layer"],
+                tuple(value["feedback_ids"]),
+                tuple(value["reason_codes"]),
+            )
+        except (TypeError, ValueError, KeyError) as exc:
+            raise ValueError("malformed policy hypothesis") from exc
+        expected = cls.create(
+            parent_artifact_id=result.parent_artifact_id,
+            candidate_artifact_id=result.candidate_artifact_id,
+            target_layer=result.target_layer,
+            feedback_ids=result.feedback_ids,
+            reason_codes=result.reason_codes,
+        )
+        if result.hypothesis_id != expected.hypothesis_id:
+            raise ValueError("policy hypothesis ID mismatch")
+        return result
+
 
 @dataclass(frozen=True, slots=True)
 class LayerIntervention:
@@ -613,7 +643,7 @@ class LayerIntervention:
                 if self.process_feedback is not None
                 else None
             ),
-            "hypothesis_id": self.hypothesis.hypothesis_id if self.hypothesis else None,
+            "hypothesis": self.hypothesis.payload() if self.hypothesis else None,
         }
 
 
@@ -641,7 +671,7 @@ class FeasibilityEvidenceRecord:
             "parent_lineage_id", "candidate_lineage_id", "parent_audit_ok",
             "candidate_audit_ok", "process_signal", "outcome", "feedback_ids",
             "reason_codes", "intervention_fingerprint", "process_feedback",
-            "hypothesis_id",
+            "hypothesis",
         }
         if set(payload) != required:
             raise ValueError("malformed feasibility replay payload")
@@ -656,11 +686,13 @@ class FeasibilityEvidenceRecord:
             raise ValueError("process signal requires process feedback")
         if payload["process_signal"] is False and process_feedback is not None:
             raise ValueError("process feedback requires process signal")
-        if payload["hypothesis_id"] is not None and (
-            not isinstance(payload["hypothesis_id"], str)
-            or not payload["hypothesis_id"].strip()
-        ):
-            raise ValueError("feasibility hypothesis ID is invalid")
+        hypothesis = payload["hypothesis"]
+        if hypothesis is not None:
+            PolicyHypothesis.from_payload(hypothesis)
+        if payload["process_signal"] is True and hypothesis is None:
+            raise ValueError("process signal requires a policy hypothesis")
+        if payload["process_signal"] is False and hypothesis is not None:
+            raise ValueError("policy hypothesis requires process signal")
         for field in ("parent_decision_ids", "candidate_decision_ids", "feedback_ids", "reason_codes"):
             values = payload[field]
             if not isinstance(values, list) or len(values) != len(set(values)) or any(
