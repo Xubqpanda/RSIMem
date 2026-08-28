@@ -198,6 +198,48 @@ class ProcessFeedback:
             "reason_codes": list(self.reason_codes),
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "ProcessFeedback":
+        fields = {
+            "feedback_id", "event_id", "source_revision", "target_layer",
+            "parent_decision_id", "candidate_decision_id",
+            "parent_execution_receipt_ids", "candidate_execution_receipt_ids",
+            "observed_before_digest", "observed_after_digest", "reason_codes",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed process feedback")
+        try:
+            result = cls(
+                value["feedback_id"],
+                value["event_id"],
+                value["source_revision"],
+                value["target_layer"],
+                value["parent_decision_id"],
+                value["candidate_decision_id"],
+                tuple(value["parent_execution_receipt_ids"]),
+                tuple(value["candidate_execution_receipt_ids"]),
+                value["observed_before_digest"],
+                value["observed_after_digest"],
+                tuple(value["reason_codes"]),
+            )
+        except (TypeError, ValueError, KeyError) as exc:
+            raise ValueError("malformed process feedback") from exc
+        identity = {
+            "event_id": result.event_id,
+            "source_revision": result.source_revision,
+            "target_layer": result.target_layer.value,
+            "parent_decision_id": result.parent_decision_id,
+            "candidate_decision_id": result.candidate_decision_id,
+            "parent_execution_receipt_ids": list(result.parent_execution_receipt_ids),
+            "candidate_execution_receipt_ids": list(result.candidate_execution_receipt_ids),
+            "observed_before_digest": result.observed_before_digest,
+            "observed_after_digest": result.observed_after_digest,
+            "reason_codes": list(result.reason_codes),
+        }
+        if result.feedback_id != f"process-feedback.{content_digest(identity)[:40]}":
+            raise ValueError("process feedback ID mismatch")
+        return result
+
 
 @dataclass(frozen=True, slots=True)
 class PolicyHypothesis:
@@ -482,8 +524,8 @@ class LayerIntervention:
             "feedback_ids": list(self.feedback.ids),
             "reason_codes": list(self.reason_codes),
             "intervention_fingerprint": self.intervention_fingerprint,
-            "process_feedback_id": (
-                self.process_feedback.feedback_id
+            "process_feedback": (
+                self.process_feedback.payload()
                 if self.process_feedback is not None
                 else None
             ),
@@ -514,7 +556,7 @@ class FeasibilityEvidenceRecord:
             "candidate_source_revision", "parent_decision_ids", "candidate_decision_ids",
             "parent_lineage_id", "candidate_lineage_id", "parent_audit_ok",
             "candidate_audit_ok", "process_signal", "outcome", "feedback_ids",
-            "reason_codes", "intervention_fingerprint", "process_feedback_id",
+            "reason_codes", "intervention_fingerprint", "process_feedback",
             "hypothesis_id",
         }
         if set(payload) != required:
@@ -523,11 +565,13 @@ class FeasibilityEvidenceRecord:
             raise ValueError("feasibility replay case ID must not be empty")
         if payload["target_layer"] not in {layer.value for layer in PolicyLayer}:
             raise ValueError("feasibility replay target layer is invalid")
-        if payload["process_feedback_id"] is not None and (
-            not isinstance(payload["process_feedback_id"], str)
-            or not payload["process_feedback_id"].strip()
-        ):
-            raise ValueError("feasibility process feedback ID is invalid")
+        process_feedback = payload["process_feedback"]
+        if process_feedback is not None:
+            ProcessFeedback.from_payload(process_feedback)
+        if payload["process_signal"] is True and process_feedback is None:
+            raise ValueError("process signal requires process feedback")
+        if payload["process_signal"] is False and process_feedback is not None:
+            raise ValueError("process feedback requires process signal")
         if payload["hypothesis_id"] is not None and (
             not isinstance(payload["hypothesis_id"], str)
             or not payload["hypothesis_id"].strip()
