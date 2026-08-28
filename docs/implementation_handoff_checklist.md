@@ -529,20 +529,20 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 功能需求：
 
-- □ Contract validator检查body长度、字符、forbidden instruction、wrapper/schema digest和parent lineage。
-- □ Deterministic extraction suite覆盖durable preference、constraint、temporary request、unresolved claim、assistant-only acknowledgement、tool evidence、credential/path和empty source。
-- □ Candidate必须保持严格JSON `{facts: string[]}` output contract。
-- □ Offline validation在独立historical split上比较parent/candidate extraction utility，不使用official score。
-- □ Validation按set-level计算resolved useful rate，并同时检查harmful、non-empty coverage、empty extraction和high-confidence missed；不允许只靠少提取获得虚假提升。
-- □ 所有ratio同时输出numerator、denominator和unknown count；resolved denominator不足时拒绝，不能只报告百分比。
+- √ Contract validator检查body长度、字符、forbidden instruction、wrapper/schema digest和parent lineage。
+- √ Deterministic extraction suite覆盖durable preference、constraint、temporary request、unresolved claim、assistant-only acknowledgement、tool evidence、credential/path和empty source。
+- √ Candidate必须保持严格JSON `{facts: string[]}` output contract。
+- √ Offline validation在独立historical split上比较parent/candidate extraction utility，不使用official score。
+- √ Validation按set-level计算resolved useful rate，并同时检查harmful、non-empty coverage、empty extraction和high-confidence missed；不允许只靠少提取获得虚假提升。
+- √ 所有ratio同时输出numerator、denominator和unknown count；resolved denominator不足时拒绝，不能只报告百分比。
 
 测试与验收：
 
-- □ Candidate不能降低所有输出为空来通过negative-only样本。
-- □ Candidate只提取一个高置信fact时，即使useful rate为100%，只要coverage低于冻结floor也必须拒绝。
-- □ Candidate不能通过复制source或输出完整transcript提高recall。
-- □ Offline quality不严格高于parent时保持REJECTED。
-- □ Offline accepted只允许进入matched trial，不可直接写production ACTIVE。
+- √ Candidate不能降低所有输出为空来通过negative-only样本。
+- √ Candidate只提取一个高置信fact时，即使useful rate为100%，只要coverage低于冻结floor也必须拒绝。
+- √ Candidate不能通过复制source或输出完整transcript提高recall。
+- √ Offline quality不严格高于parent时保持REJECTED。
+- √ Offline accepted只允许进入matched trial，不可直接写production ACTIVE。
 
 ### 2E：Matched Trial、Activation 与 Rollback
 
@@ -698,9 +698,11 @@ bash -n scripts/*.sh
 
 ## 10. 当前执行入口
 
-当前位于 **Stage 2D：Static Safety 与 Offline Prompt Validation**。Stage 1A-1H、
-Stage 2A、Stage 2B 和 Stage 2C 已经通过，低成本 live plain-parent acceptance 记录在
+当前位于 **Stage 2E：Matched Trial、Activation 与 Rollback**。Stage 1A-1H、
+Stage 2A、Stage 2B、Stage 2C 和 Stage 2D 已经通过，低成本 live plain-parent acceptance 记录在
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
+Stage 2D只证明candidate通过静态安全、deterministic extraction suite和独立historical
+split offline gate；其accepted状态只能进入matched trial，不代表production activation。
 后续顺序仍严格按照：
 
 ```text

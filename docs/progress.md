@@ -269,23 +269,33 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 - [x] Add an OpenAI-compatible provider client with zero SDK retry, separated system/user messages, JSON mode, frozen request parameters, and raw/unknown usage preservation; tests use a fake SDK and no provider call.
 - [x] Replay identical captured completions into identical candidate artifacts and preserve optimizer usage outside the optimization objective.
 
+### Extraction-Prompt Stage 2D Static Safety And Offline Validation
+
+- [x] Validate candidate lineage, exact edit replay, slot/wrapper/schema compatibility, protected rules, body constraints, and forbidden adaptive instructions.
+- [x] Run the eight-category deterministic extraction suite with strict `{facts: string[]}` parsing, retain/exclude expectations, and source-copy/prompt-leakage rejection.
+- [x] Join static safety, deterministic suite, frozen split, artifact body digests, observations, and quality decisions by stable identity.
+- [x] Compare parent and candidate at extraction-set level without official score or resource cost in the decision objective.
+- [x] Report useful, harmful, coverage, empty, and missed ratios with explicit numerator, denominator, and unknown count.
+- [x] Reject equal quality, insufficient resolved evidence, empty-output collapse, coverage collapse, safety failure, stale digests, incomplete split roles, and non-frozen candidate budgets.
+- [x] Limit an offline acceptance to matched-trial eligibility; no offline decision API can activate a production artifact.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `490 passed`.
+- [x] Pass all RSIMem tests: `506 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `394 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Extraction-Prompt Stage 2D**
+### **Current: Extraction-Prompt Stage 2E**
 
 The first optimized component is the semantic fact-extraction prompt. Delayed
 deployment evidence may update prompt body N to N+1 while the operation prompt,
 retrieval configuration, route, invocation boundary, backend, and model profile
 remain frozen. Raw resources are reported separately from the method decision.
 
-The immediate objective is static candidate safety and parent/proposal offline validation on an independent historical split. Candidate artifacts remain proposals and adaptive live runs remain blocked until offline validation, matched validation, activation, rollback, and runtime fingerprint gates pass.
+The immediate objective is a predeclared matched parent/proposal trial followed by fail-closed activation and rollback validation. Stage 2D offline acceptance only makes a candidate eligible for that trial; candidate artifacts remain proposals and production activation remains blocked until the Stage 2E gates pass.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -384,9 +394,10 @@ Acceptance criteria:
 7. [x] Implement the extraction policy envelope, independent artifact store, Mem0-flat root export, runtime binding, restart replay, and root fallback.
 8. [x] Build the content-bearing optimizer corpus with exact audit joins and train/validation/future-test isolation.
 9. [x] Implement the controlled extraction prompt optimizer with captured replay, provider adapter, evidence gating, and candidate leakage/safety rejection.
-10. [ ] Implement static safety, held-out offline validation, matched activation, and rollback for extraction prompt candidates.
-11. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
-12. [ ] Produce dated extraction-method reports before making adaptation claims.
+10. [x] Implement static safety and held-out offline validation for extraction prompt candidates.
+11. [ ] Implement the predeclared matched trial, production activation, rejection, restart, and rollback gates.
+12. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
+13. [ ] Produce dated extraction-method reports before making adaptation claims.
 
 ## Update Policy
 
