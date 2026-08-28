@@ -509,6 +509,64 @@ class RSIMemAdaptiveWritebackConfig(BaseModel):
         return value
 
 
+class RSIMemExtractionTrialProfile(BaseModel):
+    """Content-free identity for one validation-only extraction trial bundle."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        populate_by_name=True,
+    )
+
+    schema_version: Literal[1] = Field(alias="schemaVersion")
+    preparation: Literal["extraction_matched_trial_store"]
+    deployment_scope: Literal["matched_validation_only"] = Field(
+        alias="deploymentScope"
+    )
+    official_evaluation: Literal[False] = Field(alias="officialEvaluation")
+    validation_only: Literal[True] = Field(alias="validationOnly")
+    production_activation_allowed: Literal[False] = Field(
+        alias="productionActivationAllowed"
+    )
+    trial_id: str = Field(alias="trialId")
+    slot_id: Literal["mem0-flat.semantic.extraction"] = Field(alias="slotId")
+    parent_artifact_id: str = Field(alias="parentArtifactId")
+    parent_artifact_digest: str = Field(alias="parentArtifactDigest")
+    candidate_artifact_id: str = Field(alias="candidateArtifactId")
+    candidate_artifact_digest: str = Field(alias="candidateArtifactDigest")
+    offline_decision_id: str = Field(alias="offlineDecisionId")
+    config_digest: str = Field(alias="configDigest")
+    policy_store_digest: str = Field(alias="policyStoreDigest")
+    offline_decision_digest: str = Field(alias="offlineDecisionDigest")
+
+    @field_validator(
+        "trial_id",
+        "parent_artifact_id",
+        "candidate_artifact_id",
+        "offline_decision_id",
+    )
+    @classmethod
+    def _identity(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("extraction trial identity must not be empty")
+        return value
+
+    @field_validator(
+        "parent_artifact_digest",
+        "candidate_artifact_digest",
+        "config_digest",
+        "policy_store_digest",
+        "offline_decision_digest",
+    )
+    @classmethod
+    def _digest(cls, value: str) -> str:
+        if len(value) != 64 or any(
+            character not in "0123456789abcdef" for character in value
+        ):
+            raise ValueError("extraction trial digest must be sha256")
+        return value
+
+
 class HermesPersistenceConfig(BaseModel):
     """Hermes-specific persistence knobs for the evaluation harness."""
 
@@ -559,6 +617,8 @@ class HermesPersistenceConfig(BaseModel):
     ] = "disabled"
     rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | None = None
     rsimem_adaptive_policy_source_path: str = Field(default="", exclude=True)
+    rsimem_extraction_trial_profile: RSIMemExtractionTrialProfile | None = None
+    rsimem_extraction_trial_source_path: str = Field(default="", exclude=True)
 
     @model_validator(mode="after")
     def _validate_adaptive_writeback_pair(self):
@@ -567,6 +627,19 @@ class HermesPersistenceConfig(BaseModel):
             raise ValueError("adaptive semantic writeback requires adaptive config")
         if not selected and self.rsimem_adaptive_config is not None:
             raise ValueError("adaptive config requires adaptive_utility mode")
+        extraction_selected = self.rsimem_extraction_trial_profile is not None
+        if extraction_selected and self.rsimem_semantic_writeback_mode != "static":
+            raise ValueError(
+                "extraction matched trial requires static semantic writeback"
+            )
+        if extraction_selected != bool(self.rsimem_extraction_trial_source_path):
+            raise ValueError(
+                "extraction trial profile and source path must be configured together"
+            )
+        if extraction_selected and self.rsimem_adaptive_config is not None:
+            raise ValueError(
+                "extraction trial cannot use legacy adaptive utility config"
+            )
         return self
 
 
