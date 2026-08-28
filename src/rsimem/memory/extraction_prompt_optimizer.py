@@ -242,7 +242,7 @@ class ExtractionPromptOptimizer:
             )
         self._validate_candidate_content(parent, corpus, edits)
         provenance = ExtractionGenerationProvenance(
-            optimizer_model=self.config.model_profile,
+            optimizer_model=self.config.model_id,
             optimizer_config_digest=self.config.config_digest,
             training_corpus_id=corpus.corpus_id,
             training_cutoff=corpus.observation_cutoff,

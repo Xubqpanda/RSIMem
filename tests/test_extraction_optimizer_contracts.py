@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -38,6 +39,9 @@ from rsimem.memory.extraction_prompt_optimizer import (
     CapturedExtractionOptimizerClient,
     ExtractionOptimizerDecision,
     ExtractionPromptOptimizer,
+)
+from rsimem.memory.extraction_optimizer_provider import (
+    OpenAICompatibleExtractionOptimizerClient,
 )
 from rsimem.memory.optimizer_content_boundary import OptimizerSecretBoundary
 from rsimem.memory.prompt_components import text_digest
@@ -213,6 +217,9 @@ def test_frozen_config_and_nontraining_requests_fail_before_completion() -> None
     assert config.output_schema_digest == EXTRACTION_OPTIMIZER_OUTPUT_SCHEMA_DIGEST
     assert config.system_instruction_digest == EXTRACTION_OPTIMIZER_SYSTEM_DIGEST
     assert config.temperature == 0
+    assert config.model_id == "gpt-5.6-luna"
+    with pytest.raises(ValueError, match="model ID"):
+        replace(config, model_id="other-model")
     with pytest.raises(ValueError, match="temperature"):
         replace(config, temperature=0.2)
     with pytest.raises(ValueError, match="model profile"):
@@ -531,3 +538,112 @@ def test_protected_rule_and_malformed_completion_fail_closed() -> None:
         ExtractionPromptOptimizer(
             CapturedExtractionOptimizerClient("not-json")
         ).propose(_parent(), corpus)
+
+
+class _FakeCompletions:
+    def __init__(self, response) -> None:
+        self.response = response
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return self.response
+
+
+class _FakeSdk:
+    def __init__(self, response) -> None:
+        self.chat = SimpleNamespace(completions=_FakeCompletions(response))
+
+
+def test_openai_compatible_client_freezes_messages_parameters_and_usage() -> None:
+    output = json.dumps({
+        "decision": "NO_PROPOSAL",
+        "reason_codes": ["no_edit_needed"],
+        "edits": [],
+    })
+    response = SimpleNamespace(
+        id="provider-response-fixture",
+        choices=[SimpleNamespace(message=SimpleNamespace(content=output))],
+        usage=SimpleNamespace(
+            prompt_tokens=120,
+            completion_tokens=15,
+            prompt_tokens_details=SimpleNamespace(
+                cached_tokens=40,
+                cache_write_tokens=7,
+            ),
+            completion_tokens_details=SimpleNamespace(reasoning_tokens=3),
+        ),
+    )
+    sdk = _FakeSdk(response)
+    times = iter((10.0, 10.25))
+    client = OpenAICompatibleExtractionOptimizerClient(
+        api_key="fixture-secret-token",
+        base_url="https://provider.invalid/v1",
+        sdk_client=sdk,
+        clock=lambda: next(times),
+    )
+    request = build_extraction_optimizer_request(_parent(), _corpus())
+    completion = client.complete(request, ExtractionOptimizerConfig())
+
+    call = sdk.chat.completions.calls[0]
+    assert call == {
+        "model": "gpt-5.6-luna",
+        "messages": [
+            {"role": "system", "content": request.system_instruction},
+            {"role": "user", "content": request.input_json},
+        ],
+        "temperature": 0.0,
+        "max_tokens": 4_096,
+        "timeout": 120,
+        "response_format": {"type": "json_object"},
+    }
+    assert completion.output_text == output
+    assert completion.usage == RawResourceUsage(
+        input_tokens=120,
+        output_tokens=15,
+        cache_read_tokens=40,
+        cache_write_tokens=7,
+        reasoning_tokens=3,
+        model_requests=1,
+        retry_count=0,
+        duration_ms=250,
+    )
+    assert "fixture-secret-token" not in repr(client)
+    assert "fixture-secret-token" not in repr(completion)
+
+
+def test_provider_preserves_unknown_usage_and_rejects_malformed_response() -> None:
+    output = '{"decision":"NO_PROPOSAL","reason_codes":["none"],"edits":[]}'
+    response = SimpleNamespace(
+        id="response-unknown-usage",
+        choices=[SimpleNamespace(message=SimpleNamespace(content=output))],
+        usage=None,
+    )
+    client = OpenAICompatibleExtractionOptimizerClient(
+        api_key="fixture-secret-token",
+        base_url="https://provider.invalid/v1",
+        sdk_client=_FakeSdk(response),
+        clock=lambda: 1.0,
+    )
+    completion = client.complete(
+        build_extraction_optimizer_request(_parent(), _corpus()),
+    )
+    assert completion.usage.input_tokens is None
+    assert completion.usage.output_tokens is None
+    assert completion.usage.cache_read_tokens is None
+    assert completion.usage.reasoning_tokens is None
+    assert completion.usage.model_requests == 1
+
+    malformed = _FakeSdk(SimpleNamespace(id="bad", choices=[], usage=None))
+    with pytest.raises(ValueError, match="choice count"):
+        OpenAICompatibleExtractionOptimizerClient(
+            api_key="fixture-secret-token",
+            base_url="https://provider.invalid/v1",
+            sdk_client=malformed,
+        ).complete(build_extraction_optimizer_request(_parent(), _corpus()))
+    with pytest.raises(ValueError, match="absolute HTTPS"):
+        OpenAICompatibleExtractionOptimizerClient(
+            api_key="fixture-secret-token",
+            base_url="http://provider.invalid/v1",
+            sdk_client=malformed,
+        )

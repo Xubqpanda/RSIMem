@@ -22,6 +22,7 @@ EXTRACTION_OPTIMIZER_CONFIG_SCHEMA = "extraction-prompt-optimizer-config-v1"
 EXTRACTION_OPTIMIZER_REQUEST_SCHEMA = "extraction-prompt-optimizer-request-v1"
 EXTRACTION_OPTIMIZER_COMPLETION_SCHEMA = "extraction-prompt-optimizer-completion-v1"
 EXTRACTION_OPTIMIZER_ID = "extraction-prompt-rule-editor-v1"
+EXTRACTION_OPTIMIZER_MODEL_ID = "gpt-5.6-luna"
 EXTRACTION_OPTIMIZER_MODEL_PROFILE = "gpt-5.6-luna-optimizer-v1"
 EXTRACTION_OPTIMIZER_TEMPERATURE = 0.0
 EXTRACTION_OPTIMIZER_MAX_OUTPUT_TOKENS = 4_096
@@ -121,6 +122,7 @@ def _require_digest(value: object, name: str) -> None:
 
 @dataclass(frozen=True, slots=True)
 class ExtractionOptimizerConfig:
+    model_id: str = EXTRACTION_OPTIMIZER_MODEL_ID
     model_profile: str = EXTRACTION_OPTIMIZER_MODEL_PROFILE
     temperature: float = EXTRACTION_OPTIMIZER_TEMPERATURE
     max_output_tokens: int = EXTRACTION_OPTIMIZER_MAX_OUTPUT_TOKENS
@@ -144,7 +146,10 @@ class ExtractionOptimizerConfig:
             or self.optimizer_id != EXTRACTION_OPTIMIZER_ID
         ):
             raise ValueError("unsupported extraction optimizer config")
+        _require_id(self.model_id, "optimizer model ID")
         _require_id(self.model_profile, "optimizer model profile")
+        if self.model_id != EXTRACTION_OPTIMIZER_MODEL_ID:
+            raise ValueError("first optimizer model ID must remain frozen")
         if self.model_profile != EXTRACTION_OPTIMIZER_MODEL_PROFILE:
             raise ValueError("first optimizer model profile must remain frozen")
         for value, expected, name in (
@@ -188,6 +193,7 @@ class ExtractionOptimizerConfig:
             "schema_version": self.schema_version,
             "config_schema": self.config_schema,
             "optimizer_id": self.optimizer_id,
+            "model_id": self.model_id,
             "model_profile": self.model_profile,
             "temperature": float(self.temperature),
             "max_output_tokens": self.max_output_tokens,
