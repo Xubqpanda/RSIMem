@@ -79,6 +79,12 @@ from .commit_scheduler import (
     InMemoryCommitScheduleStore,
     JsonCommitScheduleStore,
 )
+from .exposure_policy import (
+    DeterministicExposurePolicy,
+    ExposurePolicyConfig,
+    InjectionReceipt,
+    InjectionReceiptStatus,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -149,4 +155,8 @@ __all__ = [
     "CommitScheduler",
     "InMemoryCommitScheduleStore",
     "JsonCommitScheduleStore",
+    "DeterministicExposurePolicy",
+    "ExposurePolicyConfig",
+    "InjectionReceipt",
+    "InjectionReceiptStatus",
 ]
