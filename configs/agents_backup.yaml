@@ -7,7 +7,7 @@ agents:
     default_model:
       model_id: gpt-5.6-luna
       api_key_env: GPT_LUNA_API_KEY
-      base_url: http://47.88.93.22:10001
+      base_url: http://47.88.93.22:10001/v1
       extra_body:
         hermes:
           provider: openai-codex
