@@ -19,8 +19,8 @@ The typed memory runtime is connected to the PAST-Bench Hermes execution path be
 The Hermes, static semantic writeback, operation graph, feedback store, and
 activation/rollback foundations are complete. The former Phase 2J/2K work is
 complete only as legacy retrieval-threshold infrastructure; extraction-prompt
-adaptation is pending. Stage 1 of the extraction-prompt handoff checklist is
-closed, and Stage 2A is the active milestone.
+adaptation is pending. Stage 1 and the Stage 2A extraction policy envelope are
+closed, and Stage 2B is the active milestone.
 
 Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
@@ -231,23 +231,34 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 - [x] Disable memory/skill background review requests for RSIMem-managed semantic runs.
 - [x] Distinguish RSIMem executor and operator-recovery writers in mutation receipts and reject native or disallowed writer contamination against a run-scoped storage baseline.
 
+### Extraction-Prompt Stage 2A Policy Envelope
+
+- [x] Define immutable root and child `ExtractionPromptPolicyArtifact` contracts with ordered stable rule IDs, structured edits, exact compiler replay, parent lineage, content digests, and optimizer provenance.
+- [x] Freeze wrapper, input/output schema, placeholder, model-profile, body-length, slot, and compiler identities outside the adaptive body.
+- [x] Protect source/safety exclusion and exact output-schema rules from generated replacement or deletion.
+- [x] Persist proposal, active, rejected, and rolled-back artifacts in an independent crash-safe store that rejects threshold-store schemas, tampering, cycles, unknown parents, and multiple ACTIVE records.
+- [x] Export the exact Mem0-flat root body as a serializable root artifact while preserving the accepted root component ID and provenance.
+- [x] Bind serialized root and child artifacts through the Mem0-flat runtime bridge; only the extraction component changes in the composite semantic manifest.
+- [x] Reload an ACTIVE child after store restart and reproduce the same binding, rendered prompt, and template digest in a fresh adapter.
+- [x] Load the same serialized artifact through a fake adapter projection and fail closed to the trusted root on corrupt lifecycle state or slot-contract drift.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `442 passed`.
+- [x] Pass all RSIMem tests: `457 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `394 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Extraction-Prompt Stage 2A**
+### **Current: Extraction-Prompt Stage 2B**
 
 The first optimized component is the semantic fact-extraction prompt. Delayed
 deployment evidence may update prompt body N to N+1 while the operation prompt,
 retrieval configuration, route, invocation boundary, backend, and model profile
 remain frozen. Raw resources are reported separately from the method decision.
 
-The immediate objective is the host-neutral extraction policy envelope and immutable prompt artifact. Adaptive live runs remain blocked until the remaining Stage 2 optimizer, held-out validation, activation, rollback, and matched-run gates pass.
+The immediate objective is the owner-controlled content-bearing optimizer corpus with exact joins to the content-free audit dataset. Adaptive live runs remain blocked until the corpus, optimizer, held-out validation, activation, rollback, and matched-run gates pass.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -343,9 +354,11 @@ Acceptance criteria:
 4. [x] Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
 5. [x] Run and audit the static SM01 matched comparison.
 6. [x] Complete and audit the Stage 1H live plain-parent smoke; see `extraction_stage1_acceptance_20260828.md`.
-7. [ ] Implement the extraction prompt artifact, optimizer, held-out validation, activation, and rollback path.
-8. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
-9. [ ] Produce dated extraction-method reports before making adaptation claims.
+7. [x] Implement the extraction policy envelope, independent artifact store, Mem0-flat root export, runtime binding, restart replay, and root fallback.
+8. [ ] Build the content-bearing optimizer corpus with exact audit joins and train/validation/future-test isolation.
+9. [ ] Implement the optimizer, held-out validation, activation, and rollback path.
+10. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
+11. [ ] Produce dated extraction-method reports before making adaptation claims.
 
 ## Update Policy
 

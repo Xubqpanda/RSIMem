@@ -460,23 +460,23 @@ frozen system/safety/schema wrapper
 
 功能需求：
 
-- □ 定义不可变 `ExtractionPromptPolicyArtifact`，保存 adaptive body、parent artifact、version、digest和生成 provenance。
-- □ Adaptive body使用版本化`ExtractionPolicySpec`表示为有稳定rule ID的有序规则列表；frozen compiler将spec确定性编译成实际prompt body。
-- □ Child artifact保存parent spec digest、结构化rule edits、compiled body和compiler digest；重新应用edits必须逐字重建同一compiled body。
-- □ Artifact只引用host-neutral `slot_id` 和slot contract digest，不保存Python callable、module object、Hermes request或Mem0-flat内部类型。
-- □ Artifact记录 frozen wrapper digest、input/output schema digest、required placeholders、model profile和最大长度。
-- □ Generated provenance记录 optimizer model/config、training corpus ID/cutoff、proposal request digest、completion digest和usage。
-- □ Baseline Mem0-flat extraction prompt被导入为 root artifact N，不依赖代码常量才能部署。
-- □ Root artifact由adapter导出并可独立序列化；同一artifact可由fake adapter加载，证明其生命周期不依赖Mem0-flat源码位置。
-- □ Artifact store复用既有 crash-safe lifecycle思想，但使用独立 schema，不能与 numeric threshold artifact混读。
-- □ Prompt body不得包含 `$source_messages`、`$exit_evidence` 或其他模板控制字符；placeholder只属于 frozen wrapper。
+- √ 定义不可变 `ExtractionPromptPolicyArtifact`，保存 adaptive body、parent artifact、version、digest和生成 provenance。
+- √ Adaptive body使用版本化`ExtractionPolicySpec`表示为有稳定rule ID的有序规则列表；frozen compiler将spec确定性编译成实际prompt body。
+- √ Child artifact保存parent spec digest、结构化rule edits、compiled body和compiler digest；重新应用edits必须逐字重建同一compiled body。
+- √ Artifact只引用host-neutral `slot_id` 和slot contract digest，不保存Python callable、module object、Hermes request或Mem0-flat内部类型。
+- √ Artifact记录 frozen wrapper digest、input/output schema digest、required placeholders、model profile和最大长度。
+- √ Generated provenance记录 optimizer model/config、training corpus ID/cutoff、proposal request digest、completion digest和usage。
+- √ Baseline Mem0-flat extraction prompt被导入为 root artifact N，不依赖代码常量才能部署。
+- √ Root artifact由adapter导出并可独立序列化；同一artifact可由fake adapter加载，证明其生命周期不依赖Mem0-flat源码位置。
+- √ Artifact store复用既有 crash-safe lifecycle思想，但使用独立 schema，不能与 numeric threshold artifact混读。
+- √ Prompt body不得包含 `$source_messages`、`$exit_evidence` 或其他模板控制字符；placeholder只属于 frozen wrapper。
 
 测试与验收：
 
-- □ Root、child、unknown parent、cycle、digest mismatch、oversize和schema mismatch测试通过。
-- □ Duplicate rule ID、unknown replace/delete target、protected rule修改、no-op edit和edit/body replay mismatch均被拒绝。
-- □ Exact artifact跨restart可重载并生成相同 rendered prompt。
-- □ Artifact篡改、多个 ACTIVE或错误 wrapper digest时fail closed到root static prompt。
+- √ Root、child、unknown parent、cycle、digest mismatch、oversize和schema mismatch测试通过。
+- √ Duplicate rule ID、unknown replace/delete target、protected rule修改、no-op edit和edit/body replay mismatch均被拒绝。
+- √ Exact artifact跨restart可重载并生成相同 rendered prompt。
+- √ Artifact篡改、多个 ACTIVE或错误 wrapper digest时fail closed到root static prompt。
 
 ### 2B：Content-Bearing Extraction Optimizer Corpus
 
@@ -698,8 +698,8 @@ bash -n scripts/*.sh
 
 ## 10. 当前执行入口
 
-当前位于 **Stage 2A：Extraction Policy Envelope 与 Artifact**。Stage 1A-1H
-已经通过，低成本 live plain-parent acceptance 记录在
+当前位于 **Stage 2B：Content-Bearing Extraction Optimizer Corpus**。Stage 1A-1H
+和 Stage 2A 已经通过，低成本 live plain-parent acceptance 记录在
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
 后续顺序仍严格按照：
 
