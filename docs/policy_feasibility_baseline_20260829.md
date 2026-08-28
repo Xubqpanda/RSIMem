@@ -29,6 +29,8 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 `LayerIntervention.from_extraction_feedback()` 将同一规则用于构造 extraction intervention：只有 primary extraction-set example 可以进入，fact-level example 会被拒绝；不完整 useful/missed 链会自动降级为 unresolved。
 
+`build_extraction_feedback_interventions()` 提供批量入口，直接消费已有 feedback dataset 的 examples，跳过非 primary source/fact projection，并对 primary example ID 去重；因此后续 Stage 2E corpus 可以直接复用这条链。
+
 ## Census
 
 | layer | cases | signal coverage | action variation | useful | harmful | missed | unresolved | censored | complete feedback | status |
