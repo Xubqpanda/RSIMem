@@ -28,6 +28,7 @@ from .adaptive_policy_store import JsonAdaptivePolicyStore
 from .backends import build_hermes_native_registry
 from .contracts import MemoryExperience, MemoryKind, MemoryMessage, MemoryObserver
 from .executor import TransactionalMutationExecutor
+from .extraction_policy_artifact import ExtractionPromptPolicyArtifact
 from .future_trace import SemanticFeedbackContract
 from .ingestion import (
     ExtractionSourceProjection,
@@ -41,7 +42,11 @@ from .operation_graph import (
     AppendOnlyOperationEvidenceLog,
     AtomicOperationRecorder,
 )
-from .prompt_components import PromptAdapterRegistry
+from .prompt_components import (
+    PromptAdapterRegistry,
+    PromptBindingFingerprint,
+    PromptComponentArtifact,
+)
 from .receipts import JsonMutationReceiptStore
 from .receipt_audit import (
     MutationReceiptAuditReport,
@@ -63,9 +68,10 @@ from ..memory_systems.mem0_flat.prompts import CompletionClient
 from ..memory_systems.mem0_flat.utility_gate import FrozenMem0UtilityGate
 
 
-STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION = 1
+STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION = 2
 SEMANTIC_COMPILATION_RECEIPT_SCHEMA_VERSION = 1
 STATIC_EXTRACTION_PARENT_ID = "static-extraction-parent-v1"
+MATCHED_EXTRACTION_CANDIDATE_ID = "matched-extraction-candidate-v1"
 LEGACY_STATIC_UTILITY_ID = "legacy-static-utility-v1"
 LEGACY_ADAPTIVE_UTILITY_ID = "legacy-adaptive-utility-v1"
 
@@ -75,6 +81,100 @@ class StaticSemanticWritebackMode(StrEnum):
     STATIC = "static"
     STATIC_UTILITY = "static_utility"
     ADAPTIVE_UTILITY = "adaptive_utility"
+
+
+class ExtractionPromptRuntimeScope(StrEnum):
+    ROOT_STATIC = "root_static"
+    MATCHED_VALIDATION = "matched_validation"
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionRuntimeBinding:
+    deployment_scope: ExtractionPromptRuntimeScope
+    policy_artifact_id: str
+    policy_artifact_digest: str
+    policy_version: str
+    component_artifact_id: str
+    component_body_digest: str
+    binding_id: str
+    adapter_id: str
+    slot_id: str
+    slot_contract_digest: str
+    frozen_wrapper_digest: str
+    input_schema_digest: str
+    output_schema_digest: str
+    rendered_template_digest: str
+    model_profile: str
+    trial_id: str | None = None
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        deployment_scope: ExtractionPromptRuntimeScope,
+        policy_artifact: ExtractionPromptPolicyArtifact,
+        component_artifact: PromptComponentArtifact,
+        binding: PromptBindingFingerprint,
+        trial_id: str | None,
+    ) -> "ExtractionRuntimeBinding":
+        scope = ExtractionPromptRuntimeScope(deployment_scope)
+        if scope == ExtractionPromptRuntimeScope.MATCHED_VALIDATION:
+            if not trial_id or policy_artifact.parent_artifact_id is None:
+                raise ValueError(
+                    "matched extraction runtime requires a child artifact and trial ID"
+                )
+        elif trial_id is not None or policy_artifact.parent_artifact_id is not None:
+            raise ValueError("root extraction runtime cannot bind a trial candidate")
+        if (
+            component_artifact.slot_id != policy_artifact.slot_id
+            or component_artifact.slot_contract_digest
+            != policy_artifact.slot_contract_digest
+            or component_artifact.version != policy_artifact.policy_version
+            or component_artifact.body_digest != policy_artifact.body_digest
+            or binding.artifact_id != component_artifact.artifact_id
+            or binding.artifact_body_digest != component_artifact.body_digest
+            or binding.slot_id != policy_artifact.slot_id
+            or binding.slot_contract_digest != policy_artifact.slot_contract_digest
+        ):
+            raise ValueError("extraction runtime binding identity mismatch")
+        return cls(
+            scope,
+            policy_artifact.artifact_id,
+            policy_artifact.artifact_digest,
+            policy_artifact.policy_version,
+            component_artifact.artifact_id,
+            component_artifact.body_digest,
+            binding.binding_id,
+            binding.adapter_id,
+            binding.slot_id,
+            binding.slot_contract_digest,
+            policy_artifact.frozen_wrapper_digest,
+            policy_artifact.input_schema_digest,
+            policy_artifact.output_schema_digest,
+            binding.rendered_template_digest,
+            policy_artifact.model_profile,
+            trial_id,
+        )
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "deployment_scope": self.deployment_scope.value,
+            "policy_artifact_id": self.policy_artifact_id,
+            "policy_artifact_digest": self.policy_artifact_digest,
+            "policy_version": self.policy_version,
+            "component_artifact_id": self.component_artifact_id,
+            "component_body_digest": self.component_body_digest,
+            "binding_id": self.binding_id,
+            "adapter_id": self.adapter_id,
+            "slot_id": self.slot_id,
+            "slot_contract_digest": self.slot_contract_digest,
+            "frozen_wrapper_digest": self.frozen_wrapper_digest,
+            "input_schema_digest": self.input_schema_digest,
+            "output_schema_digest": self.output_schema_digest,
+            "rendered_template_digest": self.rendered_template_digest,
+            "model_profile": self.model_profile,
+            "trial_id": self.trial_id,
+        }
 
 
 class SemanticCompilationReceiptStatus(StrEnum):
@@ -260,6 +360,10 @@ class StaticSemanticWritebackConfig:
     adaptive_trusted_roots: tuple[str, ...] = ()
     adaptive_parameters: tuple[TrustedAdaptiveMem0Parameter, ...] = ()
     feedback_contract: SemanticFeedbackContract = SemanticFeedbackContract.DISABLED
+    extraction_runtime_scope: ExtractionPromptRuntimeScope = (
+        ExtractionPromptRuntimeScope.ROOT_STATIC
+    )
+    extraction_runtime_config_path: str | None = None
     schema_version: int = STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -279,6 +383,11 @@ class StaticSemanticWritebackConfig:
             "feedback_contract",
             SemanticFeedbackContract(self.feedback_contract),
         )
+        object.__setattr__(
+            self,
+            "extraction_runtime_scope",
+            ExtractionPromptRuntimeScope(self.extraction_runtime_scope),
+        )
         adaptive_fields = bool(
             self.adaptive_policy_store_path
             or self.adaptive_trusted_roots
@@ -294,6 +403,21 @@ class StaticSemanticWritebackConfig:
             raise ValueError("adaptive semantic fields require adaptive_utility mode")
         if not self.enabled and self.feedback_contract != SemanticFeedbackContract.DISABLED:
             raise ValueError("semantic feedback contract requires writeback mode")
+        if self.matched_extraction_enabled:
+            if self.mode != StaticSemanticWritebackMode.STATIC:
+                raise ValueError(
+                    "matched extraction runtime requires plain static writeback"
+                )
+            if not isinstance(self.extraction_runtime_config_path, str) or not (
+                self.extraction_runtime_config_path.strip()
+            ):
+                raise ValueError(
+                    "matched extraction runtime requires an explicit config path"
+                )
+        elif self.extraction_runtime_config_path is not None:
+            raise ValueError(
+                "extraction runtime config path requires matched_validation scope"
+            )
 
     @property
     def enabled(self) -> bool:
@@ -312,13 +436,27 @@ class StaticSemanticWritebackConfig:
 
     @property
     def plain_extraction_parent(self) -> bool:
-        return self.mode == StaticSemanticWritebackMode.STATIC
+        return (
+            self.mode == StaticSemanticWritebackMode.STATIC
+            and not self.matched_extraction_enabled
+        )
+
+    @property
+    def matched_extraction_enabled(self) -> bool:
+        return (
+            self.extraction_runtime_scope
+            == ExtractionPromptRuntimeScope.MATCHED_VALIDATION
+        )
 
     @property
     def method_identity(self) -> str | None:
         return {
             StaticSemanticWritebackMode.DISABLED: None,
-            StaticSemanticWritebackMode.STATIC: STATIC_EXTRACTION_PARENT_ID,
+            StaticSemanticWritebackMode.STATIC: (
+                MATCHED_EXTRACTION_CANDIDATE_ID
+                if self.matched_extraction_enabled
+                else STATIC_EXTRACTION_PARENT_ID
+            ),
             StaticSemanticWritebackMode.STATIC_UTILITY: LEGACY_STATIC_UTILITY_ID,
             StaticSemanticWritebackMode.ADAPTIVE_UTILITY: LEGACY_ADAPTIVE_UTILITY_ID,
         }[self.mode]
@@ -337,6 +475,8 @@ class StaticSemanticWritebackConfig:
             "adaptive_trusted_roots",
             "adaptive_parameters",
             "feedback_contract",
+            "extraction_runtime_scope",
+            "extraction_runtime_config_path",
         }
         unknown = set(value) - allowed
         if unknown:
@@ -382,6 +522,17 @@ class StaticSemanticWritebackConfig:
             adaptive_parameters=tuple(parameters),
             feedback_contract=SemanticFeedbackContract(
                 str(value.get("feedback_contract") or SemanticFeedbackContract.DISABLED)
+            ),
+            extraction_runtime_scope=ExtractionPromptRuntimeScope(
+                str(
+                    value.get("extraction_runtime_scope")
+                    or ExtractionPromptRuntimeScope.ROOT_STATIC
+                )
+            ),
+            extraction_runtime_config_path=(
+                str(value["extraction_runtime_config_path"])
+                if value.get("extraction_runtime_config_path")
+                else None
             ),
         )
 
@@ -433,6 +584,13 @@ class StaticSemanticWritebackRuntime:
         adaptive_policy_store: JsonAdaptivePolicyStore | None = None,
         adaptive_parameters: tuple[TrustedAdaptiveMem0Parameter, ...] = (),
         require_adaptive_policy: bool = False,
+        extraction_policy_artifact: ExtractionPromptPolicyArtifact | None = None,
+        expected_extraction_policy_artifact_id: str | None = None,
+        expected_extraction_policy_artifact_digest: str | None = None,
+        extraction_runtime_scope: ExtractionPromptRuntimeScope = (
+            ExtractionPromptRuntimeScope.ROOT_STATIC
+        ),
+        extraction_trial_id: str | None = None,
     ) -> None:
         self.hermes_home = hermes_home.expanduser().resolve()
         self.registry = build_hermes_native_registry(self.hermes_home)
@@ -454,12 +612,47 @@ class StaticSemanticWritebackRuntime:
         self.prompt_registry = PromptAdapterRegistry()
         self.prompt_adapter = Mem0FlatPromptAdapter()
         self.prompt_registry.register(self.prompt_adapter)
-        extraction_artifact = self.prompt_registry.root_artifact(
-            MEM0_FLAT_EXTRACTION_SLOT_ID
+        extraction_policy_artifact = (
+            extraction_policy_artifact
+            or self.prompt_adapter.export_root_policy_artifact(
+                MEM0_FLAT_EXTRACTION_SLOT_ID
+            )
+        )
+        if (
+            expected_extraction_policy_artifact_id is not None
+            and extraction_policy_artifact.artifact_id
+            != expected_extraction_policy_artifact_id
+        ) or (
+            expected_extraction_policy_artifact_digest is not None
+            and extraction_policy_artifact.artifact_digest
+            != expected_extraction_policy_artifact_digest
+        ):
+            raise ValueError("configured and loaded extraction artifacts differ")
+        if (
+            ExtractionPromptRuntimeScope(extraction_runtime_scope)
+            == ExtractionPromptRuntimeScope.MATCHED_VALIDATION
+            and (
+                expected_extraction_policy_artifact_id is None
+                or expected_extraction_policy_artifact_digest is None
+            )
+        ):
+            raise ValueError(
+                "matched extraction runtime requires expected artifact identity"
+            )
+        extraction_artifact = extraction_policy_artifact.to_prompt_component(
+            self.prompt_registry.descriptor(MEM0_FLAT_EXTRACTION_SLOT_ID)
         )
         self.extraction_binding = self.prompt_registry.bind(
             MEM0_FLAT_EXTRACTION_SLOT_ID,
             extraction_artifact,
+        )
+        self.extraction_policy_artifact = extraction_policy_artifact
+        self.extraction_runtime_binding = ExtractionRuntimeBinding.create(
+            deployment_scope=extraction_runtime_scope,
+            policy_artifact=extraction_policy_artifact,
+            component_artifact=extraction_artifact,
+            binding=self.extraction_binding,
+            trial_id=extraction_trial_id,
         )
         base_policy = Mem0FlatSemanticPolicy(
             completion_client,
@@ -505,7 +698,10 @@ class StaticSemanticWritebackRuntime:
             )
         self.static_parent_identity = (
             STATIC_EXTRACTION_PARENT_ID
-            if self.utility_gate is None and self.adaptive_binding is None
+            if self.utility_gate is None
+            and self.adaptive_binding is None
+            and self.extraction_runtime_binding.deployment_scope
+            == ExtractionPromptRuntimeScope.ROOT_STATIC
             else None
         )
         self.candidates = FlatSemanticCandidateReader(

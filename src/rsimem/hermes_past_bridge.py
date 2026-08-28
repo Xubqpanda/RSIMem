@@ -30,10 +30,12 @@ from .lifecycle import (
 )
 from .memory import MemoryEvent, MemoryEventKind, MemoryKind, MemoryQuery
 from .memory.live_writeback import (
+    ExtractionPromptRuntimeScope,
     StaticSemanticBoundaryResult,
     StaticSemanticWritebackConfig,
     StaticSemanticWritebackRuntime,
 )
+from .extraction_validation_runtime import load_extraction_matched_trial_profile
 from .memory.adaptive_policy_store import JsonAdaptivePolicyStore
 from .memory.future_trace import (
     SemanticFeedbackContract,
@@ -389,6 +391,7 @@ class HermesPastBenchBridge:
                 )
             )
             adaptive_store = None
+            extraction_profile = None
             if static_writeback_config.adaptive_enabled:
                 relative_store = Path(
                     static_writeback_config.adaptive_policy_store_path or ""
@@ -405,6 +408,18 @@ class HermesPastBenchBridge:
                     trusted_root_policy_versions=(
                         static_writeback_config.adaptive_trusted_roots
                     ),
+                )
+            if static_writeback_config.matched_extraction_enabled:
+                extraction_config_path = Path(
+                    static_writeback_config.extraction_runtime_config_path or ""
+                ).expanduser().resolve()
+                capture_root = self.evidence_path.parent.resolve()
+                if not extraction_config_path.is_relative_to(capture_root):
+                    raise ValueError(
+                        "extraction runtime config must stay inside capture artifacts"
+                    )
+                extraction_profile = load_extraction_matched_trial_profile(
+                    extraction_config_path
                 )
             self.static_writeback = StaticSemanticWritebackRuntime(
                 hermes_home,
@@ -429,6 +444,31 @@ class HermesPastBenchBridge:
                 adaptive_policy_store=adaptive_store,
                 adaptive_parameters=static_writeback_config.adaptive_parameters,
                 require_adaptive_policy=static_writeback_config.adaptive_enabled,
+                extraction_policy_artifact=(
+                    extraction_profile.candidate
+                    if extraction_profile is not None
+                    else None
+                ),
+                expected_extraction_policy_artifact_id=(
+                    extraction_profile.candidate.artifact_id
+                    if extraction_profile is not None
+                    else None
+                ),
+                expected_extraction_policy_artifact_digest=(
+                    extraction_profile.candidate.artifact_digest
+                    if extraction_profile is not None
+                    else None
+                ),
+                extraction_runtime_scope=(
+                    ExtractionPromptRuntimeScope.MATCHED_VALIDATION
+                    if extraction_profile is not None
+                    else ExtractionPromptRuntimeScope.ROOT_STATIC
+                ),
+                extraction_trial_id=(
+                    extraction_profile.trial_id
+                    if extraction_profile is not None
+                    else None
+                ),
             )
             if (
                 static_writeback_config.feedback_contract

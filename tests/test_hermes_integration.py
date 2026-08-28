@@ -24,6 +24,10 @@ from rsimem.hermes_integration import (
     _bound_hermes_skills_dir,
 )
 from rsimem.hermes_past_bridge import HermesPastBenchBridge
+from rsimem.extraction_validation_runtime import (
+    EXTRACTION_TRIAL_CONFIG_FILE,
+    prepare_extraction_matched_trial_runtime,
+)
 from rsimem.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import (
     HermesLifecycleConfig,
@@ -62,6 +66,8 @@ from rsimem.memory_systems.mem0_flat import (
     POLICY_FACT_EXTRACTION_PROMPT,
     POLICY_INTERNAL_OPERATION_PROMPT,
 )
+from test_extraction_matched_activation import _offline_decision
+from test_extraction_offline_validation import _candidate, _parent
 
 
 PRIVATE_PREFERENCE = "Use TSV with owner, priority, task, and due_date."
@@ -1506,6 +1512,82 @@ def test_static_writeback_bridge_requires_native_ledger_not_lifecycle(tmp_path: 
     )
     assert bridge.lifecycle is None
     bridge.close()
+
+
+def test_matched_extraction_bridge_loads_attempt_local_active_candidate(
+    tmp_path: Path,
+) -> None:
+    home = _hermes_home(tmp_path / "home")
+    artifacts = tmp_path / "artifacts"
+    trial = artifacts / "extraction-trial"
+    parent = _parent()
+    candidate = _candidate(parent=parent)
+    prepare_extraction_matched_trial_runtime(
+        parent=parent,
+        candidate=candidate,
+        offline_decision=_offline_decision(parent, candidate),
+        output_root=trial,
+    )
+    client = FakeCompletionClient({})
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=artifacts / "events.jsonl",
+        run_id="run-extraction-trial",
+        trace_id="trace-extraction-trial",
+        episode_id="episode-extraction-trial",
+        session_id="session-extraction-trial",
+        task_id="SM01-extraction-trial",
+        experiment_variant="adaptive-extraction-rsimem",
+        static_writeback_config=StaticSemanticWritebackConfig(
+            mode="static",
+            extraction_runtime_scope="matched_validation",
+            extraction_runtime_config_path=str(
+                trial / EXTRACTION_TRIAL_CONFIG_FILE
+            ),
+        ),
+        static_completion_client=client,
+    )
+    try:
+        assert bridge.static_writeback is not None
+        binding = bridge.static_writeback.extraction_runtime_binding
+        assert binding.policy_artifact_id == candidate.artifact_id
+        assert binding.policy_artifact_digest == candidate.artifact_digest
+        assert binding.deployment_scope.value == "matched_validation"
+        assert binding.trial_id is not None
+        assert bridge.static_writeback.static_parent_identity is None
+    finally:
+        bridge.close()
+    assert client.calls == ()
+
+
+def test_matched_extraction_bridge_rejects_non_attempt_local_config(
+    tmp_path: Path,
+) -> None:
+    home = _hermes_home(tmp_path / "home")
+    outside = tmp_path / "outside" / EXTRACTION_TRIAL_CONFIG_FILE
+    client = FakeCompletionClient({})
+    config = StaticSemanticWritebackConfig(
+        mode="static",
+        extraction_runtime_scope="matched_validation",
+        extraction_runtime_config_path=str(outside),
+    )
+
+    with pytest.raises(ValueError, match="inside capture artifacts"):
+        HermesPastBenchBridge(
+            home,
+            HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+            evidence_path=tmp_path / "artifacts" / "events.jsonl",
+            run_id="run-extraction-path",
+            trace_id="trace-extraction-path",
+            episode_id="episode-extraction-path",
+            session_id="session-extraction-path",
+            task_id="SM01-extraction-path",
+            experiment_variant="adaptive-extraction-rsimem",
+            static_writeback_config=config,
+            static_completion_client=client,
+        )
+    assert client.calls == ()
 
 
 @pytest.mark.parametrize(
