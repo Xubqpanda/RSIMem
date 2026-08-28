@@ -538,6 +538,14 @@ def test_protected_rule_and_malformed_completion_fail_closed() -> None:
         ExtractionPromptOptimizer(
             CapturedExtractionOptimizerClient("not-json")
         ).propose(_parent(), corpus)
+    free_form = json.loads(protected_output(
+        build_extraction_optimizer_request(_parent(), corpus)
+    ))
+    free_form["compiled_body"] = "Model-provided free-form policy body."
+    with pytest.raises(ValueError, match="fields are invalid"):
+        ExtractionPromptOptimizer(
+            CapturedExtractionOptimizerClient(json.dumps(free_form))
+        ).propose(_parent(), corpus)
 
 
 class _FakeCompletions:
