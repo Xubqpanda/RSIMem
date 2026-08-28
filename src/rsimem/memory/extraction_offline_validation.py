@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from enum import StrEnum
@@ -12,12 +13,23 @@ from .extraction_policy_artifact import (
     ExtractionPromptPolicyArtifact,
     apply_extraction_rule_edits,
 )
+from .extraction_prompt_validation import (
+    ExtractionAcceptanceCriteria,
+    ExtractionPromptMatchedValidator,
+    ExtractionPromptValidationSplit,
+    ExtractionQualityMetrics,
+    ExtractionValidationDecision,
+    ExtractionValidationObservation,
+    ExtractionValidationSplitRole,
+    ExtractionValidationVariant,
+)
 from .prompt_components import PromptSlotDescriptor, content_digest, text_digest
 
 
 EXTRACTION_OFFLINE_SCHEMA_VERSION = 1
 EXTRACTION_STATIC_SAFETY_SCHEMA = "extraction-candidate-static-safety-v1"
 EXTRACTION_DETERMINISTIC_SUITE_SCHEMA = "extraction-deterministic-suite-v1"
+EXTRACTION_OFFLINE_DECISION_SCHEMA = "extraction-offline-validation-decision-v1"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _FORBIDDEN_POLICY = re.compile(
     r"(?:\bSM\d{2}\b|\bTSV\b|due_date|owner\s*[|,/ ]+\s*priority|"
@@ -73,6 +85,7 @@ class CandidateStaticSafetyReport:
             self.candidate_artifact_id,
         ):
             _require_id(value, "candidate safety identity")
+        _require_digest(self.candidate_artifact_digest, "candidate safety artifact digest")
         if type(self.passed) is not bool or not self.reason_codes:
             raise ValueError("candidate safety result is incomplete")
         if self.passed != (self.reason_codes == ("static_safety_passed",)):
@@ -336,10 +349,13 @@ class DeterministicExtractionSuiteReport:
         ):
             raise ValueError("unsupported deterministic extraction suite report")
         categories = tuple(value.category for value in self.results)
+        case_ids = tuple(value.case_id for value in self.results)
         if set(categories) != set(DeterministicExtractionCategory) or len(
             categories
         ) != len(set(categories)):
             raise ValueError("deterministic extraction suite coverage is incomplete")
+        if len(case_ids) != len(set(case_ids)):
+            raise ValueError("deterministic extraction suite case IDs must be unique")
         if self.passed != (self.reason_codes == ("deterministic_suite_passed",)):
             raise ValueError("deterministic suite status and reasons disagree")
         if self.passed != all(value.passed for value in self.results):
@@ -485,3 +501,313 @@ def _copies_source(source: str, facts: tuple[str, ...]) -> bool:
         if fact_ngrams & source_ngrams:
             return True
     return False
+
+
+class OfflineMetricName(StrEnum):
+    RESOLVED_USEFUL_RATE = "resolved_useful_rate"
+    OBSERVED_HARMFUL_RATE = "observed_harmful_rate"
+    NONEMPTY_COVERAGE = "nonempty_coverage"
+    EMPTY_EXTRACTION_RATE = "empty_extraction_rate"
+    HIGH_CONFIDENCE_MISSED_RATE = "high_confidence_missed_rate"
+
+
+@dataclass(frozen=True, slots=True)
+class OfflineRatioEvidence:
+    metric: OfflineMetricName
+    numerator: int
+    denominator: int
+    unknown_count: int
+    value: float | None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "metric", OfflineMetricName(self.metric))
+        if any(
+            type(value) is not int or value < 0
+            for value in (self.numerator, self.denominator, self.unknown_count)
+        ):
+            raise ValueError("offline ratio counts must be non-negative")
+        if self.numerator > self.denominator:
+            raise ValueError("offline ratio numerator exceeds denominator")
+        expected = self.numerator / self.denominator if self.denominator else None
+        if self.value != expected or (
+            self.value is not None and not math.isfinite(self.value)
+        ):
+            raise ValueError("offline ratio value does not match counts")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "metric": self.metric.value,
+            "numerator": self.numerator,
+            "denominator": self.denominator,
+            "unknown_count": self.unknown_count,
+            "value": self.value,
+        }
+
+
+def _ratio_evidence(
+    metrics: ExtractionQualityMetrics,
+) -> tuple[OfflineRatioEvidence, ...]:
+    total = metrics.completed_source_count
+    missed_denominator = (
+        metrics.missed_assessable_count
+        if metrics.missed_assessability_complete
+        else 0
+    )
+    values = (
+        (
+            OfflineMetricName.RESOLVED_USEFUL_RATE,
+            metrics.useful_count,
+            metrics.resolved_count,
+            total - metrics.resolved_count,
+        ),
+        (
+            OfflineMetricName.OBSERVED_HARMFUL_RATE,
+            metrics.harmful_count,
+            metrics.nonempty_count,
+            total - metrics.nonempty_count,
+        ),
+        (
+            OfflineMetricName.NONEMPTY_COVERAGE,
+            metrics.nonempty_count,
+            total,
+            0,
+        ),
+        (
+            OfflineMetricName.EMPTY_EXTRACTION_RATE,
+            metrics.empty_count,
+            total,
+            0,
+        ),
+        (
+            OfflineMetricName.HIGH_CONFIDENCE_MISSED_RATE,
+            metrics.missed_count if metrics.missed_assessability_complete else 0,
+            missed_denominator,
+            total - missed_denominator,
+        ),
+    )
+    return tuple(OfflineRatioEvidence(
+        metric,
+        numerator,
+        denominator,
+        unknown,
+        numerator / denominator if denominator else None,
+    ) for metric, numerator, denominator, unknown in values)
+
+
+class ExtractionOfflineDecisionStatus(StrEnum):
+    REJECTED = "rejected"
+    ACCEPTED_FOR_MATCHED_TRIAL = "accepted_for_matched_trial"
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionOfflineValidationDecision:
+    decision_id: str
+    status: ExtractionOfflineDecisionStatus
+    split_id: str
+    parent_artifact_id: str
+    parent_artifact_digest: str
+    candidate_artifact_id: str
+    candidate_artifact_digest: str
+    criteria_digest: str
+    static_safety_report_id: str
+    deterministic_suite_report_id: str
+    quality_decision: ExtractionValidationDecision
+    parent_ratios: tuple[OfflineRatioEvidence, ...]
+    candidate_ratios: tuple[OfflineRatioEvidence, ...]
+    reason_codes: tuple[str, ...]
+    decision_schema: str = EXTRACTION_OFFLINE_DECISION_SCHEMA
+    schema_version: int = EXTRACTION_OFFLINE_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if (
+            self.schema_version != EXTRACTION_OFFLINE_SCHEMA_VERSION
+            or self.decision_schema != EXTRACTION_OFFLINE_DECISION_SCHEMA
+        ):
+            raise ValueError("unsupported extraction offline decision")
+        object.__setattr__(self, "status", ExtractionOfflineDecisionStatus(self.status))
+        for value in (
+            self.decision_id,
+            self.split_id,
+            self.parent_artifact_id,
+            self.candidate_artifact_id,
+            self.static_safety_report_id,
+            self.deterministic_suite_report_id,
+        ):
+            _require_id(value, "offline validation identity")
+        for value in (
+            self.parent_artifact_digest,
+            self.candidate_artifact_digest,
+            self.criteria_digest,
+        ):
+            _require_digest(value, "offline validation digest")
+        if not self.reason_codes:
+            raise ValueError("offline validation requires reason codes")
+        accepted = self.status == (
+            ExtractionOfflineDecisionStatus.ACCEPTED_FOR_MATCHED_TRIAL
+        )
+        if accepted != (self.reason_codes == ("offline_validation_passed",)):
+            raise ValueError("offline validation status and reasons disagree")
+        if (
+            len(self.parent_ratios) != len(OfflineMetricName)
+            or len(self.candidate_ratios) != len(OfflineMetricName)
+            or {value.metric for value in self.parent_ratios}
+            != set(OfflineMetricName)
+            or {value.metric for value in self.candidate_ratios}
+            != set(OfflineMetricName)
+        ):
+            raise ValueError("offline validation ratio evidence is incomplete")
+        if (
+            self.quality_decision.split_id != self.split_id
+            or self.quality_decision.criteria_digest != self.criteria_digest
+        ):
+            raise ValueError("offline validation quality decision join mismatch")
+        if self.parent_ratios != _ratio_evidence(
+            self.quality_decision.parent_metrics
+        ) or self.candidate_ratios != _ratio_evidence(
+            self.quality_decision.proposal_metrics
+        ):
+            raise ValueError("offline validation ratio evidence mismatch")
+        if accepted and not self.quality_decision.accepted:
+            raise ValueError("offline validation cannot accept rejected quality")
+        expected = f"offline-validation.{content_digest(self.identity_payload())[:40]}"
+        if self.decision_id != expected:
+            raise ValueError("offline validation decision ID mismatch")
+
+    @property
+    def eligible_next_stage(self) -> str | None:
+        return (
+            "matched_trial"
+            if self.status
+            == ExtractionOfflineDecisionStatus.ACCEPTED_FOR_MATCHED_TRIAL
+            else None
+        )
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "decision_schema": self.decision_schema,
+            "status": self.status.value,
+            "split_id": self.split_id,
+            "parent_artifact_id": self.parent_artifact_id,
+            "parent_artifact_digest": self.parent_artifact_digest,
+            "candidate_artifact_id": self.candidate_artifact_id,
+            "candidate_artifact_digest": self.candidate_artifact_digest,
+            "criteria_digest": self.criteria_digest,
+            "static_safety_report_id": self.static_safety_report_id,
+            "deterministic_suite_report_id": self.deterministic_suite_report_id,
+            "quality_decision_id": self.quality_decision.decision_id,
+            "parent_ratios": [value.payload() for value in self.parent_ratios],
+            "candidate_ratios": [value.payload() for value in self.candidate_ratios],
+            "reason_codes": list(self.reason_codes),
+        }
+
+
+class ExtractionPromptOfflineValidator:
+    def evaluate(
+        self,
+        *,
+        parent: ExtractionPromptPolicyArtifact,
+        candidate: ExtractionPromptPolicyArtifact,
+        split: ExtractionPromptValidationSplit,
+        observations: tuple[ExtractionValidationObservation, ...],
+        criteria: ExtractionAcceptanceCriteria,
+        static_safety: CandidateStaticSafetyReport,
+        deterministic_suite: DeterministicExtractionSuiteReport,
+        parent_runtime_artifact_id: str | None = None,
+        candidate_runtime_artifact_id: str | None = None,
+    ) -> ExtractionOfflineValidationDecision:
+        if {value.role for value in split.assignments} != set(
+            ExtractionValidationSplitRole
+        ):
+            raise ValueError("offline validation split roles are incomplete")
+        if (
+            criteria.maximum_proposal_generations != 1
+            or criteria.maximum_candidate_selections != 1
+        ):
+            raise ValueError("offline validation requires one frozen candidate")
+        if (
+            static_safety.parent_artifact_id != parent.artifact_id
+            or static_safety.candidate_artifact_id != candidate.artifact_id
+            or static_safety.candidate_artifact_digest != candidate.artifact_digest
+        ):
+            raise ValueError("offline static safety report join mismatch")
+        if (
+            deterministic_suite.parent_artifact_id != parent.artifact_id
+            or deterministic_suite.candidate_artifact_id != candidate.artifact_id
+        ):
+            raise ValueError("offline deterministic suite report join mismatch")
+        parent_runtime_id = parent_runtime_artifact_id or parent.artifact_id
+        candidate_runtime_id = candidate_runtime_artifact_id or candidate.artifact_id
+        for observation in observations:
+            expected_digest = (
+                parent.body_digest
+                if observation.variant == ExtractionValidationVariant.PARENT
+                else candidate.body_digest
+            )
+            if observation.extraction_artifact_digest != expected_digest:
+                raise ValueError("offline observation body digest mismatch")
+        quality = ExtractionPromptMatchedValidator().evaluate(
+            split=split,
+            observations=observations,
+            parent_artifact_id=parent_runtime_id,
+            proposal_artifact_id=candidate_runtime_id,
+            criteria=criteria,
+        )
+        reasons = []
+        if not static_safety.passed:
+            reasons.append("static_safety_failed")
+        if not deterministic_suite.passed:
+            reasons.append("deterministic_suite_failed")
+        if not quality.accepted:
+            reasons.extend(quality.reason_codes)
+        accepted = not reasons
+        reason_codes = (
+            ("offline_validation_passed",)
+            if accepted
+            else tuple(dict.fromkeys(reasons))
+        )
+        status = (
+            ExtractionOfflineDecisionStatus.ACCEPTED_FOR_MATCHED_TRIAL
+            if accepted
+            else ExtractionOfflineDecisionStatus.REJECTED
+        )
+        values = {
+            "status": status,
+            "split_id": split.split_id,
+            "parent_artifact_id": parent.artifact_id,
+            "parent_artifact_digest": parent.artifact_digest,
+            "candidate_artifact_id": candidate.artifact_id,
+            "candidate_artifact_digest": candidate.artifact_digest,
+            "criteria_digest": criteria.digest,
+            "static_safety_report_id": static_safety.report_id,
+            "deterministic_suite_report_id": deterministic_suite.report_id,
+            "quality_decision": quality,
+            "parent_ratios": _ratio_evidence(quality.parent_metrics),
+            "candidate_ratios": _ratio_evidence(quality.proposal_metrics),
+            "reason_codes": reason_codes,
+            "decision_schema": EXTRACTION_OFFLINE_DECISION_SCHEMA,
+            "schema_version": EXTRACTION_OFFLINE_SCHEMA_VERSION,
+        }
+        identity = {
+            "schema_version": values["schema_version"],
+            "decision_schema": values["decision_schema"],
+            "status": status.value,
+            "split_id": values["split_id"],
+            "parent_artifact_id": values["parent_artifact_id"],
+            "parent_artifact_digest": values["parent_artifact_digest"],
+            "candidate_artifact_id": values["candidate_artifact_id"],
+            "candidate_artifact_digest": values["candidate_artifact_digest"],
+            "criteria_digest": values["criteria_digest"],
+            "static_safety_report_id": values["static_safety_report_id"],
+            "deterministic_suite_report_id": values["deterministic_suite_report_id"],
+            "quality_decision_id": quality.decision_id,
+            "parent_ratios": [value.payload() for value in values["parent_ratios"]],
+            "candidate_ratios": [
+                value.payload() for value in values["candidate_ratios"]
+            ],
+            "reason_codes": list(reason_codes),
+        }
+        return ExtractionOfflineValidationDecision(
+            decision_id=f"offline-validation.{content_digest(identity)[:40]}",
+            **values,
+        )
