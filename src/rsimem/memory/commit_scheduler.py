@@ -25,6 +25,7 @@ class CommitScheduleStatus(StrEnum):
 class CommitSchedule:
     schedule_id: str
     decision_id: str
+    trigger_event_id: str
     mutation_ids: tuple[str, ...]
     expected_revision: str
     execution_boundary: str
@@ -36,6 +37,7 @@ class CommitSchedule:
         for value, name in (
             (self.schedule_id, "schedule ID"),
             (self.decision_id, "decision ID"),
+            (self.trigger_event_id, "trigger event ID"),
             (self.expected_revision, "expected revision"),
             (self.execution_boundary, "execution boundary"),
         ):
@@ -57,6 +59,7 @@ class CommitSchedule:
         return {
             "schedule_id": self.schedule_id,
             "decision_id": self.decision_id,
+            "trigger_event_id": self.trigger_event_id,
             "mutation_ids": list(self.mutation_ids),
             "expected_revision": self.expected_revision,
             "execution_boundary": self.execution_boundary,
@@ -151,6 +154,7 @@ class JsonCommitScheduleStore:
             return CommitSchedule(
                 schedule_id=raw["schedule_id"],
                 decision_id=raw["decision_id"],
+                trigger_event_id=raw["trigger_event_id"],
                 mutation_ids=tuple(raw["mutation_ids"]),
                 expected_revision=raw["expected_revision"],
                 execution_boundary=raw["execution_boundary"],
@@ -181,12 +185,14 @@ def _same_schedule_identity(first: CommitSchedule, second: CommitSchedule) -> bo
     return (
         first.schedule_id,
         first.decision_id,
+        first.trigger_event_id,
         first.mutation_ids,
         first.expected_revision,
         first.execution_boundary,
     ) == (
         second.schedule_id,
         second.decision_id,
+        second.trigger_event_id,
         second.mutation_ids,
         second.expected_revision,
         second.execution_boundary,
@@ -206,10 +212,13 @@ class CommitScheduler:
             raise ValueError("commit boundary must not be empty")
         if decision.expected_revision is None:
             raise ValueError("commit decision expected revision is missing")
+        if decision.trigger_event_id is None:
+            raise ValueError("commit decision trigger event is missing")
         schedule_id = f"commit-schedule.{content_digest({'decision_id': decision.decision_id, 'boundary': boundary})[:40]}"
         candidate = CommitSchedule(
             schedule_id=schedule_id,
             decision_id=decision.decision_id,
+            trigger_event_id=decision.trigger_event_id,
             mutation_ids=decision.mutation_ids,
             expected_revision=decision.expected_revision,
             execution_boundary=boundary,
