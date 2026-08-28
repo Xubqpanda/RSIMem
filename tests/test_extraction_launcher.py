@@ -47,5 +47,5 @@ def test_backup_agent_registry_contains_no_credential() -> None:
 
     assert model["model_id"] == "gpt-5.6-luna"
     assert model["api_key_env"] == "GPT_LUNA_API_KEY"
-    assert model["base_url"] == "http://47.88.93.22:10001"
+    assert model["base_url"] == "http://47.88.93.22:10001/v1"
     assert "s" + "k-" not in raw
