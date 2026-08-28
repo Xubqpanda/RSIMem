@@ -179,6 +179,10 @@ def test_complete_useful_and_missed_chains_make_extraction_optimization_ready() 
     assert census.outcome_counts == {"useful": 1, "missed": 1}
     assert census.complete_feedback_count == 2
     assert census.unknown_count == 0
+    assert useful.replay_payload["parent_audit_ok"] is True
+    assert useful.replay_payload["candidate_audit_ok"] is True
+    assert useful.replay_payload["intervention_fingerprint"] == useful.intervention_fingerprint
+    assert report.digest == build_feasibility_report((useful, missed)).digest
     # The report is intentionally not globally ready until all six layers have
     # cases; unrepresented layers remain diagnostic-only.
     assert not report.ok
@@ -226,6 +230,19 @@ def test_candidate_must_change_target_layer_and_artifact_scope() -> None:
             process_signal=True,
             outcome=FeasibilityOutcome.UNRESOLVED,
             reason_codes=("no_change",),
+        )
+
+    with pytest.raises(ValueError, match="artifacts must be distinct"):
+        LayerIntervention(
+            case_id="case.same_artifact",
+            target_layer=PolicyLayer.EXTRACTION,
+            parent=parent,
+            candidate=candidate,
+            parent_artifact=parent_artifact,
+            candidate_artifact=parent_artifact,
+            process_signal=True,
+            outcome=FeasibilityOutcome.UNRESOLVED,
+            reason_codes=("same_artifact",),
         )
 
     wrong_layer = PolicyArtifactIdentity.create(
