@@ -37,7 +37,10 @@ from rsimem.memory import (
     MemoryQuery,
     MemoryResource,
 )
-from rsimem.memory.live_writeback import StaticSemanticWritebackConfig
+from rsimem.memory.live_writeback import (
+    StaticSemanticBoundaryResult,
+    StaticSemanticWritebackConfig,
+)
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     OperationKind,
@@ -1113,6 +1116,212 @@ def test_live_bridge_records_content_free_sm01_future_feedback(tmp_path: Path) -
     assert set(memory_ids).issubset(used_ids)
     serialized = operations_path.read_text(encoding="utf-8")
     assert PRIVATE_PREFERENCE not in serialized
+
+
+def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -> None:
+    from hermes_state import SessionDB
+
+    home = _hermes_home(tmp_path / "home")
+
+    class NativeStore:
+        def format_for_system_prompt(self, target: str) -> str | None:
+            path = home / "memories" / f"{target.upper()}.md"
+            content = path.read_text(encoding="utf-8").strip()
+            return content or None
+
+    learn_db = SessionDB(home / "state.db")
+    learn_session = "session-feedback-learn"
+    learn_db.create_session(learn_session, "past_bench", model="fixture-model")
+    learn_db.append_message(
+        learn_session,
+        "user",
+        "Always use TSV with owner, priority, task, and due_date columns.",
+    )
+    learn_db.append_message(learn_session, "assistant", "Understood.")
+    learn_client = FakeCompletionClient({
+        POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id: json.dumps({
+            "facts": [
+                "Always use TSV with owner, priority, task, and due_date columns."
+            ],
+        }),
+        POLICY_INTERNAL_OPERATION_PROMPT.artifact.prompt_id: json.dumps({
+            "operations": [{
+                "fact_index": 0,
+                "action": "add",
+                "candidate_id": None,
+            }],
+        }),
+    })
+    learn_bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "learn" / "memory.jsonl",
+        run_id="run-feedback-sequence",
+        trace_id="trace-feedback-learn",
+        episode_id="episode-feedback-learn",
+        session_id=learn_session,
+        task_id="SM01_LEARN_A_001",
+        experiment_variant="static-extraction-rsimem",
+        family_id="SM01_preference_adoption",
+        stage="learn_a",
+        static_writeback_config=StaticSemanticWritebackConfig(
+            mode="static",
+            feedback_contract="sm01_tsv_v1",
+        ),
+        static_completion_client=learn_client,
+    )
+    learn_bridge.attach(SimpleNamespace(
+        _memory_store=NativeStore(),
+        _session_db=learn_db,
+        session_id=learn_session,
+    ))
+    learn_bridge.on_task_completed({"completed": True, "messages": []})
+    learn_bridge.close()
+    learn_db.close()
+
+    source_path = home / ".rsimem" / "extraction_sources.jsonl"
+    assert source_path.exists()
+    source_serialized = source_path.read_text(encoding="utf-8")
+    assert "Always use TSV" not in source_serialized
+
+    eval_db = SessionDB(home / "state.db")
+    eval_session = "session-feedback-eval"
+    eval_db.create_session(eval_session, "past_bench", model="fixture-model")
+    eval_db.append_message(
+        eval_session,
+        "user",
+        "Extract today's action items and share the source note.",
+    )
+    eval_db.append_message(eval_session, "assistant", "Completed the report.")
+    eval_client = FakeCompletionClient({
+        POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id: json.dumps({"facts": []}),
+        POLICY_INTERNAL_OPERATION_PROMPT.artifact.prompt_id: json.dumps({
+            "operations": [],
+        }),
+    })
+    eval_operations = tmp_path / "eval" / "operations.jsonl"
+    eval_bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "eval" / "memory.jsonl",
+        run_id="run-feedback-sequence",
+        trace_id="trace-feedback-eval",
+        episode_id="episode-feedback-eval",
+        session_id=eval_session,
+        task_id="SM01_EVAL_NEAR_001",
+        experiment_variant="static-extraction-rsimem",
+        family_id="SM01_preference_adoption",
+        stage="eval_near",
+        static_writeback_config=StaticSemanticWritebackConfig(
+            mode="static",
+            feedback_contract="sm01_tsv_v1",
+        ),
+        static_completion_client=eval_client,
+        static_operation_evidence_path=eval_operations,
+    )
+    eval_agent = SimpleNamespace(
+        _memory_store=NativeStore(),
+        _session_db=eval_db,
+        session_id=eval_session,
+    )
+    eval_bridge.attach(eval_agent)
+    assert eval_agent._memory_store.format_for_system_prompt("user") is not None
+    eval_bridge.on_task_completed({
+        "completed": True,
+        "final_response": (
+            "owner\tpriority\ttask\tdue_date\n"
+            "Iris Chen\tHigh\tFix drift\t2026/04/28"
+        ),
+        "messages": [
+            {
+                "role": "user",
+                "content": "Extract today's action items and share the source note.",
+            },
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-share",
+                    "function": {
+                        "name": "notes_share",
+                        "arguments": json.dumps({
+                            "note_id": "note-1",
+                            "recipients": ["Iris Chen"],
+                        }),
+                    },
+                }],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-share",
+                "content": json.dumps({"success": True}),
+            },
+        ],
+    })
+    eval_bridge.close()
+    eval_db.close()
+
+    graph = materialize_operation_graph(
+        AppendOnlyOperationEvidenceLog(eval_operations).events
+    )
+    operations = {operation.kind: operation for operation in graph.operations}
+    feedback_path = tmp_path / "eval" / "rsimem_extraction_feedback.jsonl"
+    datasets = [
+        json.loads(line)
+        for line in feedback_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(datasets) == 1
+    primary = next(
+        example for example in datasets[0]["examples"] if example["primary"]
+    )
+    assert primary["label"] == "useful"
+    assert primary["opportunity_operation_id"] == operations[
+        OperationKind.FUTURE_QUERY
+    ].operation_id
+    assert primary["use_operation_id"] == operations[OperationKind.USE].operation_id
+    assert primary["outcome_operation_id"] == operations[
+        OperationKind.DOWNSTREAM_OUTCOME
+    ].operation_id
+    serialized = feedback_path.read_text(encoding="utf-8")
+    assert "Always use TSV" not in serialized
+    assert not any(token in serialized for token in (
+        "task_score",
+        "grader",
+        "answer_key",
+        "reasoning_tokens",
+    ))
+
+
+def test_feedback_bridge_rejects_duplicate_without_source_record(tmp_path: Path) -> None:
+    home = _hermes_home(tmp_path / "home")
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "memory.jsonl",
+        run_id="run-missing-source",
+        trace_id="trace-missing-source",
+        episode_id="episode-missing-source",
+        session_id="session-missing-source",
+        task_id="SM01_LEARN_A_001",
+        experiment_variant="static-extraction-rsimem",
+        family_id="SM01_preference_adoption",
+        stage="learn_a",
+        static_writeback_config=StaticSemanticWritebackConfig(
+            mode="static",
+            feedback_contract="sm01_tsv_v1",
+        ),
+        static_completion_client=FakeCompletionClient({}),
+    )
+    try:
+        with pytest.raises(ValueError, match="no source evidence"):
+            bridge._record_extraction_source(StaticSemanticBoundaryResult(
+                "snapshot.missing",
+                "compilation.missing",
+                None,
+                duplicate=True,
+            ))
+    finally:
+        bridge.close()
 
 
 def test_static_writeback_bridge_requires_native_ledger_not_lifecycle(tmp_path: Path) -> None:
