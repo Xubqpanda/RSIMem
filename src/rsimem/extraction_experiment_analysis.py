@@ -457,7 +457,7 @@ def _run_evidence(
         attempt["method"]
     ]
     expected_contract = manifest["feedbackContract"]["contractDigest"]
-    source_ids = {record.record_id for record in sources}
+    sources_by_id = {record.record_id: record for record in sources}
     if any(
         record.family_id != split["familyId"]
         or record.extraction_artifact_id != expected_artifact["artifactId"]
@@ -465,13 +465,34 @@ def _run_evidence(
         for record in sources
     ):
         raise ValueError("run extraction source identity differs from its manifest")
-    if any(
-        record.family_id != split["familyId"]
-        or record.dataset.contract_digest != expected_contract
-        or record.source_record_id not in source_ids
-        for record in feedback
-    ):
-        raise ValueError("run feedback evidence does not join its manifest/source")
+    for record in feedback:
+        source_record = sources_by_id.get(record.source_record_id)
+        source = source_record.source if source_record is not None else None
+        source_fact_ids = {
+            fact.fact_id for fact in source.facts
+        } if source is not None else set()
+        source_artifact_ids = set(source_record.artifact_ids) if source_record else set()
+        if (
+            source_record is None
+            or source is None
+            or record.family_id != split["familyId"]
+            or record.family_id != source_record.family_id
+            or record.run_id != source_record.run_id
+            or record.dataset.contract_digest != expected_contract
+            or record.dataset.source_projection_digest
+            != source.source_projection_digest
+            or any(
+                example.source_id != source.source_id
+                or example.extraction_set_id != source.extraction_set_id
+                or (
+                    example.fact_id is not None
+                    and example.fact_id not in source_fact_ids
+                )
+                or not set(example.artifact_ids).issubset(source_artifact_ids)
+                for example in record.dataset.examples
+            )
+        ):
+            raise ValueError("run feedback evidence does not join its manifest/source")
     safety = _safety_failures(audit)
     return {
         "replicate": attempt["replicate"],

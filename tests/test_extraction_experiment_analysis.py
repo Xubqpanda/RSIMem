@@ -368,6 +368,66 @@ def test_analysis_does_not_report_complete_usage_without_completed_runs(
     assert report["usageComplete"] is False
 
 
+def test_analysis_rejects_feedback_joined_to_an_unrelated_existing_source(
+    tmp_path: Path,
+) -> None:
+    root = _batch(tmp_path, changed=True)
+    manifest = json.loads(
+        (root / "batch_manifest.json").read_text(encoding="utf-8")
+    )
+    completed = next(
+        event
+        for event in manifest["attemptHistory"]
+        if event["status"] == "completed"
+    )
+    run = root / completed["outputDirectory"]
+    source_path = next(run.rglob("extraction_sources.jsonl"))
+    source_store = JsonExtractionSourceRecordStore(source_path)
+    original = source_store.records()[0]
+    unrelated_source = _source("unrelated", "artifact.unrelated")
+    unrelated = ExtractionSourceRecord.create(
+        family_id=original.family_id,
+        stage=original.stage,
+        run_id=original.run_id,
+        episode_id="episode.unrelated",
+        session_id="session.unrelated",
+        task_id="task.unrelated",
+        compilation_id="compilation.unrelated",
+        extraction_artifact_id=original.extraction_artifact_id,
+        extraction_artifact_digest=original.extraction_artifact_digest,
+        extraction_output_digest=_sha("unrelated output"),
+        source=unrelated_source,
+    )
+    source_store.append(unrelated)
+
+    feedback_path = next(run.rglob("rsimem_extraction_feedback.jsonl"))
+    feedback = JsonLiveExtractionFeedbackRecordLog(feedback_path).records()[0]
+    mismatched = LiveExtractionFeedbackRecord.create(
+        family_id=feedback.family_id,
+        stage=feedback.stage,
+        run_id=feedback.run_id,
+        trace_id=feedback.trace_id,
+        episode_id=feedback.episode_id,
+        session_id=feedback.session_id,
+        task_id=feedback.task_id,
+        deployment_observation_id=feedback.deployment_observation_id,
+        source_record_id=unrelated.record_id,
+        opportunity_operation_id=feedback.opportunity_operation_id,
+        use_operation_id=feedback.use_operation_id,
+        outcome_operation_id=feedback.outcome_operation_id,
+        dataset=feedback.dataset,
+    )
+    feedback_path.unlink()
+    JsonLiveExtractionFeedbackRecordLog(feedback_path).append(mismatched)
+
+    try:
+        analyze_extraction_batch(root)
+    except ValueError as exc:
+        assert "does not join" in str(exc)
+    else:
+        raise AssertionError("mismatched source/feedback join was accepted")
+
+
 def test_audit_failure_classification_requires_all_calls_to_be_provider_errors() -> None:
     assert classify_extraction_audit_failure({
         "modelCallStatuses": {"error": 3},
