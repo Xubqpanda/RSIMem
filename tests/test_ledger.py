@@ -308,6 +308,7 @@ def test_auto_loads_content_free_static_mutation_identities(tmp_path: Path) -> N
             "snapshot_id": "snapshot_1",
             "mutation_id": "mutation.1",
             "receipt_id": "receipt.1",
+            "writer_identity": "rsimem_executor",
         },
     ))
     event = json.loads(json.dumps(observer.events[0]))
@@ -317,7 +318,15 @@ def test_auto_loads_content_free_static_mutation_identities(tmp_path: Path) -> N
     )
     assert load_episode_lifecycle_events(comparison) == (event,)
 
-    event["data"]["attributes"]["operation_id"] = "private operation text"
+    event["data"]["attributes"]["action"] = "none"
+    event["data"]["attributes"]["writer_identity"] = None
+    _runtime_evidence_path(comparison).write_text(
+        json.dumps(event) + "\n",
+        encoding="utf-8",
+    )
+    assert load_episode_lifecycle_events(comparison) == (event,)
+
+    event["data"]["attributes"]["writer_identity"] = "private writer text"
     _runtime_evidence_path(comparison).write_text(
         json.dumps(event) + "\n",
         encoding="utf-8",
