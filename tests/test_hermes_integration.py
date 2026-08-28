@@ -936,6 +936,20 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
     assert len(bridge.trigger_observations) == 1
     assert len(bridge.source_selection_decisions) == 1
     assert bridge.source_selection_decisions[0].source_revision == bridge.lifecycle_results[0].snapshot.context_revision
+    policy_events = [
+        json.loads(line)
+        for line in (artifacts / "rsimem_policy_decisions.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert {event["layer"] for event in policy_events} >= {
+        "trigger",
+        "source_selection",
+        "extraction",
+        "admission",
+        "commit",
+    }
+    assert all(event["lineageId"] for event in policy_events)
     assert len(bridge.static_results) == 1
     assert len(client.calls) == 2
     serialized = (artifacts / "memory.jsonl").read_text(encoding="utf-8")
