@@ -218,6 +218,7 @@ class SafetyBoundary:
 
     active_segment_ids: tuple[str, ...] = ()
     current_turn_id: str | None = None
+    current_turn_segment_ids: tuple[str, ...] = ()
     tool_closures: tuple[tuple[str, ...], ...] = ()
     schema_valid: bool = True
     cas_valid: bool = True
@@ -230,12 +231,13 @@ class SafetyBoundary:
         object.__setattr__(self, "active_segment_ids", _tuple_strings(self.active_segment_ids, "active segment IDs"))
         if self.current_turn_id is not None:
             _require_identifier(self.current_turn_id, "current turn ID")
+        object.__setattr__(self, "current_turn_segment_ids", _tuple_strings(self.current_turn_segment_ids, "current turn segment IDs"))
         closures: list[tuple[str, ...]] = []
         members: set[str] = set()
         for closure in self.tool_closures:
             normalized = _tuple_strings(closure, "tool closure")
-            if len(normalized) < 2:
-                raise ValueError("tool closure must contain call and result segments")
+            if len(normalized) < 1:
+                raise ValueError("tool closure must contain at least one segment")
             if members.intersection(normalized):
                 raise ValueError("tool closure segments must be disjoint")
             members.update(normalized)
@@ -253,6 +255,7 @@ class SafetyBoundary:
         return {
             "active_segment_ids": list(self.active_segment_ids),
             "current_turn_id": self.current_turn_id,
+            "current_turn_segment_ids": list(self.current_turn_segment_ids),
             "tool_closures": [list(item) for item in self.tool_closures],
             "schema_valid": self.schema_valid,
             "cas_valid": self.cas_valid,
@@ -269,8 +272,11 @@ class SafetyBoundary:
     def validate_selected(self, selected_segment_ids: Sequence[str]) -> None:
         selected = set(_tuple_strings(selected_segment_ids, "selected segment IDs"))
         protected = set(self.active_segment_ids)
+        # Some hosts expose the current turn as a segment-level pointer;
+        # retain that representation in addition to the explicit segment set.
         if self.current_turn_id is not None:
             protected.add(self.current_turn_id)
+        protected.update(self.current_turn_segment_ids)
         if protected.intersection(selected):
             raise ValueError("source selection includes active/current segment")
         for closure in self.tool_closures:
