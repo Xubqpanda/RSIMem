@@ -64,6 +64,14 @@ from .policy_contracts import (
     content_digest as policy_content_digest,
     validate_policy_episode,
 )
+from .trigger_policy import (
+    SUPPORTED_TRIGGER_TYPES,
+    DeterministicTriggerPolicy,
+    HostTriggerAdapter,
+    TriggerObservation,
+    TriggerPolicyConfig,
+    TriggerPolicyState,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -123,4 +131,10 @@ __all__ = [
     "policy_canonical_json",
     "policy_content_digest",
     "validate_policy_episode",
+    "SUPPORTED_TRIGGER_TYPES",
+    "DeterministicTriggerPolicy",
+    "HostTriggerAdapter",
+    "TriggerObservation",
+    "TriggerPolicyConfig",
+    "TriggerPolicyState",
 ]

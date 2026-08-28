@@ -151,6 +151,7 @@ class TriggerEvent:
     session_id: str | None = None
     task_id: str | None = None
     turn_id: str | None = None
+    turn_index: int | None = None
     supported: bool = True
     metadata: Mapping[str, Any] = field(default_factory=dict)
     schema_version: int = MEMORY_POLICY_CONTRACT_SCHEMA_VERSION
@@ -166,6 +167,8 @@ class TriggerEvent:
         for value, name in ((self.session_id, "session ID"), (self.task_id, "task ID"), (self.turn_id, "turn ID")):
             if value is not None:
                 _require_identifier(value, name)
+        if self.turn_index is not None and (type(self.turn_index) is not int or self.turn_index < 0):
+            raise ValueError("turn index must be a non-negative integer")
         if type(self.supported) is not bool:
             raise ValueError("trigger supported must be bool")
         object.__setattr__(self, "metadata", _frozen_metadata(self.metadata))
@@ -180,6 +183,7 @@ class TriggerEvent:
         session_id: str | None = None,
         task_id: str | None = None,
         turn_id: str | None = None,
+        turn_index: int | None = None,
         supported: bool = True,
         metadata: Mapping[str, Any] | None = None,
     ) -> "TriggerEvent":
@@ -192,6 +196,7 @@ class TriggerEvent:
             "session_id": session_id,
             "task_id": task_id,
             "turn_id": turn_id,
+            "turn_index": turn_index,
         }
         return cls(
             event_id=f"event.{content_digest(identity)[:40]}",
@@ -201,6 +206,7 @@ class TriggerEvent:
             session_id=session_id,
             task_id=task_id,
             turn_id=turn_id,
+            turn_index=turn_index,
             supported=supported,
             metadata=metadata or {},
         )
