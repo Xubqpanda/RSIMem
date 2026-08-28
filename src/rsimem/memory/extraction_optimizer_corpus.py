@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from typing import Mapping
 
 from .extraction_feedback import (
     AttributionConfidence,
@@ -53,6 +54,12 @@ def _parse_utc(value: str) -> datetime:
 def _require_unique(values: tuple[str, ...], name: str) -> None:
     if len(values) != len(set(values)):
         raise ValueError(f"{name} must be unique")
+
+
+def _strict(value: object, fields: set[str], name: str) -> Mapping[str, object]:
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise ValueError(f"malformed {name}")
+    return value
 
 
 class OptimizerCorpusSplit(StrEnum):
@@ -110,6 +117,25 @@ class OptimizerSourceMessage:
             "content": self.content.payload(),
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "OptimizerSourceMessage":
+        payload = _strict(value, {
+            "segment_id", "source_message_id", "role", "segment_kind",
+            "tool_call_id", "content_truncated", "content",
+        }, "optimizer source message")
+        try:
+            return cls(
+                payload["segment_id"],
+                payload["source_message_id"],
+                payload["role"],
+                payload["segment_kind"],
+                payload["tool_call_id"],
+                payload["content_truncated"],
+                OptimizerUntrustedText.from_payload(payload["content"]),
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed optimizer source message") from exc
+
 
 @dataclass(frozen=True, slots=True)
 class OptimizerExtractedFact:
@@ -159,6 +185,29 @@ class OptimizerExtractedFact:
             "persisted_artifact_id": self.persisted_artifact_id,
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "OptimizerExtractedFact":
+        payload = _strict(value, {
+            "fact_id", "content", "content_digest", "accepted", "reason_code",
+            "semantic_keys", "disposition", "persisted_artifact_id",
+        }, "optimizer extracted fact")
+        keys = payload["semantic_keys"]
+        if not isinstance(keys, list):
+            raise ValueError("malformed optimizer fact semantic keys")
+        try:
+            return cls(
+                payload["fact_id"],
+                OptimizerUntrustedText.from_payload(payload["content"]),
+                payload["content_digest"],
+                payload["accepted"],
+                payload["reason_code"],
+                tuple(keys),
+                FactDisposition(payload["disposition"]),
+                payload["persisted_artifact_id"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed optimizer extracted fact") from exc
+
 
 @dataclass(frozen=True, slots=True)
 class OptimizerArtifactLineage:
@@ -185,6 +234,25 @@ class OptimizerArtifactLineage:
             "operation_ids": list(self.operation_ids),
             "mutation_ids": list(self.mutation_ids),
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "OptimizerArtifactLineage":
+        payload = _strict(value, {
+            "artifact_id", "content_digest", "operation_ids", "mutation_ids",
+        }, "optimizer artifact lineage")
+        if not isinstance(payload["operation_ids"], list) or not isinstance(
+            payload["mutation_ids"], list
+        ):
+            raise ValueError("malformed optimizer artifact lineage")
+        try:
+            return cls(
+                payload["artifact_id"],
+                payload["content_digest"],
+                tuple(payload["operation_ids"]),
+                tuple(payload["mutation_ids"]),
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed optimizer artifact lineage") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -234,6 +302,30 @@ class OptimizerDelayedEvidence:
             "use": self.use.payload(),
             "outcome": self.outcome.payload(),
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "OptimizerDelayedEvidence":
+        payload = _strict(value, {
+            "observation_id", "source_completed_at", "observed_at",
+            "future_opportunity_id", "opportunity_operation_id",
+            "use_operation_id", "outcome_operation_id", "opportunity", "use",
+            "outcome",
+        }, "optimizer delayed evidence")
+        try:
+            return cls(
+                payload["observation_id"],
+                payload["source_completed_at"],
+                payload["observed_at"],
+                payload["future_opportunity_id"],
+                payload["opportunity_operation_id"],
+                payload["use_operation_id"],
+                payload["outcome_operation_id"],
+                OptimizerUntrustedText.from_payload(payload["opportunity"]),
+                OptimizerUntrustedText.from_payload(payload["use"]),
+                OptimizerUntrustedText.from_payload(payload["outcome"]),
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed optimizer delayed evidence") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -289,6 +381,40 @@ class OptimizerAuditJoin:
             "operation_ids": list(self.operation_ids),
             "artifacts": [value.payload() for value in self.artifacts],
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "OptimizerAuditJoin":
+        payload = _strict(value, {
+            "source_record_id", "source_record_digest", "source_projection_id",
+            "source_projection_digest", "feedback_record_id",
+            "feedback_dataset_id", "feedback_example_id",
+            "extraction_artifact_id", "extraction_artifact_digest",
+            "extraction_output_digest", "operation_ids", "artifacts",
+        }, "optimizer audit join")
+        if not isinstance(payload["operation_ids"], list) or not isinstance(
+            payload["artifacts"], list
+        ):
+            raise ValueError("malformed optimizer audit join")
+        try:
+            return cls(
+                payload["source_record_id"],
+                payload["source_record_digest"],
+                payload["source_projection_id"],
+                payload["source_projection_digest"],
+                payload["feedback_record_id"],
+                payload["feedback_dataset_id"],
+                payload["feedback_example_id"],
+                payload["extraction_artifact_id"],
+                payload["extraction_artifact_digest"],
+                payload["extraction_output_digest"],
+                tuple(payload["operation_ids"]),
+                tuple(
+                    OptimizerArtifactLineage.from_payload(item)
+                    for item in payload["artifacts"]
+                ),
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed optimizer audit join") from exc
 
 
 @dataclass(frozen=True, slots=True)
@@ -467,6 +593,53 @@ class ExtractionOptimizerCorpusExample:
             "example_digest": self.example_digest,
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionOptimizerCorpusExample":
+        payload = _strict(value, {
+            "schema_version", "example_id", "example_digest", "primary_unit_id",
+            "level", "primary", "label", "attribution_confidence",
+            "reason_codes", "component_ownership", "audit_join",
+            "source_messages", "extracted_facts", "delayed_evidence",
+        }, "optimizer corpus example")
+        collections = (
+            payload["reason_codes"],
+            payload["source_messages"],
+            payload["extracted_facts"],
+        )
+        if any(not isinstance(item, list) for item in collections):
+            raise ValueError("malformed optimizer corpus example collections")
+        try:
+            return cls(
+                example_id=payload["example_id"],
+                example_digest=payload["example_digest"],
+                primary_unit_id=payload["primary_unit_id"],
+                level=ExtractionFeedbackLevel(payload["level"]),
+                primary=payload["primary"],
+                label=ExtractionFeedbackLabel(payload["label"]),
+                attribution_confidence=AttributionConfidence(
+                    payload["attribution_confidence"]
+                ),
+                reason_codes=tuple(payload["reason_codes"]),
+                component_ownership=OptimizerComponentOwnership(
+                    payload["component_ownership"]
+                ),
+                audit_join=OptimizerAuditJoin.from_payload(payload["audit_join"]),
+                source_messages=tuple(
+                    OptimizerSourceMessage.from_payload(item)
+                    for item in payload["source_messages"]
+                ),
+                extracted_facts=tuple(
+                    OptimizerExtractedFact.from_payload(item)
+                    for item in payload["extracted_facts"]
+                ),
+                delayed_evidence=OptimizerDelayedEvidence.from_payload(
+                    payload["delayed_evidence"]
+                ),
+                schema_version=payload["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed optimizer corpus example") from exc
+
 
 @dataclass(frozen=True, slots=True)
 class ExtractionOptimizerCorpus:
@@ -584,3 +757,32 @@ class ExtractionOptimizerCorpus:
             "corpus_id": self.corpus_id,
             "corpus_digest": self.corpus_digest,
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionOptimizerCorpus":
+        payload = _strict(value, {
+            "schema_version", "corpus_schema", "corpus_id", "corpus_digest",
+            "batch_id", "attempt_id", "split", "observation_cutoff",
+            "retention", "activation_artifact_id", "examples",
+        }, "extraction optimizer corpus")
+        if not isinstance(payload["examples"], list):
+            raise ValueError("malformed optimizer corpus examples")
+        try:
+            return cls(
+                corpus_id=payload["corpus_id"],
+                corpus_digest=payload["corpus_digest"],
+                batch_id=payload["batch_id"],
+                attempt_id=payload["attempt_id"],
+                split=OptimizerCorpusSplit(payload["split"]),
+                observation_cutoff=payload["observation_cutoff"],
+                retention=OptimizerCorpusRetention(payload["retention"]),
+                activation_artifact_id=payload["activation_artifact_id"],
+                examples=tuple(
+                    ExtractionOptimizerCorpusExample.from_payload(item)
+                    for item in payload["examples"]
+                ),
+                corpus_schema=payload["corpus_schema"],
+                schema_version=payload["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction optimizer corpus") from exc

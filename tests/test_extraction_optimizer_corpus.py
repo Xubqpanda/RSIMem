@@ -24,6 +24,7 @@ from rsimem.memory.extraction_optimizer_corpus import (
     OptimizerSourceMessage,
 )
 from rsimem.memory.optimizer_content_boundary import OptimizerSecretBoundary
+from rsimem.memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStore
 from rsimem.memory.prompt_components import content_digest, text_digest
 
 
@@ -140,6 +141,9 @@ def test_corpus_identity_is_canonical_and_covers_content_and_split() -> None:
         "feedback-example.example-v1"
     )
     assert first.examples[0].source_messages[0].content.trust == "untrusted_data"
+    assert ExtractionOptimizerCorpus.from_payload(
+        json.loads(json.dumps(first.payload()))
+    ) == first
     changed = ExtractionOptimizerCorpus.create(
         batch_id="batch.validation-v1",
         attempt_id="attempt.001",
@@ -199,3 +203,86 @@ def test_future_dates_split_activation_and_tampering_fail_closed() -> None:
     assert "official_grader" not in serialized
     assert "answer_key" not in serialized
     assert "hidden_expectation" not in serialized
+
+
+def test_private_store_is_restart_safe_split_gated_and_least_privilege(tmp_path) -> None:
+    corpus = ExtractionOptimizerCorpus.create(
+        batch_id="batch.train-v1",
+        attempt_id="attempt.001",
+        split=OptimizerCorpusSplit.TRAIN,
+        observation_cutoff="2026-08-21T00:00:00Z",
+        retention=OptimizerCorpusRetention.DELETE_AFTER_POLICY_DECISION,
+        examples=(_example(),),
+    )
+    attempt = tmp_path / "outputs" / "batch" / "attempt.001"
+    store = JsonExtractionOptimizerCorpusStore(
+        attempt,
+        attempt_id="attempt.001",
+        split=OptimizerCorpusSplit.TRAIN,
+    )
+
+    assert store.write(corpus) is True
+    assert store.write(corpus) is False
+    restarted = JsonExtractionOptimizerCorpusStore(
+        attempt,
+        attempt_id="attempt.001",
+        split=OptimizerCorpusSplit.TRAIN,
+    )
+    assert restarted.read_for_optimizer() == corpus
+    assert store.path.relative_to(attempt).as_posix() == (
+        "private/optimizer-corpus/train.json"
+    )
+    assert store.path.stat().st_mode & 0o777 == 0o600
+    assert store.private_root.stat().st_mode & 0o777 == 0o700
+    with pytest.raises(PermissionError, match="validator"):
+        restarted.read_for_validation()
+    with pytest.raises(ValueError, match="retention"):
+        restarted.purge(retention=OptimizerCorpusRetention.DELETE_AFTER_EXPERIMENT)
+    assert restarted.purge(
+        retention=OptimizerCorpusRetention.DELETE_AFTER_POLICY_DECISION
+    ) is True
+    assert not store.path.exists()
+
+
+def test_future_store_requires_matching_activation_and_detects_corruption(tmp_path) -> None:
+    future = ExtractionOptimizerCorpus.create(
+        batch_id="batch.future-v1",
+        attempt_id="attempt.002",
+        split=OptimizerCorpusSplit.FUTURE_TEST,
+        observation_cutoff="2026-08-21T00:00:00Z",
+        retention=OptimizerCorpusRetention.DELETE_AFTER_EXPERIMENT,
+        activation_artifact_id="extraction-prompt.candidate-v2",
+        examples=(_example(),),
+    )
+    store = JsonExtractionOptimizerCorpusStore(
+        tmp_path / "outputs" / "attempt.002",
+        attempt_id="attempt.002",
+        split=OptimizerCorpusSplit.FUTURE_TEST,
+    )
+    store.write(future)
+    with pytest.raises(PermissionError, match="before activation"):
+        store.read_for_future_evaluation(active_artifact_id=None)
+    with pytest.raises(PermissionError, match="mismatch"):
+        store.read_for_future_evaluation(
+            active_artifact_id="extraction-prompt.other-v2"
+        )
+    assert store.read_for_future_evaluation(
+        active_artifact_id="extraction-prompt.candidate-v2"
+    ) == future
+
+    store.path.chmod(0o644)
+    with pytest.raises(PermissionError, match="permissions"):
+        store.read_for_future_evaluation(
+            active_artifact_id="extraction-prompt.candidate-v2"
+        )
+    store.path.chmod(0o600)
+
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    payload["corpus"]["examples"][0]["source_messages"][0]["content"][
+        "text"
+    ] = "tampered"
+    store.path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed optimizer corpus store"):
+        store.read_for_future_evaluation(
+            active_artifact_id="extraction-prompt.candidate-v2"
+        )
