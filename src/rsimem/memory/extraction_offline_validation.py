@@ -543,6 +543,22 @@ class OfflineRatioEvidence:
             "value": self.value,
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "OfflineRatioEvidence":
+        fields = {"metric", "numerator", "denominator", "unknown_count", "value"}
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed offline ratio evidence")
+        try:
+            return cls(
+                value["metric"],
+                value["numerator"],
+                value["denominator"],
+                value["unknown_count"],
+                value["value"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed offline ratio evidence") from exc
+
 
 def extraction_ratio_evidence(
     metrics: ExtractionQualityMetrics,
@@ -700,6 +716,74 @@ class ExtractionOfflineValidationDecision:
             "candidate_ratios": [value.payload() for value in self.candidate_ratios],
             "reason_codes": list(self.reason_codes),
         }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "decision_id": self.decision_id,
+            **self.identity_payload(),
+            "quality_decision": self.quality_decision.payload(),
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionOfflineValidationDecision":
+        fields = {
+            "decision_id",
+            "schema_version",
+            "decision_schema",
+            "status",
+            "split_id",
+            "parent_artifact_id",
+            "parent_artifact_digest",
+            "candidate_artifact_id",
+            "candidate_artifact_digest",
+            "criteria_digest",
+            "static_safety_report_id",
+            "deterministic_suite_report_id",
+            "quality_decision_id",
+            "quality_decision",
+            "parent_ratios",
+            "candidate_ratios",
+            "reason_codes",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields or not all(
+            isinstance(value[field], list)
+            for field in ("parent_ratios", "candidate_ratios", "reason_codes")
+        ):
+            raise ValueError("malformed extraction offline decision")
+        try:
+            quality = ExtractionValidationDecision.from_payload(
+                value["quality_decision"]
+            )
+            if value["quality_decision_id"] != quality.decision_id:
+                raise ValueError("offline quality decision identity mismatch")
+            return cls(
+                decision_id=value["decision_id"],
+                status=value["status"],
+                split_id=value["split_id"],
+                parent_artifact_id=value["parent_artifact_id"],
+                parent_artifact_digest=value["parent_artifact_digest"],
+                candidate_artifact_id=value["candidate_artifact_id"],
+                candidate_artifact_digest=value["candidate_artifact_digest"],
+                criteria_digest=value["criteria_digest"],
+                static_safety_report_id=value["static_safety_report_id"],
+                deterministic_suite_report_id=value[
+                    "deterministic_suite_report_id"
+                ],
+                quality_decision=quality,
+                parent_ratios=tuple(
+                    OfflineRatioEvidence.from_payload(item)
+                    for item in value["parent_ratios"]
+                ),
+                candidate_ratios=tuple(
+                    OfflineRatioEvidence.from_payload(item)
+                    for item in value["candidate_ratios"]
+                ),
+                reason_codes=tuple(value["reason_codes"]),
+                decision_schema=value["decision_schema"],
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction offline decision") from exc
 
 
 class ExtractionPromptOfflineValidator:
