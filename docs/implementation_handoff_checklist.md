@@ -569,17 +569,19 @@ Adaptive final launcher要求 clean tree，但 static feedback launcher允许 di
 功能需求：
 
 - □ Hermes adapter将真实 task、turn、tool、context-pressure和session事件映射到统一 `TriggerEvent`；没有真实事件来源的 trigger明确标记 `unsupported`，不伪造。
-- □ 保留当前 `task_completed -> RUN` 作为 fixed parent policy；将 `session_end`、`turn_interval`、`tool_boundary`、`context_pressure` 和 `manual` 先接入 shadow-only观测，不改变正式 parent行为。
-- □ Trigger policy支持 `RUN/SKIP/DEFER`、最小间隔、pending source、下一次 eligible boundary和duplicate suppression；source revision变化必须重新判断。
-- □ Host adapter只提供事件、snapshot和执行 hook；trigger strategy、阈值、频率和skip/defer理由归RSIMem policy artifact管理。
-- □ 记录每次候选 trigger，包括未执行的 SKIP/DEFER，防止实验只看到已写入样本而忽略被跳过的样本。
+- √ 保留当前 `task_completed -> RUN` 作为 fixed parent policy；将 `session_end`、`turn_interval`、`tool_boundary`、`context_pressure` 和 `manual` 先接入 shadow-only观测，不改变正式 parent行为。
+- √ Trigger policy支持 `RUN/SKIP/DEFER`、最小间隔、pending source、下一次 eligible boundary和duplicate suppression；source revision变化必须重新判断。
+- √ Host adapter只提供事件、snapshot和执行 hook；trigger strategy、阈值、频率和skip/defer理由归RSIMem policy artifact管理。
+- √ 记录每次候选 trigger，包括未执行的 SKIP/DEFER，防止实验只看到已写入样本而忽略被跳过的样本。
 
 测试与验收：
 
-- □ task completion、session end、tool boundary和context pressure均有正反 fixture；unsupported trigger不能静默当作支持。
-- □ shadow-only trigger不改变模型调用、extraction、mutation、memory文件或future exposure。
-- □ 相同 source revision 的重复事件只产生一次 RUN；新 revision可产生新的 formation attempt。
+- √ task completion、session end、tool boundary和context pressure均有正反 fixture；unsupported trigger不能静默当作支持。
+- √ shadow-only trigger不改变模型调用、extraction、mutation、memory文件或future exposure。
+- √ 相同 source revision 的重复事件只产生一次 RUN；新 revision可产生新的 formation attempt。
 - □ active、current、failed task和open tool closure不能因为 trigger policy 而进入 semantic mutation。
+
+2B 当前实现记录：`HostTriggerAdapter`/`HermesTriggerEventAdapter` 对真实 snapshot identity、task state、turn index、tool boundary、pressure token 和 manual authorization 做显式 supported gate；`DeterministicTriggerPolicy` 保留 task-completed parent，其余事件 shadow-only。Hermes bridge 已持久化 trigger observation；正反与 replay fixture 位于 `tests/test_trigger_policy.py` 和 `tests/test_hermes_integration.py`。active/current/open-closure 到 semantic mutation 的跨层阻断仍需在 2C/2D 完整 runtime join 后验收。
 
 ### 2C：Source Selection 与 Context Projection Policy
 
