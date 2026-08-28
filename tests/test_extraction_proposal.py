@@ -15,7 +15,7 @@ from rsimem.memory.extraction_optimizer_corpus import (
     OptimizerCorpusRetention,
     OptimizerCorpusSplit,
 )
-from rsimem.extraction_proposal import prepare_extraction_proposal
+from rsimem.extraction_proposal import main, prepare_extraction_proposal
 from rsimem.memory.prompt_components import canonical_json
 from test_extraction_optimizer_contracts import _multi_corpus, _parent, _proposal_output
 
@@ -83,5 +83,41 @@ def test_no_signal_proposal_does_not_call_provider_or_write_candidate(
     assert result.candidate is None
     assert client.requests == []
     assert not (owner / "proposal" / "candidate-artifact.json").exists()
+    assert result.request.provider_eligible is False
+    assert '"request_mode":"deterministic_signal_gate"' in (
+        result.request.input_json
+    )
+    assert "source_messages" not in result.request.input_json
     payload = json.loads((owner / "proposal" / "optimizer-result.json").read_text())
     assert payload["reasonCodes"] == ["no_actionable_extraction_signal"]
+
+
+def test_no_signal_cli_does_not_read_credentials_or_validate_provider(
+    tmp_path: Path,
+) -> None:
+    corpus = _multi_corpus(("unresolved", "censored"), ownerships=(
+        "unresolved",
+        "unresolved",
+    ))
+    store, owner = _store(tmp_path, corpus)
+    output = owner / "proposal-cli"
+
+    result = main([
+        str(store.attempt_root),
+        "--owner-controlled-root",
+        str(owner),
+        "--attempt-id",
+        store.attempt_id,
+        "--output",
+        str(output),
+        "--api-key-file",
+        str(tmp_path / "missing-key"),
+        "--base-url",
+        "http://provider.invalid/v1",
+    ])
+
+    assert result == 0
+    payload = json.loads((output / "optimizer-result.json").read_text())
+    assert payload["decision"] == "NO_PROPOSAL"
+    assert payload["usage"]["model_requests"] == 0
+    assert not (output / "candidate-artifact.json").exists()
