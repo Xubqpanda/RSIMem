@@ -135,22 +135,24 @@ def _fixture():
         "op.use-v1",
         "op.outcome-v1",
     )
+    current_input = "Prepare the action-item report."
+    observation = DeploymentObservation(
+        "observation.eval-v1",
+        "SM01_preference_adoption",
+        "eval_near",
+        "task.eval-v1",
+        text_digest(current_input),
+        (),
+        (TSV_KEY,),
+        "owner\tpriority\ttask\tdue_date\nA\thigh\tShip\t2026/09/01",
+        (),
+        True,
+    )
     feedback_dataset = ExtractionFeedbackBuilder(
         default_feedback_contract_registry()
     ).build(
         source,
-        DeploymentObservation(
-            "observation.eval-v1",
-            "SM01_preference_adoption",
-            "eval_near",
-            "task.eval-v1",
-            "2" * 64,
-            (),
-            (TSV_KEY,),
-            "owner\tpriority\ttask\tdue_date\nA\thigh\tShip\t2026/09/01",
-            (),
-            True,
-        ),
+        observation,
         FutureMemoryEvidence(
             "opportunity.eval-v1",
             ExposureMode.EAGER_SYSTEM_PROMPT,
@@ -269,19 +271,18 @@ def _fixture():
     delayed = DelayedEvidenceContent(
         "2026-08-20T00:00:00Z",
         "2026-08-21T00:00:00Z",
-        "The future report task required the stored TSV preference.",
-        "The response used the four-column TSV preference.",
-        "The report task completed successfully.",
+        current_input,
     )
-    return projection, source_record, feedback, graph, traces, delayed
+    return projection, source_record, feedback, observation, graph, traces, delayed
 
 
 def test_builder_exactly_joins_content_and_content_free_evidence() -> None:
-    projection, source, feedback, graph, facts, delayed = _fixture()
+    projection, source, feedback, observation, graph, facts, delayed = _fixture()
     examples = ExtractionOptimizerCorpusBuilder().build_examples(
         projection=projection,
         source_record=source,
         feedback_record=feedback,
+        observation=observation,
         operation_graph=graph,
         fact_contents=facts,
         delayed_content=delayed,
@@ -302,6 +303,7 @@ def test_builder_exactly_joins_content_and_content_free_evidence() -> None:
         projection=projection,
         source_record=source,
         feedback_record=feedback,
+        observation=observation,
         operation_graph=graph,
         fact_contents=facts,
         delayed_content=delayed,
@@ -339,7 +341,7 @@ def test_builder_exactly_joins_content_and_content_free_evidence() -> None:
 
 @pytest.mark.parametrize("failure", ("source", "fact", "operation", "mutation"))
 def test_builder_rejects_any_broken_exact_join(failure: str) -> None:
-    projection, source, feedback, graph, facts, delayed = _fixture()
+    projection, source, feedback, observation, graph, facts, delayed = _fixture()
     if failure == "source":
         projection = _projection("A different bounded source.")
     elif failure == "fact":
@@ -354,6 +356,7 @@ def test_builder_rejects_any_broken_exact_join(failure: str) -> None:
             projection=projection,
             source_record=source,
             feedback_record=feedback,
+            observation=observation,
             operation_graph=graph,
             fact_contents=facts,
             delayed_content=delayed,
@@ -361,16 +364,17 @@ def test_builder_rejects_any_broken_exact_join(failure: str) -> None:
 
 
 def test_builder_rejects_forbidden_evaluation_content() -> None:
-    projection, source, feedback, graph, facts, delayed = _fixture()
+    projection, source, feedback, observation, graph, facts, delayed = _fixture()
     with pytest.raises(ValueError, match="forbidden evaluation evidence"):
         ExtractionOptimizerCorpusBuilder().build_examples(
             projection=projection,
             source_record=source,
             feedback_record=feedback,
+            observation=replace(
+                observation,
+                final_response="The official grader answer key says this passed.",
+            ),
             operation_graph=graph,
             fact_contents=facts,
-            delayed_content=replace(
-                delayed,
-                outcome="The official grader answer key says this passed.",
-            ),
+            delayed_content=delayed,
         )

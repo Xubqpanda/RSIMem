@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .extraction_feedback import ExtractionFeedbackLabel, FactDisposition
+from .extraction_feedback import (
+    DeploymentObservation,
+    ExtractionFeedbackLabel,
+    FactDisposition,
+)
 from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpusExample,
     OptimizerArtifactLineage,
@@ -18,7 +22,7 @@ from .extraction_projection import ExtractionSourceRecord, LiveExtractionFeedbac
 from .extraction_source import ExtractionSourceProjection
 from .operation_graph import ArtifactKind, OperationGraph, OperationKind
 from .optimizer_content_boundary import OptimizerSecretBoundary
-from .prompt_components import content_digest, text_digest
+from .prompt_components import canonical_json, content_digest, text_digest
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,9 +53,7 @@ class ExtractionFactContent:
 class DelayedEvidenceContent:
     source_completed_at: str
     observed_at: str
-    opportunity: str
-    use: str
-    outcome: str
+    current_input: str
 
 
 class ExtractionOptimizerCorpusBuilder:
@@ -64,12 +66,14 @@ class ExtractionOptimizerCorpusBuilder:
         projection: ExtractionSourceProjection,
         source_record: ExtractionSourceRecord,
         feedback_record: LiveExtractionFeedbackRecord,
+        observation: DeploymentObservation,
         operation_graph: OperationGraph,
         fact_contents: tuple[ExtractionFactContent, ...],
         delayed_content: DelayedEvidenceContent,
         forbidden_values: tuple[str, ...] = (),
     ) -> tuple[ExtractionOptimizerCorpusExample, ...]:
         self._validate_record_join(projection, source_record, feedback_record)
+        self._validate_observation(feedback_record, observation, delayed_content)
         facts = self._project_facts(
             source_record,
             operation_graph,
@@ -109,15 +113,26 @@ class ExtractionOptimizerCorpusBuilder:
             feedback_record.use_operation_id,
             feedback_record.outcome_operation_id,
             self.boundary.project(
-                delayed_content.opportunity,
+                delayed_content.current_input,
                 forbidden_values=forbidden_values,
             ),
             self.boundary.project(
-                delayed_content.use,
+                observation.final_response,
                 forbidden_values=forbidden_values,
             ),
             self.boundary.project(
-                delayed_content.outcome,
+                canonical_json({
+                    "completed": observation.completed,
+                    "observation_complete": observation.observation_complete,
+                    "censor_reason": observation.censor_reason,
+                    "tool_events": [{
+                        "event_id": event.event_id,
+                        "tool_name": event.tool_name,
+                        "success": event.success,
+                        "subject_ids": list(event.subject_ids),
+                        "recipient_ids": list(event.recipient_ids),
+                    } for event in observation.tool_events],
+                }),
                 forbidden_values=forbidden_values,
             ),
         )
@@ -185,6 +200,24 @@ class ExtractionOptimizerCorpusBuilder:
         }
         if len(opportunity_ids) != 1:
             raise ValueError("optimizer feedback opportunity join mismatch")
+
+    @staticmethod
+    def _validate_observation(
+        feedback: LiveExtractionFeedbackRecord,
+        observation: DeploymentObservation,
+        content: DelayedEvidenceContent,
+    ) -> None:
+        if (
+            observation.observation_id != feedback.deployment_observation_id
+            or observation.family_id != feedback.family_id
+            or observation.stage != feedback.stage
+            or observation.task_id != feedback.task_id
+        ):
+            raise ValueError("optimizer deployment observation join mismatch")
+        if text_digest(content.current_input) != (
+            observation.current_input_projection_digest
+        ):
+            raise ValueError("optimizer current input projection digest mismatch")
 
     def _project_facts(
         self,
