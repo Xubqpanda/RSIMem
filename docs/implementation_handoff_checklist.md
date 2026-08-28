@@ -440,9 +440,9 @@ Adaptive final launcher要求 clean tree，但 static feedback launcher允许 di
 - √ 所有 Stage 1A-1G 功能与反向测试完成。
 - √ Direct native、native+ledger和plain static semantic behavior回归通过。
 - √ Deterministic fixture证明一次且仅一次 completed-task extraction。
-- □ 一个低成本 live static smoke证明 source projection、plain parent policy、feedback set和raw accounting可重建。
-- □ `progress.md`、experiment plan和本文状态同步。
-- □ 记录完整 RSIMem、PAST-Bench、compileall、`pip check`、shell syntax、diff和secret scan结果。
+- √ 一个低成本 live static smoke证明 source projection、plain parent policy、feedback set和raw accounting可重建；见[`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
+- √ `progress.md`、experiment plan和本文状态同步。
+- √ 记录完整 RSIMem、PAST-Bench、compileall、`pip check`、shell syntax、diff和secret scan结果。
 
 第一阶段关闭后才能开始 prompt optimizer 或新的 adaptive live run。
 
@@ -681,12 +681,12 @@ bash -n scripts/*.sh
 
 ### 第一阶段完成
 
-- □ D01-D19均有明确代码修复或正式deferred理由。
-- □ Stage 1A-1H全部通过。
-- □ Static extraction path不依赖eviction、source/provenance一致、每task只执行一次。
-- □ Feedback可覆盖empty/NONE/missed且不误用eager exposure。
-- □ Validation不使用cost、硬编码证据或伪造历史identity。
-- □ 新实验launcher已冻结plain static parent和prompt-oriented manifest。
+- √ D01-D19均有明确代码修复或正式deferred理由。
+- √ Stage 1A-1H全部通过。
+- √ Static extraction path不依赖eviction、source/provenance一致、每task只执行一次。
+- √ Feedback可覆盖empty/NONE/missed且不误用eager exposure。
+- √ Validation不使用cost、硬编码证据或伪造历史identity。
+- √ 新实验launcher已冻结plain static parent和prompt-oriented manifest。
 
 ### 第二阶段完成
 
@@ -698,10 +698,10 @@ bash -n scripts/*.sh
 
 ## 10. 当前执行入口
 
-当前位于 **Stage 1H：第一阶段回归与关闭条件**。Stage 1A-1G 已完成；
-一次真实 plain-parent smoke 于 2026-08-28 因 provider 27/27 请求返回
-HTTP 503 而按 `failureStage=provider` 保留，不能作为成功证据。provider恢复后
-必须重试成功，才可关闭第一阶段并进入 Stage 2A。后续顺序仍严格按照：
+当前位于 **Stage 2A：Extraction Policy Envelope 与 Artifact**。Stage 1A-1H
+已经通过，低成本 live plain-parent acceptance 记录在
+[`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
+后续顺序仍严格按照：
 
 ```text
 1A -> 1B -> 1C -> 1D -> 1E -> 1F -> 1G -> 1H

@@ -20,9 +20,9 @@ The Hermes, static semantic writeback, operation graph, feedback store, and
 activation/rollback foundations are complete. The former Phase 2J/2K work is
 complete only as legacy retrieval-threshold infrastructure; extraction-prompt
 adaptation is pending. Stage 1 of the extraction-prompt handoff checklist is
-the active milestone. No new adaptive live batch runs before Stage 1 closes.
+closed, and Stage 2A is the active milestone.
 
-Extraction-prompt Stage 1A through 1G are complete. Legacy threshold artifacts now
+Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
 semantic compilation runs directly from a trusted completed-task snapshot,
 independent of keep/evict evaluation; session end creates no second attempt,
@@ -37,8 +37,10 @@ is the explicit parent; native writers and background review are disabled, and
 run-scoped receipt audit rejects unowned semantic drift. Source/set/fact
 feedback, family-specific opportunity/use/outcome contracts, prompt-oriented
 validation, formal extraction manifests, and raw-vector analysis are complete.
-The next milestone is a successful Stage 1H live plain-parent smoke; the first
-attempt was retained as a provider failure after all 27 requests returned 503.
+The accepted low-cost plain-parent smoke produced two source records, two exact-
+joined feedback records, 50 successful physical requests, and an issue-free
+audit. Detailed evidence and excluded attempts are recorded in
+[`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md).
 
 ## Completed Work
 
@@ -231,21 +233,21 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `371 passed`.
-- [x] Pass the vendored PAST-Bench regression suite: `390 passed, 2 skipped`.
+- [x] Pass all RSIMem tests: `442 passed`.
+- [x] Pass the vendored PAST-Bench regression suite: `394 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Extraction-Prompt Stage 1**
+### **Current: Extraction-Prompt Stage 2A**
 
 The first optimized component is the semantic fact-extraction prompt. Delayed
 deployment evidence may update prompt body N to N+1 while the operation prompt,
 retrieval configuration, route, invocation boundary, backend, and model profile
 remain frozen. Raw resources are reported separately from the method decision.
 
-The immediate objective is Stage 1E: rebuild source-, extraction-set-, and attributable fact-level feedback around preregistered opportunity, use, and outcome contracts. Stages 1F-1H remain after it. Adaptive live runs remain blocked until all Stage 1 gates pass.
+The immediate objective is the host-neutral extraction policy envelope and immutable prompt artifact. Adaptive live runs remain blocked until the remaining Stage 2 optimizer, held-out validation, activation, rollback, and matched-run gates pass.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -340,7 +342,7 @@ Acceptance criteria:
 3. [x] Complete the SM01 learn -> ingest -> validate -> mutate -> restart -> native injection -> downstream-use fixture.
 4. [x] Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
 5. [x] Run and audit the static SM01 matched comparison.
-6. [ ] Complete the Stage 1H live plain-parent smoke after provider availability; Stage 1A-1G and the full deterministic regression are complete.
+6. [x] Complete and audit the Stage 1H live plain-parent smoke; see `extraction_stage1_acceptance_20260828.md`.
 7. [ ] Implement the extraction prompt artifact, optimizer, held-out validation, activation, and rollback path.
 8. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
 9. [ ] Produce dated extraction-method reports before making adaptation claims.
