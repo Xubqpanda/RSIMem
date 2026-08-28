@@ -1,4 +1,9 @@
-"""Rebuild content-free metrics for a five-method adaptive PAST batch."""
+"""Rebuild a historical five-method threshold-infrastructure PAST batch.
+
+The heterogeneous lifecycle cost scalar is retained only to replay the
+superseded experiment. Current extraction-prompt reports use
+``extraction_experiment_analysis`` and never consume this scalar.
+"""
 
 from __future__ import annotations
 

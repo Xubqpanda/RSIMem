@@ -1,1208 +1,713 @@
-# RSIMem 实现与验收总清单
+# RSIMem Extraction-Prompt Online Adaptation 实现与验收清单
 
-最后更新：2026-08-27
+最后更新：2026-08-28
 
-## 1. 总体目标
+## 1. 文档定位
 
-这份 checklist 统一记录 RSIMem 两个阶段的串行实现和验收要求。
+本文是 RSIMem 当前唯一的实现与验收主清单。旧 checklist 中已经完成的 Hermes、PAST-Bench、semantic writeback、transaction、operation graph、feedback store、activation 和 rollback 基础设施继续保留，但不再沿用“future utility per cost + retrieval threshold adaptation”作为论文主线。
 
-- 第一阶段建立可复现、行为中立、可审计的 PAST-Bench + Hermes 实验环境，并将 lifecycle control plane 以 dry-run 方式接入真实 agent loop。
-- 第二阶段先完成 semantic memory 的真实 generation、transactional writeback、future retrieval、delayed feedback 和 adaptive memory policy。Episodic 与 procedural 只保留稳定接口和研究闸门，选定方法后再进入实现主线。
+当前工作严格分为两个串行阶段：
 
-两个阶段严格串行完成。第一阶段全部通过后才能开始第二阶段；每个子任务只有在功能、测试、证据和文档均通过验收后，才能开始下一个子任务。
+- 第一阶段：修正现有实现中偏离 extraction-prompt adaptation 的目标、契约、证据和实验 gate。
+- 第二阶段：实现由 delayed future feedback 驱动的 extraction prompt N -> N+1，并在未来 PAST-Bench matched run 中验证效果。
 
 状态约定：
 
-- `□`：尚未开始或尚未通过验收。
-- `进行中`：已经开始，但不能作为后续任务的稳定依赖。
-- `√`：功能、测试和证据均已通过验收。
+- `□`：尚未完成或尚未通过验收。
+- `进行中`：已开始，但不能作为后续任务的稳定依赖。
+- `√`：功能、测试、真实证据和文档均已通过。
+- `保留`：已有实现可复用，但不代表当前论文核心任务完成。
+- `延后`：不属于本轮串行路径。
 
-## 2. 当前研究范围
+## 2. 冻结研究范围与 Claim
 
-### 2.1 Benchmark 与 Host
+### 2.1 当前范围
 
-- 当前只使用 PAST-Bench。
-- 当前只使用 Hermes host。
-- 当前不接入其他 benchmark、host 或 agent framework。
-- 不修改 PAST-Bench task semantics、episode order、grader、answer key 或 hidden evaluation contract 来改善结果。
+- Benchmark 只使用 vendored PAST-Bench。
+- Host 只使用 Hermes。
+- Memory backend 只使用 Hermes native semantic storage，即 `MEMORY.md` / `USER.md`。
+- Memory algorithm 使用 RSIMem 内重写的 Mem0-flat semantic path，不在运行时 import MemBase。
+- 当前只优化 semantic fact-extraction prompt。
+- Extraction optimization core必须与memory backend和Host解耦；Mem0-flat/Hermes只是第一个adapter和实验载体，不属于optimizer contract。
+- Internal `ADD/UPDATE/DELETE/NONE` prompt、related-memory retrieval、future retrieval/injection surface、route、invocation boundary、backend 和基础模型参数保持冻结。
+- Episodic memory、procedural memory、context eviction、physical rewrite、其他 host 和其他 benchmark 全部延后。
 
-### 2.2 Memory Backend
-
-当前选择 Hermes native storage substrate，而不是把 MemBase 作为 runtime backend：
-
-| Memory kind | Hermes native substrate | 第一阶段 | 第二阶段 |
-|---|---|---|---|
-| Semantic | `MEMORY.md` / `USER.md` | 验证 native read、system-prompt rendering 和 adapter equivalence。 | **当前实现主线**：生成、更新和检索 durable fact、preference、rule 与 constraint。 |
-| Episodic | `state.db` session/message history | 验证 native FTS retrieval、session projection 和 adapter equivalence。 | **暂缓**：只保留 read-only contract；选定 episode segmentation、retention 和 retrieval 方法后再实现。 |
-| Procedural | `skills/**/SKILL.md` 及 resources | 验证 native list/view、resource projection 和 adapter equivalence。 | **暂缓**：只保留 contract；选定 Context2Skill、Text2Skill、SkillCreator 或其他 trajectory-to-skill 方法后再实现。 |
-
-MemBase 的 dataset、runner 和 evaluation pipeline 不进入 RSIMem。仅将本地 `/mnt/20t/xubuqiang/Study/MemBase` 中的 memory-layer 实现作为算法参考，在 RSIMem 内重写所需的最小逻辑，不在运行时 import 或调用 MemBase。
-
-第一个实现选择 Mem0 flat-memory algorithm：关闭 graph store，只保留 fact extraction、related-memory retrieval、内部 `ADD/UPDATE/DELETE/NONE` 决策和 flat retrieval。选择 Mem0 而不是 NaiveRAG，是因为 NaiveRAG 只做分块与向量检索，没有 model-based memory extraction 或 add-time update；选择 Mem0 而不是 LangMem，是因为 Mem0 的 prompt 和核心实现已经 vendored 在 MemBase 中，更容易固定版本、审计和本地重写。
-
-MemBase 的统一 layer API 覆盖多种主导表示形态，不能将其中所有系统都称为 semantic memory：
-
-| MemBase layer | 主导表示形态 | 与当前实现的关系 |
-|---|---|---|
-| Mem0 | 原子事实、偏好和 profile 型 semantic memory；flat 模式也保留 add-time conflict resolution。 | 当前第一个 semantic algorithm reference。 |
-| LangMem | 由对话抽取并维护的 semantic records。 | 后续 semantic baseline 候选。 |
-| HippoRAG2 | 文档、实体和关系组织形成的 relational semantic memory。 | 后续 relational retrieval baseline 候选。 |
-| Long-Context | 原始消息流组成的 bounded trajectory/context。 | 更接近 raw episodic/context baseline，不是 semantic compiler。 |
-| NaiveRAG | 对消息块或文档块做 embedding retrieval。 | 更接近 uncompiled episodic/document retrieval baseline。 |
-| A-MEM | 带时间、上下文、标签、链接和演化历史的 atomic agentic notes。 | Episodic 与 semantic 的混合形态。 |
-| MemOS | Reader 抽取 long-term/user memory，再以 tree structure 组织。 | Hybrid textual memory，不能视为单一类别。 |
-| EverMemOS | Event/episode、profile 和 foresight 共同组成的 personal memory。 | 明确的 episodic + semantic/profile + prospective hybrid。 |
-
-该表描述的是各实现的主导表示形态，不是互斥 taxonomy。Memory system 名称、存储结构和认知类别不是一一对应关系；当前论文只先实现其中边界最清楚、最容易做 matched comparison 的 flat semantic path。
-
-### 2.3 阶段边界
-
-第一阶段允许：
-
-- 读取 Hermes native memory。
-- 将 native memory 投影到 host-neutral typed contracts。
-- 构建 context snapshot。
-- 调用 deterministic evaluator 或受控的 lifecycle evaluator。
-- 生成并验证 dry-run writeback plan。
-- 记录 content-free lifecycle、usage 和 accounting evidence。
-
-第一阶段禁止：
-
-- 执行 semantic、episodic 或 procedural memory compiler。
-- 调用 memory distillation prompt 生成新 memory。
-- 对 `MEMORY.md`、`USER.md`、`state.db` 或 `skills/**` 执行真实 mutation。
-- 根据 dry-run plan 删除或重写真实 model context。
-- 根据 delayed feedback 更新 prompt、规则、scorer 或 policy version。
-- 宣称已经实现 memory generation、memory evolution 或 recursive self-improvement。
-
-第二阶段只有在第一阶段全部通过后才允许：
-
-- 执行版本化 semantic ingestion prompt。
-- 执行 validation、transactional mutation、reread verification 和 recovery。
-- 在固定 Hermes semantic route 和固定 invocation boundary 下运行 semantic memory policy。
-- 根据统一 future-utility-per-cost objective 评估并更新 semantic generation/update/retrieval policy。
-- 根据 deployment-observable delayed feedback 提议和激活下一 policy version。
-- Episodic/procedural 只有通过各自研究闸门后，才复用同一 transaction、ledger、feedback 和 activation infrastructure。
-
-### 2.4 统一设计哲学
-
-Hermes backend、Hermes native memory routing、policy invocation schedule 和基础模型参数在当前论文中保持固定。当前 semantic-first 实现更新两类对象：
-
-- Memory state：artifact 被新增、更新、保留、淘汰、召回或 supersede。
-- Memory policy：每条固定 route 内负责 memory extraction、内部 conflict resolution、consolidation 和 retrieval ranking 的 prompt、规则、threshold 或轻量 scorer。
-
-Hermes native routing 固定为：semantic 由 memory review/tool path 处理，episodic 由 session persistence/search path 处理，procedural 由 skill review/manager path 处理。Hermes 并不存在一个统一的 semantic/episodic/procedural classifier，因此不将其描述为“自动三分类 compiler”。当前只优化 semantic route；另外两条 route 继续作为行为中立的 adapter/read-path contract 存在。
-
-RSIMem 对 memory framework 只暴露统一 `ingest/add` 操作，不在 framework 外部预测 ADD 还是 UPDATE。一次 ingestion 可以由内部 policy 产生 `ADD`、`UPDATE`、`DELETE` 或 `NONE`，这些内部 operation 必须作为 framework outcome 被记录、计费和审计。该设计减少重复决策，但不等于系统禁止 update。
-
-完整方法闭环为：
+### 2.2 当前方法定义
 
 ```text
-context and task outcome
-  -> enter a fixed Hermes memory route at a fixed boundary
-  -> run the selected route-specific memory policy
-  -> internally add, update, delete, or retain memory
-  -> validate and persist
-  -> retrieve and inject in later tasks
-  -> observe use, non-use, outcome, supersession and cost
-  -> generate delayed utility labels
-  -> propose and validate policy version N+1
-  -> activate version N+1 in the same fixed route and boundary
+completed Hermes experience
+  -> frozen semantic compilation boundary
+  -> extraction prompt N
+  -> fixed Mem0-flat update/writeback
+  -> future eager exposure / observable use / downstream outcome
+  -> delayed extraction feedback
+  -> extraction prompt proposal N+1
+  -> held-out validation
+  -> production activation
+  -> future matched PAST-Bench evaluation
 ```
 
-只完成 memory writeback 时，只能声明 static memory lifecycle。Policy N+1 确实由 delayed feedback 产生、通过 held-out validation 并改善同一固定 route 的后续 memory behavior 后，才能声明 memory-mediated self-improvement。至少完成两次可重放 policy iteration，并让新 evidence 继续进入下一轮更新后，才能使用 recursive self-improvement 表述。
+### 2.3 Policy Update Signal
 
-## 3. 当前已完成的基础
+允许进入 extraction prompt optimizer 的信号：
 
-- √ 将 PAST-Bench 与 Hermes vendored 到 `benchmarks/past-bench`，保留 upstream attribution 和 license。
-- √ 建立 Python 3.11 development environment 和本地安装流程。
-- √ 实现 request-level model usage accounting、ledger 和 audit。
-- √ 定义 semantic、episodic、procedural memory contract、backend registry 和 runtime。
-- √ 实现 Hermes semantic、episodic、procedural native-format adapter。
-- √ 定义 `native`、`native+ledger`、`native+adapter+ledger` 三种显式执行模式，direct native 保持默认。
-- √ 实现 storage-boundary deterministic equivalence fixture。
-- √ 实现 Hermes system prompt、`session_search`、`skills_list` 和 `skill_view` execution-surface fixture。
-- √ 实现 deterministic PAST-Bench Hermes agent-loop fixture。
-- √ 对齐 episodic FTS5 normalization、filter、session lineage、conversation projection 和损坏字段行为。
-- √ 将 runtime evidence 按事件 flush 和 fsync，不等待进程正常退出后统一落盘。
-- √ 定义 `ContextSnapshot`、`WritebackPlan`、revision、provenance 和 dry-run idempotency receipt。
-- √ 当前回归基线为 RSIMem `90 passed` 与 PAST-Bench `384 passed, 2 skipped`。
+- Extraction 当时可见的 bounded completed context。
+- Policy N 实际生成的 extracted fact set。
+- Fact 或 extraction set 后续是否有 exposure opportunity。
+- 后续是否被注入、显式使用、supersede、证明冲突或关联到 deployment-observable outcome。
+- 受 observation cutoff、censoring 和 attribution confidence 约束的 missed-extraction evidence。
 
-## 4. 全局验收原则
+禁止进入 optimizer 的信号：
 
-### 4.1 行为中立
+- Official PAST-Bench score、grader、answer key、hidden expectation 或 judge feedback。
+- Validation/test batch 中尚未到达的 future evidence。
+- Model calls、tokens、latency、storage、recovery 或任何合成 cost unit。
+- Route selection、invocation schedule、backend selection 或模型参数更新。
 
-- direct native 必须保持默认开启。
-- 关闭 RSIMem 时，Hermes 的输入、存储、prompt、tool surface 和输出路径不能改变。
-- `native+ledger` 只能增加 observer evidence，不能改变 memory decision。
-- `native+adapter+ledger` 必须保持 Hermes model-visible memory surface 等价。
-- fallback 和 bypass 必须显式配置并产生 evidence，不能静默降级。
+### 2.4 Cost 与效果边界
 
-### 4.2 安全与隐私
+- Cost 只属于 evaluation/accounting plane，不属于 policy learning plane。
+- 正式报告保留 model calls、各 token bucket、retry、wall time、storage bytes、injected chars 和 recovery duration 等 raw vector。
+- 不把 request、token、byte、character 和 millisecond 直接相加为可用于结论的 `lifecycleCostUnits`。
+- Provider 未返回的 usage bucket 保持 unknown；当前廉价 provider 的 unknown 不阻塞功能开发，正式实验使用支持完整 usage 的 provider 或在报告中保留 unknown。
 
-- grader、answer key、hidden score 和未来 episode 信息不能进入 evaluator 或 dry-run policy。
-- ledger、audit、receipt、reason code 和异常 trace 不能包含 context、memory、prompt、response、credential 或用户绝对路径原文。
-- active/current/unresolved segment 和 open tool closure 必须保持 protected。
-- evaluator、adapter 或 evidence persistence 失败不能改变 Hermes memory 或 active context。
+### 2.5 当前最低 Claim
 
-### 4.3 可复现性
+第一版最低目标是一次真实 online extraction-policy adaptation：
 
-- 每次运行记录 RSIMem commit、PAST-Bench commit/tree、dirty state、model profile、judge profile、task manifest、budget 和执行顺序。
-- provider 不支持 seed 时，明确记录 independent unseeded replicate，不能将其描述为 seeded run。
-- 所有 experiment mode 使用隔离的 HOME、state directory、trace directory 和 persistence state。
-- raw resource quantity 与 provider price 分开保存。
+1. Policy N 在过去 deployment 中产生可审计 delayed feedback。
+2. 只使用过去 evidence 生成 extraction prompt N+1。
+3. N+1 通过独立 held-out validation 后被激活。
+4. 未来 run 实际加载 N+1，并至少改变一次 extraction output 或 persisted memory behavior。
+5. Adaptive N+1 的 matched aggregate primary task score 高于 static N。
 
-### 4.4 Prompt、Policy 与 Accounting
+完成以上条件可以声明 observed online extraction-policy adaptation。N+2、repeated/recursive self-improvement、跨 family 泛化和统计显著 superiority 不属于当前完成条件。
 
-- Lifecycle evaluator、route-specific ingestor/generator、retrieval scorer 和 policy updater 使用显式版本与 content digest。
-- Policy version 由 host configuration 选择，模型不能声明或覆盖当前版本。
-- Prompt template 可以进入 manifest；包含 context/memory 的 rendered prompt 和 model response 原文不能进入 ledger 或公共 report。
-- Evaluator、ingestor/generator、retrieval scorer、policy updater、retry、fallback 和 recovery 的模型调用全部进入 usage accounting。
-- Unknown usage 保持 `null`，不能推断为零。
-- Shared physical execution 只计费一次，但允许关联多个 lifecycle observation。
+### 2.6 第一版 Useful Signal 与优化目标
 
-### 4.5 Memory Safety
+第一版不让一个通用LLM直接判断“这条memory是否有用”。每个family必须在运行前注册版本化`OpportunityContract`、`UseContract`和`OutcomeContract`，再由统一resolver将deployment-observable evidence映射为label：
 
-- Memory 必须先完成 validation、persistence 和 reread verification，之后才允许 source context 逻辑退场。
-- UPDATE 必须绑定 backend、artifact ID 和 expected revision，不允许 last-write-wins 覆盖未知新版本。
-- Generated procedural memory 必须通过 Hermes-compatible security scan。
-- Raw framework output 不能绕过 host-neutral validation 直接写入 Hermes。
-- Evaluator、ingestor/generator、validator、backend 或 recovery failure 不能造成 memory 半写入或 context 不可恢复删除。
+```text
+useful
+  = observed opportunity
+  + explicit use attributable to the extraction output
+  + successful observable outcome
 
-## 5. 标准验收命令
+harmful
+  = extraction-owned unsupported/transient/conflicting memory
+  or explicit use followed by a deterministically attributable harmful outcome
 
-每个子任务至少运行聚焦测试。每个串行工作块结束前必须运行完整回归：
+missed
+  = bounded source中存在可精确绑定的durable information
+  + policy N没有生成等价fact
+  + future task出现可观测的明确需求
+  + failure可归因于该信息缺失而不是retrieval/application/model failure
+```
+
+统一判定规则：
+
+- Eager system-prompt injection本身不是opportunity或use；只有future task与memory scope/key匹配时才产生opportunity。
+- Use signal必须对应past memory携带而当前future task输入没有重新提供的信息；如果当前用户消息、工具结果或环境状态已经直接给出同一事实/规则，则该行为不能归因于memory，最多形成set-level unresolved evidence。
+- `injected_not_used`默认是`unresolved`。只有预注册contract能证明存在使用机会且缺失行为属于extraction component时，才允许产生negative/missed signal。
+- Memory被正确提取和注入但Agent没有使用时，不自动惩罚extraction prompt；该问题归入future application/retrieval component或unresolved。
+- Observation window不完整、没有相关future task、多个artifact无法唯一归因、证据冲突或只有模型主观判断时，分别记为`censored`或`unresolved`，不进入resolved denominator。
+- 多fact共同影响一次future outcome且无法拆分贡献时，只生成一个extraction-set-level label；不把同一次成功复制成多个fact-level positive。Fact-level label只在artifact/use/outcome可以唯一绑定时生成。
+- Primary optimization unit是一次completed source对应的extraction set及其future opportunity，不是fact数量，防止把一个fact拆成多条来放大reward。
+
+第一版primary objective冻结为resolved observed useful rate：
+
+```text
+resolved_useful_rate = useful_set_count / (useful_set_count + harmful_set_count)
+observed_harmful_rate = harmful_set_count / nonempty_extraction_set_count
+nonempty_coverage = nonempty_extraction_set_count / matched_completed_source_count
+empty_extraction_rate = empty_extraction_set_count / matched_completed_source_count
+high_confidence_missed_rate = missed_set_count / missed_assessable_source_count
+```
+
+所有分母为0时对应metric记为unknown，不能伪装成0。`unresolved`和`censored`不进入resolved useful rate分母，但必须完整报告。Non-empty coverage只用于与同一matched source上的parent比较，不表示每个completed task都应该产生memory；允许candidate正确输出空集合，但不能通过大面积清空输出来刷高useful比例。Proposal不能仅靠少提取或不提取提高比例，activation还必须同时满足以下预注册约束：
+
+- Resolved sample count达到`minimum_resolved_examples`，分母为零时禁止proposal和activation。
+- Candidate的`resolved_useful_rate`严格高于parent，最小delta必须在查看validation前冻结且大于0。
+- `observed_harmful_rate`不高于parent；unsupported、transient和conflicting extraction分别报告，不能相互抵消。
+- Non-empty extraction coverage不低于parent乘以预注册的`minimum_coverage_ratio`，empty extraction rate不得超过预注册上限。
+- 高置信度missed extraction rate不高于parent；没有可靠missed contract时该family不得伪造该指标，只能标为unknown。
+- Schema、safety、prompt leakage和native-writer contamination failure必须为0。
+- Cost、token、latency和storage不进入上述目标或约束，只随实验结果报告。
+
+SM01第一版contract必须明确：只有预注册的`eval_near/eval_far`报告任务构成TSV preference opportunity；future task输入没有重新提供TSV preference时，合法四列表头及非空数据行才构成memory-specific use signal；task completion及预注册的非grader输出/工具条件构成outcome signal。单artifact时允许fact-level归因，多artifact时最多生成set-level evidence。仅检测到TSV格式而没有memory-specific opportunity，当前turn已直接要求TSV，或只因最终回答缺少TSV，均不能自动把某条已正确提取的memory判为harmful。
+
+## 3. 可复用的已完成基础
+
+以下能力保留，不重新实现：
+
+- √ PAST-Bench 与 Hermes vendoring、安装、preflight 和 GPT-Luna runner。
+- √ `native`、`native+ledger`、`native+adapter+ledger` 显式执行模式与 direct-native 默认路径。
+- √ Request-level model usage、billing execution identity、ledger 和 audit。
+- √ Semantic、episodic、procedural typed contracts 与 Hermes native adapters；当前只启用 semantic mutation。
+- √ `ContextSnapshot`、tool closure、revision、provenance、writeback plan 和 idempotency foundation。
+- √ Mem0-flat extraction、related-memory comparison 和 internal `ADD/UPDATE/DELETE/NONE` implementation。
+- √ Mutation validation、transaction receipt、CAS、reread verification、restart recovery 和 rollback foundation。
+- √ Content-free atomic operation graph 与 source/extraction/mutation/future operation lineage。
+- √ Delayed-feedback dataset identity、cutoff、censoring、exposure、stage gate 和 immutable store foundation。
+- √ Adaptive artifact lifecycle state、atomic ACTIVE pointer、rejection、rollback 和 restart-safe store foundation。
+- √ Matched experiment manifest、replicate rotation、attempt retention、persistence isolation 和 five-method analysis foundation。
+- √ 已完成 static SM01 三方法实验；结果继续保存在 [`static_sm01_20260827.md`](static_sm01_20260827.md)。
+- √ 已完成 static utility infrastructure 实验；它保留为历史工程证据，不再定义当前 adaptive objective。
+
+当前已验证基线：RSIMem `345 passed`；PAST-Bench `390 passed, 2 skipped`；compileall、`pip check` 和 diff check 通过。该数字只表示重写 checklist 前的代码基线，后续每个任务必须记录新的实际结果。
+
+## 4. 审计发现：必须在第一阶段修正的问题
+
+### D01：Adaptive Objective 仍错误命名为 Utility Per Cost
+
+当前 `ADAPTIVE_POLICY_OBJECTIVE` 使用 `delayed-future-utility-per-cost-v1`，adaptive feature 列表包含 `raw_resource_usage`，offline/matched validator 也使用 cost gate。这与当前冻结方法冲突。
+
+修正目标：新 adaptive schema 只表达 delayed future utility；resource usage 只留在 audit/report，不进入 learner 和 activation decision。
+
+### D02：当前 Production Learner 只更新 Retrieval Threshold
+
+`adaptive_preparation.py` 只创建 `retrieval_accept_threshold`，runtime config 和 binder 也只支持数值 threshold。该路径只能证明 online-update plumbing，不能证明 extraction prompt optimization。
+
+修正目标：threshold 路径保留为 legacy infrastructure，不再被 launcher 命名为正式 `adaptive-rsimem`；核心 ACTIVE artifact 必须是 extraction prompt artifact。
+
+### D03：Prompt Artifact 只有 Digest，没有可部署 Template Body
+
+现有 `PromptArtifact` 描述静态代码内模板的 identity，`AdaptivePolicyArtifact.prompt_refs` 只保存引用，无法持久化、验证和部署模型生成的新 prompt 内容。`PromptSourceProvenance` 也只支持固定 Git upstream，不适合 generated child prompt。
+
+修正目标：新增带 parent lineage、完整可部署 policy body、生成 provenance 和 content digest 的 extraction prompt artifact；不能把 prompt 文本伪装成 numeric parameter。
+
+### D04：Extraction 与 Update Prompt 被强制共用 Policy Version
+
+`Mem0FlatSemanticPolicy` 要求 fact prompt 与 operation prompt 的 `policy_version` 完全相同。只升级 extraction prompt 时，要么错误地改写 update prompt version，要么无法构造 policy。
+
+修正目标：每个 component 拥有独立 artifact identity，composite semantic policy manifest 显式组合 extraction prompt digest、update prompt digest、retrieval config digest、route 和 boundary。
+
+### D05：Semantic Compilation 依赖 Eviction Plan
+
+当前真实 semantic writeback 只有在 lifecycle evaluator 生成 `ContextAction.EVICT + WritebackAction.ADD/UPDATE` plan 后才运行。Extraction 是否执行因此被一个与当前论文无关的 context-eviction decision 控制。
+
+修正目标：在固定 completed-task boundary 上直接构建 semantic compilation request；context eviction 和 physical rewrite 保持 disabled，不能成为 extraction prerequisite。
+
+### D06：Plan Source 与 Prompt 实际输入不一致
+
+当前 deterministic evaluator 的 plan 通常只绑定第一个 completed user segment，但 `StaticSemanticWritebackRuntime` 将 snapshot 中全部 messages 放入 `MemoryExperience`，extraction prompt 实际读取未被 plan source IDs 完整绑定的内容。
+
+修正目标：定义唯一 `ExtractionSourceProjection`；其 message IDs、内容 digest、prompt input、provenance、idempotency identity 和 optimizer corpus必须完全一致。
+
+### D07：Task-Completed 与 Session-End 语义不一致
+
+当前 lifecycle 在 task-completed 和 session-end 都生成 plan，但 semantic writeback 只消费 task-completed 结果。Session-end plan 会产生多余 dry-run evidence，使 checklist 声称的 invocation boundary 与真实 extraction boundary 不一致。
+
+修正目标：第一版 extraction 只使用 `task_completed`；同一 completed experience 只能编译一次。Session-end 仅负责 cleanup，不生成第二个 semantic compilation attempt。
+
+### D08：Feedback Dataset 看不到 NONE、无 Fact 和 Missed Extraction
+
+当前 builder 只遍历具有非 `NONE` mutation 和 target artifact 的 operation。没有提取 fact、fact 被过滤、internal `NONE` 或应提取但遗漏的 source 都不会形成 training example。
+
+修正目标：新增 source-level 和 extraction-set-level example；即使没有 mutation，也必须记录 extraction result、future observation window 和 unresolved/missed status。
+
+### D09：Content-Free Dataset 无法直接优化 Prompt
+
+Operation graph 只保存 ID、digest 和 metadata，适合审计但不包含 source text、old extraction output 或 future evidence content。Prompt optimizer 无法仅凭这些字段提出规则修改。
+
+修正目标：保留 content-free audit dataset，同时新增 owner-controlled、ignored、content-bearing optimizer corpus；两者必须通过稳定 ID/digest exact join。
+
+### D10：SM01 Feedback Resolver 不是通用 Use Evidence
+
+当前 `sm01_tsv_v1` 通过 final response 是否包含四列 TSV 推断 reuse，并在 future surface 多于一个 memory artifact 时整体 censor。Hermes semantic path实际是 blank query 后将全部 memory eager 注入，不是 selective retrieval。
+
+修正目标：显式记录 `exposure_mode=eager_system_prompt`；不把 eager exposure 称为 selective retrieval，不把 injected-but-not-used 自动标为 negative；支持 extraction-set-level outcome，并只在证据可唯一归因时生成 fact-level label。
+
+### D11：Offline 与 Matched Validation 仍是 Threshold-Specific
+
+Offline validator 使用 threshold 对 0/1 target 的 squared error；matched validator 使用 positive-rate、cost ratio、stability 和 uncertainty。这些 contract 不能直接评价 prompt artifact。
+
+修正目标：为 extraction prompt 单独定义 validation observation、quality metric 和 decision schema，不复用 threshold error 作为 prompt quality。
+
+### D12：Matched Gate 包含无效或虚假的条件
+
+- `minimum_quality_delta=0` 允许零提升通过。
+- `maximum_cost_ratio=1` 将 cost 错误地作为 activation gate。
+- Live assembler 将 `stability_failure=False` 和 `uncertainty=0.0` 硬编码为已知值。
+- 异构 request/token/storage 被相加为 lifecycle cost。
+
+修正目标：Prompt activation 只使用可真实重建的 delayed extraction quality 与安全 gate；未测量字段删除或标为 unknown，不能使用常量冒充证据。
+
+### D13：新 Live Run 被映射成旧 Validation Example ID
+
+Matched assembler 按 replicate 位置把新 live run 包装成旧 split 的 `example_id/episode_id`，实际 derived example identity 只放在旁路 source metadata 中。
+
+修正目标：每个 live observation 使用自身真实 run/task/episode/extraction identity；parent/proposal 通过 predeclared pair ID、task manifest digest、replicate slot 和 execution profile配对，不冒用历史 example identity。
+
+### D14：Feedback Collection 使用带 Cost Gate 的 Parent Policy
+
+`FEEDBACK_METHOD_VARIANTS` 当前只有 `static-utility-rsimem`，正式 adaptive methods 中 static/adaptive 也都启用 utility gate。因此旧 feedback 并非来自“只冻结 extraction prompt、其余行为一致”的 parent policy。
+
+修正目标：新 parent variant 使用 plain static Mem0-flat extraction/writeback，不启用 cost utility gate；N 与 N+1 唯一允许变化的是 extraction policy body。
+
+### D15：Formal Feedback Batch 没有强制 Clean Tree
+
+Adaptive final launcher要求 clean tree，但 static feedback launcher允许 dirty RSIMem tree并只在 manifest 中记录。这样 training evidence 无法对应唯一源码状态。
+
+修正目标：所有正式 feedback、validation 和 final evaluation batch 都要求 clean RSIMem tree、clean PAST tree、固定 commit/tree 和不可复用 batch ID。
+
+### D16：缺少 Prompt Activation Fingerprint
+
+当前 audit 只能证明 active policy version 出现在 utility evidence，不能证明新的 extraction prompt template 被实际渲染、改变输出并影响 persisted memory。
+
+修正目标：建立 `ACTIVE artifact -> rendered prompt -> extraction output -> mutation/artifact -> future exposure/use/outcome` 的逐级 fingerprint 和计数。
+
+### D17：Native Hermes Writer 隔离不是 Fail-Closed
+
+当前 static writeback 会从显式 `enabled_toolsets` 中移除 `memory`，并通过 `skip_memory=False` 保留 native memory prompt read surface。在现有 PAST 配置中 memory tool 与 background review 没有触发，但当 `enabled_toolsets` 为空列表时，Hermes 的工具解析可能回退到全部默认工具，使 native memory writer重新出现。
+
+修正目标：Static/adaptive RSIMem显式禁用 native `memory` tool、memory nudge和background memory review，同时保留只读system-prompt injection；不能依赖某个task恰好提供非空toolset。
+
+### D18：按 Replicate 切分仍会重复同一 Task Template
+
+当前SM01 feedback、validation和final launcher虽然使用不同run与replicate，但每次都重放同一组固定PAST-Bench task文本。Prompt optimizer如果已经看过过去replicate中的eval source/final response，再在相同task template上测试，会形成benchmark task leakage；unseeded model variation不能替代数据独立性。
+
+修正目标：Formal prompt experiment按family或task-template group隔离train、validation和final test；同一task manifest digest的重复replicate只能属于同一个split。单一SM01重复实验只作为pipeline pilot，不作为最终paper effect evidence。
+
+### D19：缺少 Host-Neutral Prompt Slot 与 Backend Adapter Contract
+
+当前 Mem0-flat 虽然允许构造时传入 `fact_prompt`，但 prompt identity、默认模板、policy construction 和 runtime binding 都写在 Mem0-flat 实现内部。系统没有统一方式让一个外部 memory implementation 声明“这个运行时入口是 semantic extraction prompt”，也不能证明仅给出的源码路径或 module symbol 就是实际模型调用所消费的 prompt。现有 TypeScript LightRSI runtime 也不能通过 npm import 直接替换 Python memory framework 内部对象。
+
+修正目标：定义 host-neutral `PromptSlot` 和 `MemoryPromptAdapter` contract。Backend 只需在真实 prompt consumption boundary 注册一个稳定 slot，optimizer、artifact store、validation 和 activation 只依赖 slot contract。第一版以 Python SDK/API 完成 Mem0-flat adapter；未来迁入 LightRSI 时共享语言无关的 artifact schema，并通过 Python SDK 或 IPC/sidecar 接入 Python backend，而不是依赖源码路径 monkey-patch。
+
+## 5. 第一阶段：修正既有偏离与证据缺陷
+
+第一阶段完成前，不运行新的 adaptive live batch，不生成论文效果结论。
+
+### 1A：重置方法与文档边界
+
+功能需求：
+
+- √ 将 adaptive objective 从 utility-per-cost 改为 delayed extraction utility，并升级 schema/version，禁止静默解释旧 artifact。
+- √ 从 learner feature ownership、offline validation 和 matched activation 中移除 resource cost。
+- √ 将 retrieval-threshold learner 标记为 `legacy_threshold_experiment` 或等价非论文路径。
+- √ 在 README、`progress.md`、experiment plan 和代码 docstring 中统一“第一版只优化 extraction prompt”。
+- √ 将 2J/2K 已完成表述改成“threshold infrastructure complete，extraction adaptation pending”。
+- √ 保留历史实验报告，不重写历史结果，但为旧 utility experiment 增加 superseded-method note。
+
+测试与验收：
+
+- √ 全仓搜索不再把 `future-utility-per-cost` 描述为当前方法目标。
+- √ 新 adaptive config 无 `cost_weight`、`maximum_cost_ratio` 或 `lifecycleCostUnits` learner field。
+- √ 旧 threshold artifact 不会被新 extraction runtime 当作兼容 artifact 加载。
+
+### 1B：解耦 Semantic Compilation 与 Context Eviction
+
+功能需求：
+
+- √ 新增显式 `SemanticCompilationTrigger.TASK_COMPLETED` 或等价 contract。
+- √ 由 trusted Hermes completion boundary 直接触发 semantic compilation，不要求 EVICT plan。
+- √ Context eviction、physical rewrite 和 saved-token accounting 保持 disabled/not applicable。
+- √ Failed、active、unresolved 或 open-tool-closure experience 不进入 completed semantic compilation。
+- √ Session-end 不再生成第二个 semantic plan；同一 task/source revision 重放返回同一 receipt，不重复调用 extraction model。
+
+测试与验收：
+
+- √ 在无 eviction evaluator 时，completed task 仍能执行一次 semantic extraction/writeback。
+- √ 开启或关闭 dry-run eviction observer 不改变 extraction request、model calls、mutation 或 memory bytes。
+- √ Task-completed 后再 close session 不产生第二次 extraction operation。
+- √ Active/current turn、open tool call 和 failed task 均 fail closed 且 backend mutation 为零。
+
+### 1C：冻结一致的 Extraction Source Projection
+
+功能需求：
+
+- √ 定义版本化 `ExtractionSourceProjection`，明确允许的 roles、tool closure、message order、content bounds 和 metadata allowlist。
+- √ 第一版投影使用完整 completed task experience，但不包含 system prompt、hidden grader、answer key、benchmark metadata 或 session 外消息。
+- √ `source_message_ids` 必须精确覆盖传给 extraction prompt 的每一条 message，不多不少。
+- √ Source projection digest 同时进入 request identity、idempotency receipt、operation artifact、prompt render evidence 和 optimizer corpus join。
+- √ Assistant claim 与 tool output可以作为带 role/type 的上下文输入，但 prompt contract继续禁止把未经用户或工具证据支持的 assistant acknowledgement 当 durable fact。
+- √ Source 大于预算时使用版本化、确定性的裁剪规则并记录 truncation，不允许调用方静默截断。
+
+测试与验收：
+
+- √ 增删、重排或修改任一投影 message 都会改变 source digest 和 request identity。
+- √ 未被 source IDs 绑定的 sentinel 不会出现在 rendered extraction prompt。
+- √ Tool call/result closure 不会被拆分；超预算裁剪保持 closure 原子性。
+- √ 同一 snapshot/task 重启前后生成相同 projection 和 digest。
+
+### 1D：拆分 Component Identity 与 Static Parent Policy
+
+功能需求：
+
+- √ Extraction prompt、update prompt 和 retrieval config分别拥有独立 version/digest。
+- √ 定义版本化、host-neutral `PromptSlotDescriptor`：至少包含 `slot_id`、`memory_kind=semantic`、`policy_stage=extraction`、input/output schema digest、frozen wrapper digest、model profile和owner adapter identity。
+- √ 定义 `MemoryPromptAdapter` 最小接口：列出 slot、读取 root artifact、校验 replacement artifact、将 artifact绑定到真实 policy factory，并返回actual binding fingerprint；optimizer不得 import Hermes、Mem0-flat或PAST-Bench实现。
+- √ Slot注册发生在真实prompt consumption boundary；源码文件路径或Python dotted symbol只能作为可选provenance，不能作为runtime replacement contract。
+- √ 第一个 `Mem0FlatPromptAdapter` 将 `mem0-flat.semantic.extraction` 显式绑定到 `Mem0FlatSemanticPolicy.fact_prompt`；未注册、重复slot、owner不匹配或目标不可替换时在模型调用前fail closed。
+- √ 新增 composite semantic policy manifest，明确 route、boundary、backend、framework 和三个 component identity。
+- √ `Mem0FlatSemanticPolicy` 允许 extraction prompt N+1 与 frozen update prompt N 组合，但 composite digest 必须变化。
+- √ Operation context记录 composite policy version；每个 operation 额外记录自己实际使用的 component artifact identity。
+- √ 新 static parent variant关闭 utility/cost gate，只运行 frozen extraction prompt + frozen update/retrieval。
+- √ Static/adaptive mode显式将native `memory` tool加入disabled set，并将background memory review关闭；`skip_memory=False`只用于读取和渲染RSIMem写入的native semantic files。
+- √ Native Hermes、RSIMem executor和operator recovery的每次semantic mutation拥有可区分writer identity；正式static/adaptive run只允许RSIMem committed receipt对应的writer。
+
+测试与验收：
+
+- √ 只改 extraction body时，只有 extraction component digest与 composite digest变化。
+- √ 使用同一host-neutral fake adapter可在不import Hermes/PAST-Bench的测试中完成root读取、replacement绑定、render和fingerprint校验。
+- √ Mem0-flat adapter只需一次显式注册即可加载root或ACTIVE extraction artifact；删除注册、给出错误slot ID或仅提供源码路径时不得静默报告绑定成功。
+- √ 实际completion request记录的render fingerprint必须与adapter返回的binding fingerprint一致，不能只证明artifact被store读取。
+- √ Update prompt、retrieval config、route、boundary、backend 或 model profile漂移会被 matched manifest拒绝。
+- √ Legacy static utility mode仍可回归，但不进入新 parent/adaptive launcher。
+- √ 在`enabled_toolsets=None`、空列表和非空列表三种配置下，static/adaptive model surface都不包含native `memory` writer，且background review model request为零。
+- √ 检测到无RSIMem receipt的semantic file mutation时audit失败。
+
+### 1E：修正 Feedback Evidence 与 Label Semantics
+
+功能需求：
+
+- √ Feedback builder同时生成 source-level、extraction-set-level 和可归因 fact-level examples。
+- √ 新增版本化`OpportunityContract`、`UseContract`和`OutcomeContract` registry；contract声明family、eligible stage、memory scope matcher、允许读取的deployment surface、use parser、outcome parser和ambiguity semantics。
+- √ Use resolver比较past-memory semantic key与current future input projection；current turn已重新提供同一信息时标记`current_input_confounded`，不得生成memory-attributed useful。
+- √ Primary label unit固定为`source_id + extraction_set_id + future_opportunity_id`；fact-level只能作为唯一归因时的诊断和optimizer example，不能重复增加primary reward。
+- √ `NONE`、empty extraction、filtered fact、failed mutation 和 no-mutation source均保留为 example，而不是被丢弃。
+- √ Eager system-prompt exposure与 selective retrieval使用不同枚举；当前 Hermes semantic path记录前者。
+- √ `injected_not_used` 在没有显式负面证据时标为 unresolved，不自动标为 negative。
+- √ Useful只来自`opportunity + explicit attributable use + successful observable outcome`；三段operation identity缺一不可。
+- √ Harmful只来自extraction-owned unsupported/transient/conflicting memory，或explicit use后的deterministically attributed harmful outcome；正确memory未被Agent采用不属于extraction harmful。
+- √ 没有曝光机会、多个 artifact 无法区分贡献、观察窗口不完整或信号冲突时标为 unresolved/censored。
+- √ Missed extraction必须同时绑定source span/digest、empty或不等价extraction result、future opportunity和absence-attributed outcome；任一缺失都保持unresolved。
+- √ 等价fact检查第一版优先使用family contract的deterministic normalized key/value或结构约束；若未来使用LLM matcher，必须独立版本化、冻结并禁止访问grader/answer，不能在当前SM01 pilot中临时加入。
+- √ Resource usage 从 label payload 中移出，单独保存在 accounting join。
+- √ Feedback resolver使用版本化family contract registry；每个train/validation/final family在运行前声明允许读取的deployment surface、use signal和ambiguity规则，未知family或缺失contract在模型调用前失败。
+
+测试与验收：
+
+- √ 覆盖 useful、harmful、empty、filtered、NONE、missed、ambiguous-multi-artifact、not-exposed 和 censored fixtures。
+- √ 删除opportunity、use或successful outcome任一证据后，useful label必须消失；仅有eager injection不能补足三段证据。
+- √ 同一次set-level success包含三个facts时，primary useful count仍为1；只有唯一绑定的fact-level diagnostic可以额外存在。
+- √ 正确fact已提取但未来Agent未使用时，不能生成extraction harmful或missed label。
+- √ SM01 多 artifact 不再让整次 extraction 无条件失效；允许 set-level label，fact-level不确定时保持 unresolved。
+- √ 删除 future use/outcome evidence 后 positive label不能继续存在。
+- √ Eager injection但无显式使用时不能生成 negative label。
+- √ Official score、grader、answer 和 expectation 在 label builder API 中不可达。
+- √ SM01、SM02、SM05等被选family各自具有正向、负向、ambiguous和censored contract fixture；不能把TSV parser复用于非TSV family。
+
+### 1F：重建 Prompt-Oriented Validation Contract
+
+功能需求：
+
+- √ 新 validation observation使用真实 live run/task/episode/extraction identity，不复用历史 example ID。
+- √ Parent/proposal pair由 `pair_id + replicate + task_manifest_digest + model_profile + budget + persistence_state` 精确绑定。
+- √ Activation primary quality固定为set-level `resolved_useful_rate=useful/(useful+harmful)`；unresolved/censored不进入分母，也不能伪装成0。
+- √ Acceptance config显式冻结`minimum_resolved_examples`、大于0的`minimum_useful_rate_delta`、`maximum_harmful_rate_delta`、`minimum_coverage_ratio`、`maximum_empty_rate`和`maximum_missed_rate_delta`，并固定每个metric的上述numerator/denominator定义。
+- √ Candidate必须同时通过strict useful-rate improvement与全部anti-collapse/safety constraints；任何一项unknown且该项被配置为required时拒绝。
+- √ Cost不参与 activation；raw cost仅随 decision report输出。
+- √ Stability和uncertainty只有在真实计算时才进入 report；否则为 unknown并不参与 gate。
+- √ Proposal generation次数和 candidate selection budget预先冻结，不能反复查看同一 validation 后无限改 prompt。
+- √ Split unit使用family/task-template group而不是run ID；相同task manifest digest不能跨train、validation和final test。
+
+测试与验收：
+
+- √ 旧/new identity冒用、pair错位、task digest漂移和variant缺失均 fail closed。
+- √ Equal quality、无 resolved evidence、仅随机 score波动或无实际 extraction intervention都不能激活。
+- √ Candidate输出全空、只保留一个高置信fact、将一个fact拆成多条或把unresolved从分母删除但不报告时均不能提高可接受quality。
+- √ Useful率提高但harmful、empty或high-confidence missed任一越界时保持REJECTED。
+- √ Positive delayed quality且所有安全条件通过时可以激活，即使 resource cost更高。
+- √ Validation decision可从 raw observation重建，且不读取 official task score。
+- √ 将同一SM01 task template放入不同split时，split audit必须拒绝。
+
+### 1G：修正 Experiment Manifest、Launcher 与 Analyzer
+
+功能需求：
+
+- √ 新方法名称明确为 `static-extraction-rsimem` 和 `adaptive-extraction-rsimem`，不复用 `adaptive_utility` 造成语义混淆。
+- √ Feedback collector使用 plain static parent extraction policy，不启用 utility gate。
+- √ Formal feedback、validation 和 final batch都要求 clean RSIMem/PAST tree并记录 commit/tree。
+- √ Manifest记录 source-projection version、extraction parent/active artifact、update prompt digest、retrieval config digest、feedback contract和proposal budget。
+- √ Manifest记录opportunity/use/outcome contract digest、primary objective schema、primary unit、resolved denominator和全部anti-collapse threshold。
+- √ Manifest记录split role、family/task-template group ID和task manifest digest，阻止同一template跨split复用。
+- √ Analyzer删除异构 `lifecycleCostUnits` 和由其派生的 `futureUtilityPerCost`；保留 raw vector。
+- √ Analyzer传播 usage completeness；unknown bucket不参与 delta和claim。
+- √ Analyzer增加 prompt activation funnel：eligible、rendered N+1、changed extraction、changed mutation/artifact、future exposure、use和outcome。
+- √ Analyzer分别报告eligible opportunity、useful、harmful、missed、unresolved、censored、non-empty coverage、empty rate和schema/safety failures；不只输出一个aggregate score。
+
+测试与验收：
+
+- √ Dirty tree、旧 artifact、wrong component digest、错误 method mapping和重复 batch ID在模型调用前失败。
+- √ Static/adaptive 两侧除 extraction artifact外的 manifest identity完全相同。
+- √ Unknown usage不阻止 quality analysis，也不会被计算成真实零。
+- √ 无 changed extraction时，analyzer拒绝 operation-attributed adaptation claim。
+
+### 1H：第一阶段回归与关闭条件
+
+- √ 所有 Stage 1A-1G 功能与反向测试完成。
+- √ Direct native、native+ledger和plain static semantic behavior回归通过。
+- √ Deterministic fixture证明一次且仅一次 completed-task extraction。
+- □ 一个低成本 live static smoke证明 source projection、plain parent policy、feedback set和raw accounting可重建。
+- □ `progress.md`、experiment plan和本文状态同步。
+- □ 记录完整 RSIMem、PAST-Bench、compileall、`pip check`、shell syntax、diff和secret scan结果。
+
+第一阶段关闭后才能开始 prompt optimizer 或新的 adaptive live run。
+
+## 6. 第二阶段：实现 Extraction Prompt N -> N+1
+
+### 2A：Extraction Policy Envelope 与 Artifact
+
+为降低 generated prompt 改坏 schema或安全边界的风险，第一版不允许模型重写整个 wire prompt。Prompt拆为：
+
+```text
+frozen system/safety/schema wrapper
+  + adaptive extraction-policy body
+  + frozen source_messages / exit_evidence slots
+```
+
+功能需求：
+
+- □ 定义不可变 `ExtractionPromptPolicyArtifact`，保存 adaptive body、parent artifact、version、digest和生成 provenance。
+- □ Adaptive body使用版本化`ExtractionPolicySpec`表示为有稳定rule ID的有序规则列表；frozen compiler将spec确定性编译成实际prompt body。
+- □ Child artifact保存parent spec digest、结构化rule edits、compiled body和compiler digest；重新应用edits必须逐字重建同一compiled body。
+- □ Artifact只引用host-neutral `slot_id` 和slot contract digest，不保存Python callable、module object、Hermes request或Mem0-flat内部类型。
+- □ Artifact记录 frozen wrapper digest、input/output schema digest、required placeholders、model profile和最大长度。
+- □ Generated provenance记录 optimizer model/config、training corpus ID/cutoff、proposal request digest、completion digest和usage。
+- □ Baseline Mem0-flat extraction prompt被导入为 root artifact N，不依赖代码常量才能部署。
+- □ Root artifact由adapter导出并可独立序列化；同一artifact可由fake adapter加载，证明其生命周期不依赖Mem0-flat源码位置。
+- □ Artifact store复用既有 crash-safe lifecycle思想，但使用独立 schema，不能与 numeric threshold artifact混读。
+- □ Prompt body不得包含 `$source_messages`、`$exit_evidence` 或其他模板控制字符；placeholder只属于 frozen wrapper。
+
+测试与验收：
+
+- □ Root、child、unknown parent、cycle、digest mismatch、oversize和schema mismatch测试通过。
+- □ Duplicate rule ID、unknown replace/delete target、protected rule修改、no-op edit和edit/body replay mismatch均被拒绝。
+- □ Exact artifact跨restart可重载并生成相同 rendered prompt。
+- □ Artifact篡改、多个 ACTIVE或错误 wrapper digest时fail closed到root static prompt。
+
+### 2B：Content-Bearing Extraction Optimizer Corpus
+
+Audit dataset继续content-free；optimizer corpus只存在于owner-controlled ignored output中。
+
+功能需求：
+
+- □ 每个 example保存 bounded source projection、policy N extracted fact set、persisted fact lineage，以及opportunity/use/outcome三段delayed evidence。
+- □ Example显式标记`useful/harmful/missed/unresolved/censored`、label level（source/set/fact）、attribution confidence、reason codes和component ownership。
+- □ Useful example只在三段证据完整时进入resolved optimizer bucket；harmful和missed必须携带各自的可重建归因链。
+- □ 同时保存对应content-free dataset/example/operation/artifact IDs与digests，支持exact join。
+- □ Corpus区分train、validation和future-test batch；future-test内容在N+1激活前不可达。
+- □ Corpus文件使用attempt-local路径、最小权限和显式retention policy，不进入Git、通用ledger或共享trace。
+- □ Credential、authorization header和机器路径在进入optimizer provider前通过专用secret boundary处理；不改变正常agent context，只保护optimizer副本。
+- □ Source content被作为untrusted data结构化传入optimizer，不能覆盖optimizer system instruction。
+
+测试与验收：
+
+- □ 同一frozen source/evidence重建canonical-equivalent corpus。
+- □ Content-free audit与content-bearing corpus任一join缺失、冲突或future-dated时fail closed。
+- □ Tracked-source/manifest/ledger中不存在corpus正文。
+- □ Corpus中不存在official grader、answer key、hidden expectation或future-test内容。
+
+### 2C：Extraction Prompt Optimizer
+
+第一版使用一个受控LLM meta-optimizer，根据历史example总结“什么应该提取、什么不应该提取”的规则。Optimizer不直接自由重写整个prompt，而是对parent `ExtractionPolicySpec`生成结构化rule edits，再由frozen compiler生成replacement policy body。
+
+功能需求：
+
+- □ 冻结optimizer system instruction、input schema、output schema、model profile、temperature、token budget和timeout。
+- □ 输入包含parent policy body，以及按useful/harmful/missed/unresolved分类的bounded training examples。
+- □ Optimizer input按source/set/fact层级分组，显式说明`unresolved/censored`不是negative，且同一set不能按fact数重复加权。
+- □ Output只允许`ADD_RULE/REPLACE_RULE/DELETE_RULE` edits、每个edit的evidence example IDs和结构化reason codes；candidate body由frozen compiler生成，不接受模型提供的第二份不一致body。
+- □ Protected durability、source-grounding、credential和schema规则只能位于frozen wrapper或protected rule set，optimizer不能删除或弱化。
+- □ Optimizer objective明确要求提高future observed useful proportion，同时保持harmful、coverage、empty和missed constraints；不输入cost或official task score。
+- □ Formal policy update默认只生成一个candidate；若未来增加K candidates，K和selection rule必须在查看validation结果前冻结。
+- □ 无resolved signal、只有censored evidence或attribution不足时返回`NO_PROPOSAL`，不为了推进实验强行改prompt。
+- □ Optimizer调用usage单独记录，但不作为optimizer目标或candidate排序依据。
+
+测试与验收：
+
+- □ Useful-only、harmful、missed、conflicting、low-sample和no-signal fixtures通过。
+- □ Optimizer将`injected_not_used`误当negative、将application failure归因给extraction或复制一次set success给多个facts时，proposal contract拒绝。
+- □ 相同captured optimizer completion生成相同artifact；不要求重新调用随机模型逐字复现。
+- □ Candidate body不能复制training source中的用户事实、task ID、答案、专有值或长n-gram；prompt必须学习规则，不能充当memory store。
+- □ Candidate rule不得出现SM01、TSV、固定列名、项目名或其他family-specific shortcut，除非该词原本属于frozen generic root contract；命中shortcut时拒绝而不是交给validation碰运气。
+- □ Prompt injection、credential exfiltration、schema override和benchmark-specific shortcut candidate被拒绝。
+
+### 2D：Static Safety 与 Offline Prompt Validation
+
+功能需求：
+
+- □ Contract validator检查body长度、字符、forbidden instruction、wrapper/schema digest和parent lineage。
+- □ Deterministic extraction suite覆盖durable preference、constraint、temporary request、unresolved claim、assistant-only acknowledgement、tool evidence、credential/path和empty source。
+- □ Candidate必须保持严格JSON `{facts: string[]}` output contract。
+- □ Offline validation在独立historical split上比较parent/candidate extraction utility，不使用official score。
+- □ Validation按set-level计算resolved useful rate，并同时检查harmful、non-empty coverage、empty extraction和high-confidence missed；不允许只靠少提取获得虚假提升。
+- □ 所有ratio同时输出numerator、denominator和unknown count；resolved denominator不足时拒绝，不能只报告百分比。
+
+测试与验收：
+
+- □ Candidate不能降低所有输出为空来通过negative-only样本。
+- □ Candidate只提取一个高置信fact时，即使useful rate为100%，只要coverage低于冻结floor也必须拒绝。
+- □ Candidate不能通过复制source或输出完整transcript提高recall。
+- □ Offline quality不严格高于parent时保持REJECTED。
+- □ Offline accepted只允许进入matched trial，不可直接写production ACTIVE。
+
+### 2E：Matched Trial、Activation 与 Rollback
+
+功能需求：
+
+- □ 在独立PAST-Bench validation batch中轮换运行parent N与proposal N+1。
+- □ Pair使用相同family、episode manifest、model、budget、home seed state和feedback contract。
+- □ Activation只看deployment-observable set-level useful rate、anti-collapse constraints和安全审计，不看official task score。
+- □ Proposal必须达到strict useful-rate delta、resolved sample下限，并同时通过harmful/coverage/empty/missed gate才激活；equal、unknown、conflicting或任一约束失败保持REJECTED。
+- □ Production activation原子切换唯一ACTIVE extraction artifact。
+- □ Operator rollback恢复parent N；自动rollback只在有真实定义的safety violation时触发。
+
+测试与验收：
+
+- □ Trial config不能被official final launcher误当production config。
+- □ Activation crash不会产生两个ACTIVE artifact。
+- □ Rejection、重复activation、restart和rollback幂等。
+- □ Decision记录真实pair IDs、artifact digests、U/H/M/unresolved/censored counts、各ratio分子分母、coverage、quality delta、constraint results和reason codes。
+
+### 2F：Runtime Prompt Binding 与 Activation Fingerprint
+
+功能需求：
+
+- □ Runtime通过 `slot_id -> MemoryPromptAdapter` registry解析唯一ACTIVE extraction artifact，由adapter组合frozen wrapper并注入真实policy factory。
+- □ 对开发者暴露的一行适配入口等价于显式注册一个slot，例如`prompt_slot("mem0-flat.semantic.extraction", default=..., schemas=...)`；该便利API必须落到同一adapter contract，不能使用全局monkey-patch。
+- □ Static N和adaptive N+1使用相同completion client、model profile、update prompt、retrieval config和backend。
+- □ 每次extraction operation记录actual extraction artifact ID/version/body digest、wrapper digest和render input digest。
+- □ Extracted fact、mutation和persisted memory lineage回连actual artifact。
+- □ Audit输出`eligible -> rendered -> changed extraction -> changed artifact -> future exposure -> use/outcome` funnel。
+
+测试与验收：
+
+- □ Config声明N+1但runtime加载N时fail closed。
+- □ Store中的slot ID、adapter owner、contract digest、wrapper digest或schema digest任一不匹配时，在extraction model调用前fail closed到明确配置的root policy；formal adaptive run不得静默fallback后继续标记为adaptive。
+- □ N/N+1产生相同extraction时记录no intervention，不伪装成changed decision。
+- □ N+1改变extraction但update/retrieval/component identity漂移时matched audit失败。
+- □ Restart后actual artifact fingerprint保持一致。
+
+### 2G：Deterministic End-To-End Gate
+
+- □ 构造一个过去context中含durable与temporary信息、未来任务只使用durable信息的fixture。
+- □ Policy N产生至少一个可归因问题，例如遗漏durable fact或提取temporary fact。
+- □ Fixture分别构造完整`opportunity -> use -> successful outcome` useful链和`source -> no equivalent extraction -> future demand -> absence-attributed outcome` missed链。
+- □ 删除任一useful/missed链节点后label退化为unresolved，而不是继续贡献optimizer reward。
+- □ Delayed feedback构建optimizer corpus并生成N+1。
+- □ N+1通过offline/matched fixture validation并被激活。
+- □ Future fixture实际加载N+1，改变extraction和persisted memory，并改善deployment-observable outcome。
+- □ 全链不读取grader/answer，不使用cost信号，不修改update/retrieval policy。
+- □ Restart、rejection、no-proposal和rollback反向路径全部通过。
+
+验收：只有结构化证据可以精确重建`N -> past feedback -> N+1 -> future changed extraction/outcome`时，才进入真实provider实验。
+
+### 2H：真实 PAST-Bench Online Adaptation
+
+正式实验严格按以下顺序执行，每一步审计通过后才能进入下一步：
+
+1. 冻结train/validation/final family或task-template split、model、budget、replicate、source projection、opportunity/use/outcome contracts、optimizer config、resolved useful-rate objective和全部anti-collapse acceptance criterion。
+2. 使用static parent N运行至少3个independent unseeded feedback replicates。
+3. 构建并审计optimizer corpus；若没有足够resolved extraction signal，停止并更换预声明的semantic memory family，不降低gate。
+4. 生成一个candidate N+1并完成offline validation。
+5. 运行独立parent/proposal matched validation batch；只有strict positive resolved useful-rate delta且全部anti-collapse/safety constraints通过才激活。
+6. 使用production ACTIVE N+1运行未来matched final batch，同时运行static N control。
+7. 汇总no persistence、native Hermes、static N和adaptive N+1；native+ledger只作为accounting control。
+
+Family规则：
+
+- 第一轮可以用SM01完成pipeline pilot，因为它已有显式TSV reuse contract；该pilot不能作为最终paper effect evidence。
+- Formal train、validation和final test使用互斥的semantic family/task-template group，例如在查看结果前从SM01、SM02、SM05中冻结各自角色；具体分配必须由feedback-signal可用性预检决定，而不是按效果挑选。
+- 若training family只能提供单一positive或大量ambiguous/censored evidence，不允许强行训练prompt；应在查看final test前调整预声明的training family集合，不降低resolved-signal gate。
+- Update-ability family不用于第一版update-prompt优化；若其任务能提供extraction质量信号，只能在明确冻结update prompt的前提下作为extraction验证family。
+
+最终效果验收：
+
+- □ 所有variant使用matched task manifest、model、budget、order、sandbox和persistence isolation。
+- □ 每个variant完成预设replicate；failed/provider run保留并单独报告。
+- □ N+1在真实run中至少一次改变extraction并影响persisted memory。
+- □ Adaptive N+1 aggregate primary task score严格高于matched static N。
+- □ 报告每个replicate、task score、pass rate、persistence gap和activation funnel。
+- □ 报告U/H/M/unresolved/censored原始计数、resolved useful rate及其分子分母、coverage和empty rate；不把unknown silently drop。
+- □ 报告raw calls/tokens/retry/latency/storage/injection/recovery，不生成无定义的混合cost结论。
+- □ 若只有aggregate正向均值，可声明observed uplift，不声明统计显著superiority。
+- □ 不要求N+2，不声明recursive self-improvement。
+
+### 2I：Ablation 与论文边界
+
+第一版只运行与extraction claim直接相关的ablation：
+
+- □ Static parent prompt vs adaptive extraction prompt。
+- □ Delayed-feedback optimizer vs 不使用delayed feedback的generic prompt rewrite。
+- □ Operation/source attribution vs 无差别episode feedback。
+- □ 包含missed-extraction evidence vs 只观察已提取fact的future evidence。
+- □ Constrained structured rule edits vs unconstrained free-form prompt rewrite。
+
+以下ablation标记为deferred/not applicable：
+
+- Update-prompt optimization。
+- Retrieval-threshold或retrieval-prompt optimization。
+- Lifecycle-cost optimization。
+- Episodic/procedural memory policy。
+- N+2 recursive iteration。
+- Cross-host或cross-benchmark generalization。
+
+## 7. 全局安全、复现与证据要求
+
+- 不修改PAST-Bench task semantics、episode order、grader、answer key或hidden evaluation contract来改善结果。
+- Official score只在final evaluation完成后由reporter读取，learner、validator和activation API不可达。
+- 所有formal batch要求clean tree、固定commit/tree、唯一batch ID和append-onlyattempt history。
+- Raw trace和content-bearing optimizer corpus不提交Git；content-free manifest、audit和derived report可独立审计。
+- Prompt optimizer和extraction model的每次物理请求都计入usage，不把离线优化视为免费。
+- Adapter、ledger、corpus writer或audit失败不能静默改变agent/memory behavior；formal experiment中证据缺失fail closed。
+- 每个schema变更升级version，旧artifact必须显式migrate或拒绝，不能按新语义静默加载。
+- “一行适配”是开发者在真实prompt调用边界进行一次显式slot注册，不表示LightRSI可仅凭任意源码路径可靠修改第三方框架。Python backend第一版使用Python SDK；npm/TypeScript侧只消费共享artifact contract或通过IPC调用，不直接patch Python对象。
+- 每个任务使用独立commit，包含功能、failure semantics、正反测试和文档状态更新。
+
+## 8. 标准验收命令
+
+在RSIMem仓库根目录运行：
 
 ```bash
-cd /path/to/RSIMem
+.venv/bin/python -m pytest -q
 .venv/bin/python -m compileall -q src tests
-.venv/bin/pytest -q tests
-.venv/bin/pip check
-git diff --check origin/main..HEAD
-
-cd benchmarks/past-bench
-../../.venv/bin/pytest -q
+.venv/bin/python -m pip check
+git diff --check
+bash -n scripts/*.sh
 ```
 
-PAST-Bench tests 必须从 `benchmarks/past-bench` 目录运行。从 RSIMem 根目录直接收集 `benchmarks/past-bench/tests` 会解析到冲突的顶层 `agent` module，不能将该入口的 collection error 当成产品回归。
-
-每个子任务的验收材料包括：
-
-- 精确 commit ID 和 dirty-worktree 状态。
-- 实际执行的命令和结果摘要。
-- fixture 的输入、模式、预期和输出路径。
-- failure、fallback、retry 和 restart 的 machine-readable evidence。
-- 对 benchmark semantics 未修改的确认。
-
-## 6. 第一阶段 1A：环境与配置冻结
-
-目标：保证任意后续实验都建立在同一套可定位、可隔离和可复现的环境上。
-
-### 1A.1 安装与依赖
-
-功能需求：
-
-- √ 从 clean checkout 建立 `.venv` 并安装 RSIMem 与 vendored PAST-Bench。
-- √ 固定 Python major/minor requirement，并检查 `pip check`。
-- √ 文档化 RSIMem 和 PAST-Bench 两套正确测试入口。
-- √ 增加一个不包含 secret 的 environment preflight command 或脚本，检查 Python、依赖、必须目录和可选 provider 配置。
-
-验收需求：
-
-- √ clean temporary HOME 下 preflight 能通过。
-- √ 缺失依赖、错误 Python、不可写 state directory 和缺失 provider configuration 分别给出明确错误。
-- √ preflight 不打印 API key、Authorization header 或完整机器专属路径。
-
-### 1A.2 Experiment Configuration
-
-功能需求：
-
-- √ 显式选择 `native`、`native+ledger` 或 `native+adapter+ledger`。
-- √ direct native 为默认模式。
-- √ 配置 failure policy、evidence path、replicate count 和 matched mode order。
-- √ 将最终使用的 model、judge、budget、task family、execution mode 和 persistence isolation 汇总到单一 manifest schema。
-
-验收需求：
-
-- √ manifest 缺少关键字段、包含未知 mode 或指向 dirty benchmark 时 fail closed。
-- √ manifest 记录实际执行值，而不是只记录用户请求值。
-- √ restart 后使用同一 manifest 能定位同一 experiment identity，但不会覆盖已有 attempt evidence。
-
-### 1A.3 阶段闸门
-
-- √ 在 clean temporary HOME 下完成安装、preflight、RSIMem tests 和 PAST-Bench tests。
-- √ 所有配置和版本信息可从 manifest 重建。
-- √ 环境检查不调用真实模型，也不产生 memory mutation。
-
-1A 验收记录（2026-08-27）：
-
-- 实现 commits：`1f174ab`（secret-free preflight）、`e1eafcd`（validated manifest/restart attempts）、`5e6a306`（resolved runtime/environment binding）。
-- Clean temporary venv 使用 Python 3.11，从当前 checkout 安装 `RSIMem`、`PAST-Bench[mock,sandbox,dev]` 与 vendored `hermes-agent`；无 provider credential 时 optional preflight 通过。
-- Clean temporary HOME 回归：RSIMem `90 passed`；从 `benchmarks/past-bench` 运行 PAST-Bench `384 passed, 2 skipped`。
-- Manifest v2 记录实际 registry model/base URL、run-config runtime/temperature/judge、逐 task `max_turns`/timeout、完整 installed distribution version map、代码 revision、dirty state、轮换顺序与隔离策略。
-- 已知限制：preflight 只验证 provider 配置存在，不发网络请求验证 provider 可用性；这是为了保证本阶段环境检查不调用模型。RSIMem dirty state 会被记录，PAST-Bench subtree dirty state会直接拒绝。
-
-## 7. 第一阶段 1B：Deterministic Read-Path 等价性冻结
-
-依赖：1A 通过。
-
-目标：冻结三个执行模式在没有模型随机性时的行为等价性。
-
-### 1B.1 Storage 与 Execution Surface
-
-功能需求：
-
-- √ 比较 semantic rendering、episodic FTS view 和 procedural resource projection。
-- √ 调用 Hermes 原生 system-prompt builder、`session_search`、`skills_list` 和 `skill_view`。
-- √ 覆盖 pagination、filters、session lineage、full conversation 和 linked skill resource。
-- √ 覆盖 restart-stable artifact identity。
-
-验收需求：
-
-- √ 三种模式产生完全相同的 model-visible deterministic output。
-- √ adapter evidence 不包含 memory text。
-- √ fail-closed 与 native-bypass 均有明确测试。
-- √ episodic query normalization 和 malformed structured field 与 native Hermes 一致。
-
-### 1B.2 PAST-Bench Agent Loop
-
-功能需求：
-
-- √ 在 deterministic fixture 中经过真实 `HermesAdapter.step` 和 `_run_agent` 路径。
-- √ fixture 同时触发 semantic、episodic 和 procedural read surface。
-- √ episode-local evidence 通过 run、variant、trace、task、family 和 stage 关联到 ledger。
-
-验收需求：
-
-- √ 三种模式的最终 model-visible fixture output 相同。
-- √ direct native 不产生 RSIMem runtime evidence。
-- √ 两个 ledger mode 的 query、retrieval 和 injection 各记录一次，不重不漏。
-- √ malformed、misplaced 或 conflicting evidence 被 audit 拒绝。
-
-### 1B.3 阶段闸门
-
-- √ RSIMem 全量回归通过。
-- √ PAST-Bench 全量回归通过。
-- √ deterministic read-path equivalence 已有可重复 fixture evidence。
-
-## 8. 第一阶段 1C：Live Matched Read-Path 验证
-
-依赖：1B 通过。
-
-目标：证明 typed adapter read path 在真实模型运行中没有引入可归因的系统性行为变化。
-
-### 1C.1 Matched Replicates
-
-功能需求：
-
-- √ 使用同一 model profile、judge profile、task manifest、budget、sandbox 和 provider 配置运行三个 execution mode。
-- √ 每个 mode 至少完成 3 个 independent replicate。
-- √ replicate 之间轮换 mode order，不能始终让同一 mode 最先执行。
-- √ 记录每个 attempt 的 scheduled order、actual order、failure stage 和 output directory。
-
-验收需求：
-
-- √ 所有成功 run 通过 `rsimem-audit`，usage reconciliation 和 physical request deduplication 为零漂移。
-- √ 三种模式不存在未解释的 task input、task order、storage state 或 budget 差异。
-- √ adapter mode 不存在静默 bypass、静默空召回或 evidence 丢失。
-- √ failed provider attempt 与 successful run 分开保存，不能删除失败 evidence。
-
-### 1C.2 Nondeterminism Boundary
-
-功能需求：
-
-- √ 比较 task score、pass rate、model requests、各 token bucket、tool calls、retries、stored bytes、injected chars 和 wall time。
-- √ 对逐 episode 差异进行 attribution，区分模型随机性、provider failure 和 adapter-caused divergence。
-- √ 在观察结果前定义统计汇总方式，不能根据结果临时选择有利指标。
-
-验收需求：
-
-- √ adapter-caused model-visible input difference 必须为零。
-- √ accounting drift 必须为零。
-- √ 不用一次 run 或任意拍脑袋阈值宣称“完全等价”。
-- √ 形成 dated report，明确样本量、失败 attempt、限制和是否通过阶段闸门。
-
-### 1C.3 阶段闸门
-
-只有 deterministic equivalence 继续通过、live runs 全部可审计且没有 adapter-caused divergence 时，才能进入 1D。provider instability 导致 replicate 不完整时，本工作块保持未完成，不提前开发后续接线。
-
-1C 验收记录（2026-08-27）：
-
-- Accepted batch：`outputs/matched/hermes_luna_sm01/20260827_073620`；RSIMem `24def06`；每 mode 3 个 order-rotated independent unseeded replicate。
-- Machine analysis：`stageGatePassed=true`、`issues=[]`；9 个 audit 全部通过，所有 run 17 traces，0 retry，0 accounting/privacy issue。
-- Adapter：每 replicate 28 个 same-call native-shadow projection check，共 84 个；0 mismatch、0 bypass、0 unresolved injection。
-- Quality：所有 mode/replicate 的 with-persistence evaluation `1.0/100%`，without-persistence `0.4/0%`；逐 episode score 与 pass 完全一致。
-- Dated report：`docs/matched_phase1c_20260827.md`。排除的开发批次和 live semantic-only 限制在报告中单列，未并入 accepted aggregate。
-
-## 9. 第一阶段 1D：真实 Hermes Lifecycle Dry-Run 接线
-
-依赖：1C 通过。
-
-目标：在真实 PAST-Bench Hermes loop 中构建 snapshot、运行 lifecycle evaluator 并产生 validated dry-run plan，但不生成或写入 memory。
-
-### 1D.1 Host Lifecycle Boundary
-
-功能需求：
-
-- √ 在 task completion 和 session end 接入明确 host event，不通过自然语言猜测任务是否完成。
-- √ context-pressure 只有在 Hermes 提供可信 token total 和 threshold 时启用；当前 live 配置未开放该触发器。
-- √ turn interval 和 tool boundary 保持默认关闭。
-- √ 同一 boundary 的重复 callback 产生相同 logical identity。
-
-验收需求：
-
-- √ deterministic fixture 精确触发一次 task-completed 和一次 session-end evaluation。
-- √ duplicate callback、retry 和 restart 不重复产生 accepted dry-run mutation；restart 记录为 persistent-receipt duplicate。
-- √ disabled mode 不构建 snapshot、不调用 evaluator、不生成 lifecycle artifacts，也不改变 Hermes 行为。
-
-### 1D.2 Live Context Snapshot
-
-功能需求：
-
-- √ 从真实 Hermes `state.db` message row、session 和 host task state 构造 `ContextSnapshot`。
-- √ stable segment ID 绑定数据库 row ID 与 tool call ID，不依赖消息列表位置。
-- √ task/session boundary 使用 `current_turn_id=None`，并正确标记 completed、unresolved 和 tool call/result closure。
-- √ snapshot revision 覆盖所有会影响 lifecycle decision 的结构化字段。
-- √ token total 等于 segment token count 之和；Hermes 未持久化 per-message usage 时使用显式标记的 deterministic estimate，不伪装成零。
-
-验收需求：
-
-- √ 同一 transcript 重启后产生相同 segment ID、snapshot ID 和 revision。
-- √ 新增 turn 后旧 segment ID 保持稳定，snapshot revision 改变。
-- √ orphan tool result、duplicate tool call、open tool call、缺失 current turn 和 stale task state fail closed。
-- √ raw context 只存在于 snapshot/evaluator runtime boundary，不进入 ledger。
-
-### 1D.3 Evaluator Configuration
-
-功能需求：
-
-- √ 配置显式选择 deterministic evaluator 或 injected JSON lifecycle evaluator，默认关闭。
-- √ evaluator request 携带 snapshot revision、protected IDs、trigger、turn index 和 host-selected policy version。
-- √ policy version 由 host configuration 固定，模型不能声明或覆盖版本。
-- √ evaluator timeout、invalid JSON、missing signal、unknown segment 和 unsafe action 产生结构化 rejection。
-- √ evaluator failure 不推进 scheduler state，允许使用同一 boundary retry。
-
-验收需求：
-
-- √ deterministic evaluator 在固定 fixture 上完全可重现。
-- √ mocked evaluator 覆盖 valid、malformed、partial、timeout、exception 和 policy-version override。
-- √ evaluator failure 不产生 accepted plan、receipt 或 mutation event，并允许同一 boundary retry。
-- √ lifecycle evaluator 的模型调用以 `component=lifecycle_evaluator`、`purpose=rsimem_lifecycle` 进入 Hermes request accounting，prompt/response 原文不进入 ledger。
-
-### 1D.4 Dry-Run Plan 与 Evidence
-
-功能需求：
-
-- √ 将通过验证的 lifecycle signal 转换为 revisioned `WritebackPlan`。
-- √ plan 关联 run、episode、session、task、snapshot、evaluation、segment 和 policy version。
-- √ 使用 persistent idempotency receipt，重复处理同一 logical input 只能接受一次 dry-run。
-- √ plan validation 保护 current、active、unresolved 和 open tool closure。
-- √ dry-run 只记录本来会执行的 action，不调用 compiler 或 backend mutation。
-
-验收需求：
-
-- √ stale revision、duplicate plan、malformed receipt、ambiguous update target 和 unsafe eviction 被拒绝。
-- √ 并发 dry-run coordinator 只有一个能够 reserve 同一 idempotency key。
-- √ restart 后 duplicate plan 被识别，receipt corruption fail closed。
-- √ deterministic safety fixture 验证 Hermes memory files、state DB、skills 和 forwarded rows 在 dry-run 前后字节级/值级不变；accepted live run 验证 RSIMem 只产生 dry-run evidence。
-
-### 1D.5 阶段闸门
-
-- √ 真实 Hermes loop 能产出 snapshot、evaluation、validated dry-run plan 和完整 content-free evidence。
-- √ disabled、success、failure、retry 和 restart 路径均有 deterministic test。
-- √ 三个 execution mode 的 deterministic read-path equivalence、Phase 1C live baseline 和当前 revision lifecycle-enabled acceptance 均通过。
-- √ RSIMem 与 PAST-Bench 全量回归通过。
-- √ 没有真实 memory generation、memory mutation 或 context eviction。
-
-## 10. 第一阶段 1E：最终验收与冻结
-
-依赖：1D 通过。
-
-目标：把第一阶段冻结为第二阶段可直接依赖的稳定实验底座。
-
-### 1E.1 End-To-End Infrastructure Acceptance
-
-功能需求：
-
-- √ 从 clean temporary HOME 启动 PAST-Bench Hermes。
-- √ 加载固定 family/task manifest、model profile、budget 和显式 lifecycle override。
-- √ 完成 selected task sequence、typed memory reads、snapshot、evaluation、dry-run plan、ledger 和 audit。
-- √ deterministic acceptance 模拟 evaluator failure 和 restart，并完成可审计恢复。
-
-验收需求：
-
-- √ direct native 行为保持不变且仍为默认配置。
-- √ adapter mode 的 model-visible memory 与 native 等价。
-- √ 所有 physical model requests、tool calls、memory reads 和 dry-run lifecycle events 可重建且不重不漏。
-- √ 所有 observer-facing evidence 通过 privacy audit。
-- √ RSIMem 第一阶段不修改 Hermes memory 或 active context；native Hermes 自身的 control writes 单独保留并计量。
-
-### 1E.2 第二阶段输入契约冻结
-
-功能需求：
-
-- √ 冻结 `ContextSnapshot`、lifecycle evaluation、`WritebackPlan`、provenance、revision、idempotency 和 usage schema 为 `LIFECYCLE_CONTRACT_SCHEMA_VERSION=1`。
-- √ 在 `phase1_acceptance_20260827.md` 记录第二阶段可以依赖的 API、版本、fixture 和 evidence path。
-- √ 列出所有已知限制，第一阶段未实现 compiler、真实 mutation、static/adaptive policy 或 physical rewrite。
-
-验收需求：
-
-- √ 第二阶段可以从一个 validated plan 获得 route-specific ingestor 所需 source reference 和 structured exit evidence。
-- √ schema version mismatch、unknown required field 和 stale revision 有明确拒绝语义。
-- √ 第一阶段 report 不包含任何 memory quality 或 recursive improvement claim。
-
-### 1E.3 第一阶段完成条件
-
-只有以下条件全部成立，才能将第一阶段标记为完成：
-
-- √ 1A-1E 所有子任务均已勾选并有对应 commit。
-- √ 最终 RSIMem 与 PAST-Bench 全量测试通过。
-- √ live matched read-path validation 通过。
-- √ 真实 Hermes lifecycle dry-run acceptance 通过。
-- √ ledger、audit、restart、failure 和 privacy evidence 完整。
-- √ 第一阶段没有执行任何 RSIMem memory generation、mutation 或 context eviction。
-
-## 11. 第二阶段前置条件
-
-第二阶段实现真实 memory generation 与 self-improvement。开始前必须满足：
-
-- √ 1A-1E 全部完成。
-- √ Live matched read-path validation 通过，未发现 adapter-caused model-visible divergence。
-- √ 真实 Hermes lifecycle dry-run 已接通 snapshot、evaluation、validated plan、ledger 和 audit。
-- √ `ContextSnapshot`、`WritebackPlan`、provenance、revision、idempotency 和 usage schema 已冻结 v1。
-- √ Direct native 仍是默认路径，第二阶段功能全部通过显式配置启用。
-- √ RSIMem 与 PAST-Bench 全量回归保持通过。
-
-任一前置条件未满足时，不开始 ingestor/generator、backend mutation 或 policy update。
-
-## 12. 第二阶段 2A：固定 Routing 与 Ingestion Contract
-
-目标：冻结 Hermes 既有 memory routing 和调用边界，当前只为 semantic route 暴露统一 ingestion，不让 RSIMem 重复判断 memory form 或 ADD/UPDATE。
-
-建议修改范围：`src/rsimem/lifecycle/contracts.py`、`src/rsimem/lifecycle/writeback.py`、`docs/lifecycle_controller.md` 和 contract tests。
-
-### 2A.1 Fixed Route And Invocation
-
-功能需求：
-
-- √ 固定 semantic、episodic、procedural 三条 Hermes native route，不增加统一 memory-form classifier；当前只启用 semantic policy implementation。
-- √ 固定 semantic route 的 task-completed/session-end natural invocation boundary、输入投影和 eager output surface，所有 semantic policy version 使用相同触发条件。
-- √ Semantic route 对外只接受 `ingest(experience)`；episodic/procedural route contract 保持可构造但 `policy_enabled=false`。
-- √ 外部 request 不携带 ADD、UPDATE、DELETE 或 NONE；Phase 1 plan action 在 trusted projection 中被丢弃。
-- √ `ContextExitSemantics` 明确 natural、logical 和 physical；Phase 2A 只接受 natural boundary。
-
-验收需求：
-
-- √ 相同 semantic experience 在所有 policy variant 中进入相同 fixed route 和 natural invocation boundary。
-- √ Semantic request 构造时拒绝 episodic/procedural route override。
-- √ Disabled coordinator 在解析 provider 或调用 policy 前返回 native path。
-- √ Trusted builder 拒绝 open tool closure、active/current context、active task 和 unresolved source。
-
-### 2A.2 Add-Only External Contract
-
-功能需求：
-
-- √ 外部 ingestion contract 只包含 source experience、fixed route、policy version、provenance、natural trigger 和 idempotency identity。
-- √ 定义 host-neutral `SemanticMemoryPolicy` interface：接收 request 与受控 candidate reader，返回 policy decision；coordinator 生成 `MemoryIngestResult`，接口不暴露 native payload/path/object。
-- √ `mem0_flat_policy` provider shell 与显式 registry 绑定 policy/framework/prompt/feature version 和 capability；unknown provider fail closed。
-- √ Framework 内部 proposal 支持 `ADD`、`UPDATE`、`DELETE` 或 `NONE`。
-- √ Resolved operation/result 记录 target、expected revision、old/new digest、usage、reason code、transaction/recovery requirement 和 stable IDs。
-- √ RSIMem 外层只验证/绑定 framework proposal，不实现独立 ADD-versus-UPDATE predictor。
-
-验收需求：
-
-- √ 同一 idempotency request 返回同一 result，不重复调用 policy；跨 coordinator 逻辑 execution/operation ID 稳定。
-- √ UPDATE/DELETE target/revision 由 trusted reader 绑定，并强制 transaction/recovery receipt requirement；Phase 2A 尚不执行 mutation。
-- √ Successful `NONE` operation 与 `FAILED`/`REJECTED` framework result 明确区分。
-- √ `PolicyCapability.add_time_update` 与 operation allowlist 显式声明；unsupported proposal fail closed。
-- √ Fake policy 与 `mem0_flat` provider shell 可在不改 coordinator 的前提下替换。
-
-### 2A.3 Policy Ownership
-
-功能需求：
-
-- √ Policy descriptor 由 runtime 绑定 policy、framework、prompt 和 feature schema version。
-- √ Proposal 只能携带 action、candidate ID、content digest 和 reason；不拥有 backend、artifact、revision、policy identity 或 activation 权限。
-- √ Coordinator 使用 fixed router、trusted candidate reader 和 capability contract deterministic 绑定 target/revision 并验证安全要求。
-
-验收需求：
-
-- √ Request metadata 与 proposal schema 拒绝 version/backend/target/artifact/revision 注入。
-- √ 同一 policy binding 与 deterministic request 跨 coordinator 产生相同 execution/operation identity。
-- √ Policy version 变化时 ingestion execution identity 改变，source snapshot identity 不改变。
-
-### 2A.4 阶段闸门
-
-- √ `memory_adapters.md` 记录 fixed routing、external add-only、internal operation 与 trusted ownership semantics。
-- √ `test_semantic_ingestion_contracts.py` 正反向 contract 测试通过。
-- √ 2A coordinator 只生成结果，不调用 compiler、`MemoryRuntime.mutate()` 或 backend mutation。
-
-## 13. 第二阶段 2B：Prompt 与 Memory Ingestion 基础设施
-
-依赖：2A 通过。
-
-目标：参考 MemBase 中的 Mem0 flat algorithm，建立可版本化、可计费、可验证的 ingestion 边界，但暂不写入 Hermes。
-
-建议修改范围：新增 `src/rsimem/memory_systems/mem0_flat/`，扩展 `src/rsimem/memory/contracts.py`、`src/rsimem/ledger.py` 和 ingestion tests。只重写 memory algorithm，不复制 MemBase dataset、runner、evaluation 或 tracing framework。
-
-### 2B.1 Prompt Artifact
-
-功能需求：
-
-- √ 定义 prompt ID、version、template digest、input schema、output schema、model profile 和 policy version。
-- √ Mem0 fact extraction、Mem0 internal operation decision 和可选 semantic retrieval scorer 使用统一 prompt contract。
-- √ Prompt template 与 rendered prompt 分离。
-- √ Prompt artifact 可进入 manifest；rendered prompt 不进入 ledger、receipt 或 report。
-- √ 记录 MemBase commit `d2aca6c7abcb1d67b331586cb834495d037fa3a6`、原 prompt 路径、MIT attribution 和本地修改 digest。
-- √ 不原样保留 Mem0 中与 memory construction 无关或不适合 PAST-Bench 的指令，例如要求谎称信息来自公开互联网的回答规则。
-
-验收需求：
-
-- √ Digest 与 template 内容确定性绑定。
-- √ 缺失 schema、model profile 或 version 的 artifact 构造失败。
-- √ Rendered prompt 中的 sentinel text 不出现在 observer-facing evidence。
-- √ Fake completion client 可在无 provider 环境下验证 contract。
-
-### 2B.2 Ingest Request 与 Result
-
-功能需求：
-
-- √ `MemoryIngestRequest` 包含 source、fixed route、exit evidence、scope、validity、framework version、policy version 和 provenance。
-- √ 外部 request 不携带预先决定的 ADD/UPDATE operation 或 target。
-- √ `MemoryIngestResult` 包含 execution ID、status、ordered internal operations、usage、reason codes 和 content digests。
-- √ Internal UPDATE/DELETE operation 必须返回 candidate target，trusted resolver 再绑定真实 artifact 和 revision。
-- √ Framework 只能返回 host-neutral operation/artifact，不能返回 Hermes/OpenAI/Anthropic native payload。
-- √ 区分 rejected、failed、successful NONE 和 successful mutation。
-
-验收需求：
-
-- √ Missing provenance、source、route 或 version 被拒绝。
-- √ Stale snapshot、unknown route、ambiguous internal target、duplicate operation 和 invalid resource 被拒绝。
-- √ Canonical identity 不受 key order 影响，但任一 framework-relevant evidence 变化都会改变。
-- √ Timeout、invalid JSON 和 exception 转为结构化 failure，不泄漏 source content。
-
-### 2B.3 Deterministic Ingestor
-
-功能需求：
-
-- √ 实现仅供 fixture 使用的 deterministic pass-through ingestor。
-- √ 支持 semantic ingestion 内部产生 ADD/UPDATE/DELETE/NONE。
-- √ 不调用模型、不读取 grader、不读取隐藏状态。
-- √ Ingestion planning 完成后 backend 保持不变。
-
-验收需求：
-
-- √ 相同 request 重启前后生成相同 execution、mutation 和 digest。
-- √ Malformed candidate、stale target 和 unsupported capability 被拒绝。
-- √ Ingestor success/failure usage 可进入 ledger 和 audit。
-
-### 2B.4 Atomic Memory Operation Graph
-
-设计参考：MemTrace 使用 `comment_variable`、`comment_op`、`comment_op_scope` 和 `comment_mutation` 将 Mem0 的 extraction、operation decision、mutation 与 retrieval 组织成 operation-variable graph，并按 attributed operation 将失败反馈分配给 fact-extraction prompt 或 update-decision prompt。RSIMem 只借鉴“原子步骤可归因”的思想，不复制其 runtime、全量变量快照、XML subgraph、source-code metadata 或默认 LLM attribution 流程。MemTrace optimization 示例可使用 golden answer 构造失败反馈；RSIMem 不复用这一监督边界，PAST-Bench hidden grader 继续严格隔离。
-
-功能需求：
-
-- √ 只为 source observation、fact extraction、related-memory retrieval、internal operation decision、target resolution、validation、mutation、reread verification、future query、retrieval、injection、use 和 downstream outcome 等预定义高价值边界记录 operation；不做 per-token、任意函数调用或完整 Python call graph tracing。
-- √ 提供最小 instrumentation API，例如 `operation_scope`、`record_artifact` 和 `record_mutation`；允许用 decorator/context manager 降低接线成本，但 operation identity、parent edge 和 failure semantics 由显式 contract 决定，不能依赖函数名或调用栈猜测。
-- √ 每次 operation 记录 `operation_id`、parent operation IDs、typed input/output artifact IDs、run/episode/session、policy/prompt/framework version、status、reason code、latency、model usage 和 retry identity。
-- √ Variable/artifact node 只记录 stable ID、kind、schema version、content digest、byte/token size、revision 和 provenance reference；原文只留在 owner-controlled source/backend。
-- √ Mutation edge 记录 target ID、expected revision、before/after digest、internal `ADD/UPDATE/DELETE/NONE` 和 receipt ID，不复制 before/after content。
-- √ 支持一条 source 产生多个 fact、一条 fact 检索多个 related memories、多个 proposal 归并为一个 mutation，以及一个 artifact 多次 retrieval/use。
-- √ Operation graph 从 append-only lifecycle evidence 派生，不建立第二套可修改的事实来源。
-- √ 在线 critical path 只追加定长/有界 event；parent traversal、subgraph materialization、failure grouping 和 policy-target join 在 episode 后离线执行。
-- √ 支持 `minimal`、`sampled` 和 `diagnostic` tracing level；论文主实验默认 `minimal`，`diagnostic` 只用于受控失败分析，不能静默启用。
-- √ Tracing 为 observer-only；graph writer、digest、serialization 或 flush failure 不能改变 ingestion decision、backend mutation 或 model-visible memory。
-
-验收需求：
-
-- √ Deterministic Mem0 fixture 可重建 `source -> extraction -> related retrieval -> decision -> mutation -> verification` 子图。
-- √ Future-use fixture 可继续连接 `artifact -> retrieval -> injection -> use/non-use -> outcome`，且 operation/artifact identity 不重不漏。
-- √ Parallel model calls、retry、NONE、rejected proposal、failed mutation 和 restart recovery 不会错误合并为同一 operation。
-- √ Ledger/graph privacy audit 证明不存在 raw source、memory、query、prompt、response、credential 或绝对路径。
-- √ 强制注入 tracing failure 时，memory result 与 tracing-disabled control 等价，并产生独立的 observer failure evidence 或显式 audit gap。
-- √ 分别报告 tracing-disabled、minimal 和 diagnostic 的 event count、serialized bytes、CPU time、wall-time overhead 和 peak memory；超过预先配置预算时降级为 minimal 并标记 attribution gap。
-
-### 2B.5 阶段闸门
-
-- √ Prompt、request、result、deterministic ingestion 和 atomic operation graph contract 冻结版本。
-- √ Ingestor 与 executor 已证明解耦。
-- √ 尚未执行真实 backend mutation。
-
-### 2B 验收记录（2026-08-27）
-
-- Contract：`PROMPT_CONTRACT_SCHEMA_VERSION=1`、`INGESTION_CONTRACT_SCHEMA_VERSION=1` 和 `OPERATION_GRAPH_SCHEMA_VERSION=1`；schema mismatch 均 fail closed。`MemoryIngestRequest` 当前是唯一启用的 route-specific `SemanticIngestRequest` 的显式别名。
-- Commits：`d9b2b28`（prompt artifacts 与 MemBase provenance）、`19d6a3a`（request/result、deterministic ingestor 与 usage ledger）、`0ec25b5`（atomic operation evidence graph）、`b185088`（ambiguous target、schema 与 audit gate hardening）、`b4ed32b`（public contract alias 与 tracing report gate）。
-- Focused evidence：`test_mem0_flat_prompt_contracts.py`、`test_semantic_ingestion_contracts.py` 和 `test_atomic_operation_graph.py` 覆盖 prompt privacy、canonical identity、structured failure、四类 internal operation、restart、graph reconstruction、observer failure 与 tracing overhead。
-- Full acceptance：RSIMem `154 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
-- 已知限制：completion client 和 pass-through ingestor 仍为 fixture-only；尚未接真实 extraction/update model、semantic validator、transaction executor 或 live PAST-Bench ingestion。Graph 中的 mutation/verification fixture 是合成 evidence contract，不代表 Hermes backend 已写入。Operation evidence 尚未接入 live runner，overhead 数值只在 deterministic fixture 中验证，不能作为论文性能结果。可选 semantic retrieval scorer 目前只有 versioned prompt contract，没有 retrieval implementation。
-
-## 14. 第二阶段 2C：Mutation Validation 与 Security Boundary
-
-依赖：2B 通过。
-
-目标：在任何 memory-framework output 接触 Hermes 前建立统一 validation pipeline。
-
-建议修改范围：新增 `src/rsimem/memory/validation.py`，扩展 backend descriptor、ingest result、coordinator 和 tests。
-
-### 2C.1 Host-Neutral Validation
-
-- √ 校验 mutation kind、action、backend capability、namespace、target ownership 和 expected revision。
-- √ 校验 content、metadata allowlist、resource path/count/size 和 provenance consistency。
-- √ Validation result 只包含 reason code、digest 和 size，不包含原文。
-- √ Path traversal、absolute path、duplicate resource、oversized content、invalid namespace 和 stale revision 全部拒绝。
-- √ Validation failure 不调用 `backend.mutate`，不创建 committed receipt。
-
-### 2C.2 Semantic Validation
-
-- √ Semantic 校验 `memory/user` namespace、entry delimiter、字符预算、duplicate 和 conflict。
-- √ Semantic entry 仅允许 durable fact、preference、rule 和 constraint，不接受完整 transcript、tool payload 或 skill resource。
-- √ Prompt injection、credential、machine path、fabricated target、changed source 和 cross-run target 被拒绝。
-- √ Episodic/procedural validator 保持 disabled；没有对应 research gate 和 fixture 时不能通过 generic mutation path 写入。
-
-验收需求：
-
-- √ Semantic memory 有完整 allow/reject matrix。
-- √ Safe semantic fixture 通过。
-- √ Disabled episodic/procedural mutation 被 capability gate 拒绝。
-
-### 2C.3 阶段闸门
-
-- √ Semantic memory validation 正反向 fixture 完整。
-- √ Security failure、revision conflict 和 unsupported action 均 fail closed。
-- √ 任何 rejected output 都没有修改 backend。
-
-### 2C 验收记录（2026-08-27）
-
-- Contract：`VALIDATION_CONTRACT_SCHEMA_VERSION=1`。Host 通过 `TrustedValidationContext` 绑定 source/scope/validity，通过 `TargetOwnershipResolver` 解析 target ownership；framework 不能逐次提供一个自称 trusted 的 target binding。
-- Commits：`17776f6`（host-neutral/semantic validation 与 allow/reject matrix）、`cf63146`（validator-owned target ownership resolver、backend read failure 与 Hermes budget 对齐）、`86c9a14`（任意 malformed payload fail closed 与 numeric hash revision compatibility）。
-- Focused evidence：`test_memory_validation.py` 覆盖 ADD/UPDATE/DELETE/NONE、安全 semantic 类别、metadata/resource/provenance、duplicate/conflict、prompt injection、credential、machine path、target fabrication、cross-run、revision、backend failure 和 disabled memory kinds；所有 case 均断言 `mutate_calls == 0`。
-- Full acceptance：RSIMem `175 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
-- 已知限制：semantic durability/quality 仍依赖受限 category contract 加 deterministic structure/security checks，不能替代后续真实模型质量评估；prompt-injection pattern 是 conservative denylist，不构成完整内容安全证明。当前 ownership registry 仅供 fixture 使用且不持久化，Phase 2D 必须由 transaction receipt/recovery 提供 durable ownership。尚未创建 committed receipt，也未执行任何 backend mutation；episodic/procedural mutation 保持 disabled。
-
-## 15. 第二阶段 2D：事务化 Mutation Executor
-
-依赖：2C 通过。
-
-目标：将 dry-run coordinator 升级为 crash-safe、idempotent、可恢复的真实 executor。
-
-建议修改范围：扩展 `src/rsimem/lifecycle/writeback.py`，新增 executor/recovery module，扩展 backend、ledger 和 audit tests。
-
-### 2D.1 Receipt State Machine
-
-- √ 定义 `pending`、`committed`、`failed` 和 `rolled_back`。
-- √ Pending receipt 记录 idempotency key、attempt、backend、target、pre-revision、mutation digest 和 provenance。
-- √ Receipt 原子写入并加锁，同一 logical mutation 只能有一个 active executor。
-- √ Unknown、malformed、digest conflict 和 target conflict fail closed。
-
-验收需求：
-
-- √ 两个并发 executor 只有一个 reserve 成功。
-- √ Duplicate retry 不重复 ADD 或 UPDATE。
-- √ Receipt corruption 与 orphan artifact 被 audit 发现。
-
-### 2D.2 Apply、Verify 与 Recovery
-
-- √ 严格执行 `validate -> reserve pending -> mutate -> reread -> verify -> commit receipt`。
-- √ ADD 验证实际 artifact ID、kind、digest、resources 和 revision。
-- √ UPDATE 使用 expected revision CAS，storage bytes 从实际结果计算。
-- √ Backend accepted 但 reread 不一致时不能 commit。
-- √ 覆盖 reserve 后、backend call 前、backend write 后、verification 前和 receipt commit 前五个 crash point。
-- √ Restart 后区分未执行、已执行未 commit、失败和状态未知。
-- √ 可证明安全时 commit/rollback；状态不明时阻止同目标后续 mutation。
-
-验收需求：
-
-- √ Semantic ADD、UPDATE、DELETE 和 NONE 成功路径通过。
-- √ Revision conflict、permission error、disk failure、partial write 和 reread mismatch 不产生 committed receipt。
-- √ 五个 crash fixture 均有确定、幂等的恢复结果。
-- √ 外部 actor 修改 revision 时停止自动 rollback。
-
-### 2D.3 Context Exit Gate
-
-- √ 只有 committed 且 reread-verified 的 memory 才允许 source logical exit。
-- √ 任一 failure 保留 source context/reference。
-- √ 第一版只在 natural task/session boundary 执行 logical exit。
-- √ Physical rewrite 保持关闭，直到 host contract 能证明 revision、tool closure 和 rollback。
-- √ Report 区分 natural exit、logical exit 和 physical rewrite。
-
-### 2D.4 阶段闸门
-
-- √ Transaction、idempotency、recovery 和 audit 全部通过。
-- √ 真实 mutation 默认关闭，只在 isolated fixture 显式启用。
-- √ Direct native 和第一阶段 read-path regression 继续通过。
-
-### 2D 验收记录（2026-08-27）
-
-- Contract：`MUTATION_RECEIPT_SCHEMA_VERSION=1` 与 `MUTATION_EXECUTOR_SCHEMA_VERSION=1`。Receipt core identity 不可变，transition 使用 `store_revision` CAS；committed receipt 同时实现 durable target ownership resolver。Executor 默认 disabled，只有 `enabled=true, isolated_fixture=true` 才允许调用 backend。
-- Commits：`f9303e2`（durable receipt state/CAS/reservation/ownership）、`aaad37c`（transaction executor、reread verification、recovery、audit、context exit 与 real operation evidence）、`c158cee`（真实 crash window 与 ADD ownership race）、`246ca33`（并发 executor、terminal failure restart、session boundary 与显式 fail-closed hardening）。
-- Focused evidence：`test_mutation_receipts.py` 与 `test_transactional_executor.py` 覆盖两 executor concurrency、ADD/UPDATE/DELETE/NONE、duplicate retry、real UPDATE CAS、permission/disk/partial write/reread mismatch、五 crash point、restart commit、safe rollback、external revision、ownership race、receipt corruption/orphan audit、operation graph 和 natural/logical/physical exit report。
-- Full acceptance：RSIMem `210 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
-- 已知限制：JSON receipt store 和 `flock` 当前只用于单机 isolated fixture，不宣称 distributed transaction。Recovery 只在可由 pre/desired digest 和 revision 证明时继续或标记 rollback；DELETE 后缺失、partial write、外部修改或 ownership 不明时保持 pending+blocked，不自动认领或执行补偿性逆 mutation。Context exit 当前是 host-neutral gate/report，没有执行 Hermes physical context rewrite。真实 mutation尚未接入 PAST-Bench/live runner；本阶段没有 provider 调用或真实实验结果。
-
-## 16. 第二阶段 2E：Mem0-Style Semantic Memory 与 SM01 闭环
-
-依赖：2D 通过。
-
-目标：在 `SM01_preference_adoption` 完成第一条真实 semantic writeback、restart、retrieval、injection 和 downstream-use 链路。
-
-### 2E.1 Mem0 Flat Ingestion
-
-- √ 基于 Mem0 `FACT_RETRIEVAL_PROMPT` 重写 PAST-Bench semantic fact/preference extraction prompt。
-- √ 基于 Mem0 `DEFAULT_UPDATE_MEMORY_PROMPT` 实现 related-memory comparison 和内部 `ADD/UPDATE/DELETE/NONE` decision。
-- √ 关闭 graph store，不复制 MemBase runner/evaluation，只实现 flat semantic construction 与 retrieval。
-- √ Add-time related-memory candidate reader 对 Hermes semantic entries 建立受控的 flat search projection；它只服务 internal operation decision，不替换 Hermes future-task eager injection surface。
-- √ 明确 candidate retrieval 的 embedding/model、top-k、threshold、index revision 和 rebuild semantics，并纳入 policy version 与 usage accounting。
-- √ 将 durable fact、preference、rule 和 constraint提取为最小独立 entry，不复制完整轨迹、失败尝试、tool noise 或 unresolved information。
-- √ Internal UPDATE/DELETE suggestion 经 trusted resolver 绑定唯一 target/revision；ambiguous target fail closed。
-- √ Duplicate 使用 NONE，superseded artifact 保留 provenance 和 replacement relation。
-
-验收需求：
-
-- √ SM01 fixture 通过统一 ingest 请求生成一条最小、可重新注入的 preference。
-- √ Temporary、contradictory、unknown-owner 和 unresolved candidate 被拒绝或 defer。
-- √ 重复 experience 不新增 duplicate entry。
-- √ 新信息、冲突信息、重复信息和应删除信息分别覆盖内部 ADD、UPDATE、NONE 和 DELETE。
-- √ Prompt malformed、timeout 和 hallucinated target fail closed。
-
-### 2E.2 SM01 End-To-End
-
-- √ Learn episode 在固定 semantic route/boundary 产生 snapshot 和 ingest request，不额外判断 memory form。
-- √ Mem0-style ingestor、validation 和 executor 写入 isolated `MEMORY.md` 或 `USER.md`。
-- √ 新进程/fresh session 通过 Hermes native prompt builder 注入 memory。
-- √ 连接 source、ingestion、internal operation、mutation、artifact、retrieval、injection 和 downstream task。
-
-验收需求：
-
-- √ Restart 后 artifact 存在且 digest/revision 可验证。
-- √ Model-visible prompt 不由测试直接注入答案。
-- √ Disabled mode 恢复 direct native behavior。
-- √ Ledger 可重建链路但不包含 preference 原文。
-- √ Failure 不导致 source evidence 丢失。
-
-2E.1/2E.2 闸门记录：
-
-- Contract：Mem0-flat 使用两个冻结 v2 prompt artifact、受控 token-hash cosine flat retrieval 和 committed-receipt ownership binding。SM01 loop 只连接既有 ingestion、validation 与 default-disabled isolated executor，不开放新的外部 mutation contract，也不执行 physical context rewrite。
-- Commits：`c77224f`（Mem0-flat semantic policy）与 `2fb3967`（SM01 learn -> writeback -> restart -> native Hermes prompt injection、稳定 artifact ledger join 和 failure controls）。
-- Focused evidence：`test_mem0_flat_policy.py` 覆盖 ADD/UPDATE/DELETE/NONE、duplicate、unknown-owner、temporary/unresolved、malformed/timeout/hallucinated target；`test_sm01_semantic_loop.py` 覆盖 committed ADD、receipt audit、restart digest/revision、真实 Hermes prompt builder、deterministic downstream use、disabled mode、malformed ingestion、stale source 和 content-free ledger join。
-- Full acceptance：RSIMem `228 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
-- 已知限制：本闸门使用 deterministic completion fixture 和 isolated native files，尚未把真实 Mem0 policy 的 extraction/retrieval/decision/target-resolution 全部接入 atomic operation recorder，也未运行 static writeback matched model experiment。后续由 2E.3 和 2E.4 分别完成，不据此宣称 adaptive self-improvement。
-
-### 2E.3 Operation-Level Attribution
-
-- √ 将 Mem0-style ingestion 拆为 extraction、related-memory retrieval、internal decision、target resolution、validation、mutation 和 reread verification operation。
-- √ 将未来 semantic query、candidate retrieval、injection、use/non-use 和 task outcome 接回同一 artifact revision。
-- √ 为每个 optimizable operation 标注 policy parameter/prompt field ownership，至少区分 fact-extraction prompt、update-decision prompt 和 retrieval parameters。
-- √ Attribution 输出只引用 operation/artifact/policy ID 和 failure category，不包含原始 memory 或模型响应。
-- √ 同一失败可以归因到一个或多个 candidate operation，但必须记录 attribution method、confidence、evidence window 和 version。
-- √ Attribution 采用分层策略：先使用 contract violation、receipt、retrieval/use 和 outcome evidence 做 deterministic attribution；只有失败样本无法定位且明确启用时，才允许调用预算受限的 LLM attribution。
-- √ Successful、NONE、未曝光和 censored 样本不默认触发 LLM attribution；批量 attribution 必须采样、去重并设置 calls/tokens/wall-time 上限。
-- √ Attribution model 的请求、token、重试、延迟和费用单独计入 policy-update cost，不能算作免费离线处理。
-
-验收需求：
-
-- √ Extraction 漏事实、错误 UPDATE target、重复 ADD、retrieval miss 和 retrieved-but-unused 分别落到不同 operation/failure category。
-- √ 最终 task failure 不会无条件归因给最后一次回答或全部历史 memory operation。
-- √ Attribution 只能使用失败发生时已可观测 evidence，不能读取 grader answer、未来 episode 或 held-out outcome。
-- √ 关闭 attribution 不改变 ingestion、retrieval 和任务结果。
-- √ Deterministic attribution 足够时不会发出 attribution model request；预算耗尽时保留 unresolved attribution，不使用全轨迹统一归因兜底。
-
-2E.3 闸门记录：
-
-- Contract：`ATTRIBUTION_SCHEMA_VERSION=1`。真实 Mem0-flat/transaction/future fixture 记录 source、extraction、related retrieval、decision、target resolution、validation、mutation、verification、future query/retrieval/injection/use/outcome；policy ownership 通过 content-free `POLICY_PARAMETER` artifact edge 表示。Attribution 使用显式 cutoff/window/version，仅输出稳定 ID、category、method、confidence、reason 和 raw model usage。
-- Commits：`af602d4`（semantic operation lifecycle、verified artifact revision 与 future exposure graph）和 `73916b0`（deterministic-first attribution、exposure eligibility、batch sampling/dedup、model budget/accounting 与反向 fixtures）。
-- Focused evidence：真实 SM01 fixture 形成 13 类顺序 operation 并把同一 committed artifact ID/revision 接回 restart retrieval/injection/use/outcome；真实 policy rejection 和 ADD ownership race 分别归入 wrong target 与 duplicate ADD。独立 fixtures 区分 extraction miss、retrieval miss、retrieved-not-injected、not-exposed、retrieved-but-unused、censored 和 unresolved task failure。
-- Full acceptance：RSIMem `240 passed`；PAST-Bench 从其目录运行 `385 passed, 2 skipped`；`compileall`、`pip check`、`git diff --check` 和源码 credential-shape scan 通过。
-- 已知限制：本阶段没有调用 attribution model；model fallback 只有显式启用、存在成功 injection、证据仍 unresolved 且预算允许时才可调用。当前 deterministic categories 是冻结 reason/operation contract，不是因果效果估计；future use/outcome 来自 deployment-visible fixture evidence，不使用 official grader score。Delayed utility label、exposure propensity 和跨 episode dataset 属于 2I，不在本阶段宣称完成。
-
-### 2E.4 Static SM01 Comparison 与闸门
-
-- √ 比较 no persistence、native Hermes 和 static semantic writeback。
-- √ 固定 model、judge、budget、task order、sandbox 和 persistence isolation。
-- √ 报告 task score、persistence gap、usage、ingestion-policy cost、storage、retrieval、injection、retry 和 wall time。
-- √ 每个 variant 完成规定 replicate 并通过 audit。
-- √ 第一条 semantic lifecycle 可复现、可审计、无 leakage。
-- √ 尚未宣称 adaptive self-improvement。
-
-2E.4 闸门记录：
-
-- Accepted batch：`static_sm01_20260827_v3`，RSIMem commit `f62285a`，PAST tree `145326f`；三种方法各 3 个 rotated、independent unseeded replicates，共 9 completed attempts、81 unique traces，9 个 audit 均 `ok=true`。
-- Static route：`native+ledger` read surface + deterministic completed-boundary lifecycle + Mem0-flat semantic writeback；原生 Hermes `memory` toolset 被禁用但 `skip_memory=False`，因此不存在 native/RSIMem 双写且保留 native prompt injection。
-- Static 每 replicate 固定形成 6 个 ingestion execution、7 个 policy request、1 个 committed ADD 和 5 个 NONE。Replicate 2/3 在 learn A 写入并在 learn B/eval-near/eval-far 注入；replicate 1 的 ADD 晚于 frozen post-learn anchor，作为 admission timing variance 保留。
-- Aggregate 与 cost report：[`static_sm01_20260827.md`](static_sm01_20260827.md)。Static 是已审计 baseline，不据此宣称 adaptive update、delayed utility learning 或 recursive self-improvement。
-
-## 17. 延后范围 2F：Episodic Memory Research Gate
-
-状态：不属于当前 semantic-first 串行主线，不阻塞 2H-2K。只有完成方法选择和 matched-evaluation 设计后，才拆分为实现 checklist。
-
-目标：先回答“什么是值得保留和复用的 episode、如何分段、如何根据 outcome 检索”，避免将 transcript retention 错当成已经优化 episodic memory。
-
-### 2F.1 候选方法与可借鉴机制
-
-| 方法方向 | 主要机制 | 可借鉴内容 | 当前限制 |
-|---|---|---|---|
-| EM-LLM | 依据 surprise 等信号在线切分 event，并做 event-level organization/retrieval。 | Episode boundary、event adjacency 和跨 event retrieval。 | 主要面向无限上下文，不直接解决 agent outcome attribution。 |
-| Generative Agents / MemoryBank | 基于 relevance、importance、recency、reflection 或 forgetting/reinforcement 管理经历。 | Retention score、时间衰减和强化基线。 | Reflection 可能把 episode 编译成 semantic summary，taxonomy 边界较模糊。 |
-| Reflexion / ExpeL | 保存失败、反馈和成功轨迹，并在后续任务复用 verbal experience。 | Outcome-aware experience representation。 | 产物常接近 strategy/lesson，可能属于 semantic 或 procedural memory。 |
-| EverMemOS | Boundary detection 后形成 event/episode，并联合 profile 与 foresight 检索。 | Event segmentation、episode metadata 和多阶段 retrieval。 | 是 hybrid system，不能作为纯 episodic 对照直接解释。 |
-| Causal Episodic Memory / MERIT | 只使用已结束的历史 episode，区分 verified correction 与 unsuccessful direction，并按 failure type 做 hybrid retrieval。 | Temporal eligibility、positive/negative outcome、failure-typed retrieval 和 causal availability audit。 | 当前证据集中在 Text-to-SQL repair，迁移到 PAST-Bench 前需独立验证。 |
-
-### 2F.2 解锁条件
-
-- □ 给出 operational definition：episodic artifact 必须保留 situated event、时间/任务边界和 outcome，而不只是去上下文化的事实或步骤。
-- □ 选定一个 PAST-Bench family，证明它需要 episode-level experience，且不能由同预算 semantic fact baseline 等价解决。
-- □ 冻结 segmentation、admission、positive/negative outcome、temporal eligibility、retrieval 和 stale handling contract。
-- □ 决定是引用 Hermes native session/message 作为 source of truth，还是生成独立 episode artifact；两种方案均禁止无审计复制 transcript。
-- □ 设计 no episodic、raw episode retrieval、chosen episodic method 和 matched semantic baseline。
-- □ 明确官方 grader 只用于 evaluation，不能作为在线 memory polarity、admission 或 retrieval 的隐藏信号。
-- □ 完成 privacy、restart、deduplication、current-session self-retrieval 和 source-deletion failure semantics。
-
-只有以上项目完成后，才允许实现 episodic mutation/retrieval；此前保持 adapter read-only，不能为追求“三类齐全”提前写一个缺少研究假设的版本。
-
-## 18. 延后范围 2G：Procedural Memory Research Gate
-
-状态：不属于当前 semantic-first 串行主线，不阻塞 2H-2K。
-
-目标：选定 trajectory-to-skill 方法后，再将可复用执行经验编译为 Hermes native skill；当前不自造一个无法与论文 baseline 横向比较的 procedural prompt。
-
-### 2G.1 解锁条件
-
-- □ 对 Context2Skill、Text2Skill、SkillCreator 和直接 trajectory distillation 做统一输入、输出、反馈、依赖和 license 对比。
-- □ 选定一个 PAST-Bench procedural-reuse family，冻结 native skill control 与 generated skill variant。
-- □ 定义 reusable workflow 与 one-off command 的判定、适用条件、验证步骤、失败恢复和边界条件。
-- □ 定义 `SKILL.md`、references、templates、scripts、assets 的完整 resource transaction 和 security scan。
-- □ 明确 compiler plugin 与 Hermes storage backend 分离，外部仍只调用 ingest/add。
-- □ 设计 generation、restart、progressive disclosure、actual use 和 downstream outcome 的 operation graph。
-
-通过研究闸门后再实现 transactional persistence、`skills_list`/`skill_view` reuse 和 matched evaluation，并复用 2B-2D 已验证的版本、validation、receipt 与 recovery infrastructure。
-
-## 19. 第二阶段 2H：统一 Static Memory Policy Objective
-
-依赖：2E 通过。2F/2G 为延后研究范围，不是当前依赖。
-
-目标：在固定 semantic route 和固定 invocation boundary 下，用同一 future-utility-per-cost objective 评价 semantic policy 的 extraction、internal update/consolidation 和 retrieval behavior，不学习何时调用哪条 policy。
-
-### 2H.1 Feature 与 Utility Contract
-
-- √ 定义 completion、unresolved、scope、validity、recency、reuse、conflict、storage/retrieval/injection cost 和 recovery risk。
-- √ 区分 host-observed、model-predicted 和 delayed feature。
-- √ Feature schema 版本化并定义 missing-value semantics。
-- √ Hidden benchmark score 不属于 policy feature。
-- √ 定义 predicted benefit、full lifecycle cost 和 uncertainty/risk。
-- √ Generation/update quality 与 retrieval ranking 使用相同 future-utility semantics。
-- √ 第一版使用固定规则或可解释非参数化 scorer。
-
-验收需求：
-
-- √ Feature extraction deterministic fixture 通过。
-- √ Missing、unknown、out-of-range 和 future-dated feature 有明确处理。
-- √ 成本升高且 utility 不变时，policy score 不应提高。
-- √ Utility 升高且成本不变时，policy score 不应下降。
-- √ Unknown cost、no history、low confidence 和 conflict 使用 conservative fallback。
-
-2H.1 验收记录：
-
-- Contract：`semantic-static-utility-features-v1`、`semantic-lifecycle-cost-v1` 和 `semantic-static-utility-policy-v1`。固定 observation 集合没有 grader/score 或自由 metadata；deterministic safety 字段只能来自 host-observed evidence，delayed/future-dated evidence 不能进入 static decision。
-- Scorer：generation、internal operation 和 retrieval target 共用同一 monotone benefit-risk-full-lifecycle-cost objective，并输出 feature/cost digest、policy/schema version、cutoff、contribution 和 machine-readable conservative reason。
-- Commit：`addd3b6`。Focused `5 passed`；full RSIMem `253 passed`；PAST-Bench `387 passed, 2 skipped`；compileall 和 diff check 通过。
-- 已知限制：本闸门只冻结 contract、extractor 和 interpretable scorer，尚未改变 Mem0-flat live generation/internal operation/retrieval output；该接线属于 2H.2。
-
-### 2H.2 Fixed Invocation 下的 Static Policy
-
-- √ Semantic route 使用固定 Mem0-style extraction、internal operation 和 flat retrieval policy。
-- √ 所有 static variant 接收相同 semantic route、boundary 和 source trajectory。
-- √ Static policy 在整个 run 中冻结，不使用当前 run 反馈在线更新。
-- √ Logical exit 只有在 persistence commit 后生效。
-- √ Physical rewrite disabled 时不报告 saved tokens；启用时根据真实 forwarded context 计算。
-
-验收需求：
-
-- √ 相同 route、input、feature 和 version 产生相同 internal operation/retrieval output。
-- √ Policy version 不改变 route 或 invocation count。
-- √ Unsupported internal operation 在 capability/validation 阶段过滤。
-- √ Natural、logical 和 physical exit evidence 分开统计。
-
-2H.2 验收记录：
-
-- Contract：新增显式 `static_utility` opt-in mode；原 `static` baseline 和 disabled default 不变。两种 active mode 使用相同 `hermes-native-semantic` route、task/session boundary、source snapshot、Mem0 extraction prompt、internal-operation prompt 和 provider invocation count。
-- Frozen binding：`FrozenMem0UtilityConfig` 与 `StaticUtilityPolicy` 均不可变；bound policy identity 对 config、threshold、weight、cost cap、retrieval config 和 feature schema 做 canonical digest。相同请求重放会重置并重建等价 decision evidence，不从当前 run outcome 更新 scorer。
-- Unified decision：generation admission、related-memory filtering/ranking 和 ADD/UPDATE/DELETE admission 共用 `semantic-static-utility-policy-v1`。Non-ACCEPT mutation 降为 `NONE`，但不会跳过既定 extraction/operation prompt；unsupported operation 仍由既有 capability/validation contract fail closed。
-- Evidence：lifecycle ledger 增量写入 content-free `static_utility_decisions`，只保留 target、disposition、score、risk/cost、reason、schema/version 和 input digest。Natural、logical、physical exit 分开；physical rewrite 保持 disabled，`savedTokens=None`。
-- Commits：`81a2427`、`dbed4e9`、`79a5f7a`、`a2dceae`。Focused policy/utility/writeback tests `30 passed`，Hermes bridge/transaction focused tests `67 passed`，PAST plumbing focused tests `30 passed`。Full RSIMem `262 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check`、diff check 和 credential-shape scan 通过。
-- 已知限制：2H.2 证明 deterministic policy/runtime contract 与 PAST plumbing；尚未用真实 provider 在 selected semantic-relevant PAST family 运行 `static_utility` 并审计，因此 2H.3 保持未完成。Physical rewrite 没有实现，也不报告推测 token 节省。
-
-### 2H.3 阶段闸门
-
-- √ Semantic generation/internal operation/retrieval outcome 使用统一 utility semantics。
-- √ Static LightRSI 可在 selected semantic-relevant PAST-Bench families 运行并审计。
-- √ Policy 在 run 内保持冻结。
-
-2H.3 验收记录：
-
-- Live gate：完成 `SM01_preference_adoption` 的 3-replicate rotated `static-rsimem` / `static-utility-rsimem` batch。6/6 scheduled slots completed，54 unique traces，284 unique physical model requests，6/6 audit `ok=true`。Batch 与完整 raw evidence 位于 ignored 的 `outputs/static_utility_sm01/hermes_luna/static_utility_sm01_20260827_v1`；正式报告见 [`static_utility_sm01_20260827.md`](static_utility_sm01_20260827.md)。
-- Frozen audit：新增 `static_utility_decisions` strict ledger join。Utility event 与 `semantic-static-utility-features-v1` ingestion execution 必须 exact match；unknown/content fields、numeric/schema violation、orphan/missing execution、run 内或跨 replicate gate/policy/schema drift 均 fail closed。3 个 live utility runs 共 18 expected/observed executions，gate digest、gate version、feature schema 和 scorer policy 各自全局唯一。
-- Matched boundary：deterministic fixture 证明 static/utility 使用相同 route、source snapshot、boundary、two-prompt cadence、raw usage contract 和 transaction/exit semantics。Live 每个 method/run 均为 6 ingestion executions、7 ingestion-policy model requests、1 planned `ADD`、5 `NONE`、0 retries。Provider 没有 seed，因此 live token、latency、trajectory 和 score 不要求逐值相等。
-- Utility coverage：live 每个 utility run产生 1 个 accepted generation decision 和 1 个 accepted internal-operation decision。该 batch 后续 boundary 没有抽取出 durable fact，未进入 related retrieval；retrieval 的统一 scorer/filter/rank 由 deterministic Mem0-flat integration fixture 验收，不宣称 live retrieval coverage。
-- Result boundary：Static utility primary score mean `0.4106`，static baseline `0.3700`；差异完全来自一个 unseeded replicate，且两者 hard pass rate 均为 0，因此不做质量优势声明。Raw generation/storage/retrieval/injection/recovery quantities保持独立，不换算 provider price；physical rewrite 仍 disabled，saved tokens 保持 unknown/not applicable。
-- Commits：`05866b1`（utility ledger/audit）、`6f41add`（rotated launcher/manifest）、`40109eb`（rebuildable content-free batch analysis）。Focused analysis/manifest/ledger tests `34 passed`；full RSIMem `266 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check`、diff check、analysis replay、source credential scan、exact-key batch scan 和 outputs ignore check 通过。
-- Failure evidence：第一次 static slot 因调用 launcher 时外层命令被误设为 1 秒 timeout，记录为 `launcher_timeout`；隔离 retry attempt 2 完成。该失败不属于 provider/method failure，不进入 aggregate，也未覆盖 manifest history。
-- 已知限制：本闸门只关闭 frozen static semantic objective。它不生成 delayed utility label，不更新 policy，不实现 physical rewrite，也不支持 adaptive/self-improving claim；这些依次属于 2I、2J 与 2K。
-
-## 20. 第二阶段 2I：Delayed Feedback Dataset
-
-依赖：2H 通过。
-
-目标：构建可用于更新 memory policy 的无泄漏 delayed feedback 数据。
-
-### 2I.1 Lifecycle Join 与 Label
-
-- √ 从 atomic operation graph 连接 source、extraction、related-memory retrieval、internal operation、mutation、artifact revision、query、retrieval、injection、task、tool、supersession 和 recovery。
-- √ 支持一个 artifact 多次 retrieval、一次 query 多个 hit 和共享 physical execution。
-- √ 明确 observation window、cutoff 和 policy version。
-- √ 显式记录 non-retrieval、retrieved-not-injected、injected-not-used、superseded 和 censored。
-- √ Label 只使用后续 retrieval、injection、tool behavior、retry、completion、supersession、non-use 和 lifecycle cost。
-- √ Official PAST-Bench score 只用于最终 evaluation，不进入 policy-update label。
-- √ 定义 positive、negative、unresolved 和 censored utility。
-- √ 为每个 label 保留 attributed operation IDs 和最小 failure subgraph，使 extraction、operation decision 与 retrieval policy 能分别接收反馈。
-
-验收需求：
-
-- √ Referential-integrity audit 发现 orphan、duplicate、revision mismatch 和 future leakage。
-- √ 同一 evidence 重复生成 canonical-equivalent dataset。
-- √ 四类 label fixture 通过，修改 attribution window 生成新版本且不覆盖旧数据。
-- √ Dataset 不包含 raw memory、prompt、response 或 hidden evidence。
-- √ 删除无关 operation 后 label 不变；删除被归因 operation 后 integrity audit 失败，防止把整条 trajectory 无差别作为训练样本。
-
-### 2I.2 Exposure Bias
-
-- √ 记录 artifact 是否有曝光机会、是否进入 candidate set 和是否被 policy 过滤。
-- √ 区分“没有价值”和“没有曝光机会”，不把未召回直接标为负 utility。
-- √ 记录 propensity 或 deterministic eligibility，支持偏差分析。
-- √ Missing propensity 时禁止使用需要 propensity correction 的 estimator。
-- √ Dataset report 显示 observation count 和 censoring rate。
-
-2I.1-2I.2 验收记录：
-
-- Dataset contract：新增版本化 observation window、四类 delayed utility label、content-free provenance、artifact-specific exposure join、raw resource/retry evidence 和 immutable JSON store。即时 extraction/decision attribution 只保留为 provenance，只有 retrieval、injection、use、tool behavior、downstream outcome、supersession 和 recovery 可以决定 delayed failure label。
-- Exposure contract：显式记录 opportunity、candidate inclusion、policy filtering、deterministic/logged/missing propensity；需要 propensity correction 的 estimator 对 missing 或 zero propensity fail closed。Dataset report 输出 observation、opportunity、candidate、filter、missing propensity、label/exposure count 和 censoring rate。
-- Commits：`9930fee`、`5305318`、`7ae15e8`、`19b34d6`、`f0ff3f5`、`8a673b3`、`97a291b`、`45fcfda`、`a72b996`。Focused feedback/SM01/future-trace/attribution tests `49 passed`；full RSIMem `290 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check`、diff check 和 source credential-shape scan 通过。
-- 已知限制：当前 propensity 是 deterministic fixture eligibility evidence，不是由随机化 logging policy 估计的因果 propensity。2I 只关闭 delayed-feedback dataset gate；adaptive learner 仍保持 disabled，属于 2J。
-
-### 2I.3 阶段闸门
-
-- √ Feedback dataset 可重建、可审计、无 leakage。
-- √ Utility label 与 official score 严格隔离。
-- √ Static policy、feature schema 和 label schema 冻结版本。
-
-2I.3 验收记录：
-
-- Stage gate 使用冻结 config digest 独立重建 dataset，要求 canonical dataset identity 完全一致，并重新执行 referential-integrity、future-leakage 和 content-surface audit。
-- Feature/policy/label/window identity 变化、label 篡改、example identity 篡改或 rebuild 失败均 fail closed；gate report 只包含稳定 ID、digest、计数、状态和 issue code。
-- 最终验证：full RSIMem `290 passed`；PAST-Bench `387 passed, 2 skipped`；compileall、`pip check`、diff check 和 tracked-source credential scan 通过。
-
-## 21. 第二阶段 2J：Adaptive Memory Policy
-
-依赖：2I 通过。
-
-目标：利用 delayed feedback 更新轻量 policy，不修改 Hermes backend 或基础模型参数。
-
-### 2J.1 Policy Learner 与 Artifact
-
-- √ 首先实现可解释 learner，例如 Bayesian estimate、regularized linear scorer 或 contextual bandit。
-- √ Learner 只读取冻结 feature/label dataset。
-- √ 记录 training config、seed、feature、objective 和 regularization。
-- √ Low-sample、missing feature 和 distribution shift 使用 conservative fallback。
-- √ Policy learner 只更新 semantic route 内 extraction、operation、consolidation 或 retrieval parameters/prompt，不更新 route selector 或 invocation schedule。
-- √ Prompt/parameter update 使用 attributed failure subgraph 聚合，不把所有 task failure 同时归因给全部历史 operation。
-- √ Policy artifact 包含 version、parent、dataset version、schema、parameters、prompt refs、metrics 和 digest。
-- √ Proposal、validated、active、rejected 和 rolled_back 使用显式状态。
-
-验收需求：
-
-- √ 相同 dataset/config/seed 产生相同 artifact。
-- √ Hidden grader evidence 不进入 learner input。
-- √ Tampering、unknown parent、schema mismatch 和 missing provenance 被拒绝。
-- √ Restart 后 active policy 唯一且可验证。
-
-2J.1 验收记录：
-
-- Learner：使用 parameter-owner-bound Bayesian negative-rate posterior 与 L2 shrinkage；正向 label 只作用于实际 owner，负向 label 还必须命中对应 semantic component 的 attributed failure subgraph。Low sample、missing component evidence 或 missing-propensity distribution shift 均输出零 delta。
-- Artifact/store：记录 parent、dataset ID/payload digest、冻结 schema、training config/seed/objective/regularization、bounded parameter、prompt ref、content-free metrics/provenance 和 content digest。Lifecycle state 与 immutable artifact 分离，使用文件锁、原子 replace、transition-id 幂等、连续 history audit 和唯一 active pointer。
-- Commits：`91eb9f2`（frozen dataset -> deterministic proposal）和 `580f71a`（crash-safe lifecycle store）。Focused adaptive learner/store/feedback tests `34 passed`；full RSIMem `300 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check` 和 diff check 通过。
-- 已知限制：2J.1 只证明 proposal 与 lifecycle persistence contract。Held-out split、acceptance criterion、validation decision 和真实 activation 尚未实现；在 2J.2 关闭前，不允许把通用 state transition 接入 live adaptive policy。
-
-### 2J.2 Validation、Activation 与 Rollback
-
-- √ 按时间或 task group 划分 train/validation，避免 future leakage。
-- √ 与 frozen static policy 在同一 held-out evidence 比较。
-- √ 预先定义 quality、cost、stability 和 uncertainty acceptance criterion。
-- √ 未通过 criterion 的 proposal 保持 rejected。
-- √ 原子切换 active policy pointer，每个 decision 记录实际 version。
-- √ 支持 operator rollback 和 automatic safety rollback。
-
-验收需求：
-
-- √ Split identity、cutoff 和 episode membership 可审计。
-- √ Acceptance decision 可重放，不根据 test official score 选择 policy。
-- √ Activation crash 不产生两个 active policy。
-- √ Repeated activation/rejection/rollback 幂等，restart 后稳定。
-
-2J.2 验收记录：
-
-- 两级 validation：time-ordered episode split 与 content-free offline pre-screen 只能把 proposal 推进到 `validated`；最终 activation 必须 replay static/proposal matched held-out observation pairs。Pair 强制匹配 example、episode、task-input digest、budget、evidence cutoff 和实际 policy version。
-- Criterion/decision：quality 只统计两侧均 resolved 的 deployment-observable label；cost、stability 和 uncertainty 使用同一 held-out pair。Criteria、split、offline decision 和 matched decision 均 content-addressed；official score/grader/answer/expectation 不在 API surface。
-- Activation/rollback：matched coordinator 是唯一高层 activation 路径；decision 先持久化，再通过原子 active pointer 激活。Activation crash 保持 `validated` 且无 active；operator/automatic rollback 使用 content-addressed evidence，transition replay 幂等并可跨 restart 审计。
-- Commits：`3ce428b`（training membership）、`28e340f`（split/offline validation/decision persistence）、`70077ea`（封堵 offline activation）、`ce76d86`（matched receipt requirement）、`f5c294b`（matched execution gate）和 `03c1984`（example/episode binding）。Full RSIMem `314 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check` 和 diff check 通过。
-- 已知限制：2J.2 只负责 split、offline screening 与 matched activation contract；active artifact 到 Mem0-flat decision 的绑定由 2J.3 完成。Matched observation 仍由 fixture 提供，不构成 PAST-Bench adaptive quality claim；真实 replicates 属于 2K。
-
-### 2J.3 阶段闸门
-
-- √ Policy N+1 由 deployment-observable feedback 生成。
-- √ N+1 通过 held-out validation 后才激活。
-- √ Activation、rejection、rollback 和 replay 全部可审计。
-- √ 满足 memory-mediated adaptive self-improvement 的实现定义。
-
-2J.3 验收记录：
-
-- Runtime binding：`ActiveAdaptiveMem0Binder` 只读取唯一 active artifact，并将 allowlisted extraction、internal-operation、consolidation-UPDATE 和 retrieval threshold 映射到固定 Mem0-flat utility gate。无 active artifact 时返回原 static gate，空 override 不改变 static digest、route 或 prompt cadence。
-- Actual version：N+1 runtime 先把所有 unchanged/changed target scorer 统一绑定到 active artifact version，再应用 target-specific threshold。Generation、internal-operation 和 retrieval utility decision 与 binding observer 均记录实际 N+1 version。
-- End-to-end replay：deterministic fixture 从 N 的 atomic operation/delayed-feedback dataset 生成 proposal，经 time-ordered offline validation 和 static/proposal matched held-out gate 激活 N+1；同一 retrieval feature/cost digest 下，N 为 `accept`、N+1 为 `defer`。结构化 audit exact join dataset、artifact、offline/matched decision、active store、binding 与 future decision。
-- Commit：`9999c11`。Focused adaptive/feedback/Mem0 tests `70 passed`；full RSIMem `317 passed`；PAST-Bench 从其目录运行 `387 passed, 2 skipped`；compileall、`pip check` 和 diff check 通过。
-- 已知限制：本闸门关闭的是 deterministic memory-mediated adaptive implementation definition，不是 PAST-Bench quality claim。尚未运行 adaptive live replicates，也未证明两轮递归更新、跨 family 泛化或统计优势；这些属于 2K。
-
-## 22. 第二阶段 2K：PAST-Bench 实验与论文验收
-
-依赖：2J 通过。
-
-目标：仅在 PAST-Bench 内验证 static/adaptive LightRSI 的效果、成本、机制和泛化性。
-
-### 2K.1 Variants 与 Family 顺序
-
-- √ 冻结五方法 execution profile：no persistence、direct native Hermes、native + ledger、static RSIMem 和 adaptive RSIMem；只有 adaptive 方法读取 adaptive config。
-- √ 增加版本化 strict JSON transport；store source 与 destination 都必须是受限相对路径，缺失、逃逸、模式错配和未知字段 fail closed。
-- √ 每次 persistence attempt 在隔离 Hermes home 内复制 prepared store；无持久化不复制，已有冲突内容不覆盖。
-- √ Manifest schema 记录 config/store digest、唯一 ACTIVE policy/artifact identity、RSIMem commit、PAST-Bench commit/tree 和实际轮换顺序。
-- √ 五方法 launcher 使用 `ADAPTIVE_METHOD_VARIANTS` 的 replicate rotation；direct native、ledger、static 和 adaptive 不通过 shell 隐式共享错误模式。
-- √ adaptive attempt 的 post-run audit 要求 utility evidence 使用 manifest 中的 ACTIVE policy version。
-- √ prior deployment feedback 通过 content-addressed dataset/gate manifest、跨 run time split 和 retrieval-owner-only learner 生成离线 `PROPOSAL -> VALIDATED/REJECTED` store；离线路径不能写 ACTIVE pointer。
-- √ static/proposal held-out validation 使用独立两方法 manifest、validation-only trial store、audited operation graph label 和 raw resource accounting；不读取 official score、grader、answer、expectation 或 final response 原文。
-- √ production activation 只接受完整 matched observation pairs；trial config 不能通过正式 adaptive resolver，accepted decision 才生成带 activation provenance 的 production config。
-- □ 比较 no persistence、native Hermes、native + ledger、static LightRSI 和 adaptive LightRSI。
-- □ 所有 variant 使用 matched model、judge、budget、task order、sandbox 和 persistence isolation。
-- □ 当前依次运行 semantic-relevant memory-ability 和 update-ability families。
-- □ Procedural-reuse 只有在 2G 解锁并实现后加入；episodic-specific family 只有在 2F 解锁并实现后加入。
-- □ 每增加 family，先冻结 memory mapping、allowed signal、forbidden evidence、expected lifecycle 和 acceptance。
-- □ 只在核心 families 稳定后决定是否运行完整 family set。
-
-验收需求：
-
-- □ 每个 variant 完成预先规定的 independent replicate。
-- □ 所有 run 通过 usage、privacy、identity 和 lifecycle audit。
-- □ Failed run 与 provider failure 单独报告，不删除。
-
-2K.1 execution-readiness 验收记录（2026-08-28）：
-
-- Runtime/config：`adaptive_utility` 仅在 explicit `native+ledger`、lifecycle enabled、attempt-local prepared store 且唯一 ACTIVE policy 可绑定时启动；错误在模型调用前拒绝。Direct native 与 static defaults 不变。
-- PAST transport/isolation：单一 strict JSON 同时固定 destination、trusted roots、runtime-owned parameters 和 sibling prepared-store file；host-only source path 不下发到 RSIMem contract 或模型输入。
-- Manifest/launcher：schema v3 把 config/store digest 与 active artifact identity 纳入 experiment identity；`run_luna_adaptive_sm01.sh` 固定五方法 mapping、3+ independent unseeded replicates、clean-tree requirement、failure retention 和 method-specific audit。
-- Preparation/activation：feedback manifest v2 将完整 content-free gate/audit/report 纳入 identity；`adaptive_preparation` 重验 dataset 后只训练 stable retrieval threshold。`run_luna_adaptive_validation_sm01.sh` 独立运行 rotated static/proposal held-out pair，assembler 只从 audit、operation graph 和 deployment feedback 生成 observation；production store 是 canonical VALIDATED store 的独立副本，只有 matched coordinator 可以切换 ACTIVE。
-- Commits：原 execution plumbing 为 `ff669ca`、`b79a6e0`、`d8c2845`、`c2432cc`、`9005999`；production preparation/activation 链为 `d5663d6`、`78e904a`、`1759bc2`、`0bec9ca`、`f9c567a`、`a4e8c06`、`85d089c`、`e5252f8`、`9065d7e`、`0d6dc93`。Full RSIMem `342 passed`；PAST-Bench 从其目录运行 `390 passed, 2 skipped`；compileall、`pip check`、全部 shell syntax、diff check 和 tracked-secret scan 通过。
-- 已知限制：当前 shell 未配置 provider credential，因此尚无新的 live feedback batch、真实 held-out static/proposal observation、production ACTIVE store 或五方法 adaptive replicate。以上完成项只关闭 execution-readiness，不关闭 comparison、family、metrics 或 claim gate。禁止从同一 official/test run 现场生成 policy 再评估该 run。
-
-2K.1 下一执行顺序（每一步先审计输出再进入下一步）：
+在vendored PAST-Bench目录运行：
 
 ```bash
-RSIMEM_STATIC_METHOD_SET=feedback RSIMEM_REPLICATES=3 \
-  RSIMEM_BATCH_ID=<feedback-batch> scripts/run_luna_static_sm01.sh
-
-RSIMEM_OFFLINE_PREPARATION=outputs/feedback_sm01/hermes_luna/<feedback-batch>/prepared/adaptive \
-  RSIMEM_BATCH_ID=<validation-batch> scripts/run_luna_adaptive_validation_sm01.sh
-
-RSIMEM_ADAPTIVE_CONFIG=outputs/adaptive_validation_sm01/hermes_luna/<validation-batch>/activated/adaptive-config.json \
-  RSIMEM_REPLICATES=3 RSIMEM_BATCH_ID=<adaptive-batch> \
-  scripts/run_luna_adaptive_sm01.sh
+../../.venv/bin/python -m pytest -q
 ```
 
-第二条命令若 matched decision rejected，则不会生成 `adaptive-config.json`，第三条命令不得运行。
+每个阶段还必须运行对应focused tests、tracked-secret scan和一次isolated temporary-home restart fixture。真实provider命令只在代码、fixture和preflight全部通过后执行。
 
-### 2K.2 Metrics 与 Ablation
+## 9. 两阶段完成定义
 
-- √ 五方法 analyzer 从 manifest、audit、ledger、sequence result 和 atomic operation graph 重建 raw quality/resource/mechanism quantities；缺失 token bucket、audit/privacy failure、policy drift 和不完整 replicate fail closed。
-- √ 按 replicate 报告 static -> adaptive paired quality、usage、storage 和 lifecycle-cost delta，并输出 content-free cost-quality frontier；provider price 保持 `null`。
-- √ Claim guard 默认拒绝单 family 的 recursive self-improvement、generalization 和 statistical superiority；只有真实 evidence 满足对应 gate 才能解除。
-- √ Ablation applicability 由最终 ACTIVE artifact 与实际 runtime component 决定；首轮 retrieval-only learner 的 generation-policy update 标为 not applicable，不能伪装成已执行消融。
-- □ 报告 task score、pass rate、persistence gap 和 mechanism evidence。
-- □ 报告 model tokens/calls、tools、retry、latency 和 wall time。
-- □ 报告 ingestion/generation policy、storage、retrieval、injection、policy update 和 recovery cost。
-- □ 报告 artifact/bytes、retrieval/injection/use/non-use、supersession 和 rollback。
-- □ 报告 future utility per lifecycle cost 和 cost-quality frontier，但不让 economics 掩盖 quality claim。
-- □ Ablate Mem0 internal update、operation-level attribution、unified utility objective、delayed feedback、generation-policy update、retrieval-policy update 和 lifecycle cost。
+### 第一阶段完成
 
-验收需求：
+- □ D01-D19均有明确代码修复或正式deferred理由。
+- □ Stage 1A-1H全部通过。
+- □ Static extraction path不依赖eviction、source/provenance一致、每task只执行一次。
+- □ Feedback可覆盖empty/NONE/missed且不误用eager exposure。
+- □ Validation不使用cost、硬编码证据或伪造历史identity。
+- □ 新实验launcher已冻结plain static parent和prompt-oriented manifest。
 
-- □ Raw quantities 与 derived metrics 可从 evidence 重算。
-- □ Provider price 变化不要求重新运行。
-- □ Adaptive gain 不来自更高 budget、未计费调用或 leakage。
-- □ 每个 ablation 只改变一个因素并保持 backend/model/task matched。
+### 第二阶段完成
 
-2K.2 execution-readiness 验收记录（2026-08-28）：
+- □ Stage 2A-2I全部通过或按当前claim明确标记not applicable。
+- □ Exact extraction prompt N+1可生成、验证、激活、加载、回滚和重放。
+- □ 真实future run证明N+1改变extraction与memory behavior。
+- □ Adaptive aggregate primary task score高于matched static。
+- □ 论文claim严格限制为实际通过的online extraction-policy adaptation证据。
 
-- Analyzer：`adaptive-future-utility-raw-cost-v1` 保留 requests、全部 token buckets、retry、wall time、tools、storage、retrieval/injection/use、mutation/supersession/recovery 和 ingestion/utility accounting；derived utility-per-cost 不包含 provider price。
-- Matched comparison：static/adaptive delta 按 replicate 配对，不用两个独立 aggregate mean 冒充 paired evidence；configured budget identity 与 realized request/token/cost delta 分开报告。
-- Claim boundary：一个通过 audit 的 SM01 batch最多支持 fixed-route/unified-objective/operation-attributed implementation evidence；recursive iteration、跨 family generalization和quality superiority仍为 fail-closed。
-- Commits：`a525114`（five-method raw/derived analyzer）与 `6749b2c`（paired delta 和 claim guard）。Full RSIMem `345 passed`；PAST-Bench `390 passed, 2 skipped`；compileall、`pip check`、全部 shell syntax、diff check 和 tracked-secret scan 通过。
-- 已知限制：尚无真实 adaptive batch，所有 report/metrics/ablation 结果项保持未完成。当前 production learner 只更新 retrieval threshold；只有未来 ACTIVE artifact 真正包含 generation/update parameter 时，才允许增加对应单因素 ablation。
+## 10. 当前执行入口
 
-### 2K.3 Claim Gate
-
-- `Fixed-route semantic memory optimization`：Hermes native routing 保持不变，semantic 真实闭环通过。
-- `Unified memory policy objective`：generation/internal update 与 retrieval outcome 使用同一 future-utility semantics。
-- `Operation-attributed policy improvement`：Policy update 可以定位到 extraction、internal decision 或 retrieval operation，而不是只使用无差别 episode reward。
-- `Memory-mediated self-improvement`：Policy N+1 来自 delayed feedback，并影响未来 task decision。
-- `Recursive self-improvement`：至少两次可重放 policy iteration，且新 evidence 继续进入下一轮更新。
-- `Generalization within PAST-Bench`：多个预先选定 family 在同一 Hermes backend 完成 matched evaluation。
-
-不满足对应 gate 时，删除或弱化相关 claim。
-
-### 2K.4 第二阶段完成条件
-
-- □ 当前主线 2A-2E、2H-2K 均有 commit、tests 和 evidence；2F/2G 只有解锁并纳入论文 claim 后才计入完成条件。
-- □ Static/adaptive variants 完成 matched PAST-Bench evaluation。
-- □ Lifecycle 与 usage 可重建且无 leakage。
-- □ Policy proposal、activation 和 rollback 可重放。
-- □ 论文 claim 与实际通过的 gate 一致。
-- □ 未接入范围外 backend、host 或 benchmark。
-
-## 23. 总体串行执行规则
-
-- 当前 semantic-first 主线严格按照 `1A -> 1B -> 1C -> 1D -> 1E -> 2A -> 2B -> 2C -> 2D -> 2E -> 2H -> 2I -> 2J -> 2K` 推进。
-- 2F/2G 是延后研究闸门，不阻塞 semantic 主线；只有选定方法、冻结 matched baseline 并更新 checklist 后才进入实现。
-- 同一工作块内严格按子任务编号推进。
-- 每个子任务使用独立 commit，包含实现、failure semantics、测试和验收材料。
-- 当前子任务未通过时，不提前实现后续任务。
-- 发现 contract 缺陷时，先更新当前 contract 和 checklist，不通过后续模块绕开问题。
-- 不只完成 happy path，也不能把 failure、restart、privacy、accounting 或 leakage test 留到以后。
-- 持续更新 checklist；只有功能、测试、证据和文档全部通过后，才勾选对应任务。
-
-## 24. 单个任务记录模板
+当前位于 **Stage 1H：第一阶段回归与关闭条件**。Stage 1A-1G 已完成；
+一次真实 plain-parent smoke 于 2026-08-28 因 provider 27/27 请求返回
+HTTP 503 而按 `failureStage=provider` 保留，不能作为成功证据。provider恢复后
+必须重试成功，才可关闭第一阶段并进入 Stage 2A。后续顺序仍严格按照：
 
 ```text
-Task ID:
-Objective:
-In scope:
-Out of scope:
-Modified modules:
-Contract/version changes:
-Prompt/policy changes:
-Configuration and default:
-Failure semantics:
-Transaction/restart semantics:
-Privacy and leakage impact:
-Accounting impact:
-Focused tests:
-Negative tests:
-Integration fixture:
-Full regression result:
-Experiment evidence:
-Known limitations:
-Commit:
+1A -> 1B -> 1C -> 1D -> 1E -> 1F -> 1G -> 1H
+   -> 2A -> 2B -> 2C -> 2D -> 2E -> 2F -> 2G -> 2H -> 2I
 ```
+
+任何上游contract缺陷必须在当前阶段修正，不通过后续模块、脚本参数或手工数据绕过。
+
+跑实验的API key放在/mnt/20t/xubuqiang/Study/api_key.md，可以去那边查看。

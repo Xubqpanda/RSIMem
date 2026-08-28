@@ -1,4 +1,9 @@
-"""Validated experiment identity, scheduling, and attempt provenance."""
+"""Legacy baseline and threshold-experiment manifests.
+
+Formal extraction-prompt experiments use ``extraction_experiment_manifest``.
+The method names and utility modes in this module remain only for historical
+replay and regression compatibility.
+"""
 
 from __future__ import annotations
 

@@ -118,9 +118,10 @@ Validate, accept, or roll back each proposal without using hidden benchmark grad
 The stage passes when policy versions are reproducible and adaptive LightRSI can be compared against the static policy.
 
 Threshold-oriented learner, validation, activation, rollback, and runtime
-binding gates are retained as legacy infrastructure. Extraction artifacts,
-prompt-oriented validation, runtime binding, and matched live comparison remain
-pending.
+binding gates are retained as legacy infrastructure. Extraction-owned feedback,
+prompt-oriented validation, and formal manifest/analyzer contracts are complete.
+Deployable extraction artifacts, optimizer-driven runtime binding, and matched
+live comparison remain Phase 2 work.
 
 ### Stage 4: Expand Task Coverage
 
