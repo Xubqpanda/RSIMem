@@ -97,6 +97,9 @@ class DeterministicSourceSelectionPolicy:
             if segment.segment_id in protected:
                 rejected.append(segment.segment_id)
                 continue
+            if segment.role not in {"user", "assistant", "tool"}:
+                rejected.append(segment.segment_id)
+                continue
             if self.config.projection_mode == ProjectionMode.SELECTED_COMPLETED_SEGMENTS and segment.segment_id not in set(self.config.selected_segment_ids):
                 continue
             if self.config.projection_mode == ProjectionMode.INCREMENTAL_REVISION and segment.segment_id in previous:
@@ -131,11 +134,13 @@ class DeterministicSourceSelectionPolicy:
 
         selected_set = set(selected)
         candidate_set = {item.segment_id for item in candidates}
+        rejected_set = set(rejected)
         skipped.extend(sorted(candidate_set.difference(selected_set).difference(rejected)))
         skipped.extend(
             segment.segment_id
             for segment in snapshot.segments
             if segment.segment_id not in candidate_set and segment.segment_id not in protected and segment.segment_id not in closures
+            and segment.segment_id not in rejected_set
         )
         reason = "source_selected" if selected else "no_eligible_source"
         return self._decision(snapshot, event, safety, selected=tuple(selected), skipped=tuple(dict.fromkeys(skipped)), rejected=tuple(dict.fromkeys(rejected)), reason=reason)
