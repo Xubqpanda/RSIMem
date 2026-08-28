@@ -365,6 +365,28 @@ def test_missing_process_signal_is_diagnostic_only_without_hypothesis() -> None:
     assert "no_process_signal" in census.reason_codes
 
 
+def test_process_feedback_allows_empty_execution_receipts_but_requires_reasons() -> None:
+    case = _case("case.receipts", FeasibilityOutcome.UNRESOLVED, FeedbackChain())
+    assert case.process_feedback is not None
+    feedback = replace(
+        case.process_feedback,
+        parent_execution_receipt_ids=(),
+        candidate_execution_receipt_ids=(),
+    )
+    assert feedback.parent_execution_receipt_ids == ()
+    assert feedback.candidate_execution_receipt_ids == ()
+
+    with pytest.raises(ValueError, match="process feedback reason codes"):
+        replace(feedback, reason_codes=())
+
+
+def test_string_normalization_rejects_unhashable_values() -> None:
+    case = _case("case.unhashable", FeasibilityOutcome.UNRESOLVED, FeedbackChain())
+    assert case.process_feedback is not None
+    with pytest.raises(ValueError, match="candidate execution receipts"):
+        replace(case.process_feedback, candidate_execution_receipt_ids=({"id": "x"},))
+
+
 def test_census_reports_unresolved_and_censored_separately() -> None:
     unresolved = _case("case.unresolved_ratio", FeasibilityOutcome.UNRESOLVED, FeedbackChain())
     censored = _case("case.censored_ratio", FeasibilityOutcome.CENSORED, FeedbackChain())
