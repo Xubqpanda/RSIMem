@@ -194,6 +194,10 @@ def test_complete_useful_and_missed_chains_make_extraction_optimization_ready() 
     assert census.censored_count == 0
     assert census.unresolved_ratio == 0.0
     assert census.censored_ratio == 0.0
+    assert census.useful_count == 1
+    assert census.harmful_count == 0
+    assert census.missed_count == 1
+    assert census.resolved_useful_rate == 1.0
     assert useful.replay_payload["parent_audit_ok"] is True
     assert useful.replay_payload["candidate_audit_ok"] is True
     assert useful.process_feedback is not None
@@ -372,6 +376,7 @@ def test_census_reports_unresolved_and_censored_separately() -> None:
     payload = census.payload()
     assert payload["unresolvedCount"] == 1
     assert payload["censoredCount"] == 1
+    assert payload["resolvedUsefulRate"] is None
 
 
 def test_failed_replay_audit_rejects_intervention() -> None:
