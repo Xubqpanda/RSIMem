@@ -18,6 +18,7 @@ from rsimem.memory.extraction_feedback import (
     FactDisposition,
 )
 from rsimem.memory.extraction_projection import Mem0FlatExtractionSourceProjector
+from rsimem.memory.extraction_projection import JsonExtractionSourceRecordStore
 from rsimem.memory.live_writeback import StaticSemanticWritebackRuntime
 from rsimem.memory_systems.mem0_flat import (
     FakeCompletionClient,
@@ -181,5 +182,56 @@ def test_projector_rejects_duplicate_without_original_trace_result(tmp_path) -> 
                 family_id=FAMILY,
                 available_semantic_keys=(TSV_KEY,),
             )
+    finally:
+        runtime.close()
+
+
+def test_source_record_store_is_restart_safe_and_fails_closed(tmp_path) -> None:
+    runtime, boundary = _compile(tmp_path, facts=(PREFERENCE,))
+    path = tmp_path / "source-records.jsonl"
+    try:
+        record = Mem0FlatExtractionSourceProjector().project_record(
+            boundary,
+            runtime.policy,
+            family_id=FAMILY,
+            stage="learn_a",
+            available_semantic_keys=(TSV_KEY,),
+        )
+        store = JsonExtractionSourceRecordStore(path)
+        assert store.append(record) is True
+        assert JsonExtractionSourceRecordStore(path).append(record) is False
+        candidates = JsonExtractionSourceRecordStore(path).candidates(
+            family_id=FAMILY,
+            artifact_ids=record.artifact_ids,
+            opportunity_semantic_keys=(TSV_KEY,),
+        )
+        assert candidates == (record,)
+        assert PREFERENCE not in path.read_text(encoding="utf-8")
+    finally:
+        runtime.close()
+
+    path.write_text("not-json\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed extraction source"):
+        JsonExtractionSourceRecordStore(path).records()
+
+
+def test_empty_source_record_remains_joinable_without_memory_artifact(tmp_path) -> None:
+    runtime, boundary = _compile(tmp_path, facts=())
+    try:
+        record = Mem0FlatExtractionSourceProjector().project_record(
+            boundary,
+            runtime.policy,
+            family_id=FAMILY,
+            stage="learn_a",
+            available_semantic_keys=(TSV_KEY,),
+        )
+        assert record.artifact_ids == ()
+        store = JsonExtractionSourceRecordStore(tmp_path / "empty-sources.jsonl")
+        store.append(record)
+        assert store.candidates(
+            family_id=FAMILY,
+            artifact_ids=(),
+            opportunity_semantic_keys=(TSV_KEY,),
+        ) == (record,)
     finally:
         runtime.close()
