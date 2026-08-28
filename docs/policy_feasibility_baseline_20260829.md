@@ -80,3 +80,10 @@ git diff --check
 ```
 
 runner 会生成 7 个 case、写入 content-free evidence ledger，并在重复运行时复用相同 record IDs；它仍然只产生 feasibility/shadow 证据，不调用 provider。
+
+Stage 2E 的 `rsimem.extraction_proposal` 现在也会写出
+`feasibility-hypothesis.json`。该文件只包含 optimizer result/request、parent
+and candidate artifact identity、training corpus digest、actionable evidence
+IDs 和 reason codes；`NO_PROPOSAL` 明确没有 candidate。proposal 写入前会
+通过 `project_optimizer_result()` 的 parent/corpus/ownership/schema gate，因而
+不会把一个未验证的 optimizer-result.json 当成 N+1 intervention。
