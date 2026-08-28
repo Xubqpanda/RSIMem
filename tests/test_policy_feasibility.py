@@ -183,6 +183,10 @@ def test_complete_useful_and_missed_chains_make_extraction_optimization_ready() 
     assert census.unknown_count == 0
     assert useful.replay_payload["parent_audit_ok"] is True
     assert useful.replay_payload["candidate_audit_ok"] is True
+    assert useful.process_feedback is not None
+    assert useful.process_feedback.event_id == useful.parent.event.event_id
+    assert useful.process_feedback.target_layer is PolicyLayer.EXTRACTION
+    assert useful.process_feedback.parent_decision_id == useful.parent_decision.decision_id
     assert useful.replay_payload["intervention_fingerprint"] == useful.intervention_fingerprint
     assert report.digest == build_feasibility_report((useful, missed)).digest
     # The report is intentionally not globally ready until all six layers have
