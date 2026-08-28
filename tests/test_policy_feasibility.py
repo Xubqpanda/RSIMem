@@ -201,6 +201,9 @@ def test_complete_useful_and_missed_chains_make_extraction_optimization_ready() 
     assert useful.hypothesis is not None
     assert useful.hypothesis.target_layer is PolicyLayer.EXTRACTION
     assert useful.hypothesis.candidate_artifact_id == useful.candidate_artifact.artifact_id
+    assert useful.hypothesis == type(useful.hypothesis).from_payload(
+        useful.hypothesis.payload()
+    )
     assert useful.replay_payload["intervention_fingerprint"] == useful.intervention_fingerprint
     report_case = next(item for item in report.payload()["cases"] if item["caseId"] == useful.case_id)
     assert report_case["processFeedback"]["feedback_id"] == useful.process_feedback.feedback_id
@@ -438,6 +441,18 @@ def test_process_feedback_tampering_is_rejected() -> None:
     payload["observed_after_digest"] = "0" * 64
     with pytest.raises(ValueError, match="ID mismatch|malformed"):
         type(case.process_feedback).from_payload(payload)
+
+
+def test_hypothesis_tampering_is_rejected() -> None:
+    case = _case(
+        "case.hypothesis_tamper",
+        FeasibilityOutcome.USEFUL,
+        FeedbackChain("opportunity.1", "use.1", "outcome.1"),
+    )
+    payload = case.hypothesis.payload()
+    payload["feedback_ids"] = ["foreign.feedback"]
+    with pytest.raises(ValueError, match="ID mismatch|malformed"):
+        type(case.hypothesis).from_payload(payload)
 
 
 def test_executable_feasibility_census_replays_and_persists(tmp_path) -> None:
