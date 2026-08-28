@@ -379,6 +379,27 @@ def test_census_reports_unresolved_and_censored_separately() -> None:
     assert payload["resolvedUsefulRate"] is None
 
 
+def test_census_reports_ambiguous_reason_separately() -> None:
+    parent, candidate = _replays()
+    case = LayerIntervention(
+        case_id="case.ambiguous",
+        target_layer=PolicyLayer.EXTRACTION,
+        parent=parent,
+        candidate=candidate,
+        parent_artifact=_artifact("fixed.extraction.parent.v1", PolicyArtifactKind.FIXED),
+        candidate_artifact=_artifact("adaptive.extraction.candidate.v1", PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE),
+        process_signal=True,
+        outcome=FeasibilityOutcome.UNRESOLVED,
+        reason_codes=("ambiguous_multi_artifact",),
+    )
+    census = next(
+        item for item in build_feasibility_report((case,)).census
+        if item.layer is PolicyLayer.EXTRACTION
+    )
+    assert census.ambiguous_count == 1
+    assert census.ambiguous_ratio == 1.0
+
+
 def test_failed_replay_audit_rejects_intervention() -> None:
     parent, candidate = _replays()
     failed_parent = replace(
