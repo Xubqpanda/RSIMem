@@ -21,6 +21,8 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 `ProcessFeedback` 进一步将 intervention 绑定到 event、source revision、目标层 parent/candidate decision、执行 receipt 集合和 before/after output digest；`JsonFeasibilityEvidenceLedger` 以原子替换和文件锁持久化该 identity。重启读取、重复写入、损坏记录和冲突记录均 fail closed。ledger 只保存 ID、digest、状态和 reason，不保存 snapshot 或 memory 正文。
 
+每个有 process signal 的 case 还会生成 `PolicyHypothesis`：它把 past feedback IDs、parent artifact、candidate artifact 和唯一 target layer 固定成稳定的 N+1 proposal identity。hypothesis 不能引用 intervention 外部的 feedback，也不能跨层或复用相同 artifact。
+
 ## Census
 
 | layer | cases | signal coverage | action variation | useful | harmful | missed | unresolved | censored | complete feedback | status |
@@ -38,10 +40,10 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 ```text
 PYTHONPATH=src pytest -q tests/test_policy_feasibility.py tests/test_policy_replay.py
-12 passed
+13 passed
 
 .venv/bin/pytest -q tests
-620 passed
+621 passed
 
 cd benchmarks/past-bench && ../../.venv/bin/pytest -q
 397 passed, 2 skipped
