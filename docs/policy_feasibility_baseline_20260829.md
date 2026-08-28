@@ -27,6 +27,8 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 为避免 opaque fixture ID 被误接入正式训练，`feedback_chain_from_extraction_example()` 只接受真实 `ExtractionFeedbackExample` 的 primary extraction-set useful/missed 记录，并要求其 operation identity 完整；fact-level、harmful、unresolved 和 censored 记录返回空链，继续留在诊断桶。
 
+`LayerIntervention.from_extraction_feedback()` 将同一规则用于构造 extraction intervention：只有 primary extraction-set example 可以进入，fact-level example 会被拒绝；不完整 useful/missed 链会自动降级为 unresolved。
+
 ## Census
 
 | layer | cases | signal coverage | action variation | useful | harmful | missed | unresolved | censored | complete feedback | status |
