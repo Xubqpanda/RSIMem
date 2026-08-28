@@ -20,6 +20,7 @@ from .memory.extraction_prompt_optimizer import (
     ExtractionOptimizerResult,
     ExtractionPromptOptimizer,
 )
+from .memory.policy_feasibility import project_optimizer_result
 from .memory.prompt_components import canonical_json, content_digest
 from .memory_systems.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT,
@@ -114,6 +115,12 @@ def prepare_extraction_proposal(
             "primaryExampleIds": list(result.request.primary_example_ids),
         },
     )
+    projection = project_optimizer_result(
+        result,
+        corpus,
+        parent_artifact_id=parent.artifact_id,
+    )
+    _write_immutable(output / "feasibility-hypothesis.json", projection.payload())
     if result.decision == ExtractionOptimizerDecision.PROPOSE:
         assert result.candidate is not None
         _write_immutable(
