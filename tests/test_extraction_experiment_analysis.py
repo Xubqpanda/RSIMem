@@ -4,7 +4,10 @@ import hashlib
 import json
 from pathlib import Path
 
-from rsimem.extraction_experiment_analysis import analyze_extraction_batch
+from rsimem.extraction_experiment_analysis import (
+    analyze_extraction_batch,
+    classify_extraction_audit_failure,
+)
 from rsimem.extraction_experiment_manifest import (
     EXTRACTION_METHOD_VARIANTS,
     extraction_execution_order,
@@ -223,6 +226,25 @@ def _batch(tmp_path: Path, *, changed: bool) -> Path:
         for method in EXTRACTION_METHOD_VARIANTS
     }
     for ordinal, method in enumerate(extraction_execution_order(1), start=1):
+        if ordinal == 1:
+            failed_name = "r01_provider_failed"
+            record_extraction_attempt(
+                root / "batch_manifest.json",
+                replicate=1,
+                ordinal=ordinal,
+                method=method,
+                run_name=failed_name,
+                status="running",
+            )
+            record_extraction_attempt(
+                root / "batch_manifest.json",
+                replicate=1,
+                ordinal=ordinal,
+                method=method,
+                run_name=failed_name,
+                status="failed",
+                failure_stage="provider",
+            )
         run_name = f"r01_{method.replace('-', '_')}"
         record_extraction_attempt(
             root / "batch_manifest.json",
@@ -267,6 +289,13 @@ def test_analysis_reports_quality_raw_unknown_usage_and_complete_funnel(
 
     assert report["qualityReady"] is True
     assert report["usageComplete"] is False
+    assert report["failedAttempts"] == [{
+        "replicate": 1,
+        "method": "static-extraction-rsimem",
+        "attemptNumber": 1,
+        "runName": "r01_provider_failed",
+        "failureStage": "provider",
+    }]
     assert report["activationFunnel"] == {
         "eligible": 1,
         "renderedNPlus1": 1,
@@ -321,3 +350,15 @@ def test_analysis_rejects_adaptation_claim_without_changed_extraction(
     assert claim["eligible"] is False
     assert claim["reason"] == "activation_funnel_incomplete"
     assert "changedExtraction" in claim["missingStages"]
+
+
+def test_audit_failure_classification_requires_all_calls_to_be_provider_errors() -> None:
+    assert classify_extraction_audit_failure({
+        "modelCallStatuses": {"error": 3},
+    }) == "provider"
+    assert classify_extraction_audit_failure({
+        "modelCallStatuses": {"ok": 2, "error": 1},
+    }) == "audit"
+    assert classify_extraction_audit_failure({
+        "issues": [{"kind": "incomplete_model_usage"}],
+    }) == "audit"
