@@ -432,6 +432,20 @@ def test_feasibility_ledger_missing_case_fails_closed(tmp_path) -> None:
         ledger.verify_case(case)
 
 
+def test_feasibility_ledger_does_not_retain_deleted_file_cache(tmp_path) -> None:
+    case = _case(
+        "case.deleted_file",
+        FeasibilityOutcome.UNRESOLVED,
+        FeedbackChain(),
+    )
+    path = tmp_path / "deleted.jsonl"
+    ledger = JsonFeasibilityEvidenceLedger(path)
+    ledger.record_case(case)
+    path.unlink()
+    with pytest.raises(ValueError, match="record is missing"):
+        ledger.verify_case(case)
+
+
 def test_process_feedback_tampering_is_rejected() -> None:
     case = _case(
         "case.feedback_tamper",
