@@ -544,7 +544,7 @@ class OfflineRatioEvidence:
         }
 
 
-def _ratio_evidence(
+def extraction_ratio_evidence(
     metrics: ExtractionQualityMetrics,
 ) -> tuple[OfflineRatioEvidence, ...]:
     total = metrics.completed_source_count
@@ -661,9 +661,9 @@ class ExtractionOfflineValidationDecision:
             or self.quality_decision.criteria_digest != self.criteria_digest
         ):
             raise ValueError("offline validation quality decision join mismatch")
-        if self.parent_ratios != _ratio_evidence(
+        if self.parent_ratios != extraction_ratio_evidence(
             self.quality_decision.parent_metrics
-        ) or self.candidate_ratios != _ratio_evidence(
+        ) or self.candidate_ratios != extraction_ratio_evidence(
             self.quality_decision.proposal_metrics
         ):
             raise ValueError("offline validation ratio evidence mismatch")
@@ -782,8 +782,8 @@ class ExtractionPromptOfflineValidator:
             "static_safety_report_id": static_safety.report_id,
             "deterministic_suite_report_id": deterministic_suite.report_id,
             "quality_decision": quality,
-            "parent_ratios": _ratio_evidence(quality.parent_metrics),
-            "candidate_ratios": _ratio_evidence(quality.proposal_metrics),
+            "parent_ratios": extraction_ratio_evidence(quality.parent_metrics),
+            "candidate_ratios": extraction_ratio_evidence(quality.proposal_metrics),
             "reason_codes": reason_codes,
             "decision_schema": EXTRACTION_OFFLINE_DECISION_SCHEMA,
             "schema_version": EXTRACTION_OFFLINE_SCHEMA_VERSION,
