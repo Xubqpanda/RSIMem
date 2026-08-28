@@ -30,6 +30,11 @@ from .lifecycle import (
     TaskLifecycleState,
 )
 from .memory import MemoryEvent, MemoryEventKind, MemoryKind, MemoryQuery
+from .memory.trigger_policy import (
+    DeterministicTriggerPolicy,
+    HermesTriggerEventAdapter,
+    TriggerObservation,
+)
 from .memory.live_writeback import (
     ExtractionPromptRuntimeScope,
     StaticSemanticBoundaryResult,
@@ -348,6 +353,9 @@ class HermesPastBenchBridge:
         self._agent: object | None = None
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
+        self._trigger_adapter = HermesTriggerEventAdapter()
+        self._trigger_policy = DeterministicTriggerPolicy()
+        self._trigger_observations: list[TriggerObservation] = []
         self._static_results: list[StaticSemanticBoundaryResult] = []
         self._static_failures: list[tuple[str, str]] = []
         self._semantic_futures: list[tuple[SemanticFutureEvidence, str]] = []
@@ -569,6 +577,12 @@ class HermesPastBenchBridge:
     @property
     def lifecycle_failures(self) -> tuple[tuple[str, str], ...]:
         return tuple(self._lifecycle_failures)
+
+    @property
+    def trigger_observations(self) -> tuple[TriggerObservation, ...]:
+        """All observed trigger candidates, including shadow SKIP decisions."""
+
+        return tuple(self._trigger_observations)
 
     @property
     def static_results(self) -> tuple[StaticSemanticBoundaryResult, ...]:
@@ -1023,6 +1037,14 @@ class HermesPastBenchBridge:
             for item in self._lifecycle_results
         ):
             self._lifecycle_results.append(result)
+        trigger_event = self._trigger_adapter.from_snapshot(
+            result.snapshot,
+            trigger.value,
+            turn_index=sum(1 for row in rows if row.get("role") == "user"),
+        )
+        observation = self._trigger_policy.decide(trigger_event)
+        if not any(item.event.event_id == observation.event.event_id for item in self._trigger_observations):
+            self._trigger_observations.append(observation)
         return result
 
     def adapter_call(
