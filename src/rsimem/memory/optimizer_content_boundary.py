@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Mapping
 
 from .prompt_components import text_digest
 
@@ -90,6 +91,35 @@ class OptimizerUntrustedText:
             "projected_digest": self.projected_digest,
             "redactions": [value.value for value in self.redactions],
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "OptimizerUntrustedText":
+        fields = {
+            "schema_version",
+            "text_schema",
+            "trust",
+            "text",
+            "source_digest",
+            "projected_digest",
+            "redactions",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed optimizer text payload")
+        redactions = value["redactions"]
+        if not isinstance(redactions, list):
+            raise ValueError("malformed optimizer text redactions")
+        try:
+            return cls(
+                text=value["text"],
+                source_digest=value["source_digest"],
+                projected_digest=value["projected_digest"],
+                redactions=tuple(OptimizerTextRedaction(item) for item in redactions),
+                trust=value["trust"],
+                text_schema=value["text_schema"],
+                schema_version=value["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed optimizer text payload") from exc
 
 
 class OptimizerSecretBoundary:
