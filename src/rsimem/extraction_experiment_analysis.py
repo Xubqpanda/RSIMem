@@ -143,7 +143,7 @@ def _terminal_attempts(manifest: dict[str, Any]) -> tuple[dict[str, Any], ...]:
     for event in manifest["attemptHistory"]:
         latest[event["runName"]] = event
     return tuple(
-        event for event in latest.values() if event["status"] == "completed"
+        event for event in latest.values() if event["status"] != "running"
     )
 
 
@@ -423,6 +423,22 @@ def _safety_failures(audit: dict[str, Any]) -> int:
     )
 
 
+def classify_extraction_audit_failure(audit: dict[str, Any]) -> str:
+    """Distinguish an all-provider-error run from an evidence/audit failure."""
+
+    statuses = audit.get("modelCallStatuses")
+    if isinstance(statuses, dict) and statuses:
+        error_count = statuses.get("error")
+        non_error = sum(
+            value
+            for key, value in statuses.items()
+            if key != "error" and type(value) is int and value >= 0
+        )
+        if type(error_count) is int and error_count > 0 and non_error == 0:
+            return "provider"
+    return "audit"
+
+
 def _run_evidence(
     batch_root: Path,
     manifest: dict[str, Any],
@@ -612,7 +628,15 @@ def _claim(funnel: dict[str, int], safety_failures: int) -> dict[str, object]:
 def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
     root = batch_root.expanduser().resolve()
     manifest = load_extraction_manifest(root / "batch_manifest.json")
-    attempts = _terminal_attempts(manifest)
+    terminal_attempts = _terminal_attempts(manifest)
+    attempts = tuple(
+        attempt for attempt in terminal_attempts
+        if attempt["status"] == "completed"
+    )
+    failed_attempts = tuple(
+        attempt for attempt in terminal_attempts
+        if attempt["status"] == "failed"
+    )
     rows = tuple(
         _run_evidence(root, manifest, attempt)
         for attempt in sorted(
@@ -656,6 +680,13 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
             for row in rows
             for bucket in row["rawUsage"].values()
         ),
+        "failedAttempts": [{
+            "replicate": attempt["replicate"],
+            "method": attempt["method"],
+            "attemptNumber": attempt["attemptNumber"],
+            "runName": attempt["runName"],
+            "failureStage": attempt["failureStage"],
+        } for attempt in failed_attempts],
         "runs": [{
             "replicate": row["replicate"],
             "method": row["method"],

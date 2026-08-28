@@ -167,7 +167,15 @@ if results.get("variant") != "with_persistence":
   fi
   if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.audit \
     "${trace_dir}" --output "${trace_dir}/audit.json"; then
-    manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" failed audit
+    failure_stage="$(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
+import json
+import sys
+from pathlib import Path
+from rsimem.extraction_experiment_analysis import classify_extraction_audit_failure
+audit = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+print(classify_extraction_audit_failure(audit))
+' "${trace_dir}/audit.json")"
+    manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" failed "${failure_stage}"
     exit 1
   fi
   if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c '
