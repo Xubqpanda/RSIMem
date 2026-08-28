@@ -24,6 +24,8 @@ from rsimem.lifecycle import (
     run_sm01_preference_fixture,
 )
 from rsimem.memory import MemoryEvent, MemoryEventKind, MemoryKind
+from rsimem.memory.policy_contracts import TriggerDecision
+from rsimem.memory.policy_evidence import JsonPolicyDecisionLedger
 from rsimem.memory.ingestion import (
     InternalMemoryAction,
     MemoryIngestOutcome,
@@ -437,6 +439,45 @@ def test_static_utility_evidence_joins_ingestion_and_audits_frozen_policy(
         "featureSchemas": ["semantic-static-utility-features-v1"],
         "policyVersions": ["semantic-static-utility-policy-v1"],
     }
+
+
+def test_audit_run_reports_policy_evidence_and_identity(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    policy_path = _runtime_evidence_path(comparison).with_name(
+        "rsimem_policy_decisions.jsonl"
+    )
+    decision = TriggerDecision.create(
+        policy_version="fixed.trigger.parent.v1",
+        source_revision="snapshot.rev.1",
+        input_payload={"event": "event.fixture"},
+        output_payload={"action": "RUN"},
+        action="RUN",
+        execution_status="pending",
+        reason_codes=("task_completed_parent",),
+        lineage_id="lineage.fixture",
+        trigger_event_id="event.fixture",
+    )
+    JsonPolicyDecisionLedger(
+        policy_path,
+        variant="with_persistence",
+        trace_id="trace-1",
+    ).record_decision(
+        decision,
+        run_id="run-1",
+        episode_id="learn",
+        session_id="session-1",
+        task_id="task-1",
+        snapshot_id="snapshot.fixture",
+    )
+    write_ledger(
+        comparison,
+        comparison.parent / "ledger.jsonl",
+        judge_enabled=False,
+    )
+    report = audit_run(comparison.parent)
+    assert report["policyEvidence"]["files"] == 1
+    assert report["policyEvidence"]["events"] == 1
+    assert report["policyEvidence"]["reports"][0]["ok"] is True
 
 
 def test_static_utility_evidence_rejects_content_and_policy_drift(

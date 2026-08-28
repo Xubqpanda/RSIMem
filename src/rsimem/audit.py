@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .ledger import resolve_comparison_evidence_path
+from .memory.policy_audit import audit_policy_evidence
 
 
 _SECRET_PATTERNS = {
@@ -335,6 +336,39 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
     if adapter_bypasses:
         issues.append({"kind": "adapter_native_bypass", "count": adapter_bypasses})
 
+    policy_audit_rows: list[dict[str, Any]] = []
+    for trace_id, trace_path in trace_paths.items():
+        artifact_dir = trace_path.parent / "artifacts"
+        policy_path = artifact_dir / "rsimem_policy_decisions.jsonl"
+        if not policy_path.exists():
+            continue
+        lifecycle_path = artifact_dir / "rsimem_lifecycle_events.jsonl"
+        try:
+            policy_report = audit_policy_evidence(
+                policy_path,
+                lifecycle_events=lifecycle_path if lifecycle_path.exists() else None,
+            )
+            row = policy_report.payload()
+            row["traceId"] = trace_id
+            row["path"] = str(policy_path.relative_to(run_dir))
+        except (OSError, ValueError) as exc:
+            row = {
+                "ok": False,
+                "traceId": trace_id,
+                "path": str(policy_path.relative_to(run_dir)),
+                "eventCount": 0,
+                "lineageCount": 0,
+                "layers": [],
+                "errors": [type(exc).__name__ + ": " + str(exc)],
+            }
+        policy_audit_rows.append(row)
+        if row.get("ok") is not True:
+            issues.append({
+                "kind": "policy_evidence_audit_failed",
+                "traceId": trace_id,
+                "errors": row.get("errors", []),
+            })
+
     memory_leaks = sum(1 for entry in memory_entries if entry in ledger_text)
     if memory_leaks:
         issues.append({"kind": "memory_text_leak", "count": memory_leaks})
@@ -390,6 +424,11 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         "projectionChecks": len(projection_checks),
         "projectionMismatches": projection_mismatches,
         "adapterNativeBypasses": adapter_bypasses,
+        "policyEvidence": {
+            "files": len(policy_audit_rows),
+            "events": sum(int(row.get("eventCount") or 0) for row in policy_audit_rows),
+            "reports": policy_audit_rows,
+        },
         "unresolvedMemoryInjections": unresolved_injections,
         "privacy": {
             "memoryTextLeaks": memory_leaks,
