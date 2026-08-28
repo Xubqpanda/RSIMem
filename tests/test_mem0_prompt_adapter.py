@@ -182,6 +182,7 @@ def test_mem0_adapter_exports_reloadable_exact_root_policy() -> None:
         "output-schema",
     )
     assert tuple(rule.rule_id for rule in root_policy.spec.rules if rule.protected) == (
+        "durable-candidates",
         "source-safety-exclusions",
         "output-schema",
     )
@@ -255,6 +256,27 @@ def test_mem0_adapter_binds_rich_child_without_changing_frozen_components() -> N
     )
 
 
+def test_mem0_root_durability_rule_cannot_be_replaced() -> None:
+    root = Mem0FlatPromptAdapter().export_root_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID
+    )
+    with pytest.raises(ValueError, match="protected"):
+        ExtractionPromptPolicyArtifact.create_child(
+            parent=root,
+            policy_version="candidate-weakened-v2",
+            edits=(ExtractionRuleEdit(
+                "edit.weaken-durability",
+                ExtractionRuleEditAction.REPLACE,
+                "durable-candidates",
+                ExtractionPolicyRule(
+                    "durable-candidates",
+                    "Extract any information from the experience.",
+                ),
+            ),),
+            generation_provenance=_generation_provenance(),
+        )
+
+
 def test_mem0_active_child_renders_identically_after_store_restart(tmp_path) -> None:
     adapter = Mem0FlatPromptAdapter()
     root = adapter.export_root_policy_artifact(MEM0_FLAT_EXTRACTION_SLOT_ID)
@@ -264,11 +286,10 @@ def test_mem0_active_child_renders_identically_after_store_restart(tmp_path) -> 
         edits=(ExtractionRuleEdit(
             "edit.restart-scope",
             ExtractionRuleEditAction.REPLACE,
-            "durable-candidates",
+            "future-useful-scope",
             ExtractionPolicyRule(
-                "durable-candidates",
-                "Extract minimal durable facts and preferences from a completed "
-                "agent experience.",
+                "future-useful-scope",
+                "Keep durable user facts and preferences that can help later tasks.",
             ),
         ),),
         generation_provenance=_generation_provenance(),
