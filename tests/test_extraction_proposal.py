@@ -56,6 +56,11 @@ def test_proposal_persists_candidate_and_request_without_recalling_provider(
         (owner / "proposal" / "optimizer-request.json").read_text()
     )
     assert request_payload["requestDigest"] == result.request.request_digest
+    feasibility_payload = json.loads(
+        (owner / "proposal" / "feasibility-hypothesis.json").read_text()
+    )
+    assert feasibility_payload["decision"] == "PROPOSE"
+    assert feasibility_payload["candidate_artifact_id"] == result.candidate.artifact_id
     assert all(
         path.stat().st_mode & 0o777 == 0o600
         for path in (owner / "proposal").glob("*.json")
@@ -90,6 +95,11 @@ def test_no_signal_proposal_does_not_call_provider_or_write_candidate(
     assert "source_messages" not in result.request.input_json
     payload = json.loads((owner / "proposal" / "optimizer-result.json").read_text())
     assert payload["reasonCodes"] == ["no_actionable_extraction_signal"]
+    feasibility = json.loads(
+        (owner / "proposal" / "feasibility-hypothesis.json").read_text()
+    )
+    assert feasibility["decision"] == "NO_PROPOSAL"
+    assert feasibility["candidate_artifact_id"] is None
 
 
 def test_no_signal_cli_does_not_read_credentials_or_validate_provider(
