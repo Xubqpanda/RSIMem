@@ -52,10 +52,10 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 ```text
 PYTHONPATH=src pytest -q tests/test_policy_feasibility.py tests/test_policy_replay.py
-24 passed
+25 passed
 
 .venv/bin/pytest -q tests
-632 passed
+633 passed
 
 cd benchmarks/past-bench && ../../.venv/bin/pytest -q
 397 passed, 2 skipped
