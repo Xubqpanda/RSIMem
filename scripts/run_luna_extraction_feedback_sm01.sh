@@ -190,9 +190,7 @@ if audit.get("ok") is not True or audit.get("issues") != []:
 utility = audit.get("staticUtility") or {}
 if utility.get("events") != 0:
     raise ValueError("plain extraction parent emitted utility decisions")
-paths = tuple(run_dir.glob(
-    "family_homes/*/hermes_home/.rsimem/extraction_sources.jsonl"
-))
+paths = tuple(run_dir.rglob("extraction_sources.jsonl"))
 if not paths or not any(JsonExtractionSourceRecordStore(path).records() for path in paths):
     raise ValueError("formal extraction run emitted no source evidence")
 ' "${trace_dir}"; then
