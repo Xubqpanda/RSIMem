@@ -26,6 +26,7 @@ from rsimem.memory.policy_feasibility import (
     FeasibilityStatus,
     LayerIntervention,
     JsonFeasibilityEvidenceLedger,
+    PolicyHypothesis,
     build_feasibility_report,
     validate_feasibility_case,
 )
@@ -187,6 +188,9 @@ def test_complete_useful_and_missed_chains_make_extraction_optimization_ready() 
     assert useful.process_feedback.event_id == useful.parent.event.event_id
     assert useful.process_feedback.target_layer is PolicyLayer.EXTRACTION
     assert useful.process_feedback.parent_decision_id == useful.parent_decision.decision_id
+    assert useful.hypothesis is not None
+    assert useful.hypothesis.target_layer is PolicyLayer.EXTRACTION
+    assert useful.hypothesis.candidate_artifact_id == useful.candidate_artifact.artifact_id
     assert useful.replay_payload["intervention_fingerprint"] == useful.intervention_fingerprint
     assert report.digest == build_feasibility_report((useful, missed)).digest
     # The report is intentionally not globally ready until all six layers have
@@ -282,6 +286,31 @@ def test_contradictory_complete_chain_cannot_be_marked_unresolved() -> None:
 def test_feedback_ids_must_be_non_empty_strings() -> None:
     with pytest.raises(ValueError, match="non-empty strings"):
         FeedbackChain(opportunity_id=" ")
+
+
+def test_hypothesis_must_bind_feedback_and_artifacts() -> None:
+    parent, candidate = _replays()
+    parent_artifact = _artifact("fixed.extraction.parent.v1", PolicyArtifactKind.FIXED)
+    candidate_artifact = _artifact("adaptive.extraction.candidate.v1", PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE)
+    hypothesis = PolicyHypothesis.create(
+        parent_artifact_id=parent_artifact.artifact_id,
+        candidate_artifact_id=candidate_artifact.artifact_id,
+        target_layer=PolicyLayer.EXTRACTION,
+        feedback_ids=("foreign.feedback",),
+    )
+    with pytest.raises(ValueError, match="not bound to intervention"):
+        LayerIntervention(
+            case_id="case.foreign_hypothesis",
+            target_layer=PolicyLayer.EXTRACTION,
+            parent=parent,
+            candidate=candidate,
+            parent_artifact=parent_artifact,
+            candidate_artifact=candidate_artifact,
+            process_signal=True,
+            outcome=FeasibilityOutcome.UNRESOLVED,
+            reason_codes=("foreign_hypothesis",),
+            hypothesis=hypothesis,
+        )
 
 
 def test_report_rejects_duplicate_case_identity() -> None:
