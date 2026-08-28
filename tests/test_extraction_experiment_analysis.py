@@ -352,6 +352,22 @@ def test_analysis_rejects_adaptation_claim_without_changed_extraction(
     assert "changedExtraction" in claim["missingStages"]
 
 
+def test_analysis_does_not_report_complete_usage_without_completed_runs(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "empty-batch"
+    inputs = _inputs(tmp_path, phase="validation")
+    inputs["path"] = root / "batch_manifest.json"
+    inputs["registry_path"] = tmp_path / "registry.json"
+    initialize_extraction_batch_manifest(**inputs)
+
+    report = analyze_extraction_batch(root)
+
+    assert report["runs"] == []
+    assert report["qualityReady"] is False
+    assert report["usageComplete"] is False
+
+
 def test_audit_failure_classification_requires_all_calls_to_be_provider_errors() -> None:
     assert classify_extraction_audit_failure({
         "modelCallStatuses": {"error": 3},

@@ -675,7 +675,7 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
                 for row in rows
             )
         ),
-        "usageComplete": all(
+        "usageComplete": bool(rows) and all(
             bucket["complete"]
             for row in rows
             for bucket in row["rawUsage"].values()
