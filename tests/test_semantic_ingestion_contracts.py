@@ -412,6 +412,47 @@ def test_unknown_stale_duplicate_and_unsupported_operations_fail_closed() -> Non
     with pytest.raises(ValueError, match="duplicate operation"):
         _coordinator(duplicate_policy).ingest(_request(), _Candidates((candidate,)))
 
+    distinct_adds = (
+        InternalOperationProposal(
+            InternalMemoryAction.ADD,
+            "new_fact",
+            new_content_digest=_sha("first fact"),
+        ),
+        InternalOperationProposal(
+            InternalMemoryAction.ADD,
+            "new_fact",
+            new_content_digest=_sha("second fact"),
+        ),
+    )
+    multi_fact_policy = BoundSemanticPolicy(
+        _descriptor(),
+        lambda request, candidates: SemanticPolicyDecision(
+            MemoryIngestStatus.SUCCESS,
+            (*distinct_adds, *(InternalOperationProposal(
+                InternalMemoryAction.NONE,
+                "duplicate_fact",
+            ) for _ in range(2))),
+        ),
+    )
+    multi_fact = _coordinator(multi_fact_policy).ingest(_request(), _Candidates())
+    assert multi_fact is not None
+    assert tuple(operation.action for operation in multi_fact.operations) == (
+        InternalMemoryAction.ADD,
+        InternalMemoryAction.ADD,
+        InternalMemoryAction.NONE,
+        InternalMemoryAction.NONE,
+    )
+
+    duplicate_add_policy = BoundSemanticPolicy(
+        _descriptor(),
+        lambda request, candidates: SemanticPolicyDecision(
+            MemoryIngestStatus.SUCCESS,
+            (distinct_adds[0], distinct_adds[0]),
+        ),
+    )
+    with pytest.raises(ValueError, match="duplicate operation"):
+        _coordinator(duplicate_add_policy).ingest(_request(), _Candidates())
+
     limited = BoundSemanticPolicy(
         _descriptor(
             operations=frozenset({InternalMemoryAction.ADD, InternalMemoryAction.NONE}),
