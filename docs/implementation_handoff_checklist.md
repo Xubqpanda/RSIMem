@@ -710,7 +710,7 @@ deterministic runtime binding、PAST validation-only transport、activation fing
 matched drift gate；验收记录见
 [`extraction_stage2f_acceptance_20260828.md`](extraction_stage2f_acceptance_20260828.md)。
 当前必须执行Stage 2E独立matched validation batch，不能直接进入Stage 2G或production final run。
-Stage 2E plain-parent feedback已从clean detached worktree发起；认证后的三次完整运行均因provider
+Stage 2E plain-parent feedback已从clean detached worktree发起；认证后的四次完整运行均因provider
 HTTP 503 capacity失败，且没有生成source/capture/feedback evidence，因此不得进入optimizer。
 运行记录见[`extraction_stage2e_provider_attempts_20260828.md`](extraction_stage2e_provider_attempts_20260828.md)。
 后续顺序仍严格按照：
