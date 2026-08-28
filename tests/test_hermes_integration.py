@@ -1086,6 +1086,9 @@ def test_live_bridge_compiles_completed_task_without_lifecycle_evaluator(
     assert bridge.lifecycle_results == ()
     assert bridge.lifecycle_failures == ()
     assert len(bridge.static_results) == 1
+    assert len(bridge.trigger_observations) == 1
+    assert len(bridge.source_selection_decisions) == 1
+    assert bridge.source_selection_decisions[0].action.value == "RUN"
     assert bridge.static_results[0].writeback.logical_exit is True
     assert len(client.calls) == 2
     db.close()
