@@ -549,18 +549,18 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 功能需求：
 
 - □ 在独立PAST-Bench validation batch中轮换运行parent N与proposal N+1。
-- □ Pair使用相同family、episode manifest、model、budget、home seed state和feedback contract。
-- □ Activation只看deployment-observable set-level useful rate、anti-collapse constraints和安全审计，不看official task score。
-- □ Proposal必须达到strict useful-rate delta、resolved sample下限，并同时通过harmful/coverage/empty/missed gate才激活；equal、unknown、conflicting或任一约束失败保持REJECTED。
-- □ Production activation原子切换唯一ACTIVE extraction artifact。
-- □ Operator rollback恢复parent N；自动rollback只在有真实定义的safety violation时触发。
+- √ Pair使用相同family、episode manifest、model、budget、home seed state和feedback contract。
+- √ Activation只看deployment-observable set-level useful rate、anti-collapse constraints和安全审计，不看official task score。
+- √ Proposal必须达到strict useful-rate delta、resolved sample下限，并同时通过harmful、coverage、empty、missed gate才激活；equal、unknown、conflicting或任一约束失败保持REJECTED。
+- √ Production activation原子切换唯一ACTIVE extraction artifact。
+- √ Operator rollback恢复parent N；自动rollback只在有真实定义的safety violation时触发。
 
 测试与验收：
 
-- □ Trial config不能被official final launcher误当production config。
-- □ Activation crash不会产生两个ACTIVE artifact。
-- □ Rejection、重复activation、restart和rollback幂等。
-- □ Decision记录真实pair IDs、artifact digests、U/H/M/unresolved/censored counts、各ratio分子分母、coverage、quality delta、constraint results和reason codes。
+- √ Trial config不能被official final launcher误当production config。
+- √ Activation crash不会产生两个ACTIVE artifact。
+- √ Rejection、重复activation、restart和rollback幂等。
+- √ Decision记录真实pair IDs、artifact digests、U/H/M/unresolved/censored counts、各ratio分子分母、coverage、quality delta、constraint results和reason codes。
 
 ### 2F：Runtime Prompt Binding 与 Activation Fingerprint
 
@@ -698,16 +698,22 @@ bash -n scripts/*.sh
 
 ## 10. 当前执行入口
 
-当前位于 **Stage 2E：Matched Trial、Activation 与 Rollback**。Stage 1A-1H、
+当前实现入口位于 **Stage 2F：Runtime Prompt Binding 与 Activation Fingerprint**，
+但Stage 2E的真实PAST validation run仍保持未完成。Stage 1A-1H、
 Stage 2A、Stage 2B、Stage 2C 和 Stage 2D 已经通过，低成本 live plain-parent acceptance 记录在
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
 Stage 2D只证明candidate通过静态安全、deterministic extraction suite和独立historical
 split offline gate；其accepted状态只能进入matched trial，不代表production activation。
+Stage 2E的decision、trial-only config、content-free evidence assembler、atomic activation、
+rejection、restart和rollback contract已经通过deterministic验收；真实candidate run必须先由
+Stage 2F把ACTIVE extraction artifact绑定到实际prompt调用边界。Stage 2F完成后必须返回
+Stage 2E执行独立matched validation batch，不能直接进入Stage 2G或production final run。
 后续顺序仍严格按照：
 
 ```text
 1A -> 1B -> 1C -> 1D -> 1E -> 1F -> 1G -> 1H
-   -> 2A -> 2B -> 2C -> 2D -> 2E -> 2F -> 2G -> 2H -> 2I
+   -> 2A -> 2B -> 2C -> 2D -> 2E(contract) -> 2F
+   -> 2E(live matched trial) -> 2G -> 2H -> 2I
 ```
 
 任何上游contract缺陷必须在当前阶段修正，不通过后续模块、脚本参数或手工数据绕过。

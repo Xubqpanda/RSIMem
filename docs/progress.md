@@ -279,23 +279,34 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 - [x] Reject equal quality, insufficient resolved evidence, empty-output collapse, coverage collapse, safety failure, stale digests, incomplete split roles, and non-frozen candidate budgets.
 - [x] Limit an offline acceptance to matched-trial eligibility; no offline decision API can activate a production artifact.
 
+### Extraction-Prompt Stage 2E Deterministic Foundation
+
+- [x] Separate rich policy artifact identity from the actual runtime prompt-component identity in matched decisions and replay.
+- [x] Prepare a validation-only isolated ACTIVE store whose config cannot be loaded as a production profile.
+- [x] Assemble content-free observations from formal validation manifests, source records, delayed live feedback, and run-level safety audits without reading official score or raw cost into the decision.
+- [x] Require one completed run per predeclared slot, exact runtime artifact and run joins, complete feedback closure for every completed source, and paired model/budget/persistence identity.
+- [x] Preserve useful, harmful, missed, unresolved, and censored set-level evidence; unresolved/censored sources remain outside resolved and missed denominators without disappearing from coverage evidence.
+- [x] Apply strict useful-rate, harmful, coverage, empty, missed, safety, and intervention constraints before activation.
+- [x] Persist matched decisions and rollback evidence; activation, rejection, restart, duplicate apply, crash recovery, operator rollback, and observed-safety rollback are deterministic and idempotent.
+- [ ] Run the real independent PAST-Bench parent/candidate validation batch after Stage 2F binds the candidate at the extraction prompt boundary.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `506 passed`.
+- [x] Pass all RSIMem tests: `527 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `394 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Extraction-Prompt Stage 2E**
+### **Current: Extraction-Prompt Stage 2F (Unblocks The Remaining 2E Run)**
 
 The first optimized component is the semantic fact-extraction prompt. Delayed
 deployment evidence may update prompt body N to N+1 while the operation prompt,
 retrieval configuration, route, invocation boundary, backend, and model profile
 remain frozen. Raw resources are reported separately from the method decision.
 
-The immediate objective is a predeclared matched parent/proposal trial followed by fail-closed activation and rollback validation. Stage 2D offline acceptance only makes a candidate eligible for that trial; candidate artifacts remain proposals and production activation remains blocked until the Stage 2E gates pass.
+The immediate objective is binding the validation-only ACTIVE extraction artifact to the actual Mem0-flat prompt call while freezing the completion client, model profile, update prompt, retrieval config, route, boundary, and backend. After that binding passes deterministic fingerprint tests, execution returns to Stage 2E for the real predeclared parent/proposal validation batch. Candidate artifacts remain proposals and production activation remains blocked until that live gate passes.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -395,9 +406,10 @@ Acceptance criteria:
 8. [x] Build the content-bearing optimizer corpus with exact audit joins and train/validation/future-test isolation.
 9. [x] Implement the controlled extraction prompt optimizer with captured replay, provider adapter, evidence gating, and candidate leakage/safety rejection.
 10. [x] Implement static safety and held-out offline validation for extraction prompt candidates.
-11. [ ] Implement the predeclared matched trial, production activation, rejection, restart, and rollback gates.
-12. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
-13. [ ] Produce dated extraction-method reports before making adaptation claims.
+11. [x] Implement the predeclared matched-trial contract, validation-only store, evidence assembler, activation, rejection, restart, and rollback gates.
+12. [ ] Bind the validation-only ACTIVE extraction artifact to the real Mem0-flat prompt call and record its runtime fingerprint.
+13. [ ] Return to Stage 2E and run a predeclared matched static-extraction/adaptive-extraction SM01 batch.
+14. [ ] Produce dated extraction-method reports before making adaptation claims.
 
 ## Update Policy
 
