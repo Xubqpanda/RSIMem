@@ -13,14 +13,14 @@ def test_optimizer_boundary_redacts_only_its_copy_and_rejects_eval_evidence() ->
     boundary = OptimizerSecretBoundary()
     original = (
         "Authorization: Bearer secret-token inspect /mnt/private/run.json "
-        "with sk-abcdefghijklmnopqrstuvwxyz012345"
+        "with api_key=fixture-secret-token"
     )
     projected = boundary.project(original)
 
     assert original.startswith("Authorization: Bearer")
     assert "secret-token" not in projected.text
     assert "/mnt/private" not in projected.text
-    assert "sk-abcdefghijklmnopqrstuvwxyz" not in projected.text
+    assert "api_key=fixture-secret-token" not in projected.text
     assert projected.redactions == (
         OptimizerTextRedaction.AUTHORIZATION,
         OptimizerTextRedaction.CREDENTIAL,
