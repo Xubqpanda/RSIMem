@@ -93,6 +93,11 @@ from .policy_evidence import (
     JsonPolicyDecisionLedger,
     PolicyDecisionEvidence,
 )
+from .policy_audit import (
+    PolicyAuditReport,
+    audit_policy_evidence,
+    audit_policy_evidence_or_raise,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -173,4 +178,7 @@ __all__ = [
     "POLICY_EVIDENCE_SCHEMA_VERSION",
     "JsonPolicyDecisionLedger",
     "PolicyDecisionEvidence",
+    "PolicyAuditReport",
+    "audit_policy_evidence",
+    "audit_policy_evidence_or_raise",
 ]

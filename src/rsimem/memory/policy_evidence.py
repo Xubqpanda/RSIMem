@@ -9,12 +9,16 @@ import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+import re
 from typing import Sequence
 
 from .policy_contracts import PolicyDecision, content_digest
 
 
 POLICY_EVIDENCE_SCHEMA_VERSION = 1
+# Experiment variants legitimately use ``+`` (for example
+# ``native+adapter+ledger``), so the join identity grammar includes it.
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +44,10 @@ class PolicyDecisionEvidence:
     mutation_receipt_ids: tuple[str, ...] = ()
     injection_receipt_ids: tuple[str, ...] = ()
     future_feedback_ids: tuple[str, ...] = ()
+    variant: str = "unscoped"
+    trace_id: str = "unscoped"
+    family_id: str | None = None
+    stage: str | None = None
     schema_version: int = POLICY_EVIDENCE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -59,9 +67,17 @@ class PolicyDecisionEvidence:
             (self.action, "policy action"),
             (self.execution_status, "execution status"),
             (self.lineage_id, "lineage ID"),
+            (self.variant, "variant"),
+            (self.trace_id, "trace ID"),
         ):
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must not be empty")
+            if _IDENTIFIER.fullmatch(value) is None:
+                raise ValueError(f"{name} must be a stable identifier")
+        for value, name in ((self.family_id, "family ID"), (self.stage, "stage")):
+            if value is not None:
+                if not value.strip() or _IDENTIFIER.fullmatch(value) is None:
+                    raise ValueError(f"{name} must be a stable identifier")
         if self.trigger_event_id is not None and not self.trigger_event_id.strip():
             raise ValueError("trigger event ID must not be empty")
         if self.execution_receipt_id is not None and not self.execution_receipt_id.strip():
@@ -92,6 +108,10 @@ class PolicyDecisionEvidence:
         mutation_receipt_ids: Sequence[str] = (),
         injection_receipt_ids: Sequence[str] = (),
         future_feedback_ids: Sequence[str] = (),
+        variant: str = "unscoped",
+        trace_id: str = "unscoped",
+        family_id: str | None = None,
+        stage: str | None = None,
     ) -> "PolicyDecisionEvidence":
         identity = {
             "run_id": run_id,
@@ -112,6 +132,10 @@ class PolicyDecisionEvidence:
             "mutation_receipt_ids": list(mutation_receipt_ids),
             "injection_receipt_ids": list(injection_receipt_ids),
             "future_feedback_ids": list(future_feedback_ids),
+            "variant": variant,
+            "trace_id": trace_id,
+            "family_id": family_id,
+            "stage": stage,
         }
         return cls(
             event_id=f"policy-event.{content_digest(identity)[:40]}",
@@ -135,6 +159,10 @@ class PolicyDecisionEvidence:
             mutation_receipt_ids=tuple(mutation_receipt_ids),
             injection_receipt_ids=tuple(injection_receipt_ids),
             future_feedback_ids=tuple(future_feedback_ids),
+            variant=variant,
+            trace_id=trace_id,
+            family_id=family_id,
+            stage=stage,
         )
 
     def payload(self) -> dict[str, object]:
@@ -161,6 +189,10 @@ class PolicyDecisionEvidence:
             "mutationReceiptIds": list(self.mutation_receipt_ids),
             "injectionReceiptIds": list(self.injection_receipt_ids),
             "futureFeedbackIds": list(self.future_feedback_ids),
+            "variant": self.variant,
+            "traceId": self.trace_id,
+            "familyId": self.family_id,
+            "stage": self.stage,
         }
 
     @classmethod
@@ -171,6 +203,7 @@ class PolicyDecisionEvidence:
             "action", "executionStatus", "reasonCodes", "inputDigest", "outputDigest",
             "lineageId", "triggerEventId", "executionReceiptId", "mutationReceiptIds",
             "injectionReceiptIds", "futureFeedbackIds",
+            "variant", "traceId", "familyId", "stage",
         }
         if not isinstance(value, dict) or set(value) != fields:
             raise ValueError("malformed policy evidence event")
@@ -187,6 +220,8 @@ class PolicyDecisionEvidence:
                 mutation_receipt_ids=tuple(value["mutationReceiptIds"]),
                 injection_receipt_ids=tuple(value["injectionReceiptIds"]),
                 future_feedback_ids=tuple(value["futureFeedbackIds"]),
+                variant=value["variant"], trace_id=value["traceId"],
+                family_id=value["familyId"], stage=value["stage"],
                 schema_version=value["schemaVersion"],
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -212,6 +247,10 @@ class PolicyDecisionEvidence:
             'mutation_receipt_ids': list(result.mutation_receipt_ids),
             'injection_receipt_ids': list(result.injection_receipt_ids),
             'future_feedback_ids': list(result.future_feedback_ids),
+            'variant': result.variant,
+            'trace_id': result.trace_id,
+            'family_id': result.family_id,
+            'stage': result.stage,
         }
         expected_event_id = f"policy-event.{content_digest(event_identity)[:40]}"
         if result.event_id != expected_event_id:
@@ -222,9 +261,27 @@ class PolicyDecisionEvidence:
 class JsonPolicyDecisionLedger:
     """Append-only policy evidence with idempotent event IDs and conflict checks."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        variant: str = "unscoped",
+        trace_id: str = "unscoped",
+        family_id: str | None = None,
+        stage: str | None = None,
+    ) -> None:
         self.path = Path(path).expanduser().resolve()
         self.lock_path = self.path.with_name(self.path.name + ".lock")
+        self.variant = variant
+        self.trace_id = trace_id
+        self.family_id = family_id
+        self.stage = stage
+        for value, name in ((variant, "variant"), (trace_id, "trace ID")):
+            if not isinstance(value, str) or _IDENTIFIER.fullmatch(value) is None:
+                raise ValueError(f"{name} must be a stable identifier")
+        for value, name in ((family_id, "family ID"), (stage, "stage")):
+            if value is not None and (not isinstance(value, str) or _IDENTIFIER.fullmatch(value) is None):
+                raise ValueError(f"{name} must be a stable identifier")
         self._events: dict[str, str] = {}
         self._load()
 
@@ -276,6 +333,10 @@ class JsonPolicyDecisionLedger:
             self._events[evidence.event_id] = canonical
 
     def record_decision(self, decision: PolicyDecision, **kwargs: object) -> PolicyDecisionEvidence:
+        kwargs.setdefault("variant", self.variant)
+        kwargs.setdefault("trace_id", self.trace_id)
+        kwargs.setdefault("family_id", self.family_id)
+        kwargs.setdefault("stage", self.stage)
         evidence = PolicyDecisionEvidence.from_decision(decision, **kwargs)  # type: ignore[arg-type]
         self.record(evidence)
         return evidence
