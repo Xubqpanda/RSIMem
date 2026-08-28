@@ -31,6 +31,7 @@ from rsimem.memory.policy_feasibility import (
     feedback_chain_from_extraction_example,
     build_feasibility_report,
     build_extraction_feedback_interventions,
+    build_optimizer_corpus_interventions,
     validate_feasibility_case,
 )
 from rsimem.memory.policy_replay import DeterministicPolicyReplay
@@ -540,6 +541,29 @@ def test_executable_feasibility_census_replays_and_persists(tmp_path) -> None:
     for case in cases:
         ledger.verify_case(case)
     assert first.payload()["caseCount"] == 7
+
+
+def test_optimizer_corpus_primary_examples_feed_extraction_census() -> None:
+    from test_extraction_optimizer_contracts import _multi_corpus
+    from rsimem.memory.extraction_feedback import ExtractionFeedbackLabel
+
+    corpus = _multi_corpus((ExtractionFeedbackLabel.USEFUL, ExtractionFeedbackLabel.MISSED))
+    parent, candidate = _replays()
+    cases = build_optimizer_corpus_interventions(
+        corpus.examples,
+        parent=parent,
+        candidate=candidate,
+        parent_artifact=_artifact("fixed.extraction.parent.v1", PolicyArtifactKind.FIXED),
+        candidate_artifact=_artifact(
+            "adaptive.extraction.candidate.v1",
+            PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE,
+        ),
+    )
+    assert len(cases) == 2
+    assert {case.outcome for case in cases} == {
+        FeasibilityOutcome.USEFUL,
+        FeasibilityOutcome.MISSED,
+    }
 
 
 def test_real_extraction_feedback_examples_project_only_resolved_primary_chain() -> None:
