@@ -355,7 +355,7 @@ class ExtractionOptimizerCorpusBuilder:
         graph: OperationGraph,
     ) -> tuple[OptimizerArtifactLineage, ...]:
         results = []
-        operation_ids = {value.operation_id for value in graph.operations}
+        graph_operation_ids = {value.operation_id for value in graph.operations}
         mutation_ids = tuple(value.mutation_id for value in graph.mutations)
         if len(mutation_ids) != len(set(mutation_ids)):
             raise ValueError("optimizer operation graph has duplicate mutations")
@@ -367,8 +367,10 @@ class ExtractionOptimizerCorpusBuilder:
             if not mutations:
                 raise ValueError("optimizer persisted artifact has no mutation lineage")
             if any(
-                value.operation_id not in operation_ids
-                or not set(value.proposal_operation_ids).issubset(operation_ids)
+                value.operation_id not in graph_operation_ids
+                or not set(value.proposal_operation_ids).issubset(
+                    graph_operation_ids
+                )
                 for value in mutations
             ):
                 raise ValueError("optimizer mutation operation join is incomplete")
@@ -377,7 +379,7 @@ class ExtractionOptimizerCorpusBuilder:
             }
             if None in digests or len(digests) != 1:
                 raise ValueError("optimizer persisted artifact digest is ambiguous")
-            operation_ids = tuple(dict.fromkeys(
+            lineage_operation_ids = tuple(dict.fromkeys(
                 value
                 for mutation in mutations
                 for value in (mutation.operation_id, *mutation.proposal_operation_ids)
@@ -385,7 +387,7 @@ class ExtractionOptimizerCorpusBuilder:
             results.append(OptimizerArtifactLineage(
                 artifact_id,
                 next(iter(digests)),
-                operation_ids,
+                lineage_operation_ids,
                 tuple(value.mutation_id for value in mutations),
             ))
         return tuple(results)

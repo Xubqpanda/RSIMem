@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 
@@ -134,3 +135,48 @@ def test_build_corpus_exactly_joins_private_and_public_live_evidence(
         split=OptimizerCorpusSplit.TRAIN,
     ).read_for_optimizer()
     assert replay == corpus
+
+
+def test_audit_rejects_incomplete_operation_join(tmp_path: Path) -> None:
+    projection, source, feedback, observation, graph, facts, delayed = _fixture()
+    batch = tmp_path / "batch"
+    JsonExtractionSourceRecordStore(
+        batch / "home" / ".rsimem" / "extraction_sources.jsonl"
+    ).append(source)
+    JsonLiveExtractionFeedbackRecordLog(
+        batch / "eval" / "rsimem_extraction_feedback.jsonl"
+    ).append(feedback)
+    captures = JsonExtractionOptimizerCaptureLog(
+        batch / "eval" / "extraction_optimizer_capture.jsonl"
+    )
+    captures.append(ExtractionOptimizerSourceCapture.create(
+        captured_at=delayed.source_completed_at,
+        source_record_id=source.record_id,
+        source_record_digest=source.content_digest,
+        projection=projection,
+        fact_contents=facts,
+    ))
+    captures.append(ExtractionOptimizerFeedbackCapture.create(
+        captured_at=delayed.observed_at,
+        feedback_record_id=feedback.record_id,
+        source_record_id=source.record_id,
+        observation=observation,
+        current_input=delayed.current_input,
+    ))
+    broken = replace(
+        graph,
+        operations=tuple(
+            value for value in graph.operations
+            if value.operation_id != "op.mutation-v1"
+        ),
+    )
+    _write_graph(batch / "eval" / "rsimem_semantic_operations.jsonl", broken)
+
+    audit = audit_extraction_feedback_batch(
+        batch,
+        batch_id="batch.broken-join-v1",
+    )
+
+    assert audit.corpus_ready is False
+    assert audit.optimizer_signal_ready is False
+    assert audit.reason_codes == ("optimizer_corpus_join_invalid",)
