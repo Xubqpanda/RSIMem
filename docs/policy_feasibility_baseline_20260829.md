@@ -1,0 +1,44 @@
+# Six-layer policy feasibility deterministic baseline
+
+日期：2026-08-29
+
+本文记录第三阶段 3A/3B 的第一份 deterministic/shadow feasibility evidence。它验证的是 decision 是否可观察、可控制、可回放，以及是否存在可归因的 process/outcome 反馈；它不是 PAST-Bench aggregate uplift，也不是在线 adaptive policy 实验。
+
+## Fixture
+
+Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable preference（TSV 输出偏好）和一个 temporary formatting request。`DeterministicPolicyReplay` 在相同 event、snapshot revision、backend descriptor 和 lineage 下生成 parent/candidate。candidate artifact 只声明一个目标 policy layer；replay audit 必须先通过，才允许构造 `LayerIntervention`。
+
+覆盖的 intervention：
+
+- Trigger：parent `RUN`，candidate 关闭 `task_completed` 后 `SKIP`。
+- Source selection：parent 选择整个 completed task，candidate 只选择 durable segment。
+- Extraction：parent/candidate 改变 candidate fact set。
+- Admission：parent `ADD`，candidate 使用显式 target 和 revision 执行 `UPDATE`。
+- Commit：只改变 mutation ID，保持 formation decision 不变。
+- Exposure：只改变 selected artifact 集合。
+
+每个 case 都保留 `event -> decision -> receipt/lineage` 的 content-free identity。用例还覆盖：缺少 useful/missed 证据链节点时自动降级为 `unresolved`，candidate 不改变目标层时拒绝，重复 case ID 时拒绝，以及 parent/candidate replay audit 失败时拒绝。
+
+## Census
+
+| layer | cases | signal coverage | action variation | useful | harmful | missed | unresolved | censored | complete feedback | status |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| trigger | 1 | 1/1 | 1/1 | 0 | 0 | 0 | 1 | 0 | 0 | validation-only |
+| source_selection | 1 | 1/1 | 1/1 | 0 | 0 | 1 | 0 | 0 | 1 | validation-only |
+| extraction | 2 | 2/2 | 2/2 | 1 | 0 | 1 | 0 | 0 | 2 | optimization-ready |
+| admission | 1 | 1/1 | 1/1 | 0 | 1 | 0 | 0 | 0 | 0 | validation-only |
+| commit | 1 | 1/1 | 1/1 | 1 | 0 | 0 | 0 | 0 | 1 | validation-only |
+| exposure | 1 | 1/1 | 1/1 | 1 | 0 | 0 | 0 | 0 | 1 | validation-only |
+
+这里的 `optimization-ready` 只表示该层已有 process signal、目标层 action variation、至少两类 resolved outcome，以及完整可回放 evidence chain。它不表示该层已经在真实任务上提升分数。其余层保留为 `validation-only`，因为当前 fixture 没有足够的 outcome variation；没有将 unknown 或 unresolved 当成 negative。
+
+## 验证
+
+```text
+PYTHONPATH=src pytest -q tests/test_policy_feasibility.py tests/test_policy_replay.py
+10 passed
+```
+
+完整 RSIMem/PAST-Bench 回归需在已安装 `rsimem`、Hermes 和 PAST-Bench distributions 的项目实验环境中执行；本机系统 Python 3.12 环境缺少这些运行时依赖，不能把本次 focused 结果扩大解释为完整回归。
+
+实现入口：`src/rsimem/memory/policy_feasibility.py`；测试 fixture：`tests/test_policy_feasibility.py`。
