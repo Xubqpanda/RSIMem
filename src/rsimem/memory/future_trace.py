@@ -105,14 +105,14 @@ class SemanticFeedbackResolver:
             )
         scope = resolver.contract.opportunity.memory_scope_keys
         if len(scope) == 1:
-            semantic_keys = tuple(scope[0] for _ in future.memory_artifact_ids)
+            semantic_keys = tuple((scope[0],) for _ in future.memory_artifact_ids)
         elif len(scope) == len(future.memory_artifact_ids):
-            semantic_keys = scope
+            semantic_keys = tuple((value,) for value in scope)
         else:
-            semantic_keys = ()
+            semantic_keys = tuple(scope for _ in future.memory_artifact_ids)
         bindings = tuple(
-            ArtifactSemanticBinding(artifact_id, semantic_key)
-            for artifact_id, semantic_key in zip(
+            ArtifactSemanticBinding(artifact_id, keys)
+            for artifact_id, keys in zip(
                 future.memory_artifact_ids,
                 semantic_keys,
             )
