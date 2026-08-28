@@ -803,7 +803,7 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 - √ Fixture分别构造完整`opportunity -> use -> successful outcome` useful链和`source -> no equivalent extraction -> future demand -> absence-attributed outcome` missed链（当前为 fixture-local opaque IDs，不是部署标签）。
 - √ 删除任一useful/missed链节点后label退化为unresolved，而不是继续贡献optimizer reward。
 - □ End-to-end feedback保留完整轨迹，strict resolver同时生成attribution diagnosis；即使resolved attribution不足，也能验证exploratory optimizer是否提出extraction-only hypothesis。
-- □ Delayed feedback构建optimizer corpus并生成受限的、只针对当前开放层的N+1 hypothesis；没有真实 uplift 也不判定 feasibility 失败。
+- √ Delayed feedback构建optimizer corpus并生成受限的、只针对当前开放层的N+1 hypothesis；`extraction_proposal` 现在持久化经 parent/corpus/ownership gate 校验的 `feasibility-hypothesis.json`，没有真实 uplift 也不判定 feasibility 失败。
 - □ N+1通过offline replay、schema、安全和layer-boundary validation；是否激活属于后续效果实验，不属于本阶段最低验收。
 - □ Future fixture可以加载N+1并记录 intervention path；是否改善deployment-observable outcome作为后续效果实验结果，不作为六层基建的前置假设。
 - □ 全链不读取grader/answer，不使用cost信号，不修改update/retrieval policy。
