@@ -931,6 +931,23 @@ class LayerFeasibilityCensus:
         return int(self.outcome_counts.get(FeasibilityOutcome.CENSORED.value, 0))
 
     @property
+    def useful_count(self) -> int:
+        return int(self.outcome_counts.get(FeasibilityOutcome.USEFUL.value, 0))
+
+    @property
+    def harmful_count(self) -> int:
+        return int(self.outcome_counts.get(FeasibilityOutcome.HARMFUL.value, 0))
+
+    @property
+    def missed_count(self) -> int:
+        return int(self.outcome_counts.get(FeasibilityOutcome.MISSED.value, 0))
+
+    @property
+    def resolved_useful_rate(self) -> float | None:
+        denominator = self.useful_count + self.harmful_count
+        return self.useful_count / denominator if denominator else None
+
+    @property
     def unresolved_ratio(self) -> float | None:
         return self.unresolved_count / self.case_count if self.case_count else None
 
@@ -950,6 +967,10 @@ class LayerFeasibilityCensus:
             "outcomeVariation": self.outcome_variation,
             "outcomeCounts": dict(self.outcome_counts),
             "unknownCount": self.unknown_count,
+            "usefulCount": self.useful_count,
+            "harmfulCount": self.harmful_count,
+            "missedCount": self.missed_count,
+            "resolvedUsefulRate": self.resolved_useful_rate,
             "unresolvedCount": self.unresolved_count,
             "unresolvedRatio": self.unresolved_ratio,
             "censoredCount": self.censored_count,
