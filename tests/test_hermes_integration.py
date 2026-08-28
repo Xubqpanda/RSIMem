@@ -53,6 +53,11 @@ from rsimem.memory.extraction_projection import (
     ExtractionSourceRecord,
     JsonExtractionSourceRecordStore,
 )
+from rsimem.memory.extraction_optimizer_capture import (
+    ExtractionOptimizerFeedbackCapture,
+    ExtractionOptimizerSourceCapture,
+    JsonExtractionOptimizerCaptureLog,
+)
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     OperationKind,
@@ -1200,6 +1205,18 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
     assert "Always use TSV" not in source_serialized
     source_store = JsonExtractionSourceRecordStore(source_path)
     learned_source = source_store.records()[0]
+    capture_path = home / ".rsimem" / "extraction_optimizer_capture.jsonl"
+    private_captures = JsonExtractionOptimizerCaptureLog(capture_path).records()
+    assert len(private_captures) == 1
+    assert isinstance(private_captures[0], ExtractionOptimizerSourceCapture)
+    assert private_captures[0].source_record_id == learned_source.record_id
+    assert private_captures[0].projection.projection_digest == (
+        learned_source.source.source_projection_digest
+    )
+    assert private_captures[0].fact_contents[0].content.startswith(
+        "Always use TSV"
+    )
+    assert capture_path.stat().st_mode & 0o777 == 0o600
     unrelated_empty = ExtractionSourceRecord.create(
         family_id="SM01_preference_adoption",
         stage="learn_b",
@@ -1348,6 +1365,33 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
         "answer_key",
         "reasoning_tokens",
     ))
+    private_captures = JsonExtractionOptimizerCaptureLog(capture_path).records()
+    source_captures = tuple(
+        value for value in private_captures
+        if isinstance(value, ExtractionOptimizerSourceCapture)
+    )
+    feedback_captures = tuple(
+        value for value in private_captures
+        if isinstance(value, ExtractionOptimizerFeedbackCapture)
+    )
+    assert len(source_captures) == 2
+    assert {value.source_record_id for value in source_captures} == {
+        learned_source.record_id,
+        next(
+            value.record_id
+            for value in JsonExtractionSourceRecordStore(source_path).records()
+            if value.task_id == "SM01_EVAL_NEAR_001"
+        ),
+    }
+    assert len(feedback_captures) == 2
+    captured_useful = next(
+        value for value in feedback_captures
+        if value.source_record_id == learned_source.record_id
+    )
+    assert captured_useful.observation.final_response.startswith("owner\tpriority")
+    assert captured_useful.current_input == (
+        "Extract today's action items and share the source note."
+    )
 
 
 def test_live_bridge_derives_missed_from_empty_past_extraction(tmp_path: Path) -> None:

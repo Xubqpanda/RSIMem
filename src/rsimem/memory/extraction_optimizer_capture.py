@@ -331,7 +331,7 @@ class JsonExtractionOptimizerCaptureLog:
                     else existing.feedback_record_id
                 )
                 if type(existing) is type(value) and existing_id == logical_id:
-                    if existing == value:
+                    if self._equivalent(existing, value):
                         return False
                     raise ValueError("optimizer capture identity conflict")
             wrapper = self._wrapper(value)
@@ -384,10 +384,23 @@ class JsonExtractionOptimizerCaptureLog:
             )
             key = (type(value), logical_id)
             existing = by_identity.get(key)
-            if existing is not None and existing != value:
+            if existing is not None and not self._equivalent(existing, value):
                 raise ValueError("optimizer capture identity conflict")
             by_identity[key] = value
         return tuple(records)
+
+    @staticmethod
+    def _equivalent(
+        left: ExtractionOptimizerCapture,
+        right: ExtractionOptimizerCapture,
+    ) -> bool:
+        if type(left) is not type(right):
+            return False
+        left_payload = left.identity_payload()
+        right_payload = right.identity_payload()
+        left_payload.pop("captured_at")
+        right_payload.pop("captured_at")
+        return left_payload == right_payload
 
     @staticmethod
     def _wrapper(value: ExtractionOptimizerCapture) -> dict[str, object]:
