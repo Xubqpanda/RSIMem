@@ -655,7 +655,16 @@ def build_feasibility_report(cases: Iterable[LayerIntervention]) -> PolicyFeasib
             outcomes[case.outcome.value] = outcomes.get(case.outcome.value, 0) + 1
         signal_count = sum(1 for case in items if case.process_signal)
         action_count = sum(1 for case in items if case.action_changed)
-        outcome_variation_count = sum(1 for case in items if case.outcome_resolved)
+        resolved_outcomes = {
+            case.outcome
+            for case in items
+            if case.outcome_resolved
+        }
+        # "Variation" means at least two distinct resolved outcomes.  A lone
+        # useful/harmful/missed observation is coverage, not outcome variation.
+        outcome_variation_count = (
+            len(items) if len(resolved_outcomes) >= 2 else 0
+        )
         unknown_count = sum(
             1 for case in items
             if case.outcome in {FeasibilityOutcome.UNRESOLVED, FeasibilityOutcome.CENSORED}
