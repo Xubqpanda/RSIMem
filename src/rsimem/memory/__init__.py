@@ -88,6 +88,11 @@ from .exposure_policy import (
     InjectionReceipt,
     InjectionReceiptStatus,
 )
+from .policy_evidence import (
+    POLICY_EVIDENCE_SCHEMA_VERSION,
+    JsonPolicyDecisionLedger,
+    PolicyDecisionEvidence,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -165,4 +170,7 @@ __all__ = [
     "ExposurePolicyConfig",
     "InjectionReceipt",
     "InjectionReceiptStatus",
+    "POLICY_EVIDENCE_SCHEMA_VERSION",
+    "JsonPolicyDecisionLedger",
+    "PolicyDecisionEvidence",
 ]
