@@ -10,6 +10,7 @@ from past_bench.models.message import Message
 from past_bench.models.self_evolve import (
     HermesPersistenceConfig,
     RSIMemAdaptiveWritebackConfig,
+    RSIMemExtractionTrialProfile,
     SelfEvolveEpisode,
     SelfEvolveSequenceDefinition,
 )
@@ -54,6 +55,29 @@ def _adaptive_config() -> dict:
             "baseline_value": 0.35,
         }],
     }
+
+
+def _extraction_trial_profile(**overrides) -> dict:
+    value = {
+        "schemaVersion": 1,
+        "preparation": "extraction_matched_trial_store",
+        "deploymentScope": "matched_validation_only",
+        "officialEvaluation": False,
+        "validationOnly": True,
+        "productionActivationAllowed": False,
+        "trialId": "extraction-trial.fixture",
+        "slotId": "mem0-flat.semantic.extraction",
+        "parentArtifactId": "extraction-prompt.parent",
+        "parentArtifactDigest": "a" * 64,
+        "candidateArtifactId": "extraction-prompt.candidate",
+        "candidateArtifactDigest": "b" * 64,
+        "offlineDecisionId": "extraction-offline.fixture",
+        "configDigest": "c" * 64,
+        "policyStoreDigest": "d" * 64,
+        "offlineDecisionDigest": "e" * 64,
+    }
+    value.update(overrides)
+    return value
 
 
 def _rsimem_adapter_request(tmp_path: Path, rsimem: dict) -> StartSessionRequest:
@@ -316,6 +340,147 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
         RSIMemAdaptiveWritebackConfig.model_validate(escaped)
 
 
+def test_extraction_trial_transport_is_attempt_local_and_content_free(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import rsimem.extraction_validation_runtime as runtime_module
+
+    source = tmp_path / "prepared"
+    source.mkdir()
+    config_path = source / "extraction-matched-trial.json"
+    store_path = source / "extraction-trial-policies.json"
+    decision_path = source / "offline-validation-decision.json"
+    config_path.write_text('{"fixture":"config"}\n', encoding="utf-8")
+    store_path.write_text('{"fixture":"store"}\n', encoding="utf-8")
+    decision_path.write_text('{"fixture":"decision"}\n', encoding="utf-8")
+    profile = RSIMemExtractionTrialProfile.model_validate(
+        _extraction_trial_profile()
+    )
+    resolved = SimpleNamespace(
+        config_path=config_path,
+        policy_store_path=store_path,
+        offline_decision_path=decision_path,
+        profile=lambda: _extraction_trial_profile(),
+    )
+    monkeypatch.setattr(
+        runtime_module,
+        "load_extraction_matched_trial_profile",
+        lambda path: resolved,
+    )
+    common = {
+        "home_dir": tmp_path / "home",
+        "artifacts_dir": tmp_path / "artifacts",
+        "memory_enabled": True,
+        "user_profile_enabled": True,
+        "skills_enabled": True,
+        "session_search_enabled": True,
+        "memory_nudge_interval": 1,
+        "memory_flush_min_turns": 1,
+        "skill_creation_nudge_interval": 1,
+        "background_review_wait_s": 0.0,
+        "rsimem_mode": "native+ledger",
+        "rsimem_semantic_writeback_mode": "static",
+        "rsimem_extraction_trial_profile": profile,
+        "rsimem_extraction_trial_source_path": str(config_path),
+    }
+
+    payload = build_hermes_extra_body(
+        persistence_enabled=True,
+        **common,
+    )["hermes"]
+    writeback = payload["rsimem"]["semantic_writeback"]
+    target = tmp_path / "artifacts" / "rsimem_extraction_trial"
+    assert writeback["extraction_runtime_scope"] == "matched_validation"
+    assert Path(writeback["extraction_runtime_config_path"]) == (
+        target / config_path.name
+    )
+    assert (target / config_path.name).read_bytes() == config_path.read_bytes()
+    assert (target / store_path.name).read_bytes() == store_path.read_bytes()
+    assert (target / decision_path.name).read_bytes() == decision_path.read_bytes()
+    manifest_value = HermesPersistenceConfig(
+        rsimem_mode="native+ledger",
+        rsimem_semantic_writeback_mode="static",
+        rsimem_extraction_trial_profile=profile,
+        rsimem_extraction_trial_source_path=str(config_path),
+    ).model_dump(mode="json")
+    assert "rsimem_extraction_trial_profile" in manifest_value
+    assert "rsimem_extraction_trial_source_path" not in manifest_value
+    assert str(config_path) not in json.dumps(manifest_value, sort_keys=True)
+
+    (target / store_path.name).write_text("conflict\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="conflicts with source"):
+        build_hermes_extra_body(persistence_enabled=True, **common)
+
+
+def test_extraction_trial_transport_rejects_profile_or_mode_drift(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import rsimem.extraction_validation_runtime as runtime_module
+
+    source = tmp_path / "prepared"
+    source.mkdir()
+    paths = [
+        source / "extraction-matched-trial.json",
+        source / "extraction-trial-policies.json",
+        source / "offline-validation-decision.json",
+    ]
+    for path in paths:
+        path.write_text("{}\n", encoding="utf-8")
+    resolved = SimpleNamespace(
+        config_path=paths[0],
+        policy_store_path=paths[1],
+        offline_decision_path=paths[2],
+        profile=lambda: _extraction_trial_profile(
+            candidateArtifactDigest="f" * 64
+        ),
+    )
+    monkeypatch.setattr(
+        runtime_module,
+        "load_extraction_matched_trial_profile",
+        lambda path: resolved,
+    )
+    common = {
+        "home_dir": tmp_path / "home",
+        "artifacts_dir": tmp_path / "artifacts",
+        "memory_enabled": True,
+        "user_profile_enabled": True,
+        "skills_enabled": True,
+        "session_search_enabled": True,
+        "memory_nudge_interval": 1,
+        "memory_flush_min_turns": 1,
+        "skill_creation_nudge_interval": 1,
+        "background_review_wait_s": 0.0,
+        "rsimem_mode": "native+ledger",
+        "rsimem_semantic_writeback_mode": "static",
+        "rsimem_extraction_trial_profile": _extraction_trial_profile(),
+        "rsimem_extraction_trial_source_path": str(paths[0]),
+    }
+    with pytest.raises(ValueError, match="differs from manifest"):
+        build_hermes_extra_body(persistence_enabled=True, **common)
+    with pytest.raises(ValueError, match="requires static"):
+        build_hermes_extra_body(
+            persistence_enabled=True,
+            **{**common, "rsimem_semantic_writeback_mode": "static_utility"},
+        )
+    with pytest.raises(ValueError, match="source requires a trial profile"):
+        build_hermes_extra_body(
+            persistence_enabled=True,
+            **{**common, "rsimem_extraction_trial_profile": None},
+        )
+    with pytest.raises(ValueError, match="configured together"):
+        HermesPersistenceConfig(
+            rsimem_mode="native+ledger",
+            rsimem_semantic_writeback_mode="static",
+            rsimem_extraction_trial_profile=_extraction_trial_profile(),
+        )
+    with pytest.raises(ValueError, match="sha256"):
+        RSIMemExtractionTrialProfile.model_validate(
+            _extraction_trial_profile(candidateArtifactDigest="bad")
+        )
+
+
 @pytest.mark.parametrize(
     "feedback_contract",
     (
@@ -508,6 +673,60 @@ def test_cli_adaptive_override_rejects_missing_or_mismatched_config(
             agent="hermes-luna",
             rsimem_semantic_writeback_mode="adaptive_utility",
             rsimem_adaptive_config=str(invalid_path),
+        ))
+
+
+def test_cli_extraction_trial_override_records_profile_without_machine_path(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import rsimem.extraction_validation_runtime as runtime_module
+
+    manifest = tmp_path / "sequence.yaml"
+    task_dir = tmp_path / "tasks" / "T_demo"
+    task_dir.mkdir(parents=True)
+    (task_dir / "task.yaml").write_text(
+        "task_id: demo\ntask_name: Demo\nprompt:\n  text: hi\n",
+        encoding="utf-8",
+    )
+    manifest.write_text(
+        yaml.safe_dump({
+            "name": "rsimem-extraction-cli",
+            "episodes": [{"task": "tasks/T_demo", "cluster_id": "cluster-a"}],
+        }),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "extraction-matched-trial.json"
+    config_path.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(
+        runtime_module,
+        "load_extraction_matched_trial_profile",
+        lambda path: SimpleNamespace(profile=lambda: _extraction_trial_profile()),
+    )
+    sequence = SelfEvolveSequenceDefinition.from_yaml(manifest)
+
+    _apply_rsimem_execution_overrides(sequence, SimpleNamespace(
+        agent="hermes-luna",
+        rsimem_mode="native+ledger",
+        rsimem_semantic_writeback_mode="static",
+        rsimem_extraction_trial_config=str(config_path),
+    ))
+
+    assert sequence.hermes.rsimem_extraction_trial_profile is not None
+    assert sequence.hermes.rsimem_extraction_trial_profile.candidate_artifact_id == (
+        "extraction-prompt.candidate"
+    )
+    assert sequence.hermes.rsimem_extraction_trial_source_path == str(
+        config_path.resolve()
+    )
+    dumped = sequence.hermes.model_dump(mode="json")
+    assert "rsimem_extraction_trial_source_path" not in dumped
+    with pytest.raises(SystemExit, match="requires static"):
+        other = SelfEvolveSequenceDefinition.from_yaml(manifest)
+        _apply_rsimem_execution_overrides(other, SimpleNamespace(
+            agent="hermes-luna",
+            rsimem_semantic_writeback_mode="static_utility",
+            rsimem_extraction_trial_config=str(config_path),
         ))
 
 

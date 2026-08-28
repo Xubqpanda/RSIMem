@@ -17,7 +17,10 @@ from typing import Any
 
 from ..models.content import TextBlock
 from ..models.scoring import compute_task_score, is_pass
-from ..models.self_evolve import RSIMemAdaptiveWritebackConfig
+from ..models.self_evolve import (
+    RSIMemAdaptiveWritebackConfig,
+    RSIMemExtractionTrialProfile,
+)
 from ..models.task import Prompt, TaskDefinition
 from ..models.trace import TraceMessage
 from ..trace.reader import load_trace
@@ -52,6 +55,8 @@ def build_hermes_extra_body(
     rsimem_semantic_feedback_contract: str = "disabled",
     rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | dict | None = None,
     rsimem_adaptive_policy_source_path: str = "",
+    rsimem_extraction_trial_profile: RSIMemExtractionTrialProfile | dict | None = None,
+    rsimem_extraction_trial_source_path: str = "",
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -109,11 +114,35 @@ def build_hermes_extra_body(
             ))
         elif rsimem_adaptive_config is not None:
             raise ValueError("adaptive config requires adaptive_utility mode")
+        if rsimem_extraction_trial_profile is not None:
+            if semantic_writeback_mode != "static":
+                raise ValueError(
+                    "extraction matched trial requires static semantic writeback"
+                )
+            profile = RSIMemExtractionTrialProfile.model_validate(
+                rsimem_extraction_trial_profile
+            )
+            target_config = _materialize_extraction_trial_bundle(
+                source_config_path=rsimem_extraction_trial_source_path,
+                artifacts_dir=artifacts_dir,
+                expected_profile=profile,
+            )
+            semantic_writeback.update({
+                "extraction_runtime_scope": "matched_validation",
+                "extraction_runtime_config_path": str(target_config),
+            })
+        elif rsimem_extraction_trial_source_path:
+            raise ValueError("extraction trial source requires a trial profile")
         enabled_toolsets = [
             toolset for toolset in enabled_toolsets if toolset != "memory"
         ]
     elif rsimem_semantic_feedback_contract != "disabled" and persistence_enabled:
         raise ValueError("semantic feedback contract requires writeback mode")
+    elif (
+        rsimem_extraction_trial_profile is not None
+        or rsimem_extraction_trial_source_path
+    ) and persistence_enabled:
+        raise ValueError("extraction trial requires static semantic writeback")
 
     return {
         "hermes": {
@@ -152,6 +181,57 @@ def build_hermes_extra_body(
             },
         }
     }
+
+
+def _copy_immutable_file(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():
+        if target.read_bytes() != source.read_bytes():
+            raise ValueError(
+                f"attempt-local extraction trial {target.name} conflicts with source"
+            )
+        return
+    shutil.copy2(source, target)
+
+
+def _materialize_extraction_trial_bundle(
+    *,
+    source_config_path: str,
+    artifacts_dir: Path,
+    expected_profile: RSIMemExtractionTrialProfile,
+) -> Path:
+    if not source_config_path:
+        raise ValueError("extraction matched trial requires a source config")
+    source = Path(source_config_path).expanduser().resolve()
+    from rsimem.extraction_validation_runtime import (
+        EXTRACTION_TRIAL_CONFIG_FILE,
+        EXTRACTION_TRIAL_OFFLINE_DECISION_FILE,
+        EXTRACTION_TRIAL_POLICY_STORE_FILE,
+        load_extraction_matched_trial_profile,
+    )
+
+    resolved = load_extraction_matched_trial_profile(source)
+    actual_profile = RSIMemExtractionTrialProfile.model_validate(
+        resolved.profile()
+    )
+    if actual_profile != expected_profile:
+        raise ValueError("extraction trial source profile differs from manifest")
+    target_root = artifacts_dir.expanduser().resolve() / "rsimem_extraction_trial"
+    targets = {
+        resolved.config_path: target_root / EXTRACTION_TRIAL_CONFIG_FILE,
+        resolved.policy_store_path: target_root / EXTRACTION_TRIAL_POLICY_STORE_FILE,
+        resolved.offline_decision_path: (
+            target_root / EXTRACTION_TRIAL_OFFLINE_DECISION_FILE
+        ),
+    }
+    for source_path, target_path in targets.items():
+        _copy_immutable_file(source_path, target_path)
+    target_config = target_root / EXTRACTION_TRIAL_CONFIG_FILE
+    copied = load_extraction_matched_trial_profile(target_config)
+    copied_profile = RSIMemExtractionTrialProfile.model_validate(copied.profile())
+    if copied_profile != expected_profile:
+        raise ValueError("attempt-local extraction trial profile differs")
+    return target_config
 
 
 def materialize_task_hermes_seed(
@@ -590,6 +670,12 @@ class HermesPersistenceBackend(PersistenceBackend):
             rsimem_adaptive_config=sequence.hermes.rsimem_adaptive_config,
             rsimem_adaptive_policy_source_path=(
                 sequence.hermes.rsimem_adaptive_policy_source_path
+            ),
+            rsimem_extraction_trial_profile=(
+                sequence.hermes.rsimem_extraction_trial_profile
+            ),
+            rsimem_extraction_trial_source_path=(
+                sequence.hermes.rsimem_extraction_trial_source_path
             ),
         )
 

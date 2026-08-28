@@ -1977,6 +1977,11 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
     semantic_max_tokens = getattr(args, "rsimem_semantic_writeback_max_output_tokens", None)
     semantic_feedback = getattr(args, "rsimem_semantic_feedback_contract", None)
     adaptive_config_path = getattr(args, "rsimem_adaptive_config", None)
+    extraction_trial_path = getattr(
+        args,
+        "rsimem_extraction_trial_config",
+        None,
+    )
     if all(value is None for value in (
         mode,
         failure_policy,
@@ -1990,6 +1995,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         semantic_max_tokens,
         semantic_feedback,
         adaptive_config_path,
+        extraction_trial_path,
     )) and not verify_projection:
         return
     if not str(args.agent).startswith("hermes"):
@@ -2038,6 +2044,23 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
             sequence.hermes.rsimem_adaptive_policy_source_path = str(source)
         except (OSError, ValueError) as exc:
             raise SystemExit(f"invalid RSIMem adaptive config: {exc}") from exc
+    if extraction_trial_path is not None:
+        from .models.self_evolve import RSIMemExtractionTrialProfile
+        from rsimem.extraction_validation_runtime import (
+            load_extraction_matched_trial_profile,
+        )
+
+        path = Path(extraction_trial_path).expanduser().resolve()
+        try:
+            resolved = load_extraction_matched_trial_profile(path)
+            sequence.hermes.rsimem_extraction_trial_profile = (
+                RSIMemExtractionTrialProfile.model_validate(resolved.profile())
+            )
+            sequence.hermes.rsimem_extraction_trial_source_path = str(path)
+        except (OSError, ValueError) as exc:
+            raise SystemExit(
+                f"invalid RSIMem extraction trial config: {exc}"
+            ) from exc
     adaptive_selected = (
         sequence.hermes.rsimem_semantic_writeback_mode == "adaptive_utility"
     )
@@ -2045,6 +2068,25 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         raise SystemExit("adaptive semantic writeback requires adaptive config")
     if not adaptive_selected and sequence.hermes.rsimem_adaptive_config is not None:
         raise SystemExit("adaptive config requires adaptive_utility mode")
+    extraction_selected = (
+        sequence.hermes.rsimem_extraction_trial_profile is not None
+    )
+    if extraction_selected and (
+        sequence.hermes.rsimem_semantic_writeback_mode != "static"
+    ):
+        raise SystemExit(
+            "extraction matched trial requires static semantic writeback"
+        )
+    if extraction_selected != bool(
+        sequence.hermes.rsimem_extraction_trial_source_path
+    ):
+        raise SystemExit(
+            "extraction trial profile and source path must be configured together"
+        )
+    if extraction_selected and sequence.hermes.rsimem_adaptive_config is not None:
+        raise SystemExit(
+            "extraction trial cannot use legacy adaptive utility config"
+        )
 
 
 def _print_episode_result_summary(result: dict) -> None:
@@ -2307,6 +2349,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     rsimem_adaptive_config=sequence.hermes.rsimem_adaptive_config,
                     rsimem_adaptive_policy_source_path=(
                         sequence.hermes.rsimem_adaptive_policy_source_path
+                    ),
+                    rsimem_extraction_trial_profile=(
+                        sequence.hermes.rsimem_extraction_trial_profile
+                    ),
+                    rsimem_extraction_trial_source_path=(
+                        sequence.hermes.rsimem_extraction_trial_source_path
                     ),
                 )
 
@@ -3545,6 +3593,14 @@ def main(argv: list[str] | None = None) -> None:
         "--rsimem-adaptive-config",
         default=None,
         help="Strict JSON config for an attempt-local ACTIVE adaptive policy store",
+    )
+    p_evolve.add_argument(
+        "--rsimem-extraction-trial-config",
+        default=None,
+        help=(
+            "Validation-only extraction trial bundle prepared by RSIMem; "
+            "requires static semantic writeback"
+        ),
     )
 
     # cleanup
