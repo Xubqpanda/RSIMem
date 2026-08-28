@@ -26,6 +26,10 @@ from .extraction_feedback import (
     ExtractionFeedbackLabel,
     ExtractionFeedbackLevel,
 )
+from .extraction_optimizer_corpus import (
+    ExtractionOptimizerCorpusExample,
+    OptimizerComponentOwnership,
+)
 
 
 class FeasibilityOutcome(StrEnum):
@@ -174,6 +178,88 @@ def build_extraction_feedback_interventions(
         ))
     if not result:
         raise ValueError("extraction feasibility requires at least one primary example")
+    return tuple(result)
+
+
+def build_optimizer_corpus_interventions(
+    examples: Iterable[ExtractionOptimizerCorpusExample],
+    *,
+    parent: PolicyReplayResult,
+    candidate: PolicyReplayResult,
+    parent_artifact: PolicyArtifactIdentity,
+    candidate_artifact: PolicyArtifactIdentity,
+    case_id_prefix: str = "case.optimizer",
+) -> tuple["LayerIntervention", ...]:
+    """Project primary optimizer-corpus examples into extraction cases.
+
+    The corpus is owner-controlled and content-bearing, but this projection is
+    content-free: only stable example/source/operation IDs and the already
+    resolved label are copied into the feasibility contract.  Examples owned by
+    retrieval/application/outcome components cannot create extraction reward.
+    """
+
+    if not isinstance(case_id_prefix, str) or not case_id_prefix.strip():
+        raise ValueError("feasibility case ID prefix must not be empty")
+    result: list[LayerIntervention] = []
+    seen: set[str] = set()
+    for example in examples:
+        if not isinstance(example, ExtractionOptimizerCorpusExample):
+            raise TypeError("optimizer corpus examples have the wrong type")
+        if not example.primary:
+            continue
+        if example.example_id in seen:
+            raise ValueError("optimizer feasibility example IDs must be unique")
+        seen.add(example.example_id)
+        if example.label in {
+            ExtractionFeedbackLabel.USEFUL,
+            ExtractionFeedbackLabel.HARMFUL,
+            ExtractionFeedbackLabel.MISSED,
+        } and example.component_ownership is not OptimizerComponentOwnership.EXTRACTION:
+            raise ValueError("resolved optimizer example is not extraction-owned")
+        delayed = example.delayed_evidence
+        if example.label is ExtractionFeedbackLabel.USEFUL:
+            chain = FeedbackChain(
+                opportunity_id=delayed.future_opportunity_id,
+                use_id=delayed.use_operation_id,
+                outcome_id=delayed.outcome_operation_id,
+            )
+        elif example.label is ExtractionFeedbackLabel.MISSED:
+            chain = FeedbackChain(
+                source_id=example.audit_join.source_record_id,
+                demand_id=delayed.future_opportunity_id,
+                # The corpus stores the absence-attributed outcome operation,
+                # not a separate absence receipt.  Derive a distinct stable
+                # absence identity instead of duplicating the outcome ID in
+                # the hypothesis evidence tuple.
+                absence_id=(
+                    f"absence.{delayed.outcome_operation_id}"
+                    if delayed.outcome_operation_id is not None
+                    else None
+                ),
+                outcome_id=delayed.outcome_operation_id,
+            )
+        else:
+            chain = FeedbackChain()
+        result.append(LayerIntervention(
+            case_id=f"{case_id_prefix}.{example.example_id}",
+            target_layer=PolicyLayer.EXTRACTION,
+            parent=parent,
+            candidate=candidate,
+            parent_artifact=parent_artifact,
+            candidate_artifact=candidate_artifact,
+            process_signal=True,
+            outcome={
+                ExtractionFeedbackLabel.USEFUL: FeasibilityOutcome.USEFUL,
+                ExtractionFeedbackLabel.HARMFUL: FeasibilityOutcome.HARMFUL,
+                ExtractionFeedbackLabel.MISSED: FeasibilityOutcome.MISSED,
+                ExtractionFeedbackLabel.UNRESOLVED: FeasibilityOutcome.UNRESOLVED,
+                ExtractionFeedbackLabel.CENSORED: FeasibilityOutcome.CENSORED,
+            }[example.label],
+            feedback=chain,
+            reason_codes=tuple(example.reason_codes) or ("optimizer_feedback_projected",),
+        ))
+    if not result:
+        raise ValueError("optimizer feasibility requires at least one primary example")
     return tuple(result)
 
 
@@ -1126,6 +1212,7 @@ __all__ = [
     "FeedbackChain",
     "feedback_chain_from_extraction_example",
     "build_extraction_feedback_interventions",
+    "build_optimizer_corpus_interventions",
     "ProcessFeedback",
     "PolicyHypothesis",
     "LayerIntervention",
