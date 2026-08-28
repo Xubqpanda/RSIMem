@@ -506,24 +506,24 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 功能需求：
 
-- □ 冻结optimizer system instruction、input schema、output schema、model profile、temperature、token budget和timeout。
-- □ 输入包含parent policy body，以及按useful/harmful/missed/unresolved分类的bounded training examples。
-- □ Optimizer input按source/set/fact层级分组，显式说明`unresolved/censored`不是negative，且同一set不能按fact数重复加权。
-- □ Output只允许`ADD_RULE/REPLACE_RULE/DELETE_RULE` edits、每个edit的evidence example IDs和结构化reason codes；candidate body由frozen compiler生成，不接受模型提供的第二份不一致body。
-- □ Protected durability、source-grounding、credential和schema规则只能位于frozen wrapper或protected rule set，optimizer不能删除或弱化。
-- □ Optimizer objective明确要求提高future observed useful proportion，同时保持harmful、coverage、empty和missed constraints；不输入cost或official task score。
-- □ Formal policy update默认只生成一个candidate；若未来增加K candidates，K和selection rule必须在查看validation结果前冻结。
-- □ 无resolved signal、只有censored evidence或attribution不足时返回`NO_PROPOSAL`，不为了推进实验强行改prompt。
-- □ Optimizer调用usage单独记录，但不作为optimizer目标或candidate排序依据。
+- √ 冻结optimizer system instruction、input schema、output schema、model profile、temperature、token budget和timeout。
+- √ 输入包含parent policy body，以及按useful/harmful/missed/unresolved分类的bounded training examples。
+- √ Optimizer input按source/set/fact层级分组，显式说明`unresolved/censored`不是negative，且同一set不能按fact数重复加权。
+- √ Output只允许`ADD_RULE/REPLACE_RULE/DELETE_RULE` edits、每个edit的evidence example IDs和结构化reason codes；candidate body由frozen compiler生成，不接受模型提供的第二份不一致body。
+- √ Protected durability、source-grounding、credential和schema规则只能位于frozen wrapper或protected rule set，optimizer不能删除或弱化。
+- √ Optimizer objective明确要求提高future observed useful proportion，同时保持harmful、coverage、empty和missed constraints；不输入cost或official task score。
+- √ Formal policy update默认只生成一个candidate；若未来增加K candidates，K和selection rule必须在查看validation结果前冻结。
+- √ 无resolved signal、只有censored evidence或attribution不足时返回`NO_PROPOSAL`，不为了推进实验强行改prompt。
+- √ Optimizer调用usage单独记录，但不作为optimizer目标或candidate排序依据。
 
 测试与验收：
 
-- □ Useful-only、harmful、missed、conflicting、low-sample和no-signal fixtures通过。
-- □ Optimizer将`injected_not_used`误当negative、将application failure归因给extraction或复制一次set success给多个facts时，proposal contract拒绝。
-- □ 相同captured optimizer completion生成相同artifact；不要求重新调用随机模型逐字复现。
-- □ Candidate body不能复制training source中的用户事实、task ID、答案、专有值或长n-gram；prompt必须学习规则，不能充当memory store。
-- □ Candidate rule不得出现SM01、TSV、固定列名、项目名或其他family-specific shortcut，除非该词原本属于frozen generic root contract；命中shortcut时拒绝而不是交给validation碰运气。
-- □ Prompt injection、credential exfiltration、schema override和benchmark-specific shortcut candidate被拒绝。
+- √ Useful-only、harmful、missed、conflicting、low-sample和no-signal fixtures通过。
+- √ Optimizer将`injected_not_used`误当negative、将application failure归因给extraction或复制一次set success给多个facts时，proposal contract拒绝。
+- √ 相同captured optimizer completion生成相同artifact；不要求重新调用随机模型逐字复现。
+- √ Candidate body不能复制training source中的用户事实、task ID、答案、专有值或长n-gram；prompt必须学习规则，不能充当memory store。
+- √ Candidate rule不得出现SM01、TSV、固定列名、项目名或其他family-specific shortcut，除非该词原本属于frozen generic root contract；命中shortcut时拒绝而不是交给validation碰运气。
+- √ Prompt injection、credential exfiltration、schema override和benchmark-specific shortcut candidate被拒绝。
 
 ### 2D：Static Safety 与 Offline Prompt Validation
 
@@ -698,8 +698,8 @@ bash -n scripts/*.sh
 
 ## 10. 当前执行入口
 
-当前位于 **Stage 2C：Extraction Prompt Optimizer**。Stage 1A-1H、Stage 2A
-和 Stage 2B 已经通过，低成本 live plain-parent acceptance 记录在
+当前位于 **Stage 2D：Static Safety 与 Offline Prompt Validation**。Stage 1A-1H、
+Stage 2A、Stage 2B 和 Stage 2C 已经通过，低成本 live plain-parent acceptance 记录在
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
 后续顺序仍严格按照：
 

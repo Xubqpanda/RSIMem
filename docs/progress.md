@@ -20,7 +20,8 @@ The Hermes, static semantic writeback, operation graph, feedback store, and
 activation/rollback foundations are complete. The former Phase 2J/2K work is
 complete only as legacy retrieval-threshold infrastructure; extraction-prompt
 adaptation is pending. Stage 1, the Stage 2A extraction policy envelope, and
-the Stage 2B optimizer corpus are closed; Stage 2C is the active milestone.
+the Stage 2B optimizer corpus, and the Stage 2C controlled rule editor are
+closed; Stage 2D is the active milestone.
 
 Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
@@ -255,23 +256,36 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 - [x] Redact credentials, authorization headers, and machine paths only in the optimizer copy; mark all content as untrusted data and reject grader, answer-key, hidden-expectation, or judge evidence.
 - [x] Audit public source/manifest/ledger/operation payloads for any corpus body leakage without treating stable IDs and digests as content leaks.
 
+### Extraction-Prompt Stage 2C Controlled Optimizer
+
+- [x] Freeze the optimizer system instruction, input/output schemas, actual model ID, model profile, temperature, output token budget, timeout, sample bounds, edit budget, and leakage n-gram size.
+- [x] Render parent policy and train-only corpus into separate system and untrusted user messages grouped by useful, harmful, missed, unresolved, and censored extraction-set units.
+- [x] Treat source/fact levels only as attribution annotations; only one extraction-set primary per future opportunity contributes evidence weight.
+- [x] Accept only one `PROPOSE` or `NO_PROPOSAL` JSON object; rule edits require eligible primary evidence IDs and reason codes, and a model-provided compiled body is rejected.
+- [x] Create the candidate exclusively through structured ADD/REPLACE/DELETE edits and the frozen policy compiler; generated provenance records corpus, cutoff, request/completion digests, model, config, and raw usage.
+- [x] Return `NO_PROPOSAL` without a model call for no-signal, low-sample, conflicting, censored-only, unresolved-only, or non-extraction-owned evidence.
+- [x] Protect durability, source-grounding/credential exclusion, and output-schema rules from generated replacement or deletion.
+- [x] Reject family/benchmark shortcuts, fixed output columns, task/run/family identities, project-specific values, source long n-grams, prompt injection, credential exfiltration, and schema override.
+- [x] Add an OpenAI-compatible provider client with zero SDK retry, separated system/user messages, JSON mode, frozen request parameters, and raw/unknown usage preservation; tests use a fake SDK and no provider call.
+- [x] Replay identical captured completions into identical candidate artifacts and preserve optimizer usage outside the optimization objective.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `470 passed`.
+- [x] Pass all RSIMem tests: `490 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `394 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Extraction-Prompt Stage 2C**
+### **Current: Extraction-Prompt Stage 2D**
 
 The first optimized component is the semantic fact-extraction prompt. Delayed
 deployment evidence may update prompt body N to N+1 while the operation prompt,
 retrieval configuration, route, invocation boundary, backend, and model profile
 remain frozen. Raw resources are reported separately from the method decision.
 
-The immediate objective is the controlled meta-optimizer that emits structured rule edits from the training corpus. Adaptive live runs remain blocked until the optimizer, held-out validation, activation, rollback, and matched-run gates pass.
+The immediate objective is static candidate safety and parent/proposal offline validation on an independent historical split. Candidate artifacts remain proposals and adaptive live runs remain blocked until offline validation, matched validation, activation, rollback, and runtime fingerprint gates pass.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -369,9 +383,10 @@ Acceptance criteria:
 6. [x] Complete and audit the Stage 1H live plain-parent smoke; see `extraction_stage1_acceptance_20260828.md`.
 7. [x] Implement the extraction policy envelope, independent artifact store, Mem0-flat root export, runtime binding, restart replay, and root fallback.
 8. [x] Build the content-bearing optimizer corpus with exact audit joins and train/validation/future-test isolation.
-9. [ ] Implement the optimizer, held-out validation, activation, and rollback path.
-10. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
-11. [ ] Produce dated extraction-method reports before making adaptation claims.
+9. [x] Implement the controlled extraction prompt optimizer with captured replay, provider adapter, evidence gating, and candidate leakage/safety rejection.
+10. [ ] Implement static safety, held-out offline validation, matched activation, and rollback for extraction prompt candidates.
+11. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
+12. [ ] Produce dated extraction-method reports before making adaptation claims.
 
 ## Update Policy
 
