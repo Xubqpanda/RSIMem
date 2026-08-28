@@ -104,6 +104,8 @@ class LayerIntervention:
             raise ValueError("parent and candidate must use the same trigger event")
         if self.parent.lineage.trigger_event_id != self.candidate.lineage.trigger_event_id:
             raise ValueError("parent and candidate must share trigger lineage")
+        if not self.parent.audit.ok or not self.candidate.audit.ok:
+            raise ValueError("parent and candidate replay audit must pass")
         if self.parent_artifact.kind.value == "joint" or self.candidate_artifact.kind.value == "joint":
             raise ValueError("joint artifacts are not valid for single-layer feasibility cases")
         if self.candidate_artifact.layers != (self.target_layer,):
