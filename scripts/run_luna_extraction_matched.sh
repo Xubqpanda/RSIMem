@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export PYTHONUNBUFFERED=1
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RSIMEM_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+PAST_BENCH_ROOT="${PAST_BENCH_ROOT:-${RSIMEM_ROOT}/benchmarks/past-bench}"
+PAST_BENCH_BIN="${RSIMEM_ROOT}/.venv/bin/past-bench"
+PYTHON_BIN="${RSIMEM_ROOT}/.venv/bin/python"
+TRIAL_CONFIG="${RSIMEM_EXTRACTION_TRIAL_CONFIG:-}"
+EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-}"
+BATCH_ID="${RSIMEM_BATCH_ID:-}"
+TASK_FAMILY="${RSIMEM_EXTRACTION_TASK_FAMILY:-}"
+
+[[ -n "${GPT_LUNA_API_KEY:-}" ]] || { echo "GPT_LUNA_API_KEY is required." >&2; exit 2; }
+[[ -n "${TRIAL_CONFIG}" && -f "${TRIAL_CONFIG}" ]] || { echo "RSIMEM_EXTRACTION_TRIAL_CONFIG is required." >&2; exit 2; }
+[[ -n "${EXPERIMENT_CONFIG}" && -f "${EXPERIMENT_CONFIG}" ]] || { echo "RSIMEM_EXTRACTION_EXPERIMENT_CONFIG is required." >&2; exit 2; }
+[[ -n "${BATCH_ID}" && "${BATCH_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*$ ]] || { echo "RSIMEM_BATCH_ID is invalid." >&2; exit 2; }
+[[ -n "${TASK_FAMILY}" ]] || { echo "RSIMEM_EXTRACTION_TASK_FAMILY is required." >&2; exit 2; }
+[[ -x "${PAST_BENCH_BIN}" && -x "${PYTHON_BIN}" ]] || { echo "RSIMem virtual environment is incomplete." >&2; exit 2; }
+[[ -z "$(git -C "${RSIMEM_ROOT}" status --porcelain)" ]] || { echo "Formal matched validation requires a clean RSIMem tree." >&2; exit 2; }
+[[ -z "$(git -C "${PAST_BENCH_ROOT}" status --porcelain)" ]] || { echo "Formal matched validation requires a clean PAST-Bench tree." >&2; exit 2; }
+
+family_root="${PAST_BENCH_ROOT}/self-evolve-tasks-v2/${TASK_FAMILY}"
+[[ -f "${family_root}/family.yaml" ]] || { echo "Requested PAST family is incomplete." >&2; exit 2; }
+batch_root="${RSIMEM_ROOT}/outputs/extraction_matched/${BATCH_ID}"
+manifest_path="${batch_root}/batch_manifest.json"
+registry_path="${RSIMEM_ROOT}/outputs/extraction_formal/batch_registry.json"
+mkdir -p "${batch_root}"
+
+PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.extraction_matched_preflight \
+  --manifest "${manifest_path}" --batch-registry "${registry_path}" --batch-id "${BATCH_ID}" \
+  --rsimem-root "${RSIMEM_ROOT}" --past-bench-root "${PAST_BENCH_ROOT}" \
+  --family-root "${family_root}" --agent-registry "${RSIMEM_ROOT}/configs/agents.yaml" \
+  --run-config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" \
+  --experiment-config "${EXPERIMENT_CONFIG}" --trial-config "${TRIAL_CONFIG}"
+
+replicates="$(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c 'from pathlib import Path; from rsimem.extraction_experiment_manifest import load_extraction_manifest; import sys; print(load_extraction_manifest(Path(sys.argv[1]))["replicates"])' "${manifest_path}")"
+feedback_contract="$(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${EXPERIMENT_CONFIG}" <<'PY'
+import sys
+from pathlib import Path
+from rsimem.extraction_experiment_preflight import load_extraction_preflight_config
+from rsimem.memory.future_trace import SemanticFeedbackContract, _SEMANTIC_FEEDBACK_FAMILIES
+family = load_extraction_preflight_config(Path(sys.argv[1]))["familyId"]
+matches = [contract.value for contract, value in _SEMANTIC_FEEDBACK_FAMILIES.items() if value == family]
+if len(matches) != 1:
+    raise ValueError("family has no unique semantic feedback contract")
+print(matches[0])
+PY
+)"
+proxy_args=()
+[[ -z "${PAST_BENCH_PROXY:-}" ]] || proxy_args=(--proxy "${PAST_BENCH_PROXY}")
+
+manifest_call() {
+  PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "$@" <<'PY'
+import sys
+from pathlib import Path
+from rsimem.extraction_experiment_manifest import next_extraction_attempt_name, record_extraction_attempt
+operation, manifest, replicate, ordinal, method, run_name = sys.argv[1:7]
+if operation == "next":
+    value = next_extraction_attempt_name(Path(manifest), replicate=int(replicate), ordinal=int(ordinal), method=method, base_run_name=run_name)
+    print(value if value is not None else "__SKIP__")
+else:
+    record_extraction_attempt(Path(manifest), replicate=int(replicate), ordinal=int(ordinal), method=method, run_name=run_name, status=sys.argv[7], failure_stage=sys.argv[8] or None)
+PY
+}
+
+for replicate in $(seq 1 "${replicates}"); do
+  mapfile -t methods < <(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c 'from rsimem.extraction_experiment_manifest import extraction_execution_order; import sys; print("\n".join(extraction_execution_order(int(sys.argv[1]))))' "${replicate}")
+  ordinal=0
+  for method in "${methods[@]}"; do
+    ordinal=$((ordinal + 1))
+    base_name="${BATCH_ID}_r$(printf '%02d' "${replicate}")_${method//-/_}"
+    run_name="$(manifest_call next "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${base_name}")"
+    [[ "${run_name}" != "__SKIP__" ]] || continue
+    trace_dir="${batch_root}/${run_name}"
+    trial_args=()
+    [[ "${method}" != "adaptive-extraction-rsimem" ]] || trial_args=(--rsimem-extraction-trial-config "${TRIAL_CONFIG}")
+    manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" running ""
+    if ! (
+      cd "${PAST_BENCH_ROOT}"
+      "${PAST_BENCH_BIN}" evolve --family "${TASK_FAMILY}" --agent hermes-luna --runtime local \
+        --sandbox --sandbox-tools --persistence-variant with_persistence --no-judge \
+        --config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" --registry "${RSIMEM_ROOT}/configs/agents.yaml" \
+        --trace-dir "${trace_dir}" --background-review-wait-s 0 \
+        --rsimem-mode native+ledger --rsimem-adapter-failure-policy fail_closed \
+        --rsimem-lifecycle-evaluator-mode disabled --rsimem-semantic-writeback-mode static \
+        --rsimem-semantic-feedback-contract "${feedback_contract}" "${trial_args[@]}" "${proxy_args[@]}"
+    ); then
+      manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" failed past_bench
+      exit 1
+    fi
+    if ! "${PYTHON_BIN}" - "${trace_dir}" <<'PY'
+import json, sys
+from pathlib import Path
+run = Path(sys.argv[1])
+result = json.loads((run / "sequence_results.json").read_text())
+if result.get("variant") != "with_persistence":
+    raise ValueError("wrong persistence variant")
+(run / "sequence_comparison.json").write_text(json.dumps({"with_persistence": result}, ensure_ascii=True, sort_keys=True) + "\n")
+PY
+    then
+      manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" failed normalize
+      exit 1
+    fi
+    if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.ledger "${trace_dir}/sequence_comparison.json" --output "${trace_dir}/ledger.jsonl" --judge-disabled; then
+      manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" failed ledger
+      exit 1
+    fi
+    if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.audit "${trace_dir}" --output "${trace_dir}/audit.json"; then
+      manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" failed audit
+      exit 1
+    fi
+    manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" completed ""
+  done
+done
+
+PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${batch_root}" "${manifest_path}" "${TRIAL_CONFIG}" <<'PY'
+import sys
+from pathlib import Path
+from rsimem.extraction_validation_evidence import assemble_extraction_matched_evidence_batch
+from rsimem.extraction_experiment_manifest import load_extraction_manifest
+from rsimem.extraction_validation_runtime import load_extraction_matched_trial_profile
+from rsimem.memory.extraction_prompt_validation import (
+    ExtractionPromptValidationSplit, ExtractionSplitAssignment,
+    ExtractionValidationSplitRole,
+)
+root, manifest, trial = map(Path, sys.argv[1:])
+profile = load_extraction_matched_trial_profile(trial)
+registered = load_extraction_manifest(manifest)
+split = ExtractionPromptValidationSplit(
+    "live-validation." + registered["experimentId"][:24],
+    (ExtractionSplitAssignment(
+        ExtractionValidationSplitRole.VALIDATION,
+        registered["split"]["familyId"],
+        registered["split"]["taskTemplateGroupId"],
+        registered["split"]["taskManifestDigest"],
+    ),),
+)
+assemble_extraction_matched_evidence_batch(
+    root,
+    parent=profile.parent,
+    candidate=profile.candidate,
+    offline_decision=profile.offline_decision,
+    split=split,
+    output_path=root / "matched_evidence.json",
+)
+PY

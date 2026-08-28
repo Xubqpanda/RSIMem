@@ -37,7 +37,7 @@ fi
 
 batch_root="${RSIMEM_ROOT}/outputs/extraction_feedback/hermes_luna/${RSIMEM_BATCH_ID}"
 manifest_path="${batch_root}/batch_manifest.json"
-batch_registry="${RSIMEM_ROOT}/outputs/extraction_feedback/batch_registry.json"
+batch_registry="${RSIMEM_ROOT}/outputs/extraction_formal/batch_registry.json"
 mkdir -p "${batch_root}"
 
 # Manifest registration performs both clean-tree checks before any provider call.
