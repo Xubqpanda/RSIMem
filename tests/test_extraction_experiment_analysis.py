@@ -1,0 +1,323 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+from rsimem.extraction_experiment_analysis import analyze_extraction_batch
+from rsimem.extraction_experiment_manifest import (
+    EXTRACTION_METHOD_VARIANTS,
+    extraction_execution_order,
+    initialize_extraction_batch_manifest,
+    record_extraction_attempt,
+)
+from rsimem.memory.extraction_feedback import (
+    ArtifactSemanticBinding,
+    DeploymentObservation,
+    ExposureMode,
+    ExtractedFactEvidence,
+    ExtractionFeedbackBuilder,
+    ExtractionSetStatus,
+    ExtractionSourceEvidence,
+    FactDisposition,
+    FutureMemoryEvidence,
+    ObservableToolEvent,
+    default_feedback_contract_registry,
+)
+from rsimem.memory.extraction_projection import (
+    ExtractionSourceRecord,
+    JsonExtractionSourceRecordStore,
+    JsonLiveExtractionFeedbackRecordLog,
+    LiveExtractionFeedbackRecord,
+)
+from test_extraction_experiment_manifest import _inputs
+
+
+PRIVATE_TEXT = "Do not include this private memory value."
+SEMANTIC_KEY = "preference.summary.tsv"
+
+
+def _sha(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _source(method: str, artifact_id: str) -> ExtractionSourceEvidence:
+    return ExtractionSourceEvidence(
+        f"source.{method}",
+        _sha(f"source projection {method}"),
+        f"extraction-set.{method}",
+        ExtractionSetStatus.NONEMPTY,
+        (SEMANTIC_KEY,),
+        (
+            ExtractedFactEvidence(
+                f"fact.{method}",
+                SEMANTIC_KEY,
+                FactDisposition.PERSISTED,
+                artifact_id=artifact_id,
+            ),
+        ),
+    )
+
+
+def _feedback(
+    source: ExtractionSourceEvidence,
+    *,
+    source_record_id: str,
+    method: str,
+    artifact_id: str,
+) -> LiveExtractionFeedbackRecord:
+    future = FutureMemoryEvidence(
+        f"opportunity.{method}",
+        ExposureMode.EAGER_SYSTEM_PROMPT,
+        (ArtifactSemanticBinding(artifact_id, SEMANTIC_KEY),),
+        f"operation.opportunity.{method}",
+        f"operation.injection.{method}",
+    )
+    observation = DeploymentObservation(
+        f"observation.{method}",
+        "SM01_preference_adoption",
+        "eval_near",
+        "task.eval",
+        _sha(f"current input {method}"),
+        (),
+        (SEMANTIC_KEY,),
+        "owner\tpriority\ttask\tdue_date\nA\thigh\tShip\t2026/09/01",
+        (
+            ObservableToolEvent(
+                f"tool.share.{method}",
+                "notes_share",
+                True,
+                subject_ids=("note.1",),
+                recipient_ids=("owner_a",),
+            ),
+        ),
+        True,
+    )
+    dataset = ExtractionFeedbackBuilder(
+        default_feedback_contract_registry()
+    ).build(source, observation, future)
+    primary = next(example for example in dataset.examples if example.primary)
+    return LiveExtractionFeedbackRecord.create(
+        family_id="SM01_preference_adoption",
+        stage="eval_near",
+        run_id=f"run.{method}",
+        trace_id=f"trace.{method}",
+        episode_id=f"episode.{method}",
+        session_id=f"session.{method}",
+        task_id="task.eval",
+        deployment_observation_id=observation.observation_id,
+        source_record_id=source_record_id,
+        opportunity_operation_id=primary.opportunity_operation_id,
+        use_operation_id=primary.use_operation_id,
+        outcome_operation_id=primary.outcome_operation_id,
+        dataset=dataset,
+    )
+
+
+def _run_evidence(
+    run: Path,
+    *,
+    method: str,
+    extraction_artifact_id: str,
+    extraction_artifact_digest: str,
+    output_digest: str,
+    memory_artifact_id: str,
+) -> None:
+    source = _source(method, memory_artifact_id)
+    source_record = ExtractionSourceRecord.create(
+        family_id="SM01_preference_adoption",
+        stage="learn_a",
+        run_id=f"run.{method}",
+        episode_id=f"episode.learn.{method}",
+        session_id=f"session.learn.{method}",
+        task_id="task.learn",
+        compilation_id=f"compilation.{method}",
+        extraction_artifact_id=extraction_artifact_id,
+        extraction_artifact_digest=extraction_artifact_digest,
+        extraction_output_digest=output_digest,
+        source=source,
+    )
+    source_path = (
+        run
+        / "family_homes"
+        / "SM01_preference_adoption"
+        / "hermes_home"
+        / ".rsimem"
+        / "extraction_sources.jsonl"
+    )
+    JsonExtractionSourceRecordStore(source_path).append(source_record)
+    feedback = _feedback(
+        source,
+        source_record_id=source_record.record_id,
+        method=method,
+        artifact_id=memory_artifact_id,
+    )
+    JsonLiveExtractionFeedbackRecordLog(
+        run / "02_eval" / "artifacts" / "rsimem_extraction_feedback.jsonl"
+    ).append(feedback)
+    (run / "sequence_comparison.json").write_text(json.dumps({
+        "with_persistence": {
+            "episodes": [{"timing": {"wall_time_s": 1.5}}],
+        },
+    }), encoding="utf-8")
+    audit = {
+        "ok": False,
+        "issues": [{"kind": "incomplete_model_usage"}],
+        "uniquePhysicalUsage": {
+            "requests": 2,
+            "inputTokens": 100,
+            "outputTokens": 20,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "reasoningTokens": 0,
+            "retries": 0,
+        },
+        "ingestionUsage": {
+            "modelRequests": 2,
+            "inputTokens": 50,
+            "outputTokens": 10,
+            "cacheReadTokens": 0,
+            "cacheWriteTokens": 0,
+            "reasoningTokens": 0,
+            "retries": 0,
+            "durationMs": 12,
+            "storageBytes": 20,
+            "complete": {
+                "inputTokens": True,
+                "outputTokens": True,
+                "cacheReadTokens": False,
+                "cacheWriteTokens": False,
+                "reasoningTokens": False,
+                "durationMs": True,
+            },
+        },
+    }
+    (run / "audit.json").write_text(json.dumps(audit), encoding="utf-8")
+    ledger = (
+        {"kind": "memory_injection", "data": {"contentChars": 120}},
+        {"kind": "storage_snapshot", "data": {
+            "memoryFilesBytes": 30,
+            "skillFilesBytes": 0,
+            "stateDbBytes": 20,
+        }},
+    )
+    (run / "ledger.jsonl").write_text(
+        "".join(json.dumps(event) + "\n" for event in ledger),
+        encoding="utf-8",
+    )
+
+
+def _batch(tmp_path: Path, *, changed: bool) -> Path:
+    root = tmp_path / "batch"
+    inputs = _inputs(tmp_path, phase="validation")
+    inputs["path"] = root / "batch_manifest.json"
+    inputs["registry_path"] = tmp_path / "registry.json"
+    inputs["replicates"] = 1
+    initialize_extraction_batch_manifest(**inputs)
+    active = {
+        method: (
+            inputs["parent_policy"]
+            if method == EXTRACTION_METHOD_VARIANTS[0]
+            else inputs["active_policy"]
+        )
+        for method in EXTRACTION_METHOD_VARIANTS
+    }
+    for ordinal, method in enumerate(extraction_execution_order(1), start=1):
+        run_name = f"r01_{method.replace('-', '_')}"
+        record_extraction_attempt(
+            root / "batch_manifest.json",
+            replicate=1,
+            ordinal=ordinal,
+            method=method,
+            run_name=run_name,
+            status="running",
+        )
+        run = root / run_name
+        run.mkdir(parents=True)
+        adaptive = method == EXTRACTION_METHOD_VARIANTS[1]
+        _run_evidence(
+            run,
+            method=method,
+            extraction_artifact_id=active[method].extraction_component_id,
+            extraction_artifact_digest=active[method].extraction_component_digest,
+            output_digest=(
+                _sha("adaptive output") if adaptive and changed else _sha("parent output")
+            ),
+            memory_artifact_id=(
+                "artifact.adaptive"
+                if adaptive and changed
+                else "artifact.parent"
+            ),
+        )
+        record_extraction_attempt(
+            root / "batch_manifest.json",
+            replicate=1,
+            ordinal=ordinal,
+            method=method,
+            run_name=run_name,
+            status="completed",
+        )
+    return root
+
+
+def test_analysis_reports_quality_raw_unknown_usage_and_complete_funnel(
+    tmp_path: Path,
+) -> None:
+    report = analyze_extraction_batch(_batch(tmp_path, changed=True))
+
+    assert report["qualityReady"] is True
+    assert report["usageComplete"] is False
+    assert report["activationFunnel"] == {
+        "eligible": 1,
+        "renderedNPlus1": 1,
+        "changedExtraction": 1,
+        "changedArtifact": 1,
+        "futureExposure": 1,
+        "attributableUse": 1,
+        "attributableOutcome": 1,
+    }
+    assert report["claimGate"]["operationAttributedExtractionAdaptation"][
+        "eligible"
+    ] is True
+    adaptive = next(
+        run for run in report["runs"]
+        if run["method"] == "adaptive-extraction-rsimem"
+    )
+    assert adaptive["quality"]["usefulCount"] == 1
+    assert adaptive["quality"]["resolvedUsefulRate"] == 1.0
+    assert adaptive["quality"]["nonemptyCoverage"] == 1.0
+    assert adaptive["quality"]["highConfidenceMissedRate"] is None
+    assert adaptive["rawUsage"]["requests"]["value"] == 2
+    assert adaptive["rawUsage"]["inputTokens"] == {
+        "value": None,
+        "observedValue": 100,
+        "complete": False,
+    }
+    assert adaptive["rawUsage"]["ingestionInputTokens"]["value"] == 50
+    assert adaptive["rawUsage"]["ingestionCacheReadTokens"]["value"] is None
+    adaptive_summary = report["summaryByMethod"][
+        "adaptive-extraction-rsimem"
+    ]["quality"]
+    assert adaptive_summary["resolvedUsefulRate"] == 1.0
+    assert adaptive_summary["nonemptyCoverage"] == 1.0
+    assert report["pairedRawUsageDelta"]["requests"]["values"] == [0]
+    assert report["pairedRawUsageDelta"]["inputTokens"]["values"] == [None]
+    assert report["pairedRawUsageDelta"]["inputTokens"]["mean"] is None
+    assert report["providerPricing"] is None
+    serialized = json.dumps(report)
+    assert "lifecycleCostUnits" not in serialized
+    assert "futureUtilityPerCost" not in serialized
+    assert PRIVATE_TEXT not in serialized
+
+
+def test_analysis_rejects_adaptation_claim_without_changed_extraction(
+    tmp_path: Path,
+) -> None:
+    report = analyze_extraction_batch(_batch(tmp_path, changed=False))
+    claim = report["claimGate"]["operationAttributedExtractionAdaptation"]
+
+    assert report["qualityReady"] is True
+    assert report["activationFunnel"]["changedExtraction"] == 0
+    assert claim["eligible"] is False
+    assert claim["reason"] == "activation_funnel_incomplete"
+    assert "changedExtraction" in claim["missingStages"]

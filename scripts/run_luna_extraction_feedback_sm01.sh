@@ -194,4 +194,9 @@ if not paths or not any(JsonExtractionSourceRecordStore(path).records() for path
   manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" completed ""
 done
 
+PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" \
+  -m rsimem.extraction_experiment_analysis \
+  "${batch_root}" \
+  --output "${batch_root}/extraction_analysis.json"
+
 echo "Formal extraction feedback batch complete: ${batch_root}"
