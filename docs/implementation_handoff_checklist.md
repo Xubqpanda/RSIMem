@@ -800,8 +800,8 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 - □ 构造一个过去context中含durable与temporary信息、未来任务只使用durable信息的fixture。
 - □ Policy N产生至少一个可归因问题，例如遗漏durable fact或提取temporary fact。
-- □ Fixture分别构造完整`opportunity -> use -> successful outcome` useful链和`source -> no equivalent extraction -> future demand -> absence-attributed outcome` missed链。
-- □ 删除任一useful/missed链节点后label退化为unresolved，而不是继续贡献optimizer reward。
+- √ Fixture分别构造完整`opportunity -> use -> successful outcome` useful链和`source -> no equivalent extraction -> future demand -> absence-attributed outcome` missed链（当前为 fixture-local opaque IDs，不是部署标签）。
+- √ 删除任一useful/missed链节点后label退化为unresolved，而不是继续贡献optimizer reward。
 - □ End-to-end feedback保留完整轨迹，strict resolver同时生成attribution diagnosis；即使resolved attribution不足，也能验证exploratory optimizer是否提出extraction-only hypothesis。
 - □ Delayed feedback构建optimizer corpus并生成受限的、只针对当前开放层的N+1 hypothesis；没有真实 uplift 也不判定 feasibility 失败。
 - □ N+1通过offline replay、schema、安全和layer-boundary validation；是否激活属于后续效果实验，不属于本阶段最低验收。
@@ -817,11 +817,11 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 当前第三阶段的主要任务是 feasibility，不要求一次性完成六层 online optimization。每层分别完成以下验收：
 
-1. 定义该层的 decision contract、可控 action space和固定安全边界。
-2. 证明真实 Host event 或 deterministic fixture 能产生该层输入，并且 process feedback 可以记录 intervention 前后差异。
-3. 构造至少一个 parent/candidate case，candidate只改变该层且能通过 replay 重建。
-4. 记录该层的 signal coverage、action variation、outcome variation、ambiguous/unresolved比例和主要缺口。
-5. 只有 signal 和 action 足够支持下一步实验时，才把该层列为 `optimization-ready`；否则列为 `diagnostic-only` 或 `validation-only`，不强行训练。
+1. √ 定义该层的 decision contract、可控 action space和固定安全边界。
+2. √ 证明真实 Host event 或 deterministic fixture 能产生该层输入，并且 process feedback 可以记录 intervention 前后差异。
+3. √ 构造至少一个 parent/candidate case，candidate只改变该层且能通过 replay 重建。
+4. √ 记录该层的 signal coverage、action variation、outcome variation、ambiguous/unresolved比例和主要缺口。
+5. √ 只有 signal 和 action 足够支持下一步实验时，才把该层列为 `optimization-ready`；否则列为 `diagnostic-only` 或 `validation-only`，不强行训练。
 
 推荐先完成六层的 deterministic/shadow feasibility，再选择最有信号的层做真实 adaptive effect experiment。正式效果实验仍需冻结 split、model、budget、replicate、source projection、feedback contract、optimizer config和anti-collapse criteria。
 
@@ -836,7 +836,7 @@ Family规则：
 
 - □ 所有variant使用matched task manifest、model、budget、order、sandbox和persistence isolation。
 - □ 每个 feasibility case 完成预设 replay/fixture，failed/provider run保留并单独报告。
-- □ 每个 candidate 至少一次改变目标层的 decision或输入/输出 fingerprint；不要求真实任务分数提升。
+- √ 每个 deterministic candidate 至少一次改变目标层的 decision或输入/输出 fingerprint；不要求真实任务分数提升。
 - □ 报告每层的 process-signal coverage、action variation、outcome variation、unresolved/censored比例和具体失败原因。
 - □ 报告U/H/M/unresolved/censored原始计数、resolved useful rate及其分子分母、coverage和empty rate；不把unknown silently drop。
 - □ 报告raw calls/tokens/retry/latency/storage/injection/recovery，不生成无定义的混合cost结论。
@@ -968,7 +968,7 @@ bash -n scripts/*.sh
 ## 11. 当前执行入口
 
 当前实现入口已完成第二阶段六层 Memory Policy 优化基建，并进入第三阶段 deterministic/shadow feasibility 验收；尚未进入真实 adaptive effect run。当前 census 只将 Extraction fixture 暂列 `optimization-ready`，其余层为 `validation-only`，不能宣称六层 aggregate uplift 或真实 execution equivalence。
-当前已完成 2A 的 host-neutral contract 验收，并完成 2B/2C/2D 子层的 deterministic policy baseline（trigger、source selection、admission、commit scheduling、exposure）；Hermes lifecycle 已记录 trigger/source decision，并通过独立的 content-free policy evidence ledger 持久化 decision identity、revision、digest、lineage 和 receipt join；静态 semantic writeback 已将 extraction/admission/commit 与真实 ingestion/mutation receipt 关联，Hermes system-prompt boundary 已将 exposure 与 injection receipt 关联；shadow trigger 正反 fixture、跨重启 policy evidence replay、统一 cross-ledger audit、source selection 到 extraction projection 的实际绑定均已通过。上述实现尚未替代 Hermes 正式 runtime 的 admission/commit/exposure 执行，也不能作为 2B-2D 的最终 adaptive policy 验收。下一步是完成六层完整 matched replay、process-signal census 和第三阶段 feasibility cases。
+当前已完成 2A 的 host-neutral contract 验收，并完成 2B/2C/2D 子层的 deterministic policy baseline（trigger、source selection、admission、commit scheduling、exposure）；Hermes lifecycle 已记录 trigger/source decision，并通过独立的 content-free policy evidence ledger 持久化 decision identity、revision、digest、lineage 和 receipt join；静态 semantic writeback 已将 extraction/admission/commit 与真实 ingestion/mutation receipt 关联，Hermes system-prompt boundary 已将 exposure 与 injection receipt 关联；shadow trigger 正反 fixture、跨重启 policy evidence replay、统一 cross-ledger audit、source selection 到 extraction projection 的实际绑定均已通过。第三阶段 deterministic feasibility runner、strict feedback projection、process/hypothesis lineage 和 durable replay ledger 已完成首轮 baseline，但上述实现尚未替代 Hermes 正式 runtime 的 admission/commit/exposure 执行，也不能作为 2B-2D 的最终 adaptive policy 验收。下一步是接入真实 delayed feedback corpus，补足各层 resolved process/outcome variation，并在满足 gate 后进行 matched effect experiment。
 第一阶段 1A-1H、原 extraction artifact/runtime binding 基础和低成本 live plain-parent acceptance 已完成，记录在
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
 已有 extraction artifact 的 deterministic contract、content-free evidence assembler、atomic activation、
