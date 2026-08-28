@@ -390,6 +390,7 @@ def test_feasibility_evidence_ledger_is_idempotent_across_restart(tmp_path) -> N
     restarted = JsonFeasibilityEvidenceLedger(path)
     assert restarted.records == (record,)
     assert restarted.records[0].replay_payload == case.replay_payload
+    assert restarted.verify_case(case) == record
     assert "The user prefers TSV output" not in path.read_text(encoding="utf-8")
 
 
@@ -410,6 +411,17 @@ def test_feasibility_evidence_ledger_rejects_corruption_and_conflict(tmp_path) -
     path.write_text("not-json\n", encoding="utf-8")
     with pytest.raises(ValueError, match="malformed feasibility evidence"):
         JsonFeasibilityEvidenceLedger(path)
+
+
+def test_feasibility_ledger_missing_case_fails_closed(tmp_path) -> None:
+    case = _case(
+        "case.missing_receipt",
+        FeasibilityOutcome.UNRESOLVED,
+        FeedbackChain(),
+    )
+    ledger = JsonFeasibilityEvidenceLedger(tmp_path / "missing.jsonl")
+    with pytest.raises(ValueError, match="record is missing"):
+        ledger.verify_case(case)
 
 
 def test_process_feedback_tampering_is_rejected() -> None:
