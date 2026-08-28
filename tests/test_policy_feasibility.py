@@ -188,6 +188,9 @@ def test_complete_useful_and_missed_chains_make_extraction_optimization_ready() 
     assert useful.process_feedback.event_id == useful.parent.event.event_id
     assert useful.process_feedback.target_layer is PolicyLayer.EXTRACTION
     assert useful.process_feedback.parent_decision_id == useful.parent_decision.decision_id
+    assert useful.process_feedback == type(useful.process_feedback).from_payload(
+        useful.process_feedback.payload()
+    )
     assert useful.hypothesis is not None
     assert useful.hypothesis.target_layer is PolicyLayer.EXTRACTION
     assert useful.hypothesis.candidate_artifact_id == useful.candidate_artifact.artifact_id
@@ -358,6 +361,18 @@ def test_feasibility_evidence_ledger_rejects_corruption_and_conflict(tmp_path) -
     path.write_text("not-json\n", encoding="utf-8")
     with pytest.raises(ValueError, match="malformed feasibility evidence"):
         JsonFeasibilityEvidenceLedger(path)
+
+
+def test_process_feedback_tampering_is_rejected() -> None:
+    case = _case(
+        "case.feedback_tamper",
+        FeasibilityOutcome.USEFUL,
+        FeedbackChain("opportunity.1", "use.1", "outcome.1"),
+    )
+    payload = case.process_feedback.payload()
+    payload["observed_after_digest"] = "0" * 64
+    with pytest.raises(ValueError, match="ID mismatch|malformed"):
+        type(case.process_feedback).from_payload(payload)
 
 
 def _layer_artifact(layer: PolicyLayer, version: str, kind: PolicyArtifactKind) -> PolicyArtifactIdentity:
