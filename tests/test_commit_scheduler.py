@@ -31,6 +31,7 @@ def test_deferred_schedule_survives_restart_and_is_idempotent(tmp_path) -> None:
     path = tmp_path / "commit-schedules.json"
     first = CommitScheduler(JsonCommitScheduleStore(path)).schedule(_decision(), boundary="session_end")
     assert first is not None and first.status is CommitScheduleStatus.PENDING
+    assert first.trigger_event_id == "event.fixture"
     restarted = CommitScheduler(JsonCommitScheduleStore(path))
     replay = restarted.schedule(_decision(), boundary="session_end")
     assert replay == first
