@@ -226,6 +226,7 @@ class ExtractionOptimizerRequest:
     primary_example_ids: tuple[str, ...]
     system_instruction: str
     input_json: str
+    provider_eligible: bool = True
     request_schema: str = EXTRACTION_OPTIMIZER_REQUEST_SCHEMA
     schema_version: int = EXTRACTION_OPTIMIZER_SCHEMA_VERSION
 
@@ -252,6 +253,8 @@ class ExtractionOptimizerRequest:
             raise ValueError("optimizer system instruction differs")
         if not self.input_json:
             raise ValueError("optimizer request input must not be empty")
+        if type(self.provider_eligible) is not bool:
+            raise TypeError("optimizer provider eligibility must be bool")
         if self.primary_example_ids != tuple(sorted(set(self.primary_example_ids))):
             raise ValueError("optimizer primary example IDs must be sorted and unique")
         expected = content_digest(self.identity_payload())
@@ -272,6 +275,7 @@ class ExtractionOptimizerRequest:
             "primary_example_ids": list(self.primary_example_ids),
             "system_instruction_digest": text_digest(self.system_instruction),
             "input_json_digest": text_digest(self.input_json),
+            "provider_eligible": self.provider_eligible,
         }
 
 
@@ -412,6 +416,7 @@ def build_extraction_optimizer_request(
         "primary_example_ids": tuple(sorted(primary_ids)),
         "system_instruction": EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION,
         "input_json": input_json,
+        "provider_eligible": True,
         "request_schema": EXTRACTION_OPTIMIZER_REQUEST_SCHEMA,
         "schema_version": EXTRACTION_OPTIMIZER_SCHEMA_VERSION,
     }
@@ -426,6 +431,81 @@ def build_extraction_optimizer_request(
         "primary_example_ids": list(values["primary_example_ids"]),
         "system_instruction_digest": text_digest(values["system_instruction"]),
         "input_json_digest": text_digest(values["input_json"]),
+        "provider_eligible": values["provider_eligible"],
+    }
+    digest = content_digest(identity)
+    return ExtractionOptimizerRequest(
+        request_id=f"optimizer-request.{digest[:40]}",
+        request_digest=digest,
+        **values,
+    )
+
+
+def build_extraction_optimizer_gate_request(
+    parent: ExtractionPromptPolicyArtifact,
+    corpus: ExtractionOptimizerCorpus,
+    *,
+    reason_codes: tuple[str, ...],
+    config: ExtractionOptimizerConfig = FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+) -> ExtractionOptimizerRequest:
+    """Build a content-free identity for a deterministic NO_PROPOSAL gate."""
+
+    if corpus.split != OptimizerCorpusSplit.TRAIN:
+        raise ValueError("optimizer gate requires the training corpus")
+    extraction_digests = {
+        example.audit_join.extraction_artifact_digest
+        for example in corpus.examples
+    }
+    if extraction_digests != {parent.body_digest}:
+        raise ValueError("optimizer corpus was not produced by the parent policy body")
+    if not reason_codes or len(reason_codes) != len(set(reason_codes)):
+        raise ValueError("optimizer gate requires unique reason codes")
+    primary = tuple(sorted(
+        (value for value in corpus.examples if value.primary),
+        key=lambda value: value.example_id,
+    ))
+    label_counts = {
+        label.value: sum(value.label == label for value in primary)
+        for label in ExtractionFeedbackLabel
+    }
+    input_json = canonical_json({
+        "schema_version": EXTRACTION_OPTIMIZER_SCHEMA_VERSION,
+        "request_mode": "deterministic_signal_gate",
+        "decision": "NO_PROPOSAL",
+        "reason_codes": list(reason_codes),
+        "parent_artifact_id": parent.artifact_id,
+        "parent_artifact_digest": parent.artifact_digest,
+        "corpus_id": corpus.corpus_id,
+        "corpus_digest": corpus.corpus_digest,
+        "primary_label_counts": label_counts,
+    })
+    if len(input_json) > config.maximum_input_chars:
+        raise ValueError("optimizer gate request exceeds the input character budget")
+    values = {
+        "parent_artifact_id": parent.artifact_id,
+        "parent_artifact_digest": parent.artifact_digest,
+        "corpus_id": corpus.corpus_id,
+        "corpus_digest": corpus.corpus_digest,
+        "optimizer_config_digest": config.config_digest,
+        "primary_example_ids": tuple(value.example_id for value in primary),
+        "system_instruction": EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION,
+        "input_json": input_json,
+        "provider_eligible": False,
+        "request_schema": EXTRACTION_OPTIMIZER_REQUEST_SCHEMA,
+        "schema_version": EXTRACTION_OPTIMIZER_SCHEMA_VERSION,
+    }
+    identity = {
+        "schema_version": values["schema_version"],
+        "request_schema": values["request_schema"],
+        "parent_artifact_id": values["parent_artifact_id"],
+        "parent_artifact_digest": values["parent_artifact_digest"],
+        "corpus_id": values["corpus_id"],
+        "corpus_digest": values["corpus_digest"],
+        "optimizer_config_digest": values["optimizer_config_digest"],
+        "primary_example_ids": list(values["primary_example_ids"]),
+        "system_instruction_digest": text_digest(values["system_instruction"]),
+        "input_json_digest": text_digest(values["input_json"]),
+        "provider_eligible": values["provider_eligible"],
     }
     digest = content_digest(identity)
     return ExtractionOptimizerRequest(

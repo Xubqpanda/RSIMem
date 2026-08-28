@@ -48,6 +48,8 @@ class OpenAICompatibleExtractionOptimizerClient:
         request: ExtractionOptimizerRequest,
         config: ExtractionOptimizerConfig = FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
     ) -> ExtractionOptimizerCompletion:
+        if request.provider_eligible is not True:
+            raise ValueError("optimizer gate request cannot reach the provider")
         if request.optimizer_config_digest != config.config_digest:
             raise ValueError("optimizer provider config differs from request")
         started = self._clock()

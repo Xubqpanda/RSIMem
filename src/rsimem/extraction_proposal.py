@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Sequence
 
 from .memory.extraction_optimizer_contracts import FROZEN_EXTRACTION_OPTIMIZER_CONFIG
+from .memory.extraction_optimizer_contracts import (
+    ExtractionOptimizerConfig,
+    ExtractionOptimizerRequest,
+)
 from .memory.extraction_optimizer_provider import OpenAICompatibleExtractionOptimizerClient
 from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStore
 from .memory.extraction_policy_artifact import ExtractionPromptPolicyArtifact
@@ -22,6 +26,27 @@ from .memory_systems.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT_ID,
     Mem0FlatPromptAdapter,
 )
+
+
+class _DeferredExtractionOptimizerClient:
+    """Keep credentials and provider transport unreachable on NO_PROPOSAL."""
+
+    def __init__(self, api_key_file: Path | None, base_url: str) -> None:
+        self.api_key_file = api_key_file
+        self.base_url = base_url
+
+    def complete(
+        self,
+        request: ExtractionOptimizerRequest,
+        config: ExtractionOptimizerConfig,
+    ):
+        if self.api_key_file is None:
+            raise ValueError("optimizer provider API key file is required")
+        api_key = self.api_key_file.read_text(encoding="utf-8").strip()
+        return OpenAICompatibleExtractionOptimizerClient(
+            api_key=api_key,
+            base_url=self.base_url,
+        ).complete(request, config)
 
 
 def _write_immutable(path: Path, value: object) -> None:
@@ -50,6 +75,7 @@ def result_payload(result: ExtractionOptimizerResult) -> dict[str, object]:
             "corpusId": result.request.corpus_id,
             "corpusDigest": result.request.corpus_digest,
             "optimizerConfigDigest": result.request.optimizer_config_digest,
+            "providerEligible": result.request.provider_eligible,
         },
         "completionId": result.completion_id,
         "edits": [value.payload() for value in result.edits],
@@ -84,6 +110,7 @@ def prepare_extraction_proposal(
             "corpusId": result.request.corpus_id,
             "corpusDigest": result.request.corpus_digest,
             "optimizerConfigDigest": result.request.optimizer_config_digest,
+            "providerEligible": result.request.provider_eligible,
             "primaryExampleIds": list(result.request.primary_example_ids),
         },
     )
@@ -109,12 +136,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if args.api_key_file is None:
-        raise SystemExit("--api-key-file is required for provider execution")
-    api_key = args.api_key_file.read_text(encoding="utf-8").strip()
-    client = OpenAICompatibleExtractionOptimizerClient(
-        api_key=api_key,
-        base_url=args.base_url,
+    client = _DeferredExtractionOptimizerClient(
+        args.api_key_file,
+        args.base_url,
     )
     store = JsonExtractionOptimizerCorpusStore(
         args.corpus_attempt_root,

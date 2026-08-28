@@ -17,6 +17,7 @@ from .extraction_optimizer_contracts import (
     ExtractionOptimizerRequest,
     EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION,
     FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+    build_extraction_optimizer_gate_request,
     build_extraction_optimizer_request,
 )
 from .extraction_optimizer_corpus import (
@@ -185,11 +186,6 @@ class ExtractionPromptOptimizer:
         parent: ExtractionPromptPolicyArtifact,
         corpus: ExtractionOptimizerCorpus,
     ) -> ExtractionOptimizerResult:
-        request = build_extraction_optimizer_request(
-            parent,
-            corpus,
-            config=self.config,
-        )
         primary = tuple(value for value in corpus.examples if value.primary)
         actionable = tuple(value for value in primary if _is_actionable(value))
         if len(actionable) < self.config.minimum_actionable_primary_examples:
@@ -197,6 +193,12 @@ class ExtractionPromptOptimizer:
                 "no_actionable_extraction_signal"
                 if not actionable
                 else "insufficient_actionable_extraction_signal"
+            )
+            request = build_extraction_optimizer_gate_request(
+                parent,
+                corpus,
+                reason_codes=(reason,),
+                config=self.config,
             )
             return self._result(
                 ExtractionOptimizerDecision.NO_PROPOSAL,
@@ -214,6 +216,12 @@ class ExtractionPromptOptimizer:
                 set(),
             ).add(value.label)
         if any(len(labels) > 1 for labels in by_source.values()):
+            request = build_extraction_optimizer_gate_request(
+                parent,
+                corpus,
+                reason_codes=("conflicting_extraction_signal",),
+                config=self.config,
+            )
             return self._result(
                 ExtractionOptimizerDecision.NO_PROPOSAL,
                 ("conflicting_extraction_signal",),
@@ -223,6 +231,11 @@ class ExtractionPromptOptimizer:
                 None,
                 RawResourceUsage(),
             )
+        request = build_extraction_optimizer_request(
+            parent,
+            corpus,
+            config=self.config,
+        )
         completion = self.client.complete(request, self.config)
         if completion.request_id != request.request_id:
             raise ValueError("optimizer completion belongs to another request")
