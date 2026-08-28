@@ -813,7 +813,7 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 ### 3B：六层 Policy 可优化性验收
 
-第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。这只是可行性状态，不代表任何层已完成在线优化；后续仍需补充 process corpus、独立 matched validation 和失败/provider run 保留。
+第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。这只是可行性状态，不代表任何层已完成在线优化；后续仍需补充 process corpus、独立 matched validation 和失败/provider run 保留。当前验证：RSIMem `.venv` 测试 `618 passed`，PAST-Bench `397 passed, 2 skipped`。
 
 当前第三阶段的主要任务是 feasibility，不要求一次性完成六层 online optimization。每层分别完成以下验收：
 

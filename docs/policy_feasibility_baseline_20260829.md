@@ -37,8 +37,18 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 ```text
 PYTHONPATH=src pytest -q tests/test_policy_feasibility.py tests/test_policy_replay.py
 10 passed
+
+.venv/bin/pytest -q tests
+618 passed
+
+cd benchmarks/past-bench && ../../.venv/bin/pytest -q
+397 passed, 2 skipped
+
+.venv/bin/python -m compileall -q src
+.venv/bin/python -m pip check
+git diff --check
 ```
 
-完整 RSIMem/PAST-Bench 回归需在已安装 `rsimem`、Hermes 和 PAST-Bench distributions 的项目实验环境中执行；本机系统 Python 3.12 环境缺少这些运行时依赖，不能把本次 focused 结果扩大解释为完整回归。
+完整回归已在仓库 `.venv` 项目实验环境中完成。系统 Python 3.12 环境缺少 Hermes/PAST-Bench 运行时依赖，不能用系统解释器复现这些结果；实验命令应使用 `.venv`，PAST-Bench 测试应从其目录运行。
 
 实现入口：`src/rsimem/memory/policy_feasibility.py`；测试 fixture：`tests/test_policy_feasibility.py`。
