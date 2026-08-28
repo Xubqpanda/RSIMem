@@ -1191,6 +1191,29 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
     assert source_path.exists()
     source_serialized = source_path.read_text(encoding="utf-8")
     assert "Always use TSV" not in source_serialized
+    source_store = JsonExtractionSourceRecordStore(source_path)
+    learned_source = source_store.records()[0]
+    unrelated_empty = ExtractionSourceRecord.create(
+        family_id="SM01_preference_adoption",
+        stage="learn_b",
+        run_id="run-feedback-sequence",
+        episode_id="episode-feedback-learn-b",
+        session_id="session-feedback-learn-b",
+        task_id="SM01_LEARN_B_001",
+        compilation_id="compilation.feedback-unrelated-empty",
+        extraction_artifact_id=learned_source.extraction_artifact_id,
+        extraction_artifact_digest=learned_source.extraction_artifact_digest,
+        extraction_output_digest="d" * 64,
+        source=ExtractionSourceEvidence(
+            "source.feedback-unrelated-empty",
+            "e" * 64,
+            "extraction-set.feedback-unrelated-empty",
+            ExtractionSetStatus.EMPTY,
+            (),
+            (),
+        ),
+    )
+    source_store.append(unrelated_empty)
 
     eval_db = SessionDB(home / "state.db")
     eval_session = "session-feedback-eval"
@@ -1278,13 +1301,15 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
         for line in feedback_path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
-    assert len(records) == 1
-    assert records[0]["run_id"] == "run-feedback-sequence"
-    assert records[0]["episode_id"] == "episode-feedback-eval"
-    assert records[0]["task_id"] == "SM01_EVAL_NEAR_001"
-    dataset = records[0]["dataset"]
+    assert len(records) == 2
+    assert all(record["run_id"] == "run-feedback-sequence" for record in records)
+    assert all(record["episode_id"] == "episode-feedback-eval" for record in records)
+    assert all(record["task_id"] == "SM01_EVAL_NEAR_001" for record in records)
+    by_source = {record["source_record_id"]: record for record in records}
     primary = next(
-        example for example in dataset["examples"] if example["primary"]
+        example
+        for example in by_source[learned_source.record_id]["dataset"]["examples"]
+        if example["primary"]
     )
     assert primary["label"] == "useful"
     assert primary["opportunity_operation_id"] == operations[
@@ -1294,6 +1319,13 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
     assert primary["outcome_operation_id"] == operations[
         OperationKind.DOWNSTREAM_OUTCOME
     ].operation_id
+    empty_primary = next(
+        example
+        for example in by_source[unrelated_empty.record_id]["dataset"]["examples"]
+        if example["primary"]
+    )
+    assert empty_primary["label"] == "unresolved"
+    assert empty_primary["reason_codes"] == ["use_not_bound_to_memory"]
     serialized = feedback_path.read_text(encoding="utf-8")
     assert "Always use TSV" not in serialized
     assert not any(token in serialized for token in (
