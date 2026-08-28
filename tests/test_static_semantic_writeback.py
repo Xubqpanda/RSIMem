@@ -21,10 +21,12 @@ from rsimem.memory import (
     MemoryQuery,
 )
 from rsimem.memory.live_writeback import (
+    MATCHED_EXTRACTION_CANDIDATE_ID,
     LEGACY_ADAPTIVE_UTILITY_ID,
     LEGACY_STATIC_UTILITY_ID,
     STATIC_EXTRACTION_PARENT_ID,
     STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION,
+    ExtractionPromptRuntimeScope,
     StaticSemanticWritebackConfig,
     StaticSemanticWritebackMode,
     StaticSemanticWritebackRuntime,
@@ -39,11 +41,14 @@ from rsimem.memory.operation_graph import (
 )
 from rsimem.memory.receipts import MutationReceiptStatus
 from rsimem.memory_systems.mem0_flat import (
+    MEM0_FLAT_EXTRACTION_SLOT_ID,
+    Mem0FlatPromptAdapter,
     FakeCompletionClient,
     FrozenMem0UtilityGate,
     POLICY_FACT_EXTRACTION_PROMPT,
     POLICY_INTERNAL_OPERATION_PROMPT,
 )
+from test_extraction_offline_validation import _candidate
 
 
 PREFERENCE = "Use TSV with owner, priority, task, and due_date."
@@ -101,7 +106,7 @@ def _runtime(tmp_path, client):
 
 
 def test_static_config_is_default_disabled_and_strict() -> None:
-    assert STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION == 1
+    assert STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION == 2
     assert StaticSemanticWritebackConfig().enabled is False
     assert StaticSemanticWritebackConfig.from_mapping({
         "mode": "static",
@@ -113,6 +118,14 @@ def test_static_config_is_default_disabled_and_strict() -> None:
     assert plain.utility_enabled is False
     assert plain.adaptive_enabled is False
     assert plain.method_identity == STATIC_EXTRACTION_PARENT_ID
+    matched = StaticSemanticWritebackConfig.from_mapping({
+        "mode": "static",
+        "extraction_runtime_scope": "matched_validation",
+        "extraction_runtime_config_path": "/attempt/extraction-trial.json",
+    })
+    assert matched.matched_extraction_enabled is True
+    assert matched.plain_extraction_parent is False
+    assert matched.method_identity == MATCHED_EXTRACTION_CANDIDATE_ID
     utility = StaticSemanticWritebackConfig.from_mapping({
         "mode": "static_utility",
     })
@@ -153,6 +166,114 @@ def test_static_config_is_default_disabled_and_strict() -> None:
             "mode": "disabled",
             "feedback_contract": "sm01_tsv_v1",
         })
+    with pytest.raises(ValueError, match="explicit config path"):
+        StaticSemanticWritebackConfig.from_mapping({
+            "mode": "static",
+            "extraction_runtime_scope": "matched_validation",
+        })
+    with pytest.raises(ValueError, match="plain static writeback"):
+        StaticSemanticWritebackConfig.from_mapping({
+            "mode": "static_utility",
+            "extraction_runtime_scope": "matched_validation",
+            "extraction_runtime_config_path": "/attempt/extraction-trial.json",
+        })
+    with pytest.raises(ValueError, match="requires matched_validation"):
+        StaticSemanticWritebackConfig.from_mapping({
+            "mode": "static",
+            "extraction_runtime_config_path": "/attempt/extraction-trial.json",
+        })
+
+
+def test_matched_extraction_runtime_binds_candidate_and_is_restart_stable(
+    tmp_path,
+) -> None:
+    parent = Mem0FlatPromptAdapter().export_root_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID
+    )
+    candidate = _candidate(parent=parent)
+    bindings = []
+    clients = []
+    for name in ("first", "restart"):
+        client = _client()
+        clients.append(client)
+        runtime = StaticSemanticWritebackRuntime(
+            tmp_path / name / "hermes-home",
+            client,
+            operation_evidence_path=tmp_path / name / "operations.jsonl",
+            mutation_receipt_path=tmp_path / name / "receipts.json",
+            extraction_policy_artifact=candidate,
+            expected_extraction_policy_artifact_id=candidate.artifact_id,
+            expected_extraction_policy_artifact_digest=candidate.artifact_digest,
+            extraction_runtime_scope=(
+                ExtractionPromptRuntimeScope.MATCHED_VALIDATION
+            ),
+            extraction_trial_id="extraction-trial.test-restart",
+        )
+        result = runtime.process(_lifecycle(tmp_path / name))[0]
+        assert result.writeback is not None
+        assert client.calls[0]["binding_fingerprint"] == (
+            runtime.extraction_runtime_binding.binding_id
+        )
+        assert runtime.policy.semantic_manifest.extraction_component_id == (
+            runtime.extraction_runtime_binding.component_artifact_id
+        )
+        bindings.append(runtime.extraction_runtime_binding.payload())
+        runtime.close()
+
+    assert bindings[0] == bindings[1]
+    assert bindings[0]["policy_artifact_id"] == candidate.artifact_id
+    assert bindings[0]["policy_artifact_digest"] == candidate.artifact_digest
+    assert bindings[0]["deployment_scope"] == "matched_validation"
+    assert all(len(client.calls) == 2 for client in clients)
+
+
+@pytest.mark.parametrize(
+    ("actual", "expected_id", "expected_digest", "scope", "trial_id", "message"),
+    (
+        ("root", "candidate", "candidate", "matched_validation", "trial", "configured and loaded"),
+        ("candidate", "candidate", "wrong", "matched_validation", "trial", "configured and loaded"),
+        ("candidate", "candidate", "candidate", "root_static", None, "cannot bind a trial"),
+        ("candidate", None, None, "matched_validation", "trial", "expected artifact identity"),
+    ),
+)
+def test_extraction_runtime_identity_mismatch_fails_before_model_call(
+    tmp_path,
+    actual,
+    expected_id,
+    expected_digest,
+    scope,
+    trial_id,
+    message,
+) -> None:
+    adapter = Mem0FlatPromptAdapter()
+    root = adapter.export_root_policy_artifact(MEM0_FLAT_EXTRACTION_SLOT_ID)
+    candidate = _candidate(parent=root)
+    artifact = root if actual == "root" else candidate
+    resolved_id = (
+        candidate.artifact_id if expected_id == "candidate" else expected_id
+    )
+    resolved_digest = (
+        candidate.artifact_digest
+        if expected_digest == "candidate"
+        else "0" * 64
+        if expected_digest == "wrong"
+        else expected_digest
+    )
+    client = _client()
+
+    with pytest.raises(ValueError, match=message):
+        StaticSemanticWritebackRuntime(
+            tmp_path / "hermes-home",
+            client,
+            operation_evidence_path=tmp_path / "operations.jsonl",
+            mutation_receipt_path=tmp_path / "receipts.json",
+            extraction_policy_artifact=artifact,
+            expected_extraction_policy_artifact_id=resolved_id,
+            expected_extraction_policy_artifact_digest=resolved_digest,
+            extraction_runtime_scope=ExtractionPromptRuntimeScope(scope),
+            extraction_trial_id=trial_id,
+        )
+    assert client.calls == ()
 
 
 def test_explicit_adaptive_runtime_rejects_empty_store_before_model_call(
