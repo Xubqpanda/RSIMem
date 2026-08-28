@@ -190,6 +190,10 @@ def test_complete_useful_and_missed_chains_make_extraction_optimization_ready() 
     assert census.outcome_counts == {"useful": 1, "missed": 1}
     assert census.complete_feedback_count == 2
     assert census.unknown_count == 0
+    assert census.unresolved_count == 0
+    assert census.censored_count == 0
+    assert census.unresolved_ratio == 0.0
+    assert census.censored_ratio == 0.0
     assert useful.replay_payload["parent_audit_ok"] is True
     assert useful.replay_payload["candidate_audit_ok"] is True
     assert useful.process_feedback is not None
@@ -351,6 +355,23 @@ def test_missing_process_signal_is_diagnostic_only_without_hypothesis() -> None:
     )
     assert census.status is FeasibilityStatus.DIAGNOSTIC_ONLY
     assert "no_process_signal" in census.reason_codes
+
+
+def test_census_reports_unresolved_and_censored_separately() -> None:
+    unresolved = _case("case.unresolved_ratio", FeasibilityOutcome.UNRESOLVED, FeedbackChain())
+    censored = _case("case.censored_ratio", FeasibilityOutcome.CENSORED, FeedbackChain())
+    census = next(
+        item for item in build_feasibility_report((unresolved, censored)).census
+        if item.layer is PolicyLayer.EXTRACTION
+    )
+    assert census.unknown_count == 2
+    assert census.unresolved_count == 1
+    assert census.censored_count == 1
+    assert census.unresolved_ratio == 0.5
+    assert census.censored_ratio == 0.5
+    payload = census.payload()
+    assert payload["unresolvedCount"] == 1
+    assert payload["censoredCount"] == 1
 
 
 def test_failed_replay_audit_rejects_intervention() -> None:
