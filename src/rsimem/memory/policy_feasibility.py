@@ -381,6 +381,13 @@ class ProcessFeedback:
         }
         if not isinstance(value, Mapping) or set(value) != fields:
             raise ValueError("malformed process feedback")
+        for field in (
+            "parent_execution_receipt_ids",
+            "candidate_execution_receipt_ids",
+            "reason_codes",
+        ):
+            if not isinstance(value[field], list):
+                raise ValueError("malformed process feedback")
         try:
             result = cls(
                 value["feedback_id"],
@@ -495,6 +502,9 @@ class PolicyHypothesis:
         }
         if not isinstance(value, Mapping) or set(value) != fields:
             raise ValueError("malformed policy hypothesis")
+        for field in ("feedback_ids", "reason_codes"):
+            if not isinstance(value[field], list):
+                raise ValueError("malformed policy hypothesis")
         try:
             result = cls(
                 value["hypothesis_id"],
