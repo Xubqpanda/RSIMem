@@ -18,6 +18,7 @@ def test_formal_feedback_launcher_uses_plain_extraction_profile() -> None:
     assert "rsimem.extraction_experiment_analysis" in script
     assert "classify_extraction_audit_failure" in script
     assert "RSIMEM_EXTRACTION_EXPERIMENT_CONFIG" in script
+    assert 'rglob("extraction_sources.jsonl")' in script
     assert "static_utility" not in script
     assert "adaptive_utility" not in script
     assert "adaptive-rsimem" not in script
