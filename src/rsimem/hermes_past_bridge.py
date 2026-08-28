@@ -36,7 +36,16 @@ from .memory.trigger_policy import (
     TriggerObservation,
 )
 from .memory.source_selection_policy import DeterministicSourceSelectionPolicy
-from .memory.policy_contracts import SourceSelectionDecision
+from .memory.policy_contracts import (
+    AdmissionDecision,
+    DecisionAction,
+    ExecutionStatus,
+    ExtractionDecision,
+    MutationKind,
+    SourceSelectionDecision,
+)
+from .memory.admission_policy import DeterministicAdmissionPolicy
+from .memory.exposure_policy import DeterministicExposurePolicy
 from .memory.policy_evidence import JsonPolicyDecisionLedger
 from .memory.live_writeback import (
     ExtractionPromptRuntimeScope,
@@ -364,6 +373,13 @@ class HermesPastBenchBridge:
         self._policy_evidence = JsonPolicyDecisionLedger(
             self.evidence_path.with_name("rsimem_policy_decisions.jsonl")
         )
+        self._admission_policy = DeterministicAdmissionPolicy()
+        self._exposure_policy = DeterministicExposurePolicy()
+        self._policy_decision_ids: set[str] = {
+            str(event.get("decisionId"))
+            for event in self._policy_evidence.events
+            if isinstance(event.get("decisionId"), str)
+        }
         self._static_results: list[StaticSemanticBoundaryResult] = []
         self._static_failures: list[tuple[str, str]] = []
         self._semantic_futures: list[tuple[SemanticFutureEvidence, str]] = []
@@ -626,6 +642,13 @@ class HermesPastBenchBridge:
         try:
             snapshot = self._collect_completed_snapshot()
             results = self.static_writeback.process_completed_snapshot(snapshot)
+            trigger_event = self._trigger_adapter.from_snapshot(
+                snapshot,
+                EvaluationTrigger.TASK_COMPLETED.value,
+                turn_index=sum(
+                    1 for segment in snapshot.segments if segment.role == "user"
+                ),
+            )
             for compiled in results:
                 if not any(
                     item.compilation_id == compiled.compilation_id
@@ -633,6 +656,7 @@ class HermesPastBenchBridge:
                 ):
                     self._static_results.append(compiled)
                 self._record_extraction_source(compiled)
+                self._record_static_policy_evidence(compiled, snapshot, trigger_event)
         except Exception as exc:
             self._static_failures.append((
                 EvaluationTrigger.TASK_COMPLETED.value,
@@ -771,6 +795,119 @@ class HermesPastBenchBridge:
             projection=projection,
             fact_contents=tuple(fact_contents),
         ))
+
+    def _record_static_policy_evidence(
+        self,
+        boundary: StaticSemanticBoundaryResult,
+        snapshot: ContextSnapshot,
+        trigger_event: object,
+    ) -> None:
+        """Join extraction/admission/commit outcomes to policy evidence.
+
+        This is an observer-only projection.  It never changes the existing
+        Mem0-flat execution or mutation safety gates.
+        """
+
+        from .memory.policy_contracts import TriggerEvent
+
+        if not isinstance(trigger_event, TriggerEvent):
+            raise ValueError("policy evidence requires a typed trigger event")
+        writeback = boundary.writeback
+        ingestion = writeback.ingestion if writeback is not None else None
+        projection = self.static_writeback.source_projection_for(boundary.compilation_id) if self.static_writeback is not None else None
+        if ingestion is None or projection is None:
+            return
+        trace = self.static_writeback.policy.operation_trace(ingestion.idempotency_key) if self.static_writeback is not None else None
+        candidate_ids = tuple(trace.fact_artifact_ids) if trace is not None else ()
+        extraction_action = DecisionAction.RUN if ingestion.status.value == "success" else DecisionAction.SKIP
+        extraction_status = ExecutionStatus.PENDING if extraction_action == DecisionAction.RUN else ExecutionStatus.SKIPPED
+        extraction = ExtractionDecision.create(
+            policy_version=ingestion.policy_version,
+            source_revision=snapshot.context_revision,
+            input_payload={"compilation_id": boundary.compilation_id, "source_digest": projection.projection_digest},
+            output_payload={"candidate_fact_ids": list(candidate_ids), "status": ingestion.status.value},
+            action=extraction_action,
+            execution_status=extraction_status,
+            reason_codes=("extraction_completed" if extraction_action == DecisionAction.RUN else "extraction_failed",),
+            lineage_id=f"lineage.{trigger_event.event_id}",
+            trigger_event_id=trigger_event.event_id,
+            execution_receipt_id=ingestion.execution_id if extraction_action == DecisionAction.RUN else None,
+            candidate_fact_ids=candidate_ids,
+            source_digest=projection.projection_digest,
+            request_id=boundary.compilation_id,
+        )
+        self._record_policy_decision(extraction, snapshot)
+
+        operations = tuple(ingestion.operations)
+        if operations:
+            operation_actions = tuple(item.action.value for item in operations)
+            mutation_kind = (
+                MutationKind(operation_actions[0].upper())
+                if len(set(operation_actions)) == 1
+                else MutationKind.NONE
+            )
+            accepted = candidate_ids if mutation_kind != MutationKind.NONE else ()
+            targets = tuple(item.target_artifact_id for item in operations if item.target_artifact_id)
+            expected_revision = next((item.expected_revision for item in operations if item.expected_revision), "backend.revision.unobserved")
+            admission = AdmissionDecision.create(
+                policy_version=ingestion.policy_version,
+                source_revision=snapshot.context_revision,
+                input_payload={"extraction_decision_id": extraction.decision_id, "operation_ids": [item.operation_id for item in operations]},
+                output_payload={"actions": list(operation_actions), "targets": list(targets)},
+                action=DecisionAction.RUN,
+                execution_status=ExecutionStatus.EXECUTED,
+                reason_codes=("admission_resolved",),
+                lineage_id=extraction.lineage_id,
+                trigger_event_id=trigger_event.event_id,
+                execution_receipt_id=ingestion.execution_id,
+                candidate_fact_ids=candidate_ids,
+                accepted_fact_ids=accepted,
+                mutation_kind=mutation_kind,
+                backend_revision=expected_revision,
+                target_artifact_ids=targets,
+                update_supported=True,
+            )
+            self._record_policy_decision(admission, snapshot)
+            for execution in writeback.executions if writeback is not None else ():
+                commit = self._commit_decision_for_execution(execution, admission, snapshot, trigger_event)
+                self._record_policy_decision(commit, snapshot)
+
+    def _commit_decision_for_execution(self, execution: object, admission: AdmissionDecision, snapshot: ContextSnapshot, trigger_event: object):
+        from .memory.policy_contracts import CommitDecision
+
+        mutation_id = str(getattr(execution, "mutation_id", ""))
+        receipt_id = getattr(execution, "receipt_id", None)
+        status = getattr(getattr(execution, "status", None), "value", "failed")
+        action = DecisionAction.RUN if mutation_id else DecisionAction.SKIP
+        return CommitDecision.create(
+            policy_version=admission.policy_version,
+            source_revision=snapshot.context_revision,
+            input_payload={"admission_decision_id": admission.decision_id, "mutation_id": mutation_id},
+            output_payload={"status": status, "receipt_id": receipt_id},
+            action=action,
+            execution_status=ExecutionStatus.EXECUTED if action == DecisionAction.RUN else ExecutionStatus.SKIPPED,
+            reason_codes=("mutation_committed" if status == "committed" else "mutation_not_committed",),
+            lineage_id=admission.lineage_id,
+            trigger_event_id=trigger_event.event_id,
+            execution_receipt_id=receipt_id,
+            mutation_ids=(mutation_id,) if mutation_id else (),
+            expected_revision=admission.backend_revision or "backend.revision.unobserved",
+            final_receipt_id=receipt_id,
+        )
+
+    def _record_policy_decision(self, decision: object, snapshot: ContextSnapshot) -> None:
+        decision_id = getattr(decision, "decision_id")
+        if decision_id in self._policy_decision_ids:
+            return
+        self._policy_evidence.record_decision(
+            decision,
+            run_id=snapshot.run_id,
+            episode_id=snapshot.episode_id,
+            session_id=snapshot.session_id,
+            task_id=snapshot.task_id,
+            snapshot_id=snapshot.snapshot_id,
+        )
+        self._policy_decision_ids.add(decision_id)
 
     def _record_extraction_feedback(
         self,
