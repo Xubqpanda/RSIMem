@@ -1,0 +1,586 @@
+"""Owner-controlled content-bearing corpus contracts for prompt optimization."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
+
+from .extraction_feedback import (
+    AttributionConfidence,
+    ExtractionFeedbackLabel,
+    ExtractionFeedbackLevel,
+    FactDisposition,
+)
+from .optimizer_content_boundary import OptimizerUntrustedText
+from .prompt_components import content_digest
+
+
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 1
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v1"
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+
+
+def _require_id(value: object, name: str) -> str:
+    if not isinstance(value, str) or _IDENTIFIER.fullmatch(value) is None:
+        raise ValueError(f"{name} must be a stable identifier")
+    return value
+
+
+def _require_digest(value: object, name: str) -> str:
+    if not isinstance(value, str) or _DIGEST.fullmatch(value) is None:
+        raise ValueError(f"{name} must be sha256")
+    return value
+
+
+def _require_utc(value: object, name: str) -> str:
+    if not isinstance(value, str) or _ISO_UTC.fullmatch(value) is None:
+        raise ValueError(f"{name} must be an ISO UTC timestamp")
+    try:
+        datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an ISO UTC timestamp") from exc
+    return value
+
+
+def _parse_utc(value: str) -> datetime:
+    return datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+
+
+def _require_unique(values: tuple[str, ...], name: str) -> None:
+    if len(values) != len(set(values)):
+        raise ValueError(f"{name} must be unique")
+
+
+class OptimizerCorpusSplit(StrEnum):
+    TRAIN = "train"
+    VALIDATION = "validation"
+    FUTURE_TEST = "future_test"
+
+
+class OptimizerCorpusRetention(StrEnum):
+    DELETE_AFTER_POLICY_DECISION = "delete_after_policy_decision"
+    DELETE_AFTER_EXPERIMENT = "delete_after_experiment"
+
+
+class OptimizerComponentOwnership(StrEnum):
+    EXTRACTION = "extraction"
+    RETRIEVAL = "retrieval"
+    APPLICATION = "application"
+    OUTCOME = "outcome"
+    UNRESOLVED = "unresolved"
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizerSourceMessage:
+    segment_id: str
+    source_message_id: str
+    role: str
+    segment_kind: str
+    tool_call_id: str | None
+    content_truncated: bool
+    content: OptimizerUntrustedText
+
+    def __post_init__(self) -> None:
+        for value, name in (
+            (self.segment_id, "optimizer source segment ID"),
+            (self.source_message_id, "optimizer source message ID"),
+            (self.role, "optimizer source role"),
+            (self.segment_kind, "optimizer source segment kind"),
+        ):
+            _require_id(value, name)
+        if self.tool_call_id is not None:
+            _require_id(self.tool_call_id, "optimizer source tool call ID")
+        if type(self.content_truncated) is not bool:
+            raise TypeError("optimizer source truncation flag must be bool")
+        if not isinstance(self.content, OptimizerUntrustedText):
+            raise TypeError("optimizer source content has the wrong type")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "segment_id": self.segment_id,
+            "source_message_id": self.source_message_id,
+            "role": self.role,
+            "segment_kind": self.segment_kind,
+            "tool_call_id": self.tool_call_id,
+            "content_truncated": self.content_truncated,
+            "content": self.content.payload(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizerExtractedFact:
+    fact_id: str
+    content: OptimizerUntrustedText
+    content_digest: str
+    accepted: bool
+    reason_code: str | None
+    semantic_keys: tuple[str, ...]
+    disposition: FactDisposition
+    persisted_artifact_id: str | None
+
+    def __post_init__(self) -> None:
+        _require_id(self.fact_id, "optimizer fact ID")
+        _require_digest(self.content_digest, "optimizer fact content digest")
+        if self.content.source_digest != self.content_digest:
+            raise ValueError("optimizer fact content differs from extraction trace")
+        if type(self.accepted) is not bool:
+            raise TypeError("optimizer fact accepted flag must be bool")
+        if self.reason_code is not None:
+            _require_id(self.reason_code, "optimizer fact reason code")
+        _require_unique(self.semantic_keys, "optimizer fact semantic keys")
+        for value in self.semantic_keys:
+            _require_id(value, "optimizer fact semantic key")
+        object.__setattr__(self, "disposition", FactDisposition(self.disposition))
+        if self.persisted_artifact_id is not None:
+            _require_id(self.persisted_artifact_id, "optimizer persisted artifact ID")
+        if (self.disposition == FactDisposition.PERSISTED) != (
+            self.persisted_artifact_id is not None
+        ):
+            raise ValueError("optimizer fact persistence lineage is inconsistent")
+
+    def trace_payload(self) -> dict[str, object]:
+        return {
+            "fact_id": self.fact_id,
+            "content_digest": self.content_digest,
+            "accepted": self.accepted,
+            "reason_code": self.reason_code,
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            **self.trace_payload(),
+            "content": self.content.payload(),
+            "semantic_keys": list(self.semantic_keys),
+            "disposition": self.disposition.value,
+            "persisted_artifact_id": self.persisted_artifact_id,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizerArtifactLineage:
+    artifact_id: str
+    content_digest: str
+    operation_ids: tuple[str, ...]
+    mutation_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _require_id(self.artifact_id, "optimizer lineage artifact ID")
+        _require_digest(self.content_digest, "optimizer lineage artifact digest")
+        for values, name in (
+            (self.operation_ids, "optimizer lineage operation IDs"),
+            (self.mutation_ids, "optimizer lineage mutation IDs"),
+        ):
+            _require_unique(values, name)
+            for value in values:
+                _require_id(value, name)
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "artifact_id": self.artifact_id,
+            "content_digest": self.content_digest,
+            "operation_ids": list(self.operation_ids),
+            "mutation_ids": list(self.mutation_ids),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizerDelayedEvidence:
+    observation_id: str
+    source_completed_at: str
+    observed_at: str
+    future_opportunity_id: str
+    opportunity_operation_id: str | None
+    use_operation_id: str | None
+    outcome_operation_id: str | None
+    opportunity: OptimizerUntrustedText
+    use: OptimizerUntrustedText
+    outcome: OptimizerUntrustedText
+
+    def __post_init__(self) -> None:
+        _require_id(self.observation_id, "optimizer observation ID")
+        _require_id(self.future_opportunity_id, "optimizer future opportunity ID")
+        for value, name in (
+            (self.source_completed_at, "optimizer source completion time"),
+            (self.observed_at, "optimizer observation time"),
+        ):
+            _require_utc(value, name)
+        if _parse_utc(self.observed_at) < _parse_utc(self.source_completed_at):
+            raise ValueError("optimizer observation predates its source")
+        for value in (
+            self.opportunity_operation_id,
+            self.use_operation_id,
+            self.outcome_operation_id,
+        ):
+            if value is not None:
+                _require_id(value, "optimizer delayed operation ID")
+        for value in (self.opportunity, self.use, self.outcome):
+            if not isinstance(value, OptimizerUntrustedText):
+                raise TypeError("optimizer delayed content has the wrong type")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "observation_id": self.observation_id,
+            "source_completed_at": self.source_completed_at,
+            "observed_at": self.observed_at,
+            "future_opportunity_id": self.future_opportunity_id,
+            "opportunity_operation_id": self.opportunity_operation_id,
+            "use_operation_id": self.use_operation_id,
+            "outcome_operation_id": self.outcome_operation_id,
+            "opportunity": self.opportunity.payload(),
+            "use": self.use.payload(),
+            "outcome": self.outcome.payload(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizerAuditJoin:
+    source_record_id: str
+    source_record_digest: str
+    source_projection_id: str
+    source_projection_digest: str
+    feedback_record_id: str
+    feedback_dataset_id: str
+    feedback_example_id: str
+    extraction_artifact_id: str
+    extraction_artifact_digest: str
+    extraction_output_digest: str
+    operation_ids: tuple[str, ...]
+    artifacts: tuple[OptimizerArtifactLineage, ...]
+
+    def __post_init__(self) -> None:
+        for value, name in (
+            (self.source_record_id, "optimizer source record ID"),
+            (self.source_projection_id, "optimizer source projection ID"),
+            (self.feedback_record_id, "optimizer feedback record ID"),
+            (self.feedback_dataset_id, "optimizer feedback dataset ID"),
+            (self.feedback_example_id, "optimizer feedback example ID"),
+            (self.extraction_artifact_id, "optimizer extraction artifact ID"),
+        ):
+            _require_id(value, name)
+        for value, name in (
+            (self.source_record_digest, "optimizer source record digest"),
+            (self.source_projection_digest, "optimizer source projection digest"),
+            (self.extraction_artifact_digest, "optimizer extraction artifact digest"),
+            (self.extraction_output_digest, "optimizer extraction output digest"),
+        ):
+            _require_digest(value, name)
+        _require_unique(self.operation_ids, "optimizer audit operation IDs")
+        for value in self.operation_ids:
+            _require_id(value, "optimizer audit operation ID")
+        artifact_ids = tuple(value.artifact_id for value in self.artifacts)
+        _require_unique(artifact_ids, "optimizer audit artifact IDs")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "source_record_id": self.source_record_id,
+            "source_record_digest": self.source_record_digest,
+            "source_projection_id": self.source_projection_id,
+            "source_projection_digest": self.source_projection_digest,
+            "feedback_record_id": self.feedback_record_id,
+            "feedback_dataset_id": self.feedback_dataset_id,
+            "feedback_example_id": self.feedback_example_id,
+            "extraction_artifact_id": self.extraction_artifact_id,
+            "extraction_artifact_digest": self.extraction_artifact_digest,
+            "extraction_output_digest": self.extraction_output_digest,
+            "operation_ids": list(self.operation_ids),
+            "artifacts": [value.payload() for value in self.artifacts],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionOptimizerCorpusExample:
+    example_id: str
+    example_digest: str
+    primary_unit_id: str
+    level: ExtractionFeedbackLevel
+    primary: bool
+    label: ExtractionFeedbackLabel
+    attribution_confidence: AttributionConfidence
+    reason_codes: tuple[str, ...]
+    component_ownership: OptimizerComponentOwnership
+    audit_join: OptimizerAuditJoin
+    source_messages: tuple[OptimizerSourceMessage, ...]
+    extracted_facts: tuple[OptimizerExtractedFact, ...]
+    delayed_evidence: OptimizerDelayedEvidence
+    schema_version: int = EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION:
+            raise ValueError("unsupported optimizer corpus example schema")
+        _require_id(self.example_id, "optimizer corpus example ID")
+        _require_digest(self.example_digest, "optimizer corpus example digest")
+        _require_id(self.primary_unit_id, "optimizer primary unit ID")
+        object.__setattr__(self, "level", ExtractionFeedbackLevel(self.level))
+        object.__setattr__(self, "label", ExtractionFeedbackLabel(self.label))
+        object.__setattr__(
+            self,
+            "attribution_confidence",
+            AttributionConfidence(self.attribution_confidence),
+        )
+        object.__setattr__(
+            self,
+            "component_ownership",
+            OptimizerComponentOwnership(self.component_ownership),
+        )
+        if type(self.primary) is not bool or self.primary != (
+            self.level == ExtractionFeedbackLevel.EXTRACTION_SET
+        ):
+            raise ValueError("optimizer primary unit must be extraction-set level")
+        _require_unique(self.reason_codes, "optimizer reason codes")
+        for value in self.reason_codes:
+            _require_id(value, "optimizer reason code")
+        if not self.source_messages:
+            raise ValueError("optimizer corpus example requires bounded source messages")
+        fact_ids = tuple(value.fact_id for value in self.extracted_facts)
+        _require_unique(fact_ids, "optimizer extracted fact IDs")
+        if self.label in {
+            ExtractionFeedbackLabel.USEFUL,
+            ExtractionFeedbackLabel.HARMFUL,
+            ExtractionFeedbackLabel.MISSED,
+        } and self.component_ownership != OptimizerComponentOwnership.EXTRACTION:
+            raise ValueError("resolved extraction labels must remain extraction-owned")
+        delayed_operation_ids = {
+            value
+            for value in (
+                self.delayed_evidence.opportunity_operation_id,
+                self.delayed_evidence.use_operation_id,
+                self.delayed_evidence.outcome_operation_id,
+            )
+            if value is not None
+        }
+        if not delayed_operation_ids.issubset(self.audit_join.operation_ids):
+            raise ValueError("optimizer delayed operations escape the audit join")
+        persisted_artifact_ids = {
+            value.persisted_artifact_id
+            for value in self.extracted_facts
+            if value.persisted_artifact_id is not None
+        }
+        lineage_artifact_ids = {
+            value.artifact_id for value in self.audit_join.artifacts
+        }
+        if not persisted_artifact_ids.issubset(lineage_artifact_ids):
+            raise ValueError("optimizer persisted facts lack artifact lineage")
+        if self.label == ExtractionFeedbackLabel.USEFUL and (
+            self.delayed_evidence.opportunity_operation_id is None
+            or self.delayed_evidence.use_operation_id is None
+            or self.delayed_evidence.outcome_operation_id is None
+            or not self.delayed_evidence.opportunity.text
+            or not self.delayed_evidence.use.text
+            or not self.delayed_evidence.outcome.text
+        ):
+            raise ValueError("useful optimizer example lacks three-stage evidence")
+        if self.label in {
+            ExtractionFeedbackLabel.HARMFUL,
+            ExtractionFeedbackLabel.MISSED,
+        } and (
+            self.delayed_evidence.opportunity_operation_id is None
+            or self.delayed_evidence.outcome_operation_id is None
+            or not self.delayed_evidence.opportunity.text
+            or not self.delayed_evidence.outcome.text
+        ):
+            raise ValueError("negative optimizer example lacks attribution evidence")
+        digest = content_digest(self.identity_payload())
+        if self.example_digest != digest:
+            raise ValueError("optimizer corpus example digest mismatch")
+        if self.example_id != f"optimizer-example.{digest[:40]}":
+            raise ValueError("optimizer corpus example ID mismatch")
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        primary_unit_id: str,
+        level: ExtractionFeedbackLevel,
+        primary: bool,
+        label: ExtractionFeedbackLabel,
+        attribution_confidence: AttributionConfidence,
+        reason_codes: tuple[str, ...],
+        component_ownership: OptimizerComponentOwnership,
+        audit_join: OptimizerAuditJoin,
+        source_messages: tuple[OptimizerSourceMessage, ...],
+        extracted_facts: tuple[OptimizerExtractedFact, ...],
+        delayed_evidence: OptimizerDelayedEvidence,
+    ) -> "ExtractionOptimizerCorpusExample":
+        values = {
+            "primary_unit_id": primary_unit_id,
+            "level": ExtractionFeedbackLevel(level),
+            "primary": primary,
+            "label": ExtractionFeedbackLabel(label),
+            "attribution_confidence": AttributionConfidence(attribution_confidence),
+            "reason_codes": reason_codes,
+            "component_ownership": OptimizerComponentOwnership(component_ownership),
+            "audit_join": audit_join,
+            "source_messages": source_messages,
+            "extracted_facts": extracted_facts,
+            "delayed_evidence": delayed_evidence,
+            "schema_version": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
+        }
+        identity = cls._identity(values)
+        digest = content_digest(identity)
+        return cls(
+            example_id=f"optimizer-example.{digest[:40]}",
+            example_digest=digest,
+            **values,
+        )
+
+    @staticmethod
+    def _identity(values: dict[str, object]) -> dict[str, object]:
+        return {
+            "schema_version": values["schema_version"],
+            "primary_unit_id": values["primary_unit_id"],
+            "level": values["level"].value,
+            "primary": values["primary"],
+            "label": values["label"].value,
+            "attribution_confidence": values["attribution_confidence"].value,
+            "reason_codes": list(values["reason_codes"]),
+            "component_ownership": values["component_ownership"].value,
+            "audit_join": values["audit_join"].payload(),
+            "source_messages": [value.payload() for value in values["source_messages"]],
+            "extracted_facts": [value.payload() for value in values["extracted_facts"]],
+            "delayed_evidence": values["delayed_evidence"].payload(),
+        }
+
+    def identity_payload(self) -> dict[str, object]:
+        return self._identity({
+            "schema_version": self.schema_version,
+            "primary_unit_id": self.primary_unit_id,
+            "level": self.level,
+            "primary": self.primary,
+            "label": self.label,
+            "attribution_confidence": self.attribution_confidence,
+            "reason_codes": self.reason_codes,
+            "component_ownership": self.component_ownership,
+            "audit_join": self.audit_join,
+            "source_messages": self.source_messages,
+            "extracted_facts": self.extracted_facts,
+            "delayed_evidence": self.delayed_evidence,
+        })
+
+    def payload(self) -> dict[str, object]:
+        return {
+            **self.identity_payload(),
+            "example_id": self.example_id,
+            "example_digest": self.example_digest,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ExtractionOptimizerCorpus:
+    corpus_id: str
+    corpus_digest: str
+    batch_id: str
+    attempt_id: str
+    split: OptimizerCorpusSplit
+    observation_cutoff: str
+    retention: OptimizerCorpusRetention
+    activation_artifact_id: str | None
+    examples: tuple[ExtractionOptimizerCorpusExample, ...]
+    corpus_schema: str = EXTRACTION_OPTIMIZER_CORPUS_SCHEMA
+    schema_version: int = EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if (
+            self.schema_version != EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION
+            or self.corpus_schema != EXTRACTION_OPTIMIZER_CORPUS_SCHEMA
+        ):
+            raise ValueError("unsupported extraction optimizer corpus schema")
+        for value, name in (
+            (self.corpus_id, "optimizer corpus ID"),
+            (self.batch_id, "optimizer corpus batch ID"),
+            (self.attempt_id, "optimizer corpus attempt ID"),
+        ):
+            _require_id(value, name)
+        _require_digest(self.corpus_digest, "optimizer corpus digest")
+        _require_utc(self.observation_cutoff, "optimizer corpus cutoff")
+        object.__setattr__(self, "split", OptimizerCorpusSplit(self.split))
+        object.__setattr__(self, "retention", OptimizerCorpusRetention(self.retention))
+        if not self.examples:
+            raise ValueError("optimizer corpus requires examples")
+        example_ids = tuple(value.example_id for value in self.examples)
+        _require_unique(example_ids, "optimizer corpus example IDs")
+        cutoff = _parse_utc(self.observation_cutoff)
+        if any(
+            _parse_utc(value.delayed_evidence.observed_at) > cutoff
+            for value in self.examples
+        ):
+            raise ValueError("optimizer corpus contains future-dated evidence")
+        if self.split == OptimizerCorpusSplit.FUTURE_TEST:
+            if self.activation_artifact_id is None:
+                raise ValueError("future-test corpus requires activation identity")
+            _require_id(self.activation_artifact_id, "future-test activation artifact ID")
+        elif self.activation_artifact_id is not None:
+            raise ValueError("non-future corpus cannot carry activation identity")
+        digest = content_digest(self.identity_payload())
+        if self.corpus_digest != digest:
+            raise ValueError("optimizer corpus digest mismatch")
+        if self.corpus_id != f"optimizer-corpus.{digest[:40]}":
+            raise ValueError("optimizer corpus ID mismatch")
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        batch_id: str,
+        attempt_id: str,
+        split: OptimizerCorpusSplit,
+        observation_cutoff: str,
+        retention: OptimizerCorpusRetention,
+        examples: tuple[ExtractionOptimizerCorpusExample, ...],
+        activation_artifact_id: str | None = None,
+    ) -> "ExtractionOptimizerCorpus":
+        values = {
+            "batch_id": batch_id,
+            "attempt_id": attempt_id,
+            "split": OptimizerCorpusSplit(split),
+            "observation_cutoff": observation_cutoff,
+            "retention": OptimizerCorpusRetention(retention),
+            "activation_artifact_id": activation_artifact_id,
+            "examples": examples,
+            "corpus_schema": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA,
+            "schema_version": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
+        }
+        identity = cls._identity(values)
+        digest = content_digest(identity)
+        return cls(
+            corpus_id=f"optimizer-corpus.{digest[:40]}",
+            corpus_digest=digest,
+            **values,
+        )
+
+    @staticmethod
+    def _identity(values: dict[str, object]) -> dict[str, object]:
+        return {
+            "schema_version": values["schema_version"],
+            "corpus_schema": values["corpus_schema"],
+            "batch_id": values["batch_id"],
+            "attempt_id": values["attempt_id"],
+            "split": values["split"].value,
+            "observation_cutoff": values["observation_cutoff"],
+            "retention": values["retention"].value,
+            "activation_artifact_id": values["activation_artifact_id"],
+            "examples": [value.payload() for value in values["examples"]],
+        }
+
+    def identity_payload(self) -> dict[str, object]:
+        return self._identity({
+            "schema_version": self.schema_version,
+            "corpus_schema": self.corpus_schema,
+            "batch_id": self.batch_id,
+            "attempt_id": self.attempt_id,
+            "split": self.split,
+            "observation_cutoff": self.observation_cutoff,
+            "retention": self.retention,
+            "activation_artifact_id": self.activation_artifact_id,
+            "examples": self.examples,
+        })
+
+    def payload(self) -> dict[str, object]:
+        return {
+            **self.identity_payload(),
+            "corpus_id": self.corpus_id,
+            "corpus_digest": self.corpus_digest,
+        }
