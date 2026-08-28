@@ -1,15 +1,16 @@
-# RSIMem Extraction-Prompt Online Adaptation 实现与验收清单
+# RSIMem Memory Policy Online Adaptation 实现与验收清单
 
-最后更新：2026-08-28
+最后更新：2026-08-29
 
 ## 1. 文档定位
 
 本文是 RSIMem 当前唯一的实现与验收主清单。旧 checklist 中已经完成的 Hermes、PAST-Bench、semantic writeback、transaction、operation graph、feedback store、activation 和 rollback 基础设施继续保留，但不再沿用“future utility per cost + retrieval threshold adaptation”作为论文主线。
 
-当前工作严格分为两个串行阶段：
+当前工作严格分为三个串行阶段：
 
 - 第一阶段：修正现有实现中偏离 extraction-prompt adaptation 的目标、契约、证据和实验 gate。
-- 第二阶段：实现由 delayed future feedback 驱动的 extraction prompt N -> N+1，并在未来 PAST-Bench matched run 中验证效果。
+- 第二阶段：实现六层 memory policy 的可观测、可替换和可验收基建；先固定其余层验证 extraction adaptation，再逐层开放 trigger、admission 和 exposure policy。
+- 第三阶段：对六层 policy 做可优化性验收，确认每层是否有足够的 process signal、可控 action space、可回放 intervention 和具体收益 case；只有通过可行性验收的层，才进入后续真实效果实验。
 
 状态约定：
 
@@ -27,9 +28,9 @@
 - Host 只使用 Hermes。
 - Memory backend 只使用 Hermes native semantic storage，即 `MEMORY.md` / `USER.md`。
 - Memory algorithm 使用 RSIMem 内重写的 Mem0-flat semantic path，不在运行时 import MemBase。
-- 当前只优化 semantic fact-extraction prompt。
+- 最终研究对象是 semantic memory formation and exposure policy；第一轮实验先只开放 extraction policy，随后按单层增量顺序开放其余 policy。
 - Extraction optimization core必须与memory backend和Host解耦；Mem0-flat/Hermes只是第一个adapter和实验载体，不属于optimizer contract。
-- Internal `ADD/UPDATE/DELETE/NONE` prompt、related-memory retrieval、future retrieval/injection surface、route、invocation boundary、backend 和基础模型参数保持冻结。
+- 第一轮实验固定 Internal `ADD/UPDATE/DELETE/NONE` prompt、related-memory retrieval、future retrieval/injection surface、route、invocation boundary、backend 和基础模型参数；第二阶段只为后续打开这些 policy 的受控接口，不在没有 matched ablation 时同时改变它们。
 - Episodic memory、procedural memory、context eviction、physical rewrite、其他 host 和其他 benchmark 全部延后。
 
 ### 2.2 当前方法定义
@@ -40,8 +41,8 @@ completed Hermes experience
   -> extraction prompt N
   -> fixed Mem0-flat update/writeback
   -> future eager exposure / observable use / downstream outcome
-  -> delayed extraction feedback
-  -> extraction prompt proposal N+1
+  -> delayed end-to-end feedback + strict attribution diagnostics
+  -> extraction-only proposal N+1
   -> held-out validation
   -> production activation
   -> future matched PAST-Bench evaluation
@@ -49,13 +50,25 @@ completed Hermes experience
 
 ### 2.3 Policy Update Signal
 
-允许进入 extraction prompt optimizer 的信号：
+当前反馈分成两个用途不同的通道：
+
+- **Exploratory end-to-end feedback**：使用训练 split 内的完整执行轨迹、memory 状态、exposure 行为和 deployment-observable outcome，让 optimizer 探索 extraction-only 的改进方向。它可以包含 retrieval 和 agent 行为噪声，只能作为 hypothesis/proposal，不能直接把整条失败轨迹标成 extraction error。
+- **Strict attribution feedback**：使用版本化 family contract 和 deterministic resolver 生成 `useful/harmful/missed/unresolved/censored`，只把证据链完整且能归因到 extraction 的样本作为高置信诊断、约束或训练 evidence。
+
+允许进入 exploratory extraction optimizer 的训练信号：
 
 - Extraction 当时可见的 bounded completed context。
 - Policy N 实际生成的 extracted fact set。
+- Persisted memory、exposure/injection、retrieval result、tool calls/results、最终回答和 deployment-observable task outcome。
+- Strict resolver 生成的 useful、harmful、missed、unresolved 和 censored evidence，以及 stage diagnosis 和 attribution confidence。
+- Training split 内预声明允许使用的 task-level end-to-end outcome；它用于提出候选和选择后续实验方向，不伪装成 extraction-owned label。
+
+允许进入 formal extraction optimizer 的高置信信号：
+
 - Fact 或 extraction set 后续是否有 exposure opportunity。
 - 后续是否被注入、显式使用、supersede、证明冲突或关联到 deployment-observable outcome。
 - 受 observation cutoff、censoring 和 attribution confidence 约束的 missed-extraction evidence。
+- 只有 source、extraction、persistence、exposure、use 和 outcome 链条满足对应 contract 时，才进入 resolved attribution bucket。
 
 禁止进入 optimizer 的信号：
 
@@ -63,6 +76,7 @@ completed Hermes experience
 - Validation/test batch 中尚未到达的 future evidence。
 - Model calls、tokens、latency、storage、recovery 或任何合成 cost unit。
 - Route selection、invocation schedule、backend selection 或模型参数更新。
+- 未在 manifest 中声明为 deployment-observable 的隐藏标签，不能通过字段改名绕过 future-test 隔离。
 
 ### 2.4 Cost 与效果边界
 
@@ -73,7 +87,17 @@ completed Hermes experience
 
 ### 2.5 当前最低 Claim
 
-第一版最低目标是一次真实 online extraction-policy adaptation：
+当前阶段的最低目标不是一次性完成六层 online optimization，而是证明六层 policy 是否具备可优化性：
+
+1. 每层都有明确的 host-neutral decision contract和真实/确定性输入。
+2. 每层至少有一个 parent/candidate decision对，且两者只改变该层行为。
+3. 每层都有不依赖 hidden grader 的 process feedback，能够观察 intervention 后的状态或行为差异。
+4. 每层至少给出一个具体 case，说明该层的 policy decision可能改善 memory formation、memory exposure或执行可靠性。
+5. Decision、feedback和结果可以跨 restart 重建并通过 safety gate。
+
+完成以上条件只能声明 `optimization-ready`，不能声明六层已经取得真实 aggregate uplift。
+
+在可行性验收通过后，第一条真实效果目标才是一次 online extraction-policy adaptation：
 
 1. Policy N 在过去 deployment 中产生可审计 delayed feedback。
 2. 只使用过去 evidence 生成 extraction prompt N+1。
@@ -83,9 +107,39 @@ completed Hermes experience
 
 完成以上条件可以声明 observed online extraction-policy adaptation。N+2、repeated/recursive self-improvement、跨 family 泛化和统计显著 superiority 不属于当前完成条件。
 
-### 2.6 第一版 Useful Signal 与优化目标
+六层联合 policy 的更高 claim 必须另行满足增量 ablation，不能由 extraction-only 的结果直接推出：
 
-第一版不让一个通用LLM直接判断“这条memory是否有用”。每个family必须在运行前注册版本化`OpportunityContract`、`UseContract`和`OutcomeContract`，再由统一resolver将deployment-observable evidence映射为label：
+```text
+固定 Host 能力和安全边界
+  -> Trigger policy
+  -> Source selection policy
+  -> Extraction policy
+  -> Admission policy
+  -> Commit scheduling policy
+  -> Exposure policy
+  -> delayed task outcome
+```
+
+其中 transaction atomicity、CAS、revision、schema、tool closure、credential boundary 和 rollback 是不可学习的 runtime safety invariant；所谓 commit policy 只允许优化“何时提交/是否延迟/是否重试”等安全边界内的调度，不允许模型改写事务实现。
+
+### 2.6 六层 Policy 的职责边界
+
+六层 policy 的可复用 contract 必须与具体 Host 和 benchmark 分离。Host adapter 提供真实事件、snapshot、revision、memory read/write hook 和安全能力；RSIMem runtime 产生 policy decision；PAST-Bench adapter 只提供 task、future outcome 和 benchmark-specific feedback contract。
+
+| 层级 | 可学习的 decision | 必须由 runtime/adapter 固定的部分 |
+| --- | --- | --- |
+| Trigger | `RUN/SKIP/DEFER`、评估频率、下一次边界 | 真实 Host event、task state、事件顺序 |
+| Source | 本次 formation 使用哪些已完成 context segment | snapshot、message order、tool closure、revision和内容边界 |
+| Extraction | 提取哪些 durable facts以及如何表达 | prompt slot、模型调用、输出 schema和source grounding |
+| Admission | 候选是否进入 `ADD/NONE/UPDATE` | backend capability、mutation validator和禁止操作 |
+| Commit | 立即提交、延迟提交或安全重试 | transaction atomicity、CAS、receipt、rollback和writer identity |
+| Exposure | 何时注入、选择哪些 memory、排序、格式和预算 | read/injection hook、协议位置、active/current turn保护 |
+
+六层都必须支持 `observe -> decide -> execute -> record -> replay`，但第一版不要求六层同时由模型学习。每个 decision 至少记录 `decision_id`、`policy_version`、`source_revision`、`reason_codes`、输入 digest、输出 digest和实际执行结果。
+
+### 2.7 第一版 Useful Signal 与优化目标
+
+严格 attribution 通道不让一个通用LLM直接判断“这条memory是否有用”。每个family必须在运行前注册版本化`OpportunityContract`、`UseContract`和`OutcomeContract`，再由统一resolver将deployment-observable evidence映射为label。探索性端到端通道可以让受控LLM阅读完整训练轨迹并提出当前开放层的 policy 修改，但它的判断属于 hypothesis/proposal，不直接成为 `useful/harmful/missed` 标签：
 
 ```text
 useful
@@ -108,13 +162,13 @@ missed
 
 - Eager system-prompt injection本身不是opportunity或use；只有future task与memory scope/key匹配时才产生opportunity。
 - Use signal必须对应past memory携带而当前future task输入没有重新提供的信息；如果当前用户消息、工具结果或环境状态已经直接给出同一事实/规则，则该行为不能归因于memory，最多形成set-level unresolved evidence。
-- `injected_not_used`默认是`unresolved`。只有预注册contract能证明存在使用机会且缺失行为属于extraction component时，才允许产生negative/missed signal。
+- `injected_not_used`在严格 attribution 通道默认是`unresolved`；完整轨迹仍进入 exploratory corpus，并记录为 downstream non-use/stage-diagnosis evidence，但不能自动改名为 extraction failure。
 - Memory被正确提取和注入但Agent没有使用时，不自动惩罚extraction prompt；该问题归入future application/retrieval component或unresolved。
-- Observation window不完整、没有相关future task、多个artifact无法唯一归因、证据冲突或只有模型主观判断时，分别记为`censored`或`unresolved`，不进入resolved denominator。
+- Observation window不完整、没有相关future task、多个artifact无法唯一归因、证据冲突或只有模型主观判断时，严格通道分别记为`censored`或`unresolved`，不进入resolved denominator；探索性通道保留原始轨迹，但不增加resolved attribution计数。
 - 多fact共同影响一次future outcome且无法拆分贡献时，只生成一个extraction-set-level label；不把同一次成功复制成多个fact-level positive。Fact-level label只在artifact/use/outcome可以唯一绑定时生成。
 - Primary optimization unit是一次completed source对应的extraction set及其future opportunity，不是fact数量，防止把一个fact拆成多条来放大reward。
 
-第一版primary objective冻结为resolved observed useful rate：
+Strict attribution channel 的 diagnostic objective 保持为 resolved observed useful rate：
 
 ```text
 resolved_useful_rate = useful_set_count / (useful_set_count + harmful_set_count)
@@ -134,7 +188,47 @@ high_confidence_missed_rate = missed_set_count / missed_assessable_source_count
 - Schema、safety、prompt leakage和native-writer contamination failure必须为0。
 - Cost、token、latency和storage不进入上述目标或约束，只随实验结果报告。
 
-SM01第一版contract必须明确：只有预注册的`eval_near/eval_far`报告任务构成TSV preference opportunity；future task输入没有重新提供TSV preference时，合法四列表头及非空数据行才构成memory-specific use signal；task completion及预注册的非grader输出/工具条件构成outcome signal。单artifact时允许fact-level归因，多artifact时最多生成set-level evidence。仅检测到TSV格式而没有memory-specific opportunity，当前turn已直接要求TSV，或只因最终回答缺少TSV，均不能自动把某条已正确提取的memory判为harmful。
+Exploratory end-to-end channel 不使用上述 resolved useful rate 作为唯一 gate。它使用运行前冻结的 deployment-observable task outcome，例如任务完成、工具调用成功、格式/约束满足和可观察业务结果，并同时报告 extraction、admission、exposure、unresolved 和 censored 状态。其目标是发现“只改变当前开放 policy layer 是否可能改善未来结果”的候选方向，不把所有失败归因给该 layer。
+
+SM01第一版strict contract必须明确：只有预注册的`eval_near/eval_far`报告任务构成TSV preference opportunity；future task输入没有重新提供TSV preference时，合法四列表头及非空数据行才构成memory-specific use signal；task completion及预注册的非grader输出/工具条件构成outcome signal。单artifact时允许fact-level归因，多artifact时最多生成set-level evidence。仅检测到TSV格式而没有memory-specific opportunity，当前turn已直接要求TSV，或只因最终回答缺少TSV，均不能自动把某条已正确提取的memory判为harmful。探索性通道可以把“最终没有合法TSV但任务完成/失败”的完整轨迹交给 optimizer 分析，但必须标记为 end-to-end hypothesis。
+
+### 2.8 两层反馈与候选生成边界
+
+端到端 feedback 首先验证“未来结果是否包含可指导当前 policy 改进的模式”，strict attribution 再验证“该模式是否足以归因给某一层”。两者不能混成一个 label：
+
+```text
+raw trajectory + end-to-end outcome
+  -> exploratory hypothesis
+  -> policy candidate for the currently open layer
+  -> offline safety/replay
+  -> held-out matched validation
+
+source/extraction/persistence/exposure/use/outcome evidence
+  -> strict attribution diagnosis
+  -> high-confidence constraint or training evidence
+```
+
+因此，`unresolved` 不再阻止 exploratory candidate 生成，但仍然不能增加 resolved useful rate、不能直接成为 negative label，也不能绕过 matched validation。正式 candidate 生成必须记录本次开放的 layer set；如果同时改变多个 layer，必须明确标记为 joint candidate。
+
+### 2.9 Process-First Runtime Feedback
+
+真实开源部署通常没有 benchmark grader、gold answer 或 hidden expectation，因此通用 RSIMem runtime 的主反馈必须是 process feedback，output correctness 只能作为可选的应用层反馈。通用 process event 至少包括：
+
+- Host lifecycle event、task/turn/tool/session boundary和context-pressure状态。
+- 本次 trigger 是否 `RUN/SKIP/DEFER`，source选择了哪些segment，是否发生truncation或duplicate suppression。
+- Extraction request/output fingerprint、候选fact数量、空结果、过滤结果和 admission `ADD/NONE/UPDATE`。
+- Commit success/rejection/duplicate、revision/CAS结果、rollback和恢复状态。
+- Retrieval query/result、selected artifact、exposure mode、injection位置/预算和context revision。
+- Tool call/result、失败/重试、重复询问、用户纠正、人工接管、任务取消和可观察完成状态。
+
+Process event本身只能说明“发生了什么”，不自动说明语义上是否正确。Runtime可以用它产生 weak reward、stage diagnosis 和 policy hypothesis；只有应用提供的显式反馈或无隐藏答案依赖的 contract 才能提升为高置信 label。PAST-Bench grader只由最终 reporter读取，不能进入通用 policy learner。
+
+验收要求：
+
+- □ 每个 process event都能绑定到 Host event、policy decision、source revision和实际执行receipt。
+- □ absence、non-use、tool failure、retrieval miss、injection failure和task failure使用不同 reason code，不把它们统一标为 extraction failure。
+- □ 未提供output evaluator的真实部署仍能运行 trigger、formation、exposure和process-level feedback闭环。
+- □ PAST-Bench adapter同时输出 process corpus 和 evaluation-only official score；二者不能共享 learner 输入对象。
 
 ## 3. 可复用的已完成基础
 
@@ -444,11 +538,66 @@ Adaptive final launcher要求 clean tree，但 static feedback launcher允许 di
 - √ `progress.md`、experiment plan和本文状态同步。
 - √ 记录完整 RSIMem、PAST-Bench、compileall、`pip check`、shell syntax、diff和secret scan结果。
 
-第一阶段关闭后才能开始 prompt optimizer 或新的 adaptive live run。
+第一阶段关闭后才能开始第二阶段的 policy optimization infrastructure；第三阶段的真实 adaptive live run仍需等待第二阶段所有 required contract和replay gate通过。
 
-## 6. 第二阶段：实现 Extraction Prompt N -> N+1
+## 6. 第二阶段：六层 Memory Policy 优化基建
 
-### 2A：Extraction Policy Envelope 与 Artifact
+第二阶段的目标不是立即让六层都由模型联合学习，而是为每一层建立统一的 decision contract、adapter boundary、证据记录、回放和 fail-closed 行为。第一版实验可以只打开 extraction；没有这些基础设施时，不允许把 Host 固定行为误称为 RSIMem policy。以下 2A-2I 的 `√/□` 只表示基建状态，不表示第三阶段的真实效果已经完成。
+
+### 2A：统一 Memory Formation/Exposure Policy Contract
+
+功能需求：
+
+- √ 定义 host-neutral `TriggerEvent`、`TriggerDecision`、`SourceSelectionDecision`、`ExtractionDecision`、`AdmissionDecision`、`CommitDecision` 和 `ExposureDecision`，每个 decision 有 schema version、稳定 ID、policy version、source revision、reason codes、输入/输出 digest和执行状态。
+- √ 定义 `MemoryFormationPolicy` 和 `MemoryExposurePolicy` 接口；runtime只依赖接口，不 import Hermes、PAST-Bench或具体 memory backend。
+- √ 明确 `RUN/SKIP/DEFER` 的语义：SKIP不执行 extraction，DEFER必须记录下一次允许边界，RUN必须绑定本次 source projection；未知或冲突状态 fail closed。
+- √ 将六层 decision 与最终 `MemoryMutationReceipt`、injection receipt、future feedback通过 stable lineage 关联，支持从 Host event 重建整条 formation/exposure 链。
+- √ 将不可学习的安全不变量从 policy action 中隔离：active/current保护、tool closure、schema、CAS、transaction、rollback、credential和writer identity不得由模型输出。
+- √ 为 fixed policy、single-layer adaptive policy 和 joint policy 定义兼容但不可混淆的 artifact identity；联合 candidate必须声明实际开放的 layer set。
+
+测试与验收：
+
+- √ 缺少 decision、revision、source digest、policy identity或执行 receipt时，audit拒绝该 episode。
+- √ `SKIP` 不产生 extraction model request，`DEFER` 不产生 mutation，`RUN` 至少产生可关联的 source/extraction record。
+- √ 任意 policy decision 不能绕过 schema、CAS、tool closure、active/current或rollback safety gate。
+- √ 同一 event/revision 重放生成相同 decision identity，不重复执行 mutation。
+
+2A 实现记录：`src/rsimem/memory/policy_contracts.py` 提供统一 contract、SafetyBoundary、PolicyLineage、PolicyArtifactIdentity 和 audit validator；正反与 replay 测试见 `tests/test_policy_contracts.py`，对应 commit `ca174d4`。
+
+### 2B：Host Adapter 与 Lifecycle Trigger Policy
+
+功能需求：
+
+- □ Hermes adapter将真实 task、turn、tool、context-pressure和session事件映射到统一 `TriggerEvent`；没有真实事件来源的 trigger明确标记 `unsupported`，不伪造。
+- □ 保留当前 `task_completed -> RUN` 作为 fixed parent policy；将 `session_end`、`turn_interval`、`tool_boundary`、`context_pressure` 和 `manual` 先接入 shadow-only观测，不改变正式 parent行为。
+- □ Trigger policy支持 `RUN/SKIP/DEFER`、最小间隔、pending source、下一次 eligible boundary和duplicate suppression；source revision变化必须重新判断。
+- □ Host adapter只提供事件、snapshot和执行 hook；trigger strategy、阈值、频率和skip/defer理由归RSIMem policy artifact管理。
+- □ 记录每次候选 trigger，包括未执行的 SKIP/DEFER，防止实验只看到已写入样本而忽略被跳过的样本。
+
+测试与验收：
+
+- □ task completion、session end、tool boundary和context pressure均有正反 fixture；unsupported trigger不能静默当作支持。
+- □ shadow-only trigger不改变模型调用、extraction、mutation、memory文件或future exposure。
+- □ 相同 source revision 的重复事件只产生一次 RUN；新 revision可产生新的 formation attempt。
+- □ active、current、failed task和open tool closure不能因为 trigger policy 而进入 semantic mutation。
+
+### 2C：Source Selection 与 Context Projection Policy
+
+功能需求：
+
+- □ 在现有 `ExtractionSourceProjection` 之上增加可审计的 source selection decision，区分“Host可见内容”和“本次policy选择的内容”。
+- □ 支持 whole completed task、selected completed segments和增量 revision三种固定 projection mode；第一版保持 whole completed task作为 parent。
+- □ 记录被选择、被跳过、因 active/current/tool closure/预算而拒绝的 segment IDs及reason codes。
+- □ Source selection不能读取 hidden grader、answer key、future test或benchmark-only metadata。
+- □ Source digest、selected IDs、truncation和projection mode进入 extraction request、idempotency和feedback lineage。
+
+测试与验收：
+
+- □ 选择集合变化会改变 source digest和extraction identity。
+- □ source selection不能拆开 tool call/result closure，不能包含当前 active turn。
+- □ 同一 snapshot/revision回放得到相同 selection；超预算时行为确定且有记录。
+
+### 2D：Extraction Policy Envelope 与 Artifact
 
 为降低 generated prompt 改坏 schema或安全边界的风险，第一版不允许模型重写整个 wire prompt。Prompt拆为：
 
@@ -478,7 +627,55 @@ frozen system/safety/schema wrapper
 - √ Exact artifact跨restart可重载并生成相同 rendered prompt。
 - √ Artifact篡改、多个 ACTIVE或错误 wrapper digest时fail closed到root static prompt。
 
-### 2B：Content-Bearing Extraction Optimizer Corpus
+### 2D.1：Admission Policy 与 ADD/NONE/UPDATE Decision
+
+功能需求：
+
+- □ 将 extraction output 与 admission decision 显式拆开：记录候选 fact IDs、被接受/过滤的 fact IDs、`ADD/NONE/UPDATE`、reason codes和当前 backend revision。
+- □ 定义 host-neutral `AdmissionPolicy` 接口；Mem0-flat 当前内部 operation prompt作为 fixed parent admission policy接入，不让其隐式承担 extraction 结果解释。
+- □ 保留 backend 的 duplicate、conflict、temporary、unsupported、empty和unresolved safety rules；policy只能在允许集合内选择 action。
+- □ 将“没有提取到事实”和“提取到了但 admission 选择 NONE”记录为不同状态，二者不得共用一个空 extraction label。
+- □ candidate不得通过全量ADD、重复ADD或全量NONE获得虚假的 coverage/useful-rate提升。
+
+测试与验收：
+
+- □ extraction有候选但 admission=NONE、extraction为空且 admission=NONE、ADD被backend拒绝、重复ADD和UPDATE冲突均有独立 fixture。
+- □ admission decision可由 input fact digest、existing revision和policy artifact重放。
+- □ 不支持 UPDATE 的 backend不能接受 update decision；不支持 rollback 的 backend不能被声明为可安全执行的adaptive admission。
+
+### 2D.2：Commit Scheduling 与 Mutation Safety Boundary
+
+功能需求：
+
+- □ 将“是否立即提交、是否等待后续 boundary、是否安全重试”建模为 commit scheduling decision；事务实现、CAS、receipt和rollback保持固定。
+- □ 支持 pending/deferred commit 的持久状态、过期 revision、重启恢复、取消和最终状态；不能因为进程退出丢失待提交决策。
+- □ 每次 commit schedule 记录触发 event、目标 mutation IDs、expected revision、执行 boundary和最终 receipt。
+- □ 第一版正式实验固定立即提交；commit scheduling 只做 deterministic/shadow infrastructure，不能与 extraction candidate同时开放。
+
+测试与验收：
+
+- □ deferred commit不会提前修改backend，重启后可恢复或明确标记失败。
+- □ stale revision、CAS失败、重复提交、进程崩溃和rollback均不产生半提交 memory。
+- □ commit scheduler不能绕过 mutation validator或把失败伪装成成功。
+
+### 2D.3：Exposure 与 Context-Memory Interaction Policy
+
+功能需求：
+
+- □ 将 memory exposure 从 backend read 和 Host injection hook 中拆出 `ExposureDecision`，至少记录 `RUN/SKIP`、selected artifact IDs、排序、注入位置、预算和reason codes。
+- □ 区分 eager system-prompt、selective retrieval、tool-mediated read和not-exposed；不能把 Host 提供的注入能力误报成 policy 已选择的 retrieval。
+- □ Hermes adapter提供真实 injection boundary和context revision；RSIMem决定何时、注入哪些memory以及如何组成memory block。
+- □ 第一版固定当前 eager exposure、注入位置、格式和预算；exposure policy先做 shadow replay，再进入单独 matched ablation。
+- □ active/current turn、tool closure、schema和context budget是固定安全边界；exposure policy不能删除当前任务必需内容或伪造 memory source。
+
+测试与验收：
+
+- □ `SKIP` 不产生注入，`RUN` 的 artifact IDs与实际注入内容 exact join，not-exposed不能产生memory-use label。
+- □ eager与selective、空memory、多个artifact、预算裁剪和注入失败均有独立 fixture。
+- □ exposure decision变化而formation policy不变时，audit能准确标记为 exposure intervention。
+- □ 注入前后 context revision、artifact digest和render fingerprint可重建；重启后不重复注入或丢失 active pointer。
+
+### 2E：Content-Bearing Extraction Optimizer Corpus
 
 Audit dataset继续content-free；optimizer corpus只存在于owner-controlled ignored output中。
 
@@ -500,20 +697,20 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 - √ Tracked-source/manifest/ledger中不存在corpus正文。
 - √ Corpus中不存在official grader、answer key、hidden expectation或future-test内容。
 
-### 2C：Extraction Prompt Optimizer
+### 2F：Extraction Prompt Optimizer
 
 第一版使用一个受控LLM meta-optimizer，根据历史example总结“什么应该提取、什么不应该提取”的规则。Optimizer不直接自由重写整个prompt，而是对parent `ExtractionPolicySpec`生成结构化rule edits，再由frozen compiler生成replacement policy body。
 
 功能需求：
 
 - √ 冻结optimizer system instruction、input schema、output schema、model profile、temperature、token budget和timeout。
-- √ 输入包含parent policy body，以及按useful/harmful/missed/unresolved分类的bounded training examples。
-- √ Optimizer input按source/set/fact层级分组，显式说明`unresolved/censored`不是negative，且同一set不能按fact数重复加权。
+- √ 输入包含parent policy body、bounded source/trajectory evidence、deployment-observable task outcome，以及按useful/harmful/missed/unresolved/censored分类的strict diagnostics。
+- √ Optimizer input按source/set/fact和episode层级分组，显式说明`unresolved/censored`不是negative；同一set不能按fact数重复加权，完整episode outcome也不能被改名为extraction-owned error。
 - √ Output只允许`ADD_RULE/REPLACE_RULE/DELETE_RULE` edits、每个edit的evidence example IDs和结构化reason codes；candidate body由frozen compiler生成，不接受模型提供的第二份不一致body。
 - √ Protected durability、source-grounding、credential和schema规则只能位于frozen wrapper或protected rule set，optimizer不能删除或弱化。
-- √ Optimizer objective明确要求提高future observed useful proportion，同时保持harmful、coverage、empty和missed constraints；不输入cost或official task score。
+- √ Exploratory objective明确要求在固定下游组件下寻找可验证的deployment-observable outcome改善方向；strict objective继续约束harmful、coverage、empty和missed，不输入cost或official task score。
 - √ Formal policy update默认只生成一个candidate；若未来增加K candidates，K和selection rule必须在查看validation结果前冻结。
-- √ 无resolved signal、只有censored evidence或attribution不足时返回`NO_PROPOSAL`，不为了推进实验强行改prompt。
+- √ Strict attribution path在无resolved signal、只有censored evidence或attribution不足时返回`NO_PROPOSAL`；exploratory end-to-end path在满足预注册的完整episode/结果多样性/预算条件时可以保留完整训练轨迹并生成受限 hypothesis，但必须标记为unresolved/noisy evidence，且不得直接激活candidate。
 - √ Optimizer调用usage单独记录，但不作为optimizer目标或candidate排序依据。
 
 测试与验收：
@@ -525,15 +722,15 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 - √ Candidate rule不得出现SM01、TSV、固定列名、项目名或其他family-specific shortcut，除非该词原本属于frozen generic root contract；命中shortcut时拒绝而不是交给validation碰运气。
 - √ Prompt injection、credential exfiltration、schema override和benchmark-specific shortcut candidate被拒绝。
 
-### 2D：Static Safety 与 Offline Prompt Validation
+### 2G：Static Safety 与 Offline Policy Validation
 
 功能需求：
 
 - √ Contract validator检查body长度、字符、forbidden instruction、wrapper/schema digest和parent lineage。
 - √ Deterministic extraction suite覆盖durable preference、constraint、temporary request、unresolved claim、assistant-only acknowledgement、tool evidence、credential/path和empty source。
 - √ Candidate必须保持严格JSON `{facts: string[]}` output contract。
-- √ Offline validation在独立historical split上比较parent/candidate extraction utility，不使用official score。
-- √ Validation按set-level计算resolved useful rate，并同时检查harmful、non-empty coverage、empty extraction和high-confidence missed；不允许只靠少提取获得虚假提升。
+- √ Offline validation在独立historical split上比较parent/candidate的deployment-observable outcome与layer-specific intervention，不使用official score。
+- √ Strict diagnostics按set-level计算resolved useful rate，同时检查harmful、non-empty coverage、empty extraction和high-confidence missed；end-to-end exploratory quality单独报告，不与strict rate混成一个指标。
 - √ 所有ratio同时输出numerator、denominator和unknown count；resolved denominator不足时拒绝，不能只报告百分比。
 
 测试与验收：
@@ -541,17 +738,17 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 - √ Candidate不能降低所有输出为空来通过negative-only样本。
 - √ Candidate只提取一个高置信fact时，即使useful rate为100%，只要coverage低于冻结floor也必须拒绝。
 - √ Candidate不能通过复制source或输出完整transcript提高recall。
-- √ Offline quality不严格高于parent时保持REJECTED。
+- √ 对于需要正式激活的candidate，offline quality不严格高于parent时保持REJECTED；exploratory hypothesis只能进入matched trial，不能直接激活。
 - √ Offline accepted只允许进入matched trial，不可直接写production ACTIVE。
 
-### 2E：Matched Trial、Activation 与 Rollback
+### 2H：Matched Trial、Activation 与 Rollback
 
 功能需求：
 
 - □ 在独立PAST-Bench validation batch中轮换运行parent N与proposal N+1。
 - √ Pair使用相同family、episode manifest、model、budget、home seed state和feedback contract。
-- √ Activation只看deployment-observable set-level useful rate、anti-collapse constraints和安全审计，不看official task score。
-- √ Proposal必须达到strict useful-rate delta、resolved sample下限，并同时通过harmful、coverage、empty、missed gate才激活；equal、unknown、conflicting或任一约束失败保持REJECTED。
+- √ Activation只看预注册的deployment-observable task outcome、strict attribution diagnostics、anti-collapse constraints和安全审计，不看optimizer不可达的official task score。
+- √ Exploratory candidate可以在strict resolved sample不足时进入 matched trial，但不能直接激活；正式激活必须有 matched outcome improvement，并通过适用的harmful、coverage、empty、missed和安全 gate。若某项 strict metric 为unknown，只能在该项被预先声明为非必需时继续。
 - √ Production activation原子切换唯一ACTIVE extraction artifact。
 - √ Operator rollback恢复parent N；自动rollback只在有真实定义的safety violation时触发。
 
@@ -560,9 +757,9 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 - √ Trial config不能被official final launcher误当production config。
 - √ Activation crash不会产生两个ACTIVE artifact。
 - √ Rejection、重复activation、restart和rollback幂等。
-- √ Decision记录真实pair IDs、artifact digests、U/H/M/unresolved/censored counts、各ratio分子分母、coverage、quality delta、constraint results和reason codes。
+- √ Decision记录真实pair IDs、artifact digests、六层 decision fingerprints、U/H/M/unresolved/censored counts、各ratio分子分母、deployment-outcome delta、coverage、quality delta、constraint results和reason codes。
 
-### 2F：Runtime Prompt Binding 与 Activation Fingerprint
+### 2I：Runtime Prompt Binding 与 Activation Fingerprint
 
 功能需求：
 
@@ -581,52 +778,78 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 - √ N+1改变extraction但update/retrieval/component identity漂移时matched audit失败。
 - √ Restart后actual artifact fingerprint保持一致。
 
-### 2G：Deterministic End-To-End Gate
+## 7. 第三阶段：逐层 Policy 实验与 PAST-Bench 验收
+
+第二阶段完成后，六层 policy 都具备统一 contract、adapter boundary、evidence、replay 和 fail-closed 行为，但正式实验不同时打开六层。每一轮只新增一个可学习层，其他层、Host、backend、model、task manifest、budget、persistence 和协议 surface 保持不变。探索性端到端 feedback 可以用于发现 candidate，但任何 candidate 都必须经过独立 matched validation。
+
+### 3A：Deterministic End-To-End Gate
 
 - □ 构造一个过去context中含durable与temporary信息、未来任务只使用durable信息的fixture。
 - □ Policy N产生至少一个可归因问题，例如遗漏durable fact或提取temporary fact。
 - □ Fixture分别构造完整`opportunity -> use -> successful outcome` useful链和`source -> no equivalent extraction -> future demand -> absence-attributed outcome` missed链。
 - □ 删除任一useful/missed链节点后label退化为unresolved，而不是继续贡献optimizer reward。
-- □ Delayed feedback构建optimizer corpus并生成N+1。
-- □ N+1通过offline/matched fixture validation并被激活。
-- □ Future fixture实际加载N+1，改变extraction和persisted memory，并改善deployment-observable outcome。
+- □ End-to-end feedback保留完整轨迹，strict resolver同时生成attribution diagnosis；即使resolved attribution不足，也能验证exploratory optimizer是否提出extraction-only hypothesis。
+- □ Delayed feedback构建optimizer corpus并生成受限的、只针对当前开放层的N+1 hypothesis；没有真实 uplift 也不判定 feasibility 失败。
+- □ N+1通过offline replay、schema、安全和layer-boundary validation；是否激活属于后续效果实验，不属于本阶段最低验收。
+- □ Future fixture可以加载N+1并记录 intervention path；是否改善deployment-observable outcome作为后续效果实验结果，不作为六层基建的前置假设。
 - □ 全链不读取grader/answer，不使用cost信号，不修改update/retrieval policy。
 - □ Restart、rejection、no-proposal和rollback反向路径全部通过。
 
-验收：只有结构化证据可以精确重建`N -> past feedback -> N+1 -> future changed extraction/outcome`时，才进入真实provider实验。
+验收：只有结构化证据可以重建`N -> past feedback -> N+1 hypothesis -> target-layer intervention`，并确认candidate只改变预注册的policy layer时，才可以把该层标记为 `optimization-ready`。真实 provider uplift 仍属于后续效果实验，严格 attribution 不再是探索性 candidate 的唯一前置门槛。
 
-### 2H：真实 PAST-Bench Online Adaptation
+### 3B：六层 Policy 可优化性验收
 
-正式实验严格按以下顺序执行，每一步审计通过后才能进入下一步：
+当前第三阶段的主要任务是 feasibility，不要求一次性完成六层 online optimization。每层分别完成以下验收：
 
-1. 冻结train/validation/final family或task-template split、model、budget、replicate、source projection、opportunity/use/outcome contracts、optimizer config、resolved useful-rate objective和全部anti-collapse acceptance criterion。
-2. 使用static parent N运行至少3个independent unseeded feedback replicates。
-3. 构建并审计optimizer corpus；若没有足够resolved extraction signal，停止并更换预声明的semantic memory family，不降低gate。
-4. 生成一个candidate N+1并完成offline validation。
-5. 运行独立parent/proposal matched validation batch；只有strict positive resolved useful-rate delta且全部anti-collapse/safety constraints通过才激活。
-6. 使用production ACTIVE N+1运行未来matched final batch，同时运行static N control。
-7. 汇总no persistence、native Hermes、static N和adaptive N+1；native+ledger只作为accounting control。
+1. 定义该层的 decision contract、可控 action space和固定安全边界。
+2. 证明真实 Host event 或 deterministic fixture 能产生该层输入，并且 process feedback 可以记录 intervention 前后差异。
+3. 构造至少一个 parent/candidate case，candidate只改变该层且能通过 replay 重建。
+4. 记录该层的 signal coverage、action variation、outcome variation、ambiguous/unresolved比例和主要缺口。
+5. 只有 signal 和 action 足够支持下一步实验时，才把该层列为 `optimization-ready`；否则列为 `diagnostic-only` 或 `validation-only`，不强行训练。
+
+推荐先完成六层的 deterministic/shadow feasibility，再选择最有信号的层做真实 adaptive effect experiment。正式效果实验仍需冻结 split、model、budget、replicate、source projection、feedback contract、optimizer config和anti-collapse criteria。
 
 Family规则：
 
 - 第一轮可以用SM01完成pipeline pilot，因为它已有显式TSV reuse contract；该pilot不能作为最终paper effect evidence。
 - Formal train、validation和final test使用互斥的semantic family/task-template group，例如在查看结果前从SM01、SM02、SM05中冻结各自角色；具体分配必须由feedback-signal可用性预检决定，而不是按效果挑选。
-- 若training family只能提供单一positive或大量ambiguous/censored evidence，不允许强行训练prompt；应在查看final test前调整预声明的training family集合，不降低resolved-signal gate。
+- 若training family只能提供单一positive或大量ambiguous/censored evidence，不能把这些样本伪造为strict negative；应保留为process/end-to-end exploratory evidence，并在查看final test前按预注册规则调整training family集合。
 - Update-ability family不用于第一版update-prompt优化；若其任务能提供extraction质量信号，只能在明确冻结update prompt的前提下作为extraction验证family。
 
 最终效果验收：
 
 - □ 所有variant使用matched task manifest、model、budget、order、sandbox和persistence isolation。
-- □ 每个variant完成预设replicate；failed/provider run保留并单独报告。
-- □ N+1在真实run中至少一次改变extraction并影响persisted memory。
-- □ Adaptive N+1 aggregate primary task score严格高于matched static N。
-- □ 报告每个replicate、task score、pass rate、persistence gap和activation funnel。
+- □ 每个 feasibility case 完成预设 replay/fixture，failed/provider run保留并单独报告。
+- □ 每个 candidate 至少一次改变目标层的 decision或输入/输出 fingerprint；不要求真实任务分数提升。
+- □ 报告每层的 process-signal coverage、action variation、outcome variation、unresolved/censored比例和具体失败原因。
 - □ 报告U/H/M/unresolved/censored原始计数、resolved useful rate及其分子分母、coverage和empty rate；不把unknown silently drop。
 - □ 报告raw calls/tokens/retry/latency/storage/injection/recovery，不生成无定义的混合cost结论。
-- □ 若只有aggregate正向均值，可声明observed uplift，不声明统计显著superiority。
+- □ 只有后续效果实验才能声明observed uplift、layer superiority或联合版本优势。
 - □ 不要求N+2，不声明recursive self-improvement。
 
-### 2I：Ablation 与论文边界
+### 3C：逐层解锁矩阵、联合 Policy 与论文边界
+
+完成可优化性验收后，后续真实效果实验的候选解锁顺序为：
+
+| 阶段 | 新开放的 policy layer | 其余层 | 主要问题 |
+| --- | --- | --- | --- |
+| S0 | 无，static parent | 全部固定 | 复现 no-persistence、native 和 static RSIMem基线 |
+| S1 | Extraction | Trigger、Source、Admission、Commit、Exposure固定 | future feedback能否指导 extraction policy |
+| S2 | Trigger | Source、Extraction、Admission、Commit、Exposure按上一阶段固定 | 写入时机是否带来独立提升 |
+| S3 | Source selection | Trigger和前序层固定 | 选择哪些上下文进入 formation是否有价值 |
+| S4 | Admission | Trigger、Source、Extraction、Commit、Exposure固定 | ADD/NONE/UPDATE policy是否改善 memory quality |
+| S5 | Exposure | formation各层固定 | 注入时机、选择、排序和上下文组成是否改善使用 |
+| S6 | Joint | 允许联合优化的层集合预先声明 | 组合效果是否超过最佳单层版本 |
+
+当前建议的第一条真实路线是 `S0 -> S1 -> S2 -> S4 -> S5 -> S6`；Source selection先保持固定，只有当 source projection成为明确瓶颈时再加入 `S3`。这不是跳过 Source 层，而是避免第一版同时引入新的上下文裁剪变量。若某一层未通过 feasibility，后续实验可以停在该层并将其列为 future work。
+
+每个 S 阶段必须包含：
+
+- □ 固定 parent policy、唯一新增的开放 layer、candidate artifact和decision budget。
+- □ 同一 task manifest 上的 matched parent/candidate，独立 replicate、相同模型、budget、sandbox、persistence和Host adapter。
+- □ layer-specific intervention fingerprint，证明 candidate确实改变了该层，而非隐式改变其他层。
+- □ task-level end-to-end outcome、strict attribution diagnosis、coverage/empty/non-use和安全结果的完整报告。
+- □ 与 static parent、上一阶段版本和最佳单层版本的比较；只报告实际完成的层级 claim。
 
 第一版只运行与extraction claim直接相关的ablation：
 
@@ -635,6 +858,9 @@ Family规则：
 - □ Operation/source attribution vs 无差别episode feedback。
 - □ 包含missed-extraction evidence vs 只观察已提取fact的future evidence。
 - □ Constrained structured rule edits vs unconstrained free-form prompt rewrite。
+- □ Fixed `task_completed` trigger vs adaptive trigger。
+- □ Fixed exposure vs adaptive exposure。
+- □ Best single-layer variant vs joint formation/exposure policy。
 
 以下ablation标记为deferred/not applicable：
 
@@ -645,7 +871,27 @@ Family规则：
 - N+2 recursive iteration。
 - Cross-host或cross-benchmark generalization。
 
-## 7. 全局安全、复现与证据要求
+### 3D：PAST-Bench Family 的 Process-Signal 预检
+
+以下判断基于当前 family/task 定义和可观察工具协议，是运行前的设计预检，不把 hidden grader 当成 process signal。正式选择 training family 前必须执行一次 process-signal census，报告每个 family 的 episode-level coverage、action variation、source-to-outcome chain coverage和ambiguity rate。
+
+| Family | 主要 memory substrate | 可观察 process signal | 当前稀疏性判断 | 适合的 policy 实验 |
+| --- | --- | --- | --- | --- |
+| `EP01_prior_case_recall` | episodic/session recall | `session_search`、retrieved session artifact、后续 notes/tool action、task completion | 中低 ambiguity；检索调用很清楚，但是否回答正确仍部分落在 output | Exposure、retrieval和episodic recall；不作为第一版 semantic extraction train family |
+| `EP02_exception_list_recall` | episodic/session recall | `config_list/get`、`config_update` 的 integration IDs、status、exception字段和重复/错误更新 | 高 process density；关键行为直接体现在 tool arguments 和 state mutation | Episodic admission、exposure和action policy；适合作为 process feedback pilot |
+| `SM01_preference_adoption` | semantic preference | notes tool调用、share success、memory injection；格式偏好主要只在最终 TSV/文本中显现 | 低；当前 v10 的 24 条 primary feedback 全部 unresolved，不能只靠 process 判定格式偏好是否被采用 | Extraction端到端 feasibility或最终 offline evaluation，不作为 strict process-only train source |
+| `SM02_constraint_retention` | semantic constraint | `notes_share` 的 recipient IDs、调用成功/失败、完成状态 | 中高；边界遵守直接体现在 action 参数，但必须修复完整 advisory roster contract | 第一优先 semantic process-feedback training family |
+| `SM05_weak_trigger_preference_adoption` | semantic preference under weak trigger | notes tool调用和share结果；T2/T1偏好采用仍主要体现在输出格式 | 低到中；可观察到触发和写入过程，但偏好本身的后续采用信号稀疏 | Trigger/extraction diagnostic sibling，不作为第一轮唯一训练依据 |
+
+Family 选择原则：
+
+- `EP01/EP02` 的 process signal 强，不代表它们可以直接训练 semantic extraction；memory substrate 必须和开放的 policy layer匹配。
+- `SM02` 最适合先验证 semantic process feedback，因为关键约束会体现在 `notes_share` 的真实 recipient 参数，而不是只有最终文本格式。
+- `SM01/SM05` 仍可用于端到端结果和 output-based final evaluation，但不能把格式不符合直接转成 extraction failure。
+- 在任何 family 上生成 candidate 前，先统计每条episode是否有 trigger、source、extraction、admission、commit、retrieval、exposure、tool/outcome记录，以及这些字段是否存在变化；全是同一个值的字段不能被称为有效学习信号。
+- 如果一个 family 的 process chain coverage不足，先补 adapter/fixture；如果 chain完整但 action variation和outcome variation不足，换 family或把它降级为 validation-only，不修改标签门槛制造信号。
+
+## 8. 全局安全、复现与证据要求
 
 - 不修改PAST-Bench task semantics、episode order、grader、answer key或hidden evaluation contract来改善结果。
 - Official score只在final evaluation完成后由reporter读取，learner、validator和activation API不可达。
@@ -657,7 +903,7 @@ Family规则：
 - “一行适配”是开发者在真实prompt调用边界进行一次显式slot注册，不表示LightRSI可仅凭任意源码路径可靠修改第三方框架。Python backend第一版使用Python SDK；npm/TypeScript侧只消费共享artifact contract或通过IPC调用，不直接patch Python对象。
 - 每个任务使用独立commit，包含功能、failure semantics、正反测试和文档状态更新。
 
-## 8. 标准验收命令
+## 9. 标准验收命令
 
 在RSIMem仓库根目录运行：
 
@@ -677,7 +923,7 @@ bash -n scripts/*.sh
 
 每个阶段还必须运行对应focused tests、tracked-secret scan和一次isolated temporary-home restart fixture。真实provider命令只在代码、fixture和preflight全部通过后执行。
 
-## 9. 两阶段完成定义
+## 10. 三阶段完成定义
 
 ### 第一阶段完成
 
@@ -690,38 +936,41 @@ bash -n scripts/*.sh
 
 ### 第二阶段完成
 
-- □ Stage 2A-2I全部通过或按当前claim明确标记not applicable。
-- □ Exact extraction prompt N+1可生成、验证、激活、加载、回滚和重放。
-- □ 真实future run证明N+1改变extraction与memory behavior。
-- □ Adaptive aggregate primary task score高于matched static。
-- □ 论文claim严格限制为实际通过的online extraction-policy adaptation证据。
+- □ 六层 policy 的 core contract、Host adapter boundary、decision evidence、replay和安全不变量全部通过。
+- □ Trigger、Source、Extraction、Admission、Commit scheduling和Exposure均可以被fixed policy观测、回放和做 matched intervention。
+- □ Extraction artifact、trigger/admission/exposure decision和formation lineage可以跨restart重建。
+- □ 第二阶段不要求任何 adaptive layer已经取得真实效果；真实效果属于第三阶段。
 
-## 10. 当前执行入口
+### 第三阶段完成
 
-当前实现入口已返回 **Stage 2E：独立 PAST-Bench live matched validation trial**。
-Stage 2E的真实PAST validation run仍保持未完成。Stage 1A-1H、
-Stage 2A、Stage 2B、Stage 2C 和 Stage 2D 已经通过，低成本 live plain-parent acceptance 记录在
+- □ S0 baseline和六层 feasibility cases完成，并保留完整process/end-to-end feedback。
+- □ 每层都有明确的 `optimization-ready`、`diagnostic-only` 或 `validation-only` 结论。
+- □ 每个 `optimization-ready` 层都有至少一个可回放的 parent/candidate case、process signal、action variation和收益假设。
+- □ 六层的 Host adapter、decision、execution receipt、lineage和failure semantics可以独立审计。
+- □ 论文只声明六层 policy 的可优化性和具体 case；真实 uplift、单层 superiority、联合效果和跨 family 泛化列为后续效果实验结论。
+
+## 11. 当前执行入口
+
+当前实现入口已返回 **第二阶段：六层 Memory Policy 优化基建**，尚未进入第三阶段六层 feasibility 验收，也尚未进入真实 adaptive effect run。
+第一阶段 1A-1H、原 extraction artifact/runtime binding 基础和低成本 live plain-parent acceptance 已完成，记录在
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
-Stage 2D只证明candidate通过静态安全、deterministic extraction suite和独立historical
-split offline gate；其accepted状态只能进入matched trial，不代表production activation。
-Stage 2E的decision、trial-only config、content-free evidence assembler、atomic activation、
-rejection、restart和rollback contract已经通过deterministic验收。Stage 2F也已完成
-deterministic runtime binding、PAST validation-only transport、activation fingerprint和
-matched drift gate；验收记录见
+已有 extraction artifact 的 deterministic contract、content-free evidence assembler、atomic activation、
+rejection、restart、rollback、runtime binding和activation fingerprint基础可以复用，但不代表六层 policy 基建或第三阶段效果已经完成。验收记录见
 [`extraction_stage2f_acceptance_20260828.md`](extraction_stage2f_acceptance_20260828.md)。
-当前必须执行Stage 2E独立matched validation batch，不能直接进入Stage 2G或production final run。
-Stage 2E plain-parent feedback已通过显式注册的backup provider完成3个clean replicate。v10的
+Stage 2E plain-parent feedback 已通过显式注册的 backup provider 完成 3 个 clean replicate。v10 的
 source/capture/feedback exact join和private corpus可重建，但24个primary label全部为unresolved，
 actionable count为0，低于冻结门槛2；optimizer以0次模型调用返回`NO_PROPOSAL`，未生成candidate。
-因此matched trial仍未开始，也不得进入Stage 2G。验收记录见
+这被接受为 strict attribution 的 no-signal pilot，不再阻止 exploratory end-to-end feasibility；但第三阶段仍必须先逐层完成六层 decision/evidence feasibility case。验收记录见
 [`extraction_stage2e_feedback_v10_20260828.md`](extraction_stage2e_feedback_v10_20260828.md)；
 此前provider失败记录见[`extraction_stage2e_provider_attempts_20260828.md`](extraction_stage2e_provider_attempts_20260828.md)。
 后续顺序仍严格按照：
 
 ```text
 1A -> 1B -> 1C -> 1D -> 1E -> 1F -> 1G -> 1H
-   -> 2A -> 2B -> 2C -> 2D -> 2E(contract) -> 2F
-   -> 2E(live matched trial) -> 2G -> 2H -> 2I
+   -> 2A -> 2B -> 2C -> 2D -> 2D.1 -> 2D.2 -> 2D.3
+   -> 2E -> 2F -> 2G -> 2H -> 2I
+   -> 3A -> 3B(Trigger/Source/Extraction/Admission/Commit/Exposure feasibility)
+   -> 3C(S0/S1/.../S6 optional effect experiments)
 ```
 
 任何上游contract缺陷必须在当前阶段修正，不通过后续模块、脚本参数或手工数据绕过。
