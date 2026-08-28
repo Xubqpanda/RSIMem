@@ -727,6 +727,24 @@ class JsonFeasibilityEvidenceLedger:
         self.record(record)
         return record
 
+    def verify_case(self, case: LayerIntervention) -> FeasibilityEvidenceRecord:
+        """Recompute and compare a case identity after restart.
+
+        The method never treats a missing or conflicting receipt as a new
+        observation.  Callers must explicitly record a new case instead.
+        """
+
+        expected = FeasibilityEvidenceRecord.from_case(case)
+        with self._lock():
+            self._load()
+            actual = self._records.get(expected.record_id)
+        if actual is None:
+            raise ValueError("feasibility evidence record is missing")
+        canonical = json.dumps(expected.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        if actual != canonical:
+            raise ValueError("conflicting feasibility evidence record")
+        return expected
+
     @contextmanager
     def _lock(self):
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
