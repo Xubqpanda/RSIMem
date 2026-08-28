@@ -44,11 +44,13 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 这里的 `optimization-ready` 只表示该层已有 process signal、目标层 action variation、至少两类 resolved outcome，以及完整可回放 evidence chain。它不表示该层已经在真实任务上提升分数。其余层保留为 `validation-only`，因为当前 fixture 没有足够的 outcome variation；没有将 unknown 或 unresolved 当成 negative。
 
+每层报告同时保留 U/H/M、unresolved、censored 原始计数以及 `resolvedUsefulRate`；resolved denominator 为 U+H，分母为零时输出 unknown（JSON `null`）。
+
 ## 验证
 
 ```text
 PYTHONPATH=src pytest -q tests/test_policy_feasibility.py tests/test_policy_replay.py
-21 passed
+22 passed
 
 .venv/bin/pytest -q tests
 629 passed
