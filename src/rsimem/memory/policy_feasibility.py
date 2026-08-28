@@ -688,7 +688,8 @@ class LayerIntervention:
         }
 
 
-FEASIBILITY_EVIDENCE_SCHEMA_VERSION = 1
+FEASIBILITY_EVIDENCE_SCHEMA_VERSION = 2
+POLICY_FEASIBILITY_REPORT_SCHEMA_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -1007,7 +1008,7 @@ class PolicyFeasibilityReport:
 
     def payload(self) -> dict[str, object]:
         return {
-            "schemaVersion": 1,
+            "schemaVersion": POLICY_FEASIBILITY_REPORT_SCHEMA_VERSION,
             "ok": self.ok,
             "caseCount": len(self.cases),
             "cases": [
@@ -1119,6 +1120,7 @@ def validate_feasibility_case(case: LayerIntervention) -> None:
 
 __all__ = [
     "FEASIBILITY_EVIDENCE_SCHEMA_VERSION",
+    "POLICY_FEASIBILITY_REPORT_SCHEMA_VERSION",
     "FeasibilityOutcome",
     "FeasibilityStatus",
     "FeedbackChain",
