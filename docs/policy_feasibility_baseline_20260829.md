@@ -62,3 +62,15 @@ git diff --check
 完整回归已在仓库 `.venv` 项目实验环境中完成。系统 Python 3.12 环境缺少 Hermes/PAST-Bench 运行时依赖，不能用系统解释器复现这些结果；实验命令应使用 `.venv`，PAST-Bench 测试应从其目录运行。
 
 实现入口：`src/rsimem/memory/policy_feasibility.py`；测试 fixture：`tests/test_policy_feasibility.py`。
+
+## Executable runner
+
+同一 deterministic fixture 现在可直接运行，不依赖 pytest 私有 helper：
+
+```text
+.venv/bin/python -m rsimem.memory.policy_feasibility_fixture \\
+  --output /tmp/policy-feasibility.json \\
+  --evidence /tmp/policy-feasibility.jsonl
+```
+
+runner 会生成 7 个 case、写入 content-free evidence ledger，并在重复运行时复用相同 record IDs；它仍然只产生 feasibility/shadow 证据，不调用 provider。
