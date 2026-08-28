@@ -69,6 +69,8 @@ class DeterministicPolicyReplay:
         candidate_fact_ids: Sequence[str] = (),
         artifact_ids: Sequence[str] = (),
         existing_artifact_ids: Sequence[str] = (),
+        admission_update: bool = False,
+        target_artifact_ids: Sequence[str] = (),
         mutation_ids: Sequence[str] = (),
         backend_revision: str = "backend.revision.1",
     ) -> PolicyReplayResult:
@@ -124,6 +126,8 @@ class DeterministicPolicyReplay:
             backend=backend,
             backend_revision=backend_revision,
             existing_artifact_ids=existing_artifact_ids,
+            update=admission_update,
+            target_artifact_ids=target_artifact_ids,
             safety=safety,
         )
         decisions.append(admission)
