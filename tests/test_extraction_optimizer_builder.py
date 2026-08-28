@@ -23,6 +23,12 @@ from rsimem.memory.extraction_optimizer_builder import (
     ExtractionFactContent,
     ExtractionOptimizerCorpusBuilder,
 )
+from rsimem.memory.extraction_optimizer_audit import audit_optimizer_corpus_isolation
+from rsimem.memory.extraction_optimizer_corpus import (
+    ExtractionOptimizerCorpus,
+    OptimizerCorpusRetention,
+    OptimizerCorpusSplit,
+)
 from rsimem.memory.extraction_projection import (
     ExtractionSourceRecord,
     LiveExtractionFeedbackRecord,
@@ -292,6 +298,43 @@ def test_builder_exactly_joins_content_and_content_free_evidence() -> None:
     assert examples[0].audit_join.artifacts[0].mutation_ids == (
         "mutation.persist-v1",
     )
+    replay = ExtractionOptimizerCorpusBuilder().build_examples(
+        projection=projection,
+        source_record=source,
+        feedback_record=feedback,
+        operation_graph=graph,
+        fact_contents=facts,
+        delayed_content=delayed,
+    )
+    first = ExtractionOptimizerCorpus.create(
+        batch_id="batch.train-v1",
+        attempt_id="attempt.train-v1",
+        split=OptimizerCorpusSplit.TRAIN,
+        observation_cutoff="2026-08-22T00:00:00Z",
+        retention=OptimizerCorpusRetention.DELETE_AFTER_POLICY_DECISION,
+        examples=examples,
+    )
+    second = ExtractionOptimizerCorpus.create(
+        batch_id="batch.train-v1",
+        attempt_id="attempt.train-v1",
+        split=OptimizerCorpusSplit.TRAIN,
+        observation_cutoff="2026-08-22T00:00:00Z",
+        retention=OptimizerCorpusRetention.DELETE_AFTER_POLICY_DECISION,
+        examples=tuple(reversed(replay)),
+    )
+    assert first == second
+    assert audit_optimizer_corpus_isolation(first, {
+        "source-record": source.payload(),
+        "feedback-record": feedback.payload(),
+        "operation-graph": {
+            "artifacts": [value.to_payload() for value in graph.artifacts],
+            "operations": [value.to_payload() for value in graph.operations],
+            "mutations": [value.to_payload() for value in graph.mutations],
+        },
+    }) == ()
+    assert audit_optimizer_corpus_isolation(first, {
+        "manifest": {"debug": FACT_TEXT},
+    }) == ("corpus_content_leak:manifest",)
 
 
 @pytest.mark.parametrize("failure", ("source", "fact", "operation", "mutation"))
