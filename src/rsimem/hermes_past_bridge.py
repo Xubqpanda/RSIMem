@@ -43,6 +43,7 @@ from .memory.policy_contracts import (
     ExtractionDecision,
     MutationKind,
     SourceSelectionDecision,
+    TriggerEvent,
 )
 from .memory.admission_policy import DeterministicAdmissionPolicy
 from .memory.exposure_policy import DeterministicExposurePolicy
@@ -141,7 +142,11 @@ class _PromptMemoryStore:
             adapter_result,
             lambda: self._native.format_for_system_prompt(target),
         )
-        self._bridge.record_semantic_prompt(adapter_result, target)
+        self._bridge.record_semantic_prompt(
+            adapter_result,
+            target,
+            artifact_ids=tuple(hit.artifact.artifact_id for hit in self._snapshots.get(target, ())),
+        )
         return adapter_result
 
 
@@ -685,7 +690,55 @@ class HermesPastBenchBridge:
             source_ref=f"hermes_state:session:{native_session_id}",
         )
 
-    def record_semantic_prompt(self, prompt: str | None, namespace: str) -> None:
+    def record_semantic_prompt(
+        self,
+        prompt: str | None,
+        namespace: str,
+        *,
+        artifact_ids: tuple[str, ...] = (),
+    ) -> None:
+        if not artifact_ids and prompt:
+            try:
+                artifact_ids = tuple(
+                    hit.artifact.artifact_id
+                    for hit in self.runtime.query(MemoryQuery(
+                        MemoryKind.SEMANTIC,
+                        "",
+                        namespace=namespace,
+                        limit=100,
+                    ))
+                    if hit.artifact.content in prompt
+                )
+            except Exception:
+                artifact_ids = ()
+        exposure_event = TriggerEvent.create(
+            event_type="memory_exposure",
+            source_revision=self._exposure_context_revision(),
+            input_payload={
+                "namespace": namespace,
+                "artifact_ids": list(artifact_ids),
+                "prompt_digest": hashlib.sha256((prompt or "").encode("utf-8")).hexdigest(),
+            },
+            session_id=self._session_id,
+            task_id=self._task_id,
+            supported=True,
+        )
+        exposure = self._exposure_policy.decide(exposure_event, artifact_ids)
+        injection_receipt_ids: tuple[str, ...] = ()
+        if exposure.action == DecisionAction.RUN:
+            from .memory.exposure_policy import DeterministicExposurePolicy
+
+            receipt = DeterministicExposurePolicy.bind_injection(
+                exposure,
+                context_revision=exposure_event.source_revision,
+                render_fingerprint=hashlib.sha256((prompt or "").encode("utf-8")).hexdigest(),
+            )
+            injection_receipt_ids = (receipt.receipt_id,)
+        self._record_policy_decision(
+            exposure,
+            snapshot=self._synthetic_policy_snapshot(exposure_event.source_revision),
+            injection_receipt_ids=injection_receipt_ids,
+        )
         if self.semantic_future_recorder is None:
             return
         step_id = f"future-semantic.{namespace}.{len(self._semantic_futures) + 1}"
@@ -697,6 +750,57 @@ class HermesPastBenchBridge:
             step_id=step_id,
         )
         self._semantic_futures.append((future, step_id))
+
+    def _exposure_context_revision(self) -> str:
+        agent = self._agent
+        session_db = getattr(agent, "_session_db", None) if agent is not None else None
+        native_session_id = str(getattr(agent, "session_id", "") or "") if agent is not None else ""
+        rows = ()
+        if session_db is not None and native_session_id:
+            try:
+                rows = tuple(session_db.get_messages(native_session_id))
+            except Exception:
+                rows = ()
+        payload = json.dumps(rows, ensure_ascii=True, sort_keys=True, separators=(",", ":"), default=str)
+        return "exposure-rev." + hashlib.sha256(payload.encode("utf-8")).hexdigest()[:40]
+
+    def _synthetic_policy_snapshot(self, revision: str) -> ContextSnapshot:
+        """Create content-free identity for exposure evidence before task snapshot."""
+
+        from .lifecycle.snapshot import ProvenanceRef, SnapshotSegment
+
+        segment = SnapshotSegment(
+            "exposure.segment",
+            "exposure.message",
+            "system",
+            "memory exposure boundary",
+            "exposure.turn",
+            0,
+            completed=True,
+        )
+        return ContextSnapshot(
+            self._run_id,
+            self._episode_id,
+            self._session_id,
+            self._task_id,
+            "exposure.snapshot." + hashlib.sha256(revision.encode("utf-8")).hexdigest()[:40],
+            revision,
+            (segment,),
+            (),
+            None,
+            TaskLifecycleState.ACTIVE,
+            "memory_exposure",
+            (),
+            0,
+            ProvenanceRef(
+                self._run_id,
+                self._episode_id,
+                self._session_id,
+                self._task_id,
+                "exposure.snapshot." + hashlib.sha256(revision.encode("utf-8")).hexdigest()[:40],
+                "hermes:memory_exposure",
+            ),
+        )
 
     def _record_semantic_outcomes(self, result: Mapping[str, Any]) -> None:
         if (
@@ -895,7 +999,13 @@ class HermesPastBenchBridge:
             final_receipt_id=receipt_id,
         )
 
-    def _record_policy_decision(self, decision: object, snapshot: ContextSnapshot) -> None:
+    def _record_policy_decision(
+        self,
+        decision: object,
+        snapshot: ContextSnapshot,
+        *,
+        injection_receipt_ids: tuple[str, ...] = (),
+    ) -> None:
         decision_id = getattr(decision, "decision_id")
         if decision_id in self._policy_decision_ids:
             return
@@ -906,6 +1016,7 @@ class HermesPastBenchBridge:
             session_id=snapshot.session_id,
             task_id=snapshot.task_id,
             snapshot_id=snapshot.snapshot_id,
+            injection_receipt_ids=injection_receipt_ids,
         )
         self._policy_decision_ids.add(decision_id)
 
