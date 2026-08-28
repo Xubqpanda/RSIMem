@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from types import MappingProxyType
 from typing import Iterable, Mapping, Sequence
 
 from .policy_contracts import PolicyArtifactIdentity, PolicyLayer, PolicyDecision, content_digest
@@ -112,6 +113,8 @@ class LayerIntervention:
             raise ValueError("candidate artifact must open exactly the target layer")
         if self.parent_artifact.layers != (self.target_layer,):
             raise ValueError("parent artifact must identify exactly the target layer")
+        if self.parent_artifact.artifact_id == self.candidate_artifact.artifact_id:
+            raise ValueError("parent and candidate artifacts must be distinct")
         if type(self.process_signal) is not bool:
             raise ValueError("process_signal must be bool")
         outcome = FeasibilityOutcome(self.outcome)
@@ -182,6 +185,32 @@ class LayerIntervention:
             "candidate_decision": self.candidate_decision.decision_id if self.candidate_decision else None,
         })
 
+    @property
+    def replay_payload(self) -> dict[str, object]:
+        """Content-free identity used to persist and replay one intervention."""
+
+        return {
+            "case_id": self.case_id,
+            "target_layer": self.target_layer.value,
+            "parent_artifact_id": self.parent_artifact.artifact_id,
+            "candidate_artifact_id": self.candidate_artifact.artifact_id,
+            "parent_event_id": self.parent.event.event_id,
+            "candidate_event_id": self.candidate.event.event_id,
+            "parent_source_revision": self.parent.event.source_revision,
+            "candidate_source_revision": self.candidate.event.source_revision,
+            "parent_decision_ids": [item.decision_id for item in self.parent.decisions],
+            "candidate_decision_ids": [item.decision_id for item in self.candidate.decisions],
+            "parent_lineage_id": self.parent.lineage.lineage_id,
+            "candidate_lineage_id": self.candidate.lineage.lineage_id,
+            "parent_audit_ok": self.parent.audit.ok,
+            "candidate_audit_ok": self.candidate.audit.ok,
+            "process_signal": self.process_signal,
+            "outcome": self.outcome.value,
+            "feedback_ids": list(self.feedback.ids),
+            "reason_codes": list(self.reason_codes),
+            "intervention_fingerprint": self.intervention_fingerprint,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class LayerFeasibilityCensus:
@@ -195,6 +224,32 @@ class LayerFeasibilityCensus:
     complete_feedback_count: int
     status: FeasibilityStatus
     reason_codes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "layer", PolicyLayer(self.layer))
+        for value, name in (
+            (self.case_count, "case count"),
+            (self.signal_count, "signal count"),
+            (self.action_variation_count, "action variation count"),
+            (self.outcome_variation_count, "outcome variation count"),
+            (self.unknown_count, "unknown count"),
+            (self.complete_feedback_count, "complete feedback count"),
+        ):
+            if type(value) is not int or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+        if any(value > self.case_count for value in (
+            self.signal_count,
+            self.action_variation_count,
+            self.outcome_variation_count,
+            self.unknown_count,
+            self.complete_feedback_count,
+        )):
+            raise ValueError("census counts cannot exceed case count")
+        object.__setattr__(self, "outcome_counts", MappingProxyType(dict(self.outcome_counts)))
+        reasons = tuple(self.reason_codes)
+        if len(reasons) != len(set(reasons)) or any(not isinstance(item, str) or not item.strip() for item in reasons):
+            raise ValueError("census reason codes must be unique non-empty strings")
+        object.__setattr__(self, "reason_codes", reasons)
 
     @property
     def signal_coverage(self) -> float | None:
@@ -234,6 +289,12 @@ class PolicyFeasibilityReport:
     @property
     def ok(self) -> bool:
         return bool(self.cases) and all(item.status != FeasibilityStatus.DIAGNOSTIC_ONLY for item in self.census)
+
+    @property
+    def digest(self) -> str:
+        """Stable digest for cross-process/restart report comparison."""
+
+        return content_digest(self.payload())
 
     def payload(self) -> dict[str, object]:
         return {
