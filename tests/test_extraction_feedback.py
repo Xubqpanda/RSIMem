@@ -396,6 +396,102 @@ def test_feedback_observation_api_has_no_official_evaluation_surface() -> None:
     assert len(parsers) == 3
 
 
+@pytest.mark.parametrize(
+    ("family", "keys", "final_response"),
+    [
+        (
+            SM01,
+            (TSV_KEY,),
+            "owner\tpriority\ttask\tdue_date\nA\thigh\tShip\t2026/09/01",
+        ),
+        (SM02, (BOUNDARY_KEY,), "Shared the note with the allowed owner."),
+        (
+            SM05,
+            SM05_KEYS,
+            "owner\tpriority\ttask\tdue_date\nA\thigh\tShip\t2026/09/01",
+        ),
+    ],
+)
+def test_registered_family_contracts_cover_positive_harmful_ambiguous_and_censored(
+    family,
+    keys,
+    final_response,
+) -> None:
+    builder = ExtractionFeedbackBuilder(default_feedback_contract_registry())
+    observation = _observation(
+        family,
+        keys,
+        final_response=final_response,
+    )
+
+    positive = builder.build(_source(keys), observation, _future(keys))
+    assert _primary(positive).label == ExtractionFeedbackLabel.USEFUL
+
+    harmful = builder.build(
+        _source(keys, issue=ExtractionQualityIssue.UNSUPPORTED),
+        observation,
+        _future(keys),
+    )
+    assert _primary(harmful).label == ExtractionFeedbackLabel.HARMFUL
+    assert "extraction_unsupported" in _primary(harmful).reason_codes
+
+    ambiguous_source = ExtractionSourceEvidence(
+        f"source.ambiguous.{family}",
+        _sha(f"ambiguous source {family}"),
+        f"extraction-set.ambiguous.{family}",
+        ExtractionSetStatus.NONEMPTY,
+        keys,
+        (
+            ExtractedFactEvidence(
+                f"fact.ambiguous.{family}.1",
+                keys,
+                FactDisposition.PERSISTED,
+                artifact_id=f"artifact.ambiguous.{family}.1",
+            ),
+            ExtractedFactEvidence(
+                f"fact.ambiguous.{family}.2",
+                keys,
+                FactDisposition.PERSISTED,
+                artifact_id=f"artifact.ambiguous.{family}.2",
+            ),
+        ),
+    )
+    ambiguous_future = FutureMemoryEvidence(
+        f"opportunity.ambiguous.{family}",
+        ExposureMode.EAGER_SYSTEM_PROMPT,
+        (
+            ArtifactSemanticBinding(
+                f"artifact.ambiguous.{family}.1",
+                keys,
+            ),
+            ArtifactSemanticBinding(
+                f"artifact.ambiguous.{family}.2",
+                keys,
+            ),
+        ),
+        f"operation.opportunity.ambiguous.{family}",
+        f"operation.injection.ambiguous.{family}",
+    )
+    ambiguous = builder.build(
+        ambiguous_source,
+        observation,
+        ambiguous_future,
+    )
+    assert _primary(ambiguous).label == ExtractionFeedbackLabel.USEFUL
+    assert {
+        example.label
+        for example in ambiguous.examples
+        if example.level == ExtractionFeedbackLevel.FACT
+    } == {ExtractionFeedbackLabel.UNRESOLVED}
+
+    censored = builder.build(
+        _source(keys),
+        replace(observation, observation_complete=False, censor_reason="window_incomplete"),
+        _future(keys),
+    )
+    assert _primary(censored).label == ExtractionFeedbackLabel.CENSORED
+
+
 def test_feedback_dataset_log_is_idempotent_and_fails_closed(tmp_path) -> None:
     dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
         _source((TSV_KEY,)),
