@@ -8,8 +8,14 @@ does not read benchmark graders or resource cost fields.
 
 from __future__ import annotations
 
+import fcntl
+import json
+import os
+import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from types import MappingProxyType
 from typing import Iterable, Mapping, Sequence
 
@@ -212,6 +218,152 @@ class LayerIntervention:
         }
 
 
+FEASIBILITY_EVIDENCE_SCHEMA_VERSION = 1
+
+
+@dataclass(frozen=True, slots=True)
+class FeasibilityEvidenceRecord:
+    """Content-free durable identity for one replayable intervention."""
+
+    record_id: str
+    replay_payload: Mapping[str, object]
+    schema_version: int = FEASIBILITY_EVIDENCE_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != FEASIBILITY_EVIDENCE_SCHEMA_VERSION:
+            raise ValueError("unsupported feasibility evidence schema version")
+        if not isinstance(self.record_id, str) or not self.record_id.strip():
+            raise ValueError("feasibility evidence record ID must not be empty")
+        payload = dict(self.replay_payload)
+        required = {
+            "case_id", "target_layer", "parent_artifact_id", "candidate_artifact_id",
+            "parent_event_id", "candidate_event_id", "parent_source_revision",
+            "candidate_source_revision", "parent_decision_ids", "candidate_decision_ids",
+            "parent_lineage_id", "candidate_lineage_id", "parent_audit_ok",
+            "candidate_audit_ok", "process_signal", "outcome", "feedback_ids",
+            "reason_codes", "intervention_fingerprint",
+        }
+        if set(payload) != required:
+            raise ValueError("malformed feasibility replay payload")
+        if not isinstance(payload["case_id"], str) or not payload["case_id"].strip():
+            raise ValueError("feasibility replay case ID must not be empty")
+        if payload["target_layer"] not in {layer.value for layer in PolicyLayer}:
+            raise ValueError("feasibility replay target layer is invalid")
+        for field in ("parent_decision_ids", "candidate_decision_ids", "feedback_ids", "reason_codes"):
+            values = payload[field]
+            if not isinstance(values, list) or len(values) != len(set(values)) or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                raise ValueError("feasibility replay ID lists are invalid")
+        for field in ("parent_audit_ok", "candidate_audit_ok", "process_signal"):
+            if type(payload[field]) is not bool:
+                raise ValueError("feasibility replay flags are invalid")
+        outcome = FeasibilityOutcome(payload["outcome"])
+        payload["outcome"] = outcome.value
+        object.__setattr__(self, "replay_payload", MappingProxyType(payload))
+        expected = f"feasibility-record.{content_digest(payload)[:40]}"
+        if self.record_id != expected:
+            raise ValueError("feasibility evidence record ID mismatch")
+
+    @classmethod
+    def from_case(cls, case: LayerIntervention) -> "FeasibilityEvidenceRecord":
+        payload = case.replay_payload
+        return cls(f"feasibility-record.{content_digest(payload)[:40]}", payload)
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schemaVersion": self.schema_version,
+            "recordId": self.record_id,
+            "replayPayload": dict(self.replay_payload),
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "FeasibilityEvidenceRecord":
+        if not isinstance(value, dict) or set(value) != {
+            "schemaVersion", "recordId", "replayPayload",
+        }:
+            raise ValueError("malformed feasibility evidence record")
+        try:
+            return cls(
+                value["recordId"],
+                value["replayPayload"],
+                value["schemaVersion"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed feasibility evidence record") from exc
+
+
+class JsonFeasibilityEvidenceLedger:
+    """Crash-safe, idempotent storage for replay identities."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+        self._records: dict[str, str] = {}
+        self._load()
+
+    @property
+    def records(self) -> tuple[FeasibilityEvidenceRecord, ...]:
+        return tuple(
+            FeasibilityEvidenceRecord.from_payload(json.loads(value))
+            for value in self._records.values()
+        )
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
+            try:
+                record = FeasibilityEvidenceRecord.from_payload(json.loads(line))
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise ValueError(f"malformed feasibility evidence at line {line_number}") from exc
+            canonical = json.dumps(record.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+            previous = self._records.get(record.record_id)
+            if previous is not None and previous != canonical:
+                raise ValueError("conflicting feasibility evidence record")
+            self._records[record.record_id] = canonical
+
+    def record(self, record: FeasibilityEvidenceRecord) -> None:
+        canonical = json.dumps(record.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        with self._lock():
+            self._load()
+            previous = self._records.get(record.record_id)
+            if previous is not None:
+                if previous != canonical:
+                    raise ValueError("conflicting feasibility evidence record")
+                return
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            fd, temporary = tempfile.mkstemp(prefix=self.path.name + ".", dir=self.path.parent)
+            try:
+                payload = [json.loads(value) for value in self._records.values()]
+                payload.append(record.payload())
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    for item in payload:
+                        handle.write(json.dumps(item, ensure_ascii=True, sort_keys=True) + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, self.path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+            self._records[record.record_id] = canonical
+
+    def record_case(self, case: LayerIntervention) -> FeasibilityEvidenceRecord:
+        record = FeasibilityEvidenceRecord.from_case(case)
+        self.record(record)
+        return record
+
+    @contextmanager
+    def _lock(self):
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 @dataclass(frozen=True, slots=True)
 class LayerFeasibilityCensus:
     layer: PolicyLayer
@@ -384,10 +536,13 @@ def validate_feasibility_case(case: LayerIntervention) -> None:
 
 
 __all__ = [
+    "FEASIBILITY_EVIDENCE_SCHEMA_VERSION",
     "FeasibilityOutcome",
     "FeasibilityStatus",
     "FeedbackChain",
     "LayerIntervention",
+    "FeasibilityEvidenceRecord",
+    "JsonFeasibilityEvidenceLedger",
     "LayerFeasibilityCensus",
     "PolicyFeasibilityReport",
     "build_feasibility_report",
