@@ -33,6 +33,10 @@ from rsimem.memory.policy_feasibility import (
     validate_feasibility_case,
 )
 from rsimem.memory.policy_replay import DeterministicPolicyReplay
+from rsimem.memory.policy_feasibility_fixture import (
+    build_default_feasibility_cases,
+    run_default_feasibility_census,
+)
 from rsimem.memory.policy_audit import PolicyAuditReport
 from rsimem.memory.source_selection_policy import (
     DeterministicSourceSelectionPolicy,
@@ -434,6 +438,19 @@ def test_process_feedback_tampering_is_rejected() -> None:
     payload["observed_after_digest"] = "0" * 64
     with pytest.raises(ValueError, match="ID mismatch|malformed"):
         type(case.process_feedback).from_payload(payload)
+
+
+def test_executable_feasibility_census_replays_and_persists(tmp_path) -> None:
+    evidence = tmp_path / "fixture-evidence.jsonl"
+    first = run_default_feasibility_census(evidence_path=evidence)
+    second = run_default_feasibility_census(evidence_path=evidence)
+    assert first.digest == second.digest
+    ledger = JsonFeasibilityEvidenceLedger(evidence)
+    cases = build_default_feasibility_cases()
+    assert len(ledger.records) == len(cases) == 7
+    for case in cases:
+        ledger.verify_case(case)
+    assert first.payload()["caseCount"] == 7
 
 
 def test_real_extraction_feedback_examples_project_only_resolved_primary_chain() -> None:
