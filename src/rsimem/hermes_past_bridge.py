@@ -657,15 +657,7 @@ class HermesPastBenchBridge:
                     1 for segment in snapshot.segments if segment.role == "user"
                 ),
             )
-            source_decision = next(
-                (
-                    item
-                    for item in self._source_selection_decisions
-                    if item.source_revision == snapshot.context_revision
-                    and item.trigger_event_id == trigger_event.event_id
-                ),
-                None,
-            )
+            source_decision = self._observe_policy_boundary(snapshot, trigger_event)
             results = self.static_writeback.process_completed_snapshot(
                 snapshot,
                 selected_segment_ids=(
@@ -1329,32 +1321,59 @@ class HermesPastBenchBridge:
             trigger.value,
             turn_index=sum(1 for row in rows if row.get("role") == "user"),
         )
+        self._observe_policy_boundary(result.snapshot, trigger_event)
+        return result
+
+    def _observe_policy_boundary(
+        self,
+        snapshot: ContextSnapshot,
+        trigger_event: TriggerEvent,
+    ) -> SourceSelectionDecision:
+        """Record trigger/source decisions for every trusted host boundary."""
+
+        existing_source = next(
+            (
+                item
+                for item in self._source_selection_decisions
+                if item.trigger_event_id == trigger_event.event_id
+                and item.source_revision == snapshot.context_revision
+            ),
+            None,
+        )
+        if existing_source is not None:
+            return existing_source
+
         observation = self._trigger_policy.decide(trigger_event)
         if not any(item.event.event_id == observation.event.event_id for item in self._trigger_observations):
             self._trigger_observations.append(observation)
         self._policy_evidence.record_decision(
             observation.decision,
-            run_id=result.snapshot.run_id,
-            episode_id=result.snapshot.episode_id,
-            session_id=result.snapshot.session_id,
-            task_id=result.snapshot.task_id,
-            snapshot_id=result.snapshot.snapshot_id,
+            run_id=snapshot.run_id,
+            episode_id=snapshot.episode_id,
+            session_id=snapshot.session_id,
+            task_id=snapshot.task_id,
+            snapshot_id=snapshot.snapshot_id,
         )
-        source_decision = self._source_selection_policy.select(
-            result.snapshot,
-            trigger_event,
+        source_decision = (
+            self._source_selection_policy.select(snapshot, trigger_event)
+            if observation.decision.action == DecisionAction.RUN
+            else self._source_selection_policy.skip(
+                snapshot,
+                trigger_event,
+                reason="trigger_not_run",
+            )
         )
         if not any(item.decision_id == source_decision.decision_id for item in self._source_selection_decisions):
             self._source_selection_decisions.append(source_decision)
         self._policy_evidence.record_decision(
             source_decision,
-            run_id=result.snapshot.run_id,
-            episode_id=result.snapshot.episode_id,
-            session_id=result.snapshot.session_id,
-            task_id=result.snapshot.task_id,
-            snapshot_id=result.snapshot.snapshot_id,
+            run_id=snapshot.run_id,
+            episode_id=snapshot.episode_id,
+            session_id=snapshot.session_id,
+            task_id=snapshot.task_id,
+            snapshot_id=snapshot.snapshot_id,
         )
-        return result
+        return source_decision
 
     def adapter_call(
         self,
