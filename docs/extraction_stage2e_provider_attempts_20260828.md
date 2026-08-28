@@ -21,10 +21,19 @@ as provider/infra failures and are excluded from optimizer input.
 - `feedback-sm01-20260828-v3` independently reproduced the HTTP 503 capacity
   failure. One agent call succeeded, 27 calls failed, and semantic ingestion
   remained zero.
+- `feedback-sm01-20260828-v4` passed both preflight checks but was terminated by
+  the local execution-tool timeout before the first attempt completed. Its open
+  attempt was explicitly closed as `operator_interrupted`; it is not classified
+  as provider evidence.
+- `feedback-sm01-20260828-v5` ran to an audited terminal state from RSIMem commit
+  `232b4f06a8573074663f86c0fff9afff9772415d`. Four of 34 agent calls succeeded
+  and 30 failed with HTTP 503. All nine traces had incomplete model usage,
+  semantic ingestion remained zero, and the attempt closed as `failed/audit`.
 
-For both authenticated attempts, source records, private optimizer captures, and
-live extraction-feedback records all remained absent. Neither attempt can enter
-the resolved denominator, optimizer corpus, offline validation, or matched trial.
+For every completed authenticated provider-capacity attempt, source records,
+private optimizer captures, and live extraction-feedback records all remained
+absent. None can enter the resolved denominator, optimizer corpus, offline
+validation, or matched trial.
 
 ## Resume Gate
 
