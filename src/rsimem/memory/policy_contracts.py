@@ -691,6 +691,33 @@ class PolicyLineage:
             "future_feedback_ids": list(self.future_feedback_ids),
         }
 
+    @classmethod
+    def from_decisions(
+        cls,
+        decisions: Sequence[PolicyDecision],
+        *,
+        mutation_receipt_ids: Sequence[str] = (),
+        injection_receipt_ids: Sequence[str] = (),
+        future_feedback_ids: Sequence[str] = (),
+    ) -> "PolicyLineage":
+        items = tuple(decisions)
+        if not items:
+            raise ValueError("lineage requires at least one decision")
+        lineage_ids = {item.lineage_id for item in items}
+        if len(lineage_ids) != 1:
+            raise ValueError("decisions must share one lineage")
+        trigger_ids = {item.trigger_event_id for item in items if item.trigger_event_id is not None}
+        if len(trigger_ids) != 1:
+            raise ValueError("decisions must share one trigger event")
+        return cls(
+            lineage_id=items[0].lineage_id,
+            trigger_event_id=next(iter(trigger_ids)),
+            decision_ids=tuple(item.decision_id for item in items),
+            mutation_receipt_ids=tuple(mutation_receipt_ids),
+            injection_receipt_ids=tuple(injection_receipt_ids),
+            future_feedback_ids=tuple(future_feedback_ids),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class PolicyArtifactIdentity:
@@ -842,6 +869,50 @@ def audit_policy_episode(*args: object, **kwargs: object) -> PolicyAuditReport:
     return report
 
 
+def validate_policy_lineage(
+    lineage: PolicyLineage,
+    decisions: Sequence[PolicyDecision],
+    *,
+    mutation_receipt_ids: Sequence[str] = (),
+    injection_receipt_ids: Sequence[str] = (),
+    future_feedback_ids: Sequence[str] = (),
+    require_all_layers: bool = True,
+) -> PolicyAuditReport:
+    """Verify that decisions and downstream receipts form one stable join."""
+
+    report = validate_policy_episode(
+        decisions,
+        mutation_receipt_ids=mutation_receipt_ids,
+        injection_receipt_ids=injection_receipt_ids,
+        future_feedback_ids=future_feedback_ids,
+        require_all_layers=require_all_layers,
+    )
+    errors = list(report.errors)
+    if report.lineage_id != lineage.lineage_id:
+        errors.append("lineage ID does not match decisions")
+    decision_ids = tuple(item.decision_id for item in decisions)
+    if lineage.decision_ids and set(lineage.decision_ids) != set(decision_ids):
+        errors.append("lineage decision IDs do not match decisions")
+    trigger_ids = {item.trigger_event_id for item in decisions if item.trigger_event_id is not None}
+    if trigger_ids != {lineage.trigger_event_id}:
+        errors.append("lineage trigger event does not match decisions")
+    for values, expected, name in (
+        (mutation_receipt_ids, lineage.mutation_receipt_ids, "mutation receipt IDs"),
+        (injection_receipt_ids, lineage.injection_receipt_ids, "injection receipt IDs"),
+        (future_feedback_ids, lineage.future_feedback_ids, "future feedback IDs"),
+    ):
+        if expected and set(expected) != set(values):
+            errors.append(f"lineage {name} do not match evidence")
+    return PolicyAuditReport(not errors, tuple(errors), lineage.lineage_id, decision_ids)
+
+
+def audit_policy_lineage(*args: object, **kwargs: object) -> PolicyAuditReport:
+    report = validate_policy_lineage(*args, **kwargs)  # type: ignore[arg-type]
+    if not report.ok:
+        raise ValueError("; ".join(report.errors))
+    return report
+
+
 __all__ = [
     "MEMORY_POLICY_CONTRACT_SCHEMA_VERSION",
     "MEMORY_POLICY_CONTRACT_SCHEMA",
@@ -872,4 +943,6 @@ __all__ = [
     "PolicyAuditReport",
     "validate_policy_episode",
     "audit_policy_episode",
+    "validate_policy_lineage",
+    "audit_policy_lineage",
 ]

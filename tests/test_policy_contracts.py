@@ -15,12 +15,14 @@ from rsimem.memory.policy_contracts import (
     PolicyArtifactIdentity,
     PolicyArtifactKind,
     PolicyLayer,
+    PolicyLineage,
     ProjectionMode,
     SafetyBoundary,
     SourceSelectionDecision,
     TriggerDecision,
     TriggerEvent,
     validate_policy_episode,
+    validate_policy_lineage,
 )
 
 
@@ -184,3 +186,25 @@ def test_audit_rejects_missing_layer_and_execution_receipt() -> None:
         PolicyLayer.ADMISSION,
         PolicyLayer.COMMIT,
     }
+
+
+def test_lineage_join_rejects_mismatched_downstream_evidence() -> None:
+    trigger = TriggerDecision.create(**_base_kwargs())
+    lineage = PolicyLineage.from_decisions(
+        (trigger,), mutation_receipt_ids=("receipt.mutation",),
+    )
+    ok = validate_policy_lineage(
+        lineage,
+        (trigger,),
+        mutation_receipt_ids=("receipt.mutation",),
+        require_all_layers=False,
+    )
+    assert ok.ok
+    mismatch = validate_policy_lineage(
+        lineage,
+        (trigger,),
+        mutation_receipt_ids=("receipt.other",),
+        require_all_layers=False,
+    )
+    assert not mismatch.ok
+    assert any("mutation receipt" in error for error in mismatch.errors)
