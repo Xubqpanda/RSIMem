@@ -28,7 +28,10 @@ from rsimem.memory.policy_feasibility import (
     LayerIntervention,
     JsonFeasibilityEvidenceLedger,
     PolicyHypothesis,
+    OptimizerHypothesisDecision,
+    OptimizerHypothesisProjection,
     feedback_chain_from_extraction_example,
+    project_optimizer_result,
     build_feasibility_report,
     build_extraction_feedback_interventions,
     build_optimizer_corpus_interventions,
@@ -580,6 +583,63 @@ def test_optimizer_corpus_primary_examples_feed_extraction_census() -> None:
         FeasibilityOutcome.USEFUL,
         FeasibilityOutcome.MISSED,
     }
+
+
+def test_optimizer_result_projection_preserves_no_proposal_and_candidate_identity() -> None:
+    from test_extraction_optimizer_contracts import (
+        _corpus,
+        _multi_corpus,
+        _parent,
+        _proposal_output,
+    )
+    from rsimem.memory.extraction_feedback import ExtractionFeedbackLabel
+    from rsimem.memory.extraction_prompt_optimizer import (
+        CapturedExtractionOptimizerClient,
+        ExtractionPromptOptimizer,
+    )
+
+    parent = _parent()
+    no_signal_corpus = _corpus()
+    no_signal = ExtractionPromptOptimizer(
+        CapturedExtractionOptimizerClient(_proposal_output)
+    ).propose(parent, no_signal_corpus)
+    projected_no_signal = project_optimizer_result(
+        no_signal,
+        no_signal_corpus,
+        parent_artifact_id=parent.artifact_id,
+    )
+    assert projected_no_signal.decision is OptimizerHypothesisDecision.NO_PROPOSAL
+    assert projected_no_signal.candidate_artifact_id is None
+    assert OptimizerHypothesisProjection.from_payload(
+        projected_no_signal.payload()
+    ) == projected_no_signal
+
+    corpus = _multi_corpus((ExtractionFeedbackLabel.USEFUL, ExtractionFeedbackLabel.USEFUL))
+    proposal = ExtractionPromptOptimizer(
+        CapturedExtractionOptimizerClient(_proposal_output)
+    ).propose(parent, corpus)
+    projected = project_optimizer_result(
+        proposal,
+        corpus,
+        parent_artifact_id=parent.artifact_id,
+    )
+    assert projected.decision is OptimizerHypothesisDecision.PROPOSE
+    assert projected.candidate_artifact_id == proposal.candidate.artifact_id
+    assert set(projected.evidence_example_ids) == set(proposal.request.primary_example_ids)
+
+
+def test_optimizer_result_projection_rejects_corpus_or_parent_drift() -> None:
+    from test_extraction_optimizer_contracts import _corpus, _multi_corpus, _parent, _proposal_output
+    from rsimem.memory.extraction_feedback import ExtractionFeedbackLabel
+    from rsimem.memory.extraction_prompt_optimizer import CapturedExtractionOptimizerClient, ExtractionPromptOptimizer
+
+    parent = _parent()
+    corpus = _multi_corpus((ExtractionFeedbackLabel.USEFUL, ExtractionFeedbackLabel.USEFUL))
+    result = ExtractionPromptOptimizer(CapturedExtractionOptimizerClient(_proposal_output)).propose(parent, corpus)
+    with pytest.raises(ValueError, match="parent artifact"):
+        project_optimizer_result(result, corpus, parent_artifact_id="extraction-prompt.foreign")
+    with pytest.raises(ValueError, match="corpus identity"):
+        project_optimizer_result(result, _corpus(), parent_artifact_id=parent.artifact_id)
 
 
 def test_real_extraction_feedback_examples_project_only_resolved_primary_chain() -> None:
