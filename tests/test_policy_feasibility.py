@@ -195,6 +195,9 @@ def test_complete_useful_and_missed_chains_make_extraction_optimization_ready() 
     assert useful.hypothesis.target_layer is PolicyLayer.EXTRACTION
     assert useful.hypothesis.candidate_artifact_id == useful.candidate_artifact.artifact_id
     assert useful.replay_payload["intervention_fingerprint"] == useful.intervention_fingerprint
+    report_case = next(item for item in report.payload()["cases"] if item["caseId"] == useful.case_id)
+    assert report_case["processFeedback"]["feedback_id"] == useful.process_feedback.feedback_id
+    assert report_case["hypothesis"]["hypothesis_id"] == useful.hypothesis.hypothesis_id
     assert report.digest == build_feasibility_report((useful, missed)).digest
     # The report is intentionally not globally ready until all six layers have
     # cases; unrepresented layers remain diagnostic-only.
