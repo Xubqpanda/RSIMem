@@ -14,6 +14,7 @@ from rsimem.memory.extraction_feedback import (
     ExtractionFeedbackBuilder,
     ExtractionFeedbackLabel,
     ExtractionFeedbackLevel,
+    FeedbackOperationJoin,
     ExtractionQualityIssue,
     ExtractionSetStatus,
     ExtractionSourceEvidence,
@@ -358,6 +359,104 @@ def test_missed_requires_exact_source_opportunity_and_absence_outcome_chain() ->
     wrong_outcome = replace(missed, absence_outcome_operation_id="outcome.wrong")
     unresolved = builder.build(source, observation, future, missed=(wrong_outcome,))
     assert _primary(unresolved).label == ExtractionFeedbackLabel.UNRESOLVED
+
+
+def test_missed_derivation_requires_every_absence_attribution_node() -> None:
+    registry = default_feedback_contract_registry()
+    builder = ExtractionFeedbackBuilder(registry)
+    source = ExtractionSourceEvidence(
+        "source.derived-missed",
+        _sha("derived missed source"),
+        "extraction-set.derived-missed",
+        ExtractionSetStatus.EMPTY,
+        (TSV_KEY,),
+        (),
+    )
+    observation = _observation(
+        SM01,
+        (TSV_KEY,),
+        final_response="No table was produced.",
+        completed=False,
+    )
+    future = _future((), exposure=ExposureMode.NOT_EXPOSED)
+    join = FeedbackOperationJoin(
+        future.opportunity_operation_id,
+        "operation.use.derived-missed",
+        "operation.outcome.derived-missed",
+    )
+
+    missed = builder.derive_missed(
+        source,
+        observation,
+        future,
+        operation_join=join,
+    )
+    replay = builder.derive_missed(
+        source,
+        observation,
+        future,
+        operation_join=join,
+    )
+    assert missed == replay
+    assert len(missed) == 1
+    assert missed[0].semantic_key == TSV_KEY
+    assert missed[0].source_span_digest == source.source_projection_digest
+    dataset = builder.build(
+        source,
+        observation,
+        future,
+        missed=missed,
+        operation_join=join,
+    )
+    assert _primary(dataset).label == ExtractionFeedbackLabel.MISSED
+
+    extracted = _source((TSV_KEY,))
+    bound_future = FutureMemoryEvidence(
+        future.future_opportunity_id,
+        ExposureMode.EAGER_SYSTEM_PROMPT,
+        (ArtifactSemanticBinding("artifact.existing", TSV_KEY),),
+        future.opportunity_operation_id,
+        "operation.injection.existing",
+    )
+    variants = (
+        (replace(source, available_semantic_keys=()), observation, future),
+        (extracted, observation, future),
+        (source, replace(observation, task_semantic_keys=()), future),
+        (
+            source,
+            replace(observation, current_input_semantic_keys=(TSV_KEY,)),
+            future,
+        ),
+        (
+            source,
+            replace(
+                observation,
+                observation_complete=False,
+                censor_reason="window_incomplete",
+            ),
+            future,
+        ),
+        (source, observation, bound_future),
+        (
+            source,
+            replace(
+                observation,
+                final_response=(
+                    "owner\tpriority\ttask\tdue_date\n"
+                    "A\thigh\tShip\t2026/09/01"
+                ),
+                completed=True,
+            ),
+            future,
+        ),
+    )
+    for candidate_source, candidate_observation, candidate_future in variants:
+        assert builder.derive_missed(
+            candidate_source,
+            candidate_observation,
+            candidate_future,
+            operation_join=join,
+        ) == ()
 
 
 def test_incomplete_observation_is_censored_and_unknown_family_fails_closed() -> None:

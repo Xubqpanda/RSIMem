@@ -561,6 +561,31 @@ class MissedExtractionEvidence:
         if type(self.deterministically_attributed) is not bool:
             raise TypeError("missed attribution flag must be bool")
 
+    @classmethod
+    def create(
+        cls,
+        *,
+        semantic_key: str,
+        source_span_digest: str,
+        future_opportunity_id: str,
+        absence_outcome_operation_id: str,
+    ) -> "MissedExtractionEvidence":
+        identity = {
+            "semantic_key": semantic_key,
+            "source_span_digest": source_span_digest,
+            "future_opportunity_id": future_opportunity_id,
+            "absence_outcome_operation_id": absence_outcome_operation_id,
+            "deterministically_attributed": True,
+        }
+        return cls(
+            _stable_id("missed-extraction", identity),
+            semantic_key,
+            source_span_digest,
+            future_opportunity_id,
+            absence_outcome_operation_id,
+            True,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class ContractResolution:
@@ -858,6 +883,63 @@ class ExtractionFeedbackDataset:
 class ExtractionFeedbackBuilder:
     def __init__(self, registry: FeedbackContractRegistry) -> None:
         self.registry = registry
+
+    def derive_missed(
+        self,
+        source: ExtractionSourceEvidence,
+        observation: DeploymentObservation,
+        future: FutureMemoryEvidence,
+        *,
+        operation_join: FeedbackOperationJoin,
+    ) -> tuple[MissedExtractionEvidence, ...]:
+        """Derive only exact family-contract absence attribution."""
+
+        contract, resolution = self.registry.resolve(observation, future)
+        if observation.stage not in contract.opportunity.eligible_stages:
+            raise ValueError("feedback observation stage is not contract-eligible")
+        if future.opportunity_operation_id != operation_join.opportunity_operation_id:
+            raise ValueError("missed opportunity operation join mismatch")
+        resolution = replace(
+            resolution,
+            opportunity_operation_id=operation_join.opportunity_operation_id,
+            use_operation_id=operation_join.use_operation_id,
+            outcome_operation_id=operation_join.outcome_operation_id,
+        )
+        extracted_keys = {
+            semantic_key
+            for fact in source.facts
+            for semantic_key in fact.semantic_keys
+        }
+        bound_keys = {
+            semantic_key
+            for binding in future.artifact_bindings
+            for semantic_key in binding.semantic_keys
+        }
+        missing_keys = tuple(
+            semantic_key
+            for semantic_key in source.available_semantic_keys
+            if semantic_key in contract.opportunity.memory_scope_keys
+            and semantic_key not in extracted_keys
+            and semantic_key not in bound_keys
+        )
+        if (
+            not missing_keys
+            or not observation.observation_complete
+            or resolution.current_input_confounded
+            or not resolution.opportunity_observed
+            or resolution.explicit_use
+            or resolution.successful_outcome is not False
+        ):
+            return ()
+        return tuple(
+            MissedExtractionEvidence.create(
+                semantic_key=semantic_key,
+                source_span_digest=source.source_projection_digest,
+                future_opportunity_id=future.future_opportunity_id,
+                absence_outcome_operation_id=operation_join.outcome_operation_id,
+            )
+            for semantic_key in missing_keys
+        )
 
     def build(
         self,
