@@ -789,6 +789,16 @@ class PolicyFeasibilityReport:
                     "processSignal": case.process_signal,
                     "actionChanged": case.action_changed,
                     "interventionFingerprint": case.intervention_fingerprint,
+                    "processFeedback": (
+                        case.process_feedback.payload()
+                        if case.process_feedback is not None
+                        else None
+                    ),
+                    "hypothesis": (
+                        case.hypothesis.payload()
+                        if case.hypothesis is not None
+                        else None
+                    ),
                     "reasonCodes": list(case.reason_codes),
                 }
                 for case in self.cases
