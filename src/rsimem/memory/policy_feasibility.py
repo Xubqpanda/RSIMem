@@ -30,6 +30,10 @@ from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpusExample,
     OptimizerComponentOwnership,
 )
+from .extraction_prompt_optimizer import (
+    ExtractionOptimizerDecision,
+    ExtractionOptimizerResult,
+)
 
 
 class FeasibilityOutcome(StrEnum):
@@ -526,6 +530,191 @@ class PolicyHypothesis:
         if result.hypothesis_id != expected.hypothesis_id:
             raise ValueError("policy hypothesis ID mismatch")
         return result
+
+
+class OptimizerHypothesisDecision(StrEnum):
+    NO_PROPOSAL = "NO_PROPOSAL"
+    PROPOSE = "PROPOSE"
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizerHypothesisProjection:
+    """Content-free projection of one optimizer result into N+1 evidence."""
+
+    projection_id: str
+    result_id: str
+    request_id: str
+    decision: OptimizerHypothesisDecision
+    target_layer: PolicyLayer
+    parent_artifact_id: str
+    candidate_artifact_id: str | None
+    corpus_id: str
+    corpus_digest: str
+    evidence_example_ids: tuple[str, ...]
+    reason_codes: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "decision", OptimizerHypothesisDecision(self.decision))
+        object.__setattr__(self, "target_layer", PolicyLayer(self.target_layer))
+        for value, name in (
+            (self.projection_id, "optimizer projection ID"),
+            (self.result_id, "optimizer result ID"),
+            (self.request_id, "optimizer request ID"),
+            (self.parent_artifact_id, "optimizer parent artifact ID"),
+            (self.corpus_id, "optimizer corpus ID"),
+            (self.corpus_digest, "optimizer corpus digest"),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must not be empty")
+        if self.candidate_artifact_id is not None and not self.candidate_artifact_id.strip():
+            raise ValueError("optimizer candidate artifact ID must not be empty")
+        if len(self.evidence_example_ids) != len(set(self.evidence_example_ids)) or any(
+            not isinstance(value, str) or not value.strip()
+            for value in self.evidence_example_ids
+        ):
+            raise ValueError("optimizer projection evidence IDs are invalid")
+        if not self.reason_codes or len(self.reason_codes) != len(set(self.reason_codes)) or any(
+            not isinstance(value, str) or not value.strip() for value in self.reason_codes
+        ):
+            raise ValueError("optimizer projection reason codes are invalid")
+        if self.decision is OptimizerHypothesisDecision.NO_PROPOSAL and self.candidate_artifact_id is not None:
+            raise ValueError("NO_PROPOSAL projection cannot carry a candidate")
+        if self.decision is OptimizerHypothesisDecision.PROPOSE and self.candidate_artifact_id is None:
+            raise ValueError("PROPOSE projection requires a candidate")
+        expected = f"optimizer-hypothesis.{content_digest(self.identity_payload())[:40]}"
+        if self.projection_id != expected:
+            raise ValueError("optimizer projection ID mismatch")
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "result_id": self.result_id,
+            "request_id": self.request_id,
+            "decision": self.decision.value,
+            "target_layer": self.target_layer.value,
+            "parent_artifact_id": self.parent_artifact_id,
+            "candidate_artifact_id": self.candidate_artifact_id,
+            "corpus_id": self.corpus_id,
+            "corpus_digest": self.corpus_digest,
+            "evidence_example_ids": list(self.evidence_example_ids),
+            "reason_codes": list(self.reason_codes),
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {"projection_id": self.projection_id, **self.identity_payload()}
+
+    @classmethod
+    def from_payload(cls, value: object) -> "OptimizerHypothesisProjection":
+        fields = {
+            "projection_id", "result_id", "request_id", "decision",
+            "target_layer", "parent_artifact_id", "candidate_artifact_id",
+            "corpus_id", "corpus_digest", "evidence_example_ids", "reason_codes",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed optimizer hypothesis projection")
+        for field in ("evidence_example_ids", "reason_codes"):
+            if not isinstance(value[field], list):
+                raise ValueError("malformed optimizer hypothesis projection")
+        try:
+            result = cls(
+                value["projection_id"],
+                value["result_id"],
+                value["request_id"],
+                value["decision"],
+                value["target_layer"],
+                value["parent_artifact_id"],
+                value["candidate_artifact_id"],
+                value["corpus_id"],
+                value["corpus_digest"],
+                tuple(value["evidence_example_ids"]),
+                tuple(value["reason_codes"]),
+            )
+        except (TypeError, ValueError, KeyError) as exc:
+            raise ValueError("malformed optimizer hypothesis projection") from exc
+        if result.projection_id != f"optimizer-hypothesis.{content_digest(result.identity_payload())[:40]}":
+            raise ValueError("optimizer projection ID mismatch")
+        return result
+
+
+def project_optimizer_result(
+    result: ExtractionOptimizerResult,
+    corpus: "object",
+    *,
+    parent_artifact_id: str,
+    target_layer: PolicyLayer = PolicyLayer.EXTRACTION,
+) -> OptimizerHypothesisProjection:
+    """Validate a constrained optimizer result without exposing corpus text."""
+
+    from .extraction_optimizer_corpus import ExtractionOptimizerCorpus
+
+    if not isinstance(result, ExtractionOptimizerResult):
+        raise TypeError("optimizer projection result has the wrong type")
+    if not isinstance(corpus, ExtractionOptimizerCorpus):
+        raise TypeError("optimizer projection corpus has the wrong type")
+    target = PolicyLayer(target_layer)
+    if target is not PolicyLayer.EXTRACTION:
+        raise ValueError("current optimizer projection only supports extraction")
+    request = result.request
+    if request.parent_artifact_id != parent_artifact_id:
+        raise ValueError("optimizer result parent artifact differs")
+    if request.corpus_id != corpus.corpus_id or request.corpus_digest != corpus.corpus_digest:
+        raise ValueError("optimizer result corpus identity differs")
+    actionable = {
+        example.example_id
+        for example in corpus.examples
+        if example.primary
+        and example.label in {
+            ExtractionFeedbackLabel.USEFUL,
+            ExtractionFeedbackLabel.HARMFUL,
+            ExtractionFeedbackLabel.MISSED,
+        }
+        and example.component_ownership is OptimizerComponentOwnership.EXTRACTION
+        and example.attribution_confidence.value in {"high", "medium"}
+    }
+    cited = tuple(
+        example_id
+        for edit in result.edits
+        for example_id in edit.evidence_example_ids
+    )
+    if len(cited) != len(set(cited)):
+        raise ValueError("optimizer result cites duplicate evidence IDs")
+    if not set(cited).issubset(actionable):
+        raise ValueError("optimizer result cites ineligible evidence")
+    candidate_id = None
+    if result.decision is ExtractionOptimizerDecision.PROPOSE:
+        if result.candidate is None:
+            raise ValueError("optimizer proposal has no candidate artifact")
+        if result.candidate.parent_artifact_id != parent_artifact_id:
+            raise ValueError("optimizer candidate parent artifact differs")
+        candidate_id = result.candidate.artifact_id
+        if candidate_id == parent_artifact_id:
+            raise ValueError("optimizer candidate artifact must differ from parent")
+    elif result.candidate is not None or result.edits:
+        raise ValueError("NO_PROPOSAL result carries candidate data")
+    identity = {
+        "result_id": result.result_id,
+        "request_id": request.request_id,
+        "decision": OptimizerHypothesisDecision(result.decision.value).value,
+        "target_layer": target.value,
+        "parent_artifact_id": parent_artifact_id,
+        "candidate_artifact_id": candidate_id,
+        "corpus_id": corpus.corpus_id,
+        "corpus_digest": corpus.corpus_digest,
+        "evidence_example_ids": list(cited),
+        "reason_codes": list(result.reason_codes),
+    }
+    return OptimizerHypothesisProjection(
+        projection_id=f"optimizer-hypothesis.{content_digest(identity)[:40]}",
+        result_id=result.result_id,
+        request_id=request.request_id,
+        decision=result.decision.value,
+        target_layer=target,
+        parent_artifact_id=parent_artifact_id,
+        candidate_artifact_id=candidate_id,
+        corpus_id=corpus.corpus_id,
+        corpus_digest=corpus.corpus_digest,
+        evidence_example_ids=cited,
+        reason_codes=result.reason_codes,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1225,6 +1414,9 @@ __all__ = [
     "build_optimizer_corpus_interventions",
     "ProcessFeedback",
     "PolicyHypothesis",
+    "OptimizerHypothesisDecision",
+    "OptimizerHypothesisProjection",
+    "project_optimizer_result",
     "LayerIntervention",
     "FeasibilityEvidenceRecord",
     "JsonFeasibilityEvidenceLedger",
