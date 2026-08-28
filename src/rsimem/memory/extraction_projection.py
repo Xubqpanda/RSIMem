@@ -26,11 +26,16 @@ from .extraction_feedback import (
     detect_extracted_fact_semantic_keys,
 )
 from .ingestion import InternalMemoryAction, MemoryIngestStatus
-from .live_writeback import StaticSemanticBoundaryResult
-from ..memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
+from .live_writeback import ExtractionRuntimeBinding, StaticSemanticBoundaryResult
+from .prompt_components import SemanticPolicyManifest
+from ..memory_systems.mem0_flat.policy import (
+    ExtractionInvocationFingerprint,
+    Mem0FlatSemanticPolicy,
+)
 
 
-EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION = 2
+EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION = 3
+EXTRACTION_ACTIVATION_FINGERPRINT_SCHEMA_VERSION = 1
 LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION = 1
 
 
@@ -92,6 +97,176 @@ def _validate_feedback_dataset_payload(value: object) -> dict[str, object]:
 
 
 @dataclass(frozen=True, slots=True)
+class ExtractionActivationFingerprint:
+    compilation_id: str
+    extraction_operation_id: str
+    runtime_binding: ExtractionRuntimeBinding
+    semantic_policy: SemanticPolicyManifest
+    invocation: ExtractionInvocationFingerprint
+    parsed_output_digest: str
+    mutation_ids: tuple[str, ...]
+    persisted_artifact_ids: tuple[str, ...]
+    fingerprint_digest: str
+    schema_version: int = EXTRACTION_ACTIVATION_FINGERPRINT_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != EXTRACTION_ACTIVATION_FINGERPRINT_SCHEMA_VERSION:
+            raise ValueError("unsupported extraction activation fingerprint schema")
+        if any(not isinstance(value, str) or not value.strip() for value in (
+            self.compilation_id,
+            self.extraction_operation_id,
+        )):
+            raise ValueError("extraction activation identity is incomplete")
+        if not isinstance(self.runtime_binding, ExtractionRuntimeBinding):
+            raise TypeError("extraction activation runtime binding has the wrong type")
+        if not isinstance(self.semantic_policy, SemanticPolicyManifest):
+            raise TypeError("extraction activation semantic policy has the wrong type")
+        if not isinstance(self.invocation, ExtractionInvocationFingerprint):
+            raise TypeError("extraction activation invocation has the wrong type")
+        if (
+            self.semantic_policy.extraction_component_id
+            != self.runtime_binding.component_artifact_id
+            or self.semantic_policy.extraction_component_digest
+            != self.runtime_binding.component_body_digest
+            or self.semantic_policy.model_profile != self.runtime_binding.model_profile
+            or self.invocation.binding_id != self.runtime_binding.binding_id
+            or self.invocation.rendered_template_digest
+            != self.runtime_binding.rendered_template_digest
+        ):
+            raise ValueError("extraction activation binding and policy differ")
+        if len(self.parsed_output_digest) != 64 or any(
+            character not in "0123456789abcdef"
+            for character in self.parsed_output_digest
+        ):
+            raise ValueError("extraction activation parsed output digest is invalid")
+        for values, name in (
+            (self.mutation_ids, "mutation IDs"),
+            (self.persisted_artifact_ids, "persisted artifact IDs"),
+        ):
+            if (
+                not isinstance(values, tuple)
+                or len(values) != len(set(values))
+                or any(not isinstance(value, str) or not value.strip() for value in values)
+            ):
+                raise ValueError(f"extraction activation {name} are invalid")
+        expected = hashlib.sha256(
+            _canonical(self.identity_payload()).encode("utf-8")
+        ).hexdigest()
+        if self.fingerprint_digest != expected:
+            raise ValueError("extraction activation fingerprint digest mismatch")
+
+    @property
+    def fingerprint_id(self) -> str:
+        return f"extraction-activation.{self.fingerprint_digest[:40]}"
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "compilation_id": self.compilation_id,
+            "extraction_operation_id": self.extraction_operation_id,
+            "runtime_binding": self.runtime_binding.payload(),
+            "semantic_policy": self.semantic_policy.payload(),
+            "invocation": self.invocation.payload(),
+            "parsed_output_digest": self.parsed_output_digest,
+            "mutation_ids": list(self.mutation_ids),
+            "persisted_artifact_ids": list(self.persisted_artifact_ids),
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "fingerprint_id": self.fingerprint_id,
+            **self.identity_payload(),
+            "fingerprint_digest": self.fingerprint_digest,
+        }
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        compilation_id: str,
+        extraction_operation_id: str,
+        runtime_binding: ExtractionRuntimeBinding,
+        semantic_policy: SemanticPolicyManifest,
+        invocation: ExtractionInvocationFingerprint,
+        parsed_output_digest: str,
+        mutation_ids: tuple[str, ...],
+        persisted_artifact_ids: tuple[str, ...],
+    ) -> "ExtractionActivationFingerprint":
+        identity = {
+            "schema_version": EXTRACTION_ACTIVATION_FINGERPRINT_SCHEMA_VERSION,
+            "compilation_id": compilation_id,
+            "extraction_operation_id": extraction_operation_id,
+            "runtime_binding": runtime_binding.payload(),
+            "semantic_policy": semantic_policy.payload(),
+            "invocation": invocation.payload(),
+            "parsed_output_digest": parsed_output_digest,
+            "mutation_ids": list(mutation_ids),
+            "persisted_artifact_ids": list(persisted_artifact_ids),
+        }
+        return cls(
+            compilation_id,
+            extraction_operation_id,
+            runtime_binding,
+            semantic_policy,
+            invocation,
+            parsed_output_digest,
+            mutation_ids,
+            persisted_artifact_ids,
+            hashlib.sha256(_canonical(identity).encode("utf-8")).hexdigest(),
+        )
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionActivationFingerprint":
+        fields = {
+            "fingerprint_id",
+            "schema_version",
+            "compilation_id",
+            "extraction_operation_id",
+            "runtime_binding",
+            "semantic_policy",
+            "invocation",
+            "parsed_output_digest",
+            "mutation_ids",
+            "persisted_artifact_ids",
+            "fingerprint_digest",
+        }
+        if not isinstance(value, dict) or set(value) != fields:
+            raise ValueError("malformed extraction activation fingerprint")
+        invocation = value["invocation"]
+        if (
+            not isinstance(invocation, dict)
+            or set(invocation) != {
+                "render_id",
+                "render_input_digest",
+                "rendered_template_digest",
+                "model_output_digest",
+                "binding_id",
+            }
+            or not isinstance(value["mutation_ids"], list)
+            or not isinstance(value["persisted_artifact_ids"], list)
+        ):
+            raise ValueError("malformed extraction activation invocation")
+        try:
+            result = cls(
+                value["compilation_id"],
+                value["extraction_operation_id"],
+                ExtractionRuntimeBinding.from_payload(value["runtime_binding"]),
+                SemanticPolicyManifest.from_payload(value["semantic_policy"]),
+                ExtractionInvocationFingerprint(**invocation),
+                value["parsed_output_digest"],
+                tuple(value["mutation_ids"]),
+                tuple(value["persisted_artifact_ids"]),
+                value["fingerprint_digest"],
+                schema_version=value["schema_version"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction activation fingerprint") from exc
+        if value["fingerprint_id"] != result.fingerprint_id:
+            raise ValueError("extraction activation fingerprint ID mismatch")
+        return result
+
+
+@dataclass(frozen=True, slots=True)
 class ExtractionSourceRecord:
     family_id: str
     stage: str
@@ -104,6 +279,7 @@ class ExtractionSourceRecord:
     extraction_artifact_digest: str
     extraction_output_digest: str
     source: ExtractionSourceEvidence
+    activation: ExtractionActivationFingerprint
     content_digest: str
     schema_version: int = EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION
 
@@ -128,6 +304,18 @@ class ExtractionSourceRecord:
         ):
             if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
                 raise ValueError("extraction source fingerprint must be sha256")
+        if (
+            not isinstance(self.activation, ExtractionActivationFingerprint)
+            or self.activation.compilation_id != self.compilation_id
+            or self.activation.extraction_operation_id
+            != self.source.extraction_set_id
+            or self.activation.parsed_output_digest != self.extraction_output_digest
+            or self.activation.runtime_binding.component_artifact_id
+            != self.extraction_artifact_id
+            or self.activation.runtime_binding.component_body_digest
+            != self.extraction_artifact_digest
+        ):
+            raise ValueError("extraction source activation fingerprint differs")
         if self.content_digest != hashlib.sha256(
             _canonical(self.identity_payload()).encode("utf-8")
         ).hexdigest():
@@ -166,6 +354,7 @@ class ExtractionSourceRecord:
             "extraction_artifact_digest": self.extraction_artifact_digest,
             "extraction_output_digest": self.extraction_output_digest,
             "source": self.source.payload(),
+            "activation": self.activation.payload(),
         }
 
     @classmethod
@@ -183,6 +372,7 @@ class ExtractionSourceRecord:
         extraction_artifact_digest: str,
         extraction_output_digest: str,
         source: ExtractionSourceEvidence,
+        activation: ExtractionActivationFingerprint,
     ) -> "ExtractionSourceRecord":
         identity = {
             "schema_version": EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION,
@@ -197,6 +387,7 @@ class ExtractionSourceRecord:
             "extraction_artifact_digest": extraction_artifact_digest,
             "extraction_output_digest": extraction_output_digest,
             "source": source.payload(),
+            "activation": activation.payload(),
         }
         return cls(
             family_id,
@@ -210,6 +401,7 @@ class ExtractionSourceRecord:
             extraction_artifact_digest,
             extraction_output_digest,
             source,
+            activation,
             hashlib.sha256(_canonical(identity).encode("utf-8")).hexdigest(),
         )
 
@@ -229,11 +421,12 @@ class ExtractionSourceRecord:
             "extraction_artifact_digest",
             "extraction_output_digest",
             "source",
+            "activation",
             "content_digest",
         }
         if not isinstance(value, dict) or set(value) != fields:
             raise ValueError("malformed extraction source record")
-        scalar_fields = fields - {"schema_version", "source"}
+        scalar_fields = fields - {"schema_version", "source", "activation"}
         if (
             type(value["schema_version"]) is not int
             or any(not isinstance(value[field], str) for field in scalar_fields)
@@ -253,6 +446,7 @@ class ExtractionSourceRecord:
             value["extraction_artifact_digest"],
             value["extraction_output_digest"],
             ExtractionSourceEvidence.from_payload(value["source"]),
+            ExtractionActivationFingerprint.from_payload(value["activation"]),
             value["content_digest"],
             schema_version=value["schema_version"],
         )
@@ -770,6 +964,7 @@ class Mem0FlatExtractionSourceProjector:
         self,
         boundary: StaticSemanticBoundaryResult,
         policy: Mem0FlatSemanticPolicy,
+        runtime_binding: ExtractionRuntimeBinding,
         *,
         family_id: str,
         stage: str,
@@ -796,6 +991,30 @@ class Mem0FlatExtractionSourceProjector:
                 }
                 for fact in trace.fact_extractions
             ]).encode("utf-8")).hexdigest()
+        invocation = policy.extraction_invocation(ingestion.idempotency_key)
+        if invocation is None:
+            raise ValueError("extraction projection requires an invocation fingerprint")
+        executions = boundary.writeback.executions
+        activation = ExtractionActivationFingerprint.create(
+            compilation_id=boundary.compilation_id,
+            extraction_operation_id=trace.extraction_operation_id,
+            runtime_binding=runtime_binding,
+            semantic_policy=policy.semantic_manifest,
+            invocation=invocation,
+            parsed_output_digest=extraction_output_digest,
+            mutation_ids=tuple(dict.fromkeys(
+                execution.mutation_id for execution in executions
+            )),
+            persisted_artifact_ids=tuple(dict.fromkeys(
+                execution.artifact_id
+                for execution in executions
+                if execution.artifact_id is not None
+                and execution.status in {
+                    MutationExecutionStatus.COMMITTED,
+                    MutationExecutionStatus.DUPLICATE,
+                }
+            )),
+        )
         return ExtractionSourceRecord.create(
             family_id=family_id,
             stage=stage,
@@ -812,4 +1031,5 @@ class Mem0FlatExtractionSourceProjector:
             ),
             extraction_output_digest=extraction_output_digest,
             source=source,
+            activation=activation,
         )

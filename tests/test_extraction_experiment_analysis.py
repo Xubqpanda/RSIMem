@@ -34,6 +34,7 @@ from rsimem.memory.extraction_projection import (
     LiveExtractionFeedbackRecord,
 )
 from test_extraction_experiment_manifest import _inputs
+from extraction_fingerprint_support import extraction_activation_fixture
 
 
 PRIVATE_TEXT = "Do not include this private memory value."
@@ -127,6 +128,11 @@ def _run_evidence(
     output_digest: str,
     memory_artifact_id: str,
     run_id: str | None = None,
+    semantic_policy=None,
+    policy_artifact_id: str | None = None,
+    policy_artifact_digest: str | None = None,
+    matched_validation: bool | None = None,
+    policy_artifact=None,
 ) -> None:
     source = _source(method, memory_artifact_id)
     source_record = ExtractionSourceRecord.create(
@@ -141,6 +147,24 @@ def _run_evidence(
         extraction_artifact_digest=extraction_artifact_digest,
         extraction_output_digest=output_digest,
         source=source,
+        activation=extraction_activation_fixture(
+            compilation_id=f"compilation.{method}",
+            extraction_operation_id=source.extraction_set_id,
+            component_artifact_id=extraction_artifact_id,
+            component_artifact_digest=extraction_artifact_digest,
+            parsed_output_digest=output_digest,
+            persisted_artifact_ids=(memory_artifact_id,),
+            mutation_ids=(f"mutation.{method}",),
+            policy_artifact_id=policy_artifact_id,
+            policy_artifact_digest=policy_artifact_digest,
+            matched_validation=(
+                method.startswith(EXTRACTION_METHOD_VARIANTS[1])
+                if matched_validation is None
+                else matched_validation
+            ),
+            semantic_policy=semantic_policy,
+            policy_artifact=policy_artifact,
+        ),
     )
     source_path = (
         run
@@ -274,6 +298,8 @@ def _batch(tmp_path: Path, *, changed: bool) -> Path:
                 else "artifact.parent"
             ),
             run_id=run_name,
+            semantic_policy=active[method],
+            matched_validation=adaptive,
         )
         record_extraction_attempt(
             root / "batch_manifest.json",
@@ -304,6 +330,7 @@ def test_analysis_reports_quality_raw_unknown_usage_and_complete_funnel(
         "eligible": 1,
         "renderedNPlus1": 1,
         "changedExtraction": 1,
+        "noIntervention": 0,
         "changedArtifact": 1,
         "futureExposure": 1,
         "attributableUse": 1,
@@ -351,6 +378,7 @@ def test_analysis_rejects_adaptation_claim_without_changed_extraction(
 
     assert report["qualityReady"] is True
     assert report["activationFunnel"]["changedExtraction"] == 0
+    assert report["activationFunnel"]["noIntervention"] == 1
     assert claim["eligible"] is False
     assert claim["reason"] == "activation_funnel_incomplete"
     assert "changedExtraction" in claim["missingStages"]
@@ -401,6 +429,26 @@ def test_analysis_rejects_feedback_joined_to_an_unrelated_existing_source(
         extraction_artifact_digest=original.extraction_artifact_digest,
         extraction_output_digest=_sha("unrelated output"),
         source=unrelated_source,
+        activation=extraction_activation_fixture(
+            compilation_id="compilation.unrelated",
+            extraction_operation_id=unrelated_source.extraction_set_id,
+            component_artifact_id=original.extraction_artifact_id,
+            component_artifact_digest=original.extraction_artifact_digest,
+            parsed_output_digest=_sha("unrelated output"),
+            persisted_artifact_ids=("artifact.unrelated",),
+            mutation_ids=("mutation.unrelated",),
+            matched_validation=(
+                original.activation.runtime_binding.deployment_scope.value
+                == "matched_validation"
+            ),
+            semantic_policy=original.activation.semantic_policy,
+            policy_artifact_id=(
+                original.activation.runtime_binding.policy_artifact_id
+            ),
+            policy_artifact_digest=(
+                original.activation.runtime_binding.policy_artifact_digest
+            ),
+        ),
     )
     source_store.append(unrelated)
 

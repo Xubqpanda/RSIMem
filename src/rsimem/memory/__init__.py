@@ -27,6 +27,12 @@ from .backends import (
     HermesSemanticBackend,
     build_hermes_native_registry,
 )
+from .prompt_components import (
+    MemoryPromptAdapter,
+    PromptAdapterRegistry,
+    PromptSlotDescriptor,
+    prompt_slot,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -53,4 +59,8 @@ __all__ = [
     "HermesProceduralBackend",
     "HermesSemanticBackend",
     "build_hermes_native_registry",
+    "MemoryPromptAdapter",
+    "PromptAdapterRegistry",
+    "PromptSlotDescriptor",
+    "prompt_slot",
 ]

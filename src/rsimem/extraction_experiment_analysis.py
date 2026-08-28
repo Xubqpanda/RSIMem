@@ -25,6 +25,8 @@ from .memory.extraction_projection import (
     JsonLiveExtractionFeedbackRecordLog,
     LiveExtractionFeedbackRecord,
 )
+from .memory.live_writeback import ExtractionPromptRuntimeScope
+from .memory.prompt_components import SemanticPolicyManifest
 from .memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     OperationKind,
@@ -456,12 +458,27 @@ def _run_evidence(
     expected_artifact = manifest["semanticPolicy"]["activeArtifactByMethod"][
         attempt["method"]
     ]
+    expected_policy = SemanticPolicyManifest.from_payload(
+        manifest["semanticPolicy"][
+            "parent"
+            if attempt["method"] == EXTRACTION_METHOD_VARIANTS[0]
+            else "active"
+        ]
+    )
+    expected_scope = (
+        ExtractionPromptRuntimeScope.ROOT_STATIC
+        if attempt["method"] == EXTRACTION_METHOD_VARIANTS[0]
+        else ExtractionPromptRuntimeScope.MATCHED_VALIDATION
+    )
     expected_contract = manifest["feedbackContract"]["contractDigest"]
     sources_by_id = {record.record_id: record for record in sources}
     if any(
         record.family_id != split["familyId"]
         or record.extraction_artifact_id != expected_artifact["artifactId"]
         or record.extraction_artifact_digest != expected_artifact["artifactDigest"]
+        or record.activation.semantic_policy != expected_policy
+        or record.activation.runtime_binding.deployment_scope != expected_scope
+        or record.activation.persisted_artifact_ids != record.artifact_ids
         for record in sources
     ):
         raise ValueError("run extraction source identity differs from its manifest")
@@ -524,6 +541,7 @@ def _activation_funnel(rows: tuple[dict[str, Any], ...]) -> dict[str, int]:
             "eligible": 0,
             "renderedNPlus1": 0,
             "changedExtraction": 0,
+            "noIntervention": 0,
             "changedArtifact": 0,
             "futureExposure": 0,
             "attributableUse": 0,
@@ -534,6 +552,7 @@ def _activation_funnel(rows: tuple[dict[str, Any], ...]) -> dict[str, int]:
     if set(static) != set(adaptive):
         raise ValueError("static/adaptive extraction replicates do not match")
     eligible = rendered = changed_output = changed_artifact = 0
+    no_intervention = 0
     changed_active_ids: set[str] = set()
     adaptive_feedback: list[LiveExtractionFeedbackRecord] = []
     for replicate in sorted(static):
@@ -546,17 +565,29 @@ def _activation_funnel(rows: tuple[dict[str, Any], ...]) -> dict[str, int]:
             parent = parent_sources[key]
             active = active_sources[key]
             eligible += 1
-            rendered += 1
-            if parent.extraction_output_digest != active.extraction_output_digest:
+            if (
+                active.activation.runtime_binding.deployment_scope
+                == ExtractionPromptRuntimeScope.MATCHED_VALIDATION
+                and active.activation.invocation.binding_id
+                == active.activation.runtime_binding.binding_id
+            ):
+                rendered += 1
+            if (
+                parent.activation.parsed_output_digest
+                != active.activation.parsed_output_digest
+            ):
                 changed_output += 1
                 if (
-                    parent.artifact_ids != active.artifact_ids
+                    parent.activation.persisted_artifact_ids
+                    != active.activation.persisted_artifact_ids
                     or parent.source.status != active.source.status
                     or tuple(fact.disposition for fact in parent.source.facts)
                     != tuple(fact.disposition for fact in active.source.facts)
                 ):
                     changed_artifact += 1
                     changed_active_ids.add(active.record_id)
+            else:
+                no_intervention += 1
     primary = [
         next(example for example in record.dataset.examples if example.primary)
         for record in adaptive_feedback
@@ -574,6 +605,7 @@ def _activation_funnel(rows: tuple[dict[str, Any], ...]) -> dict[str, int]:
         "eligible": eligible,
         "renderedNPlus1": rendered,
         "changedExtraction": changed_output,
+        "noIntervention": no_intervention,
         "changedArtifact": changed_artifact,
         "futureExposure": exposure,
         "attributableUse": len(attributable),
@@ -629,7 +661,15 @@ def _paired_usage_delta(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
 
 
 def _claim(funnel: dict[str, int], safety_failures: int) -> dict[str, object]:
-    required = tuple(funnel)
+    required = (
+        "eligible",
+        "renderedNPlus1",
+        "changedExtraction",
+        "changedArtifact",
+        "futureExposure",
+        "attributableUse",
+        "attributableOutcome",
+    )
     missing = tuple(field for field in required if funnel[field] < 1)
     if safety_failures:
         return {

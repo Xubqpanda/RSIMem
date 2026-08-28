@@ -46,6 +46,7 @@ from .prompt_components import (
     PromptAdapterRegistry,
     PromptBindingFingerprint,
     PromptComponentArtifact,
+    prompt_slot,
 )
 from .receipts import JsonMutationReceiptStore
 from .receipt_audit import (
@@ -106,6 +107,45 @@ class ExtractionRuntimeBinding:
     rendered_template_digest: str
     model_profile: str
     trial_id: str | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "deployment_scope",
+            ExtractionPromptRuntimeScope(self.deployment_scope),
+        )
+        identities = (
+            self.policy_artifact_id,
+            self.policy_version,
+            self.component_artifact_id,
+            self.binding_id,
+            self.adapter_id,
+            self.slot_id,
+            self.model_profile,
+        )
+        if any(not isinstance(value, str) or not value.strip() for value in identities):
+            raise ValueError("extraction runtime binding identity is incomplete")
+        digests = (
+            self.policy_artifact_digest,
+            self.component_body_digest,
+            self.slot_contract_digest,
+            self.frozen_wrapper_digest,
+            self.input_schema_digest,
+            self.output_schema_digest,
+            self.rendered_template_digest,
+        )
+        if any(
+            not isinstance(value, str)
+            or len(value) != 64
+            or any(character not in "0123456789abcdef" for character in value)
+            for value in digests
+        ):
+            raise ValueError("extraction runtime binding digest is invalid")
+        if self.deployment_scope == ExtractionPromptRuntimeScope.MATCHED_VALIDATION:
+            if not isinstance(self.trial_id, str) or not self.trial_id.strip():
+                raise ValueError("matched extraction binding requires a trial ID")
+        elif self.trial_id is not None:
+            raise ValueError("root extraction binding cannot carry a trial ID")
 
     @classmethod
     def create(
@@ -175,6 +215,16 @@ class ExtractionRuntimeBinding:
             "model_profile": self.model_profile,
             "trial_id": self.trial_id,
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionRuntimeBinding":
+        fields = set(cls.__dataclass_fields__)
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed extraction runtime binding")
+        try:
+            return cls(**value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction runtime binding") from exc
 
 
 class SemanticCompilationReceiptStatus(StrEnum):
@@ -611,7 +661,11 @@ class StaticSemanticWritebackRuntime:
             base_gate = FrozenMem0UtilityGate()
         self.prompt_registry = PromptAdapterRegistry()
         self.prompt_adapter = Mem0FlatPromptAdapter()
-        self.prompt_registry.register(self.prompt_adapter)
+        prompt_slot(
+            MEM0_FLAT_EXTRACTION_SLOT_ID,
+            registry=self.prompt_registry,
+            adapter=self.prompt_adapter,
+        )
         extraction_policy_artifact = (
             extraction_policy_artifact
             or self.prompt_adapter.export_root_policy_artifact(

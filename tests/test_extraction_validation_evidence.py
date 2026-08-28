@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from rsimem.extraction_validation_evidence import (
     load_extraction_matched_evidence_batch,
 )
 from rsimem.memory.extraction_projection import (
+    ExtractionActivationFingerprint,
     ExtractionSourceRecord,
     JsonExtractionSourceRecordStore,
 )
@@ -28,6 +30,7 @@ from rsimem.memory.extraction_prompt_validation import (
 )
 from rsimem.memory.prompt_components import (
     MatchedSemanticPolicyManifest,
+    SemanticPolicyManifest,
     text_digest,
 )
 from rsimem.memory_systems.mem0_flat import (
@@ -40,6 +43,7 @@ from test_extraction_experiment_analysis import _run_evidence
 from test_extraction_experiment_manifest import _inputs
 from test_extraction_matched_activation import _offline_decision
 from test_extraction_offline_validation import _candidate, _criteria, _parent
+from extraction_fingerprint_support import extraction_activation_fixture
 
 
 def _semantic_policy(artifact):
@@ -143,6 +147,17 @@ def _batch(tmp_path: Path):
                     else f"artifact.parent-{replicate}"
                 ),
                 run_id=run_name,
+                semantic_policy=policy,
+                policy_artifact_id=(
+                    candidate.artifact_id if adaptive else parent.artifact_id
+                ),
+                policy_artifact_digest=(
+                    candidate.artifact_digest
+                    if adaptive
+                    else parent.artifact_digest
+                ),
+                matched_validation=adaptive,
+                policy_artifact=(candidate if adaptive else parent),
             )
             record_extraction_attempt(
                 root / "batch_manifest.json",
@@ -269,6 +284,7 @@ def test_validation_evidence_rejects_source_run_and_runtime_artifact_drift(
         extraction_artifact_digest=original.extraction_artifact_digest,
         extraction_output_digest=original.extraction_output_digest,
         source=original.source,
+        activation=original.activation,
     )
     source_path.unlink()
     JsonExtractionSourceRecordStore(source_path).append(drifted)
@@ -298,6 +314,19 @@ def test_validation_evidence_rejects_source_run_and_runtime_artifact_drift(
         extraction_artifact_digest=original.extraction_artifact_digest,
         extraction_output_digest=original.extraction_output_digest,
         source=original.source,
+        activation=extraction_activation_fixture(
+            compilation_id=original.compilation_id,
+            extraction_operation_id=original.source.extraction_set_id,
+            component_artifact_id="prompt-component.runtime-drift-v1",
+            component_artifact_digest=original.extraction_artifact_digest,
+            parsed_output_digest=original.extraction_output_digest,
+            persisted_artifact_ids=original.artifact_ids,
+            mutation_ids=original.activation.mutation_ids,
+            matched_validation=(
+                original.activation.runtime_binding.deployment_scope.value
+                == "matched_validation"
+            ),
+        ),
     )
     source_path.unlink()
     JsonExtractionSourceRecordStore(source_path).append(drifted)
@@ -329,10 +358,170 @@ def test_validation_evidence_rejects_source_without_feedback_closure(tmp_path) -
         extraction_artifact_digest=original.extraction_artifact_digest,
         extraction_output_digest=original.extraction_output_digest,
         source=original.source,
+        activation=extraction_activation_fixture(
+            compilation_id="compilation.uncovered-v1",
+            extraction_operation_id=original.source.extraction_set_id,
+            component_artifact_id=original.extraction_artifact_id,
+            component_artifact_digest=original.extraction_artifact_digest,
+            parsed_output_digest=original.extraction_output_digest,
+            persisted_artifact_ids=original.artifact_ids,
+            mutation_ids=("mutation.uncovered-v1",),
+            matched_validation=(
+                original.activation.runtime_binding.deployment_scope.value
+                == "matched_validation"
+            ),
+            semantic_policy=original.activation.semantic_policy,
+            policy_artifact_id=(
+                original.activation.runtime_binding.policy_artifact_id
+            ),
+            policy_artifact_digest=(
+                original.activation.runtime_binding.policy_artifact_digest
+            ),
+            policy_artifact=parent,
+        ),
     )
     store.append(uncovered)
 
     with pytest.raises(ValueError, match="complete feedback closure"):
+        assemble_extraction_matched_evidence_batch(
+            root,
+            parent=parent,
+            candidate=candidate,
+            offline_decision=offline,
+            split=split,
+        )
+
+
+@pytest.mark.parametrize(
+    "drift_field",
+    (
+        "route",
+        "boundary",
+        "backend",
+        "model_profile",
+        "update_component_digest",
+        "retrieval_component_digest",
+    ),
+)
+def test_validation_evidence_rejects_frozen_semantic_component_drift(
+    tmp_path,
+    drift_field: str,
+) -> None:
+    root, parent, candidate, offline, split = _batch(tmp_path / drift_field)
+    run = root / "r01_static_extraction_rsimem"
+    source_path = next(run.rglob("extraction_sources.jsonl"))
+    original = JsonExtractionSourceRecordStore(source_path).records()[0]
+    semantic = original.activation.semantic_policy
+    values = {
+        field: getattr(semantic, field)
+        for field in (
+            "route",
+            "boundary",
+            "backend",
+            "framework_version",
+            "model_profile",
+            "extraction_component_id",
+            "extraction_component_digest",
+            "update_component_id",
+            "update_component_digest",
+            "retrieval_component_id",
+            "retrieval_component_digest",
+        )
+    }
+    values[drift_field] = (
+        "f" * 64 if drift_field.endswith("_digest") else f"drifted-{drift_field}"
+    )
+    drifted_semantic = SemanticPolicyManifest.create(**values)
+    drifted = ExtractionSourceRecord.create(
+        family_id=original.family_id,
+        stage=original.stage,
+        run_id=original.run_id,
+        episode_id=original.episode_id,
+        session_id=original.session_id,
+        task_id=original.task_id,
+        compilation_id=original.compilation_id,
+        extraction_artifact_id=original.extraction_artifact_id,
+        extraction_artifact_digest=original.extraction_artifact_digest,
+        extraction_output_digest=original.extraction_output_digest,
+        source=original.source,
+        activation=extraction_activation_fixture(
+            compilation_id=original.compilation_id,
+            extraction_operation_id=original.source.extraction_set_id,
+            component_artifact_id=original.extraction_artifact_id,
+            component_artifact_digest=original.extraction_artifact_digest,
+            parsed_output_digest=original.extraction_output_digest,
+            persisted_artifact_ids=original.artifact_ids,
+            mutation_ids=original.activation.mutation_ids,
+            semantic_policy=drifted_semantic,
+            policy_artifact=parent,
+        ),
+    )
+    source_path.unlink()
+    JsonExtractionSourceRecordStore(source_path).append(drifted)
+
+    with pytest.raises(ValueError, match="run activation"):
+        assemble_extraction_matched_evidence_batch(
+            root,
+            parent=parent,
+            candidate=candidate,
+            offline_decision=offline,
+            split=split,
+        )
+
+
+@pytest.mark.parametrize(
+    "drift_field",
+    (
+        "adapter_id",
+        "slot_contract_digest",
+        "frozen_wrapper_digest",
+        "input_schema_digest",
+        "output_schema_digest",
+    ),
+)
+def test_validation_evidence_rejects_runtime_binding_contract_drift(
+    tmp_path,
+    drift_field: str,
+) -> None:
+    root, parent, candidate, offline, split = _batch(tmp_path / drift_field)
+    run = root / "r01_static_extraction_rsimem"
+    source_path = next(run.rglob("extraction_sources.jsonl"))
+    original = JsonExtractionSourceRecordStore(source_path).records()[0]
+    replacement = (
+        "drifted-adapter-v1" if drift_field == "adapter_id" else "f" * 64
+    )
+    binding = replace(
+        original.activation.runtime_binding,
+        **{drift_field: replacement},
+    )
+    activation = ExtractionActivationFingerprint.create(
+        compilation_id=original.compilation_id,
+        extraction_operation_id=original.source.extraction_set_id,
+        runtime_binding=binding,
+        semantic_policy=original.activation.semantic_policy,
+        invocation=original.activation.invocation,
+        parsed_output_digest=original.extraction_output_digest,
+        mutation_ids=original.activation.mutation_ids,
+        persisted_artifact_ids=original.activation.persisted_artifact_ids,
+    )
+    drifted = ExtractionSourceRecord.create(
+        family_id=original.family_id,
+        stage=original.stage,
+        run_id=original.run_id,
+        episode_id=original.episode_id,
+        session_id=original.session_id,
+        task_id=original.task_id,
+        compilation_id=original.compilation_id,
+        extraction_artifact_id=original.extraction_artifact_id,
+        extraction_artifact_digest=original.extraction_artifact_digest,
+        extraction_output_digest=original.extraction_output_digest,
+        source=original.source,
+        activation=activation,
+    )
+    source_path.unlink()
+    JsonExtractionSourceRecordStore(source_path).append(drifted)
+
+    with pytest.raises(ValueError, match="run activation"):
         assemble_extraction_matched_evidence_batch(
             root,
             parent=parent,

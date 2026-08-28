@@ -59,6 +59,7 @@ from .prompts import (
     POLICY_FACT_EXTRACTION_PROMPT,
     POLICY_INTERNAL_OPERATION_PROMPT,
     PromptTemplate,
+    RenderedPrompt,
 )
 from .utility_gate import FrozenMem0UtilityGate
 
@@ -346,6 +347,50 @@ class FactExtractionTrace:
 
 
 @dataclass(frozen=True, slots=True)
+class ExtractionInvocationFingerprint:
+    render_id: str
+    render_input_digest: str
+    rendered_template_digest: str
+    model_output_digest: str
+    binding_id: str | None
+
+    @classmethod
+    def create(
+        cls,
+        rendered: RenderedPrompt,
+        output_text: str,
+    ) -> "ExtractionInvocationFingerprint":
+        return cls(
+            rendered.render_id,
+            rendered.input_digest,
+            rendered.artifact.template_digest,
+            _sha(output_text),
+            rendered.binding_fingerprint,
+        )
+
+    def __post_init__(self) -> None:
+        if not self.render_id.strip():
+            raise ValueError("extraction render identity is incomplete")
+        if any(not _DIGEST.fullmatch(value) for value in (
+            self.render_input_digest,
+            self.rendered_template_digest,
+            self.model_output_digest,
+        )):
+            raise ValueError("extraction invocation digest is invalid")
+        if self.binding_id is not None and not self.binding_id.strip():
+            raise ValueError("extraction invocation binding is invalid")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "render_id": self.render_id,
+            "render_input_digest": self.render_input_digest,
+            "rendered_template_digest": self.rendered_template_digest,
+            "model_output_digest": self.model_output_digest,
+            "binding_id": self.binding_id,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Mem0FlatOperationTrace:
     context: OperationContext
     source_operation_id: str
@@ -457,6 +502,9 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
         self._facts: dict[str, ExtractedSemanticFact] = {}
         self._target_namespaces: dict[str, str] = {}
         self._operation_traces: dict[str, Mem0FlatOperationTrace] = {}
+        self._extraction_invocations: dict[
+            str, ExtractionInvocationFingerprint
+        ] = {}
 
     @property
     def descriptor(self) -> SemanticPolicyDescriptor:
@@ -470,6 +518,12 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
 
     def operation_trace(self, request_id: str) -> Mem0FlatOperationTrace | None:
         return self._operation_traces.get(request_id)
+
+    def extraction_invocation(
+        self,
+        request_id: str,
+    ) -> ExtractionInvocationFingerprint | None:
+        return self._extraction_invocations.get(request_id)
 
     def _operation_context(self, request: SemanticIngestRequest) -> OperationContext:
         source = request.provenance.source
@@ -735,6 +789,16 @@ class Mem0FlatSemanticPolicy(SemanticMemoryPolicy):
                 "exit_evidence": request.exit_evidence.compiler_input_payload(),
             })
             extraction_result = self.completion_client.complete(extraction)
+            invocation = ExtractionInvocationFingerprint.create(
+                extraction,
+                extraction_result.output_text,
+            )
+            existing_invocation = self._extraction_invocations.get(
+                request.idempotency_key
+            )
+            if existing_invocation is not None and existing_invocation != invocation:
+                raise ValueError("extraction invocation identity conflict")
+            self._extraction_invocations[request.idempotency_key] = invocation
             facts, fact_extractions = self._parse_facts(
                 extraction_result.output_text,
                 request,

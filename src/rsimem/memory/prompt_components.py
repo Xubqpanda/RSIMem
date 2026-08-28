@@ -310,6 +310,20 @@ class PromptAdapterRegistry:
         for slot in slots:
             self._slots[slot.slot_id] = (adapter, slot)
 
+    def register_slot(
+        self,
+        slot_id: str,
+        *,
+        adapter: MemoryPromptAdapter,
+    ) -> PromptSlotDescriptor:
+        slots = adapter.list_slots()
+        if len(slots) != 1 or slots[0].slot_id != slot_id:
+            raise ValueError(
+                "one-line prompt slot registration requires one matching slot"
+            )
+        self.register(adapter)
+        return self.descriptor(slot_id)
+
     def descriptor(self, slot_id: str) -> PromptSlotDescriptor:
         try:
             return self._slots[slot_id][1]
@@ -352,6 +366,17 @@ class PromptAdapterRegistry:
             return self._slots[slot_id]
         except KeyError as exc:
             raise KeyError(f"unregistered prompt slot: {slot_id}") from exc
+
+
+def prompt_slot(
+    slot_id: str,
+    *,
+    registry: PromptAdapterRegistry,
+    adapter: MemoryPromptAdapter,
+) -> PromptSlotDescriptor:
+    """Register one explicit adapter-owned slot without global patching."""
+
+    return registry.register_slot(slot_id, adapter=adapter)
 
 
 @dataclass(frozen=True, slots=True)
@@ -444,6 +469,32 @@ class SemanticPolicyManifest:
             "composite_digest": self.composite_digest,
             "composite_policy_version": self.composite_policy_version,
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "SemanticPolicyManifest":
+        fields = {
+            "schema_version",
+            "manifest_schema",
+            "route",
+            "boundary",
+            "backend",
+            "framework_version",
+            "model_profile",
+            "extraction_component_id",
+            "extraction_component_digest",
+            "update_component_id",
+            "update_component_digest",
+            "retrieval_component_id",
+            "retrieval_component_digest",
+            "composite_digest",
+            "composite_policy_version",
+        }
+        if not isinstance(value, dict) or set(value) != fields:
+            raise ValueError("malformed semantic policy manifest")
+        try:
+            return cls(**value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed semantic policy manifest") from exc
 
 
 @dataclass(frozen=True, slots=True)

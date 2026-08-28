@@ -15,6 +15,7 @@ from rsimem.memory.prompt_components import (
     MatchedSemanticPolicyManifest,
     SemanticPolicyManifest,
     content_digest,
+    prompt_slot,
     text_digest,
 )
 
@@ -126,6 +127,35 @@ def test_host_neutral_fake_adapter_root_replacement_render_and_fingerprint() -> 
     replacement_binding = registry.bind(adapter.slot.slot_id, replacement)
     assert replacement_binding != root_binding
     assert replacement.policy_body in adapter.render("message-b")
+
+
+def test_one_line_prompt_slot_uses_the_same_registry_contract() -> None:
+    explicit_registry = PromptAdapterRegistry()
+    explicit_adapter = _FakeAdapter()
+    explicit_registry.register(explicit_adapter)
+
+    concise_registry = PromptAdapterRegistry()
+    concise_adapter = _FakeAdapter()
+    descriptor = prompt_slot(
+        "fake.semantic.extraction",
+        registry=concise_registry,
+        adapter=concise_adapter,
+    )
+
+    assert descriptor == explicit_registry.descriptor(descriptor.slot_id)
+    assert concise_registry.root_artifact(descriptor.slot_id) == (
+        explicit_registry.root_artifact(descriptor.slot_id)
+    )
+    artifact = concise_registry.root_artifact(descriptor.slot_id)
+    assert concise_registry.bind(descriptor.slot_id, artifact) == (
+        explicit_registry.bind(descriptor.slot_id, artifact)
+    )
+    with pytest.raises(ValueError, match="one matching slot"):
+        prompt_slot(
+            "another.semantic.extraction",
+            registry=PromptAdapterRegistry(),
+            adapter=_FakeAdapter(),
+        )
 
 
 def test_prompt_registry_fails_closed_on_missing_duplicate_and_wrong_owner() -> None:

@@ -49,6 +49,7 @@ from rsimem.memory.operation_graph import (
     OperationStatus,
 )
 from rsimem.memory.prompt_components import content_digest, text_digest
+from extraction_fingerprint_support import extraction_activation_fixture
 
 
 TSV_KEY = "preference.summary.tsv"
@@ -129,6 +130,17 @@ def _fixture():
             value.trace_payload() for value in traces
         ]),
         source=source,
+        activation=extraction_activation_fixture(
+            compilation_id="compilation.learn-v1",
+            extraction_operation_id=source.extraction_set_id,
+            component_artifact_id="prompt-component.root-v1",
+            component_artifact_digest="1" * 64,
+            parsed_output_digest=content_digest([
+                value.trace_payload() for value in traces
+            ]),
+            persisted_artifact_ids=("artifact.memory-v1",),
+            mutation_ids=("mutation.fixture-v1",),
+        ),
     )
     join = FeedbackOperationJoin(
         "op.opportunity-v1",

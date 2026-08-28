@@ -27,6 +27,7 @@ from rsimem.memory.extraction_projection import (
     JsonLiveExtractionFeedbackRecordLog,
     LiveExtractionFeedbackRecord,
 )
+from extraction_fingerprint_support import extraction_activation_fixture
 from rsimem.memory.extraction_prompt_validation import (
     ExtractionAcceptanceCriteria,
     ExtractionPromptMatchedValidator,
@@ -151,6 +152,15 @@ def _live_evidence():
         extraction_artifact_digest=_sha(PARENT),
         extraction_output_digest=_sha("extracted TSV preference"),
         source=source,
+        activation=extraction_activation_fixture(
+            compilation_id="compilation.validation",
+            extraction_operation_id=source.extraction_set_id,
+            component_artifact_id=PARENT,
+            component_artifact_digest=_sha(PARENT),
+            parsed_output_digest=_sha("extracted TSV preference"),
+            persisted_artifact_ids=("memory.validation",),
+            mutation_ids=("mutation.validation",),
+        ),
     )
     deployment = DeploymentObservation(
         "observation.validation",
