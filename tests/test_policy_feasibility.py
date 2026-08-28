@@ -261,6 +261,16 @@ def test_feedback_ids_must_be_non_empty_strings() -> None:
         FeedbackChain(opportunity_id=" ")
 
 
+def test_report_rejects_duplicate_case_identity() -> None:
+    case = _case(
+        "case.duplicate",
+        FeasibilityOutcome.UNRESOLVED,
+        FeedbackChain(),
+    )
+    with pytest.raises(ValueError, match="case IDs must be unique"):
+        build_feasibility_report((case, case))
+
+
 def _layer_artifact(layer: PolicyLayer, version: str, kind: PolicyArtifactKind) -> PolicyArtifactIdentity:
     return PolicyArtifactIdentity.create(policy_version=version, kind=kind, layers=(layer,))
 
@@ -330,7 +340,11 @@ def _run_pair(layer: PolicyLayer):
     return parent, candidate
 
 
-def _layer_case(layer: PolicyLayer, outcome: FeasibilityOutcome) -> LayerIntervention:
+def _layer_case(
+    layer: PolicyLayer,
+    outcome: FeasibilityOutcome,
+    suffix: str | None = None,
+) -> LayerIntervention:
     parent, candidate = _run_pair(layer)
     feedback = (
         FeedbackChain("opportunity.layer", "use.layer", "outcome.layer")
@@ -345,7 +359,7 @@ def _layer_case(layer: PolicyLayer, outcome: FeasibilityOutcome) -> LayerInterve
         else FeedbackChain()
     )
     return LayerIntervention(
-        case_id=f"case.{layer.value}",
+        case_id=f"case.{layer.value}{f'.{suffix}' if suffix else ''}",
         target_layer=layer,
         parent=parent,
         candidate=candidate,
@@ -366,8 +380,8 @@ def test_deterministic_fixture_covers_all_six_layers() -> None:
     cases = (
         _layer_case(PolicyLayer.TRIGGER, FeasibilityOutcome.UNRESOLVED),
         _layer_case(PolicyLayer.SOURCE_SELECTION, FeasibilityOutcome.MISSED),
-        _layer_case(PolicyLayer.EXTRACTION, FeasibilityOutcome.USEFUL),
-        _layer_case(PolicyLayer.EXTRACTION, FeasibilityOutcome.MISSED),
+        _layer_case(PolicyLayer.EXTRACTION, FeasibilityOutcome.USEFUL, "useful"),
+        _layer_case(PolicyLayer.EXTRACTION, FeasibilityOutcome.MISSED, "missed"),
         _layer_case(PolicyLayer.ADMISSION, FeasibilityOutcome.HARMFUL),
         _layer_case(PolicyLayer.COMMIT, FeasibilityOutcome.USEFUL),
         _layer_case(PolicyLayer.EXPOSURE, FeasibilityOutcome.USEFUL),
