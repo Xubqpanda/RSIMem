@@ -710,9 +710,12 @@ deterministic runtime binding、PAST validation-only transport、activation fing
 matched drift gate；验收记录见
 [`extraction_stage2f_acceptance_20260828.md`](extraction_stage2f_acceptance_20260828.md)。
 当前必须执行Stage 2E独立matched validation batch，不能直接进入Stage 2G或production final run。
-Stage 2E plain-parent feedback已从clean detached worktree发起；认证后的四次完整运行均因provider
-HTTP 503 capacity失败，且没有生成source/capture/feedback evidence，因此不得进入optimizer。
-运行记录见[`extraction_stage2e_provider_attempts_20260828.md`](extraction_stage2e_provider_attempts_20260828.md)。
+Stage 2E plain-parent feedback已通过显式注册的backup provider完成3个clean replicate。v10的
+source/capture/feedback exact join和private corpus可重建，但24个primary label全部为unresolved，
+actionable count为0，低于冻结门槛2；optimizer以0次模型调用返回`NO_PROPOSAL`，未生成candidate。
+因此matched trial仍未开始，也不得进入Stage 2G。验收记录见
+[`extraction_stage2e_feedback_v10_20260828.md`](extraction_stage2e_feedback_v10_20260828.md)；
+此前provider失败记录见[`extraction_stage2e_provider_attempts_20260828.md`](extraction_stage2e_provider_attempts_20260828.md)。
 后续顺序仍严格按照：
 
 ```text

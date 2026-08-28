@@ -424,6 +424,13 @@ Acceptance criteria:
 13. [ ] Return to Stage 2E and run a predeclared matched static-extraction/adaptive-extraction SM01 batch.
 14. [ ] Produce dated extraction-method reports before making adaptation claims.
 
+The backup-provider v10 plain-parent batch completed three clean replicates and
+reconstructed the private optimizer corpus, but all 24 primary labels were
+unresolved. The deterministic signal gate returned `NO_PROPOSAL` with zero
+optimizer calls and no candidate. The matched Stage 2E item therefore remains
+open; details are recorded in
+[`extraction_stage2e_feedback_v10_20260828.md`](extraction_stage2e_feedback_v10_20260828.md).
+
 ## Update Policy
 
 Update this file whenever a milestone is completed, its acceptance criteria change, or evidence reveals a new blocker. Mark an item complete only after its implementation, tests, and required experiment evidence are all available. Record detailed numerical results in a separate dated report and link that report here rather than embedding provisional paper results in the checklist.

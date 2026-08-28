@@ -53,3 +53,15 @@ return `NO_PROPOSAL` if the resolved-signal threshold remains unmet.
 Provider capacity does not authorize changing the model profile, lowering the
 resolved-signal gate, reusing legacy schema-v2 evidence, or substituting a
 deterministic candidate.
+
+## Resolution
+
+The primary provider later completed two valid replicates in v7, but its third
+replicate failed audit after two HTTP 503 requests. The explicitly registered
+backup provider completed all three v10 replicates with zero retries after its
+API URL was corrected to include `/v1`.
+
+Provider capacity is no longer the immediate blocker. The accepted v10 batch
+produced 24 unresolved and zero actionable primary labels, so the optimizer
+correctly returned `NO_PROPOSAL`. See
+[`extraction_stage2e_feedback_v10_20260828.md`](extraction_stage2e_feedback_v10_20260828.md).
