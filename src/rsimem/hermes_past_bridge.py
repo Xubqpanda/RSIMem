@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -40,11 +40,23 @@ from .memory.future_trace import (
     SemanticFeedbackResolver,
     SemanticFutureEvidence,
     SemanticFutureTraceRecorder,
+    SemanticOutcomeEvidence,
 )
 from .memory.extraction_feedback import (
+    ArtifactSemanticBinding,
     DeploymentObservation,
+    ExposureMode,
+    ExtractionFeedbackBuilder,
+    FeedbackOperationJoin,
+    FutureMemoryEvidence,
     ObservableToolEvent,
     detect_current_input_semantic_keys,
+    detect_source_semantic_keys,
+)
+from .memory.extraction_projection import (
+    JsonExtractionFeedbackDatasetLog,
+    JsonExtractionSourceRecordStore,
+    Mem0FlatExtractionSourceProjector,
 )
 from .memory.operation_graph import OperationContext
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
@@ -441,13 +453,36 @@ class HermesPastBenchBridge:
                     family_id=family_id,
                     stage=stage,
                 )
+                feedback_registry = self.semantic_feedback_resolver.registry
+                self.extraction_source_projector = (
+                    Mem0FlatExtractionSourceProjector(feedback_registry)
+                )
+                self.extraction_source_store = JsonExtractionSourceRecordStore(
+                    Path(hermes_home) / ".rsimem" / "extraction_sources.jsonl"
+                )
+                self.extraction_feedback_builder = ExtractionFeedbackBuilder(
+                    feedback_registry
+                )
+                self.extraction_feedback_log = JsonExtractionFeedbackDatasetLog(
+                    self.evidence_path.with_name(
+                        "rsimem_extraction_feedback.jsonl"
+                    )
+                )
             else:
                 self.semantic_future_recorder = None
                 self.semantic_feedback_resolver = None
+                self.extraction_source_projector = None
+                self.extraction_source_store = None
+                self.extraction_feedback_builder = None
+                self.extraction_feedback_log = None
         else:
             self.static_writeback = None
             self.semantic_future_recorder = None
             self.semantic_feedback_resolver = None
+            self.extraction_source_projector = None
+            self.extraction_source_store = None
+            self.extraction_feedback_builder = None
+            self.extraction_feedback_log = None
         self._closed = False
 
     @property
@@ -506,11 +541,14 @@ class HermesPastBenchBridge:
                     for item in self._static_results
                 ):
                     self._static_results.append(compiled)
+                self._record_extraction_source(compiled)
         except Exception as exc:
             self._static_failures.append((
                 EvaluationTrigger.TASK_COMPLETED.value,
                 type(exc).__name__,
             ))
+            if self.extraction_source_store is not None:
+                raise
 
     def _collect_completed_snapshot(self) -> ContextSnapshot:
         agent = self._agent
@@ -555,14 +593,119 @@ class HermesPastBenchBridge:
         for future, step_id in self._semantic_futures:
             observation = self._semantic_deployment_observation(result)
             resolution = self.semantic_feedback_resolver.resolve(future, observation)
-            self.semantic_future_recorder.record_use_and_outcome(
+            outcome = self.semantic_future_recorder.record_use_and_outcome(
                 future,
                 used_artifact_ids=resolution.used_artifact_ids,
                 outcome_status=resolution.outcome_status,
                 outcome_reason_code=resolution.outcome_reason_code,
                 step_id=step_id,
             )
+            self._record_extraction_feedback(future, observation, outcome)
         self._semantic_outcomes_recorded = True
+
+    def _record_extraction_source(
+        self,
+        boundary: StaticSemanticBoundaryResult,
+    ) -> None:
+        if (
+            self.static_writeback is None
+            or self.extraction_source_projector is None
+            or self.extraction_source_store is None
+            or self._family_id is None
+            or self._stage is None
+        ):
+            return
+        if boundary.duplicate:
+            if not any(
+                record.compilation_id == boundary.compilation_id
+                for record in self.extraction_source_store.records()
+            ):
+                raise ValueError(
+                    "duplicate semantic compilation has no source evidence"
+                )
+            return
+        projection = self.static_writeback.source_projection_for(
+            boundary.compilation_id
+        )
+        if projection is None:
+            raise ValueError("semantic compilation source projection is unavailable")
+        available_keys = detect_source_semantic_keys(
+            self._family_id,
+            tuple(message.content for message in projection.messages),
+        )
+        record = self.extraction_source_projector.project_record(
+            boundary,
+            self.static_writeback.policy,
+            family_id=self._family_id,
+            stage=self._stage,
+            available_semantic_keys=available_keys,
+        )
+        self.extraction_source_store.append(record)
+
+    def _record_extraction_feedback(
+        self,
+        future: SemanticFutureEvidence,
+        observation: DeploymentObservation,
+        outcome: SemanticOutcomeEvidence,
+    ) -> None:
+        if (
+            self.semantic_feedback_resolver is None
+            or self.extraction_source_store is None
+            or self.extraction_feedback_builder is None
+            or self.extraction_feedback_log is None
+            or self._family_id is None
+        ):
+            return
+        contract = self.semantic_feedback_resolver.registry.resolver(
+            self._family_id
+        ).contract
+        if observation.stage not in contract.opportunity.eligible_stages:
+            return
+        records = self.extraction_source_store.candidates(
+            family_id=self._family_id,
+            artifact_ids=future.memory_artifact_ids,
+            opportunity_semantic_keys=contract.opportunity.memory_scope_keys,
+        )
+        for record in records:
+            keys_by_artifact: dict[str, list[str]] = {}
+            for fact in record.source.facts:
+                if (
+                    fact.artifact_id is None
+                    or fact.artifact_id not in future.memory_artifact_ids
+                ):
+                    continue
+                values = keys_by_artifact.setdefault(fact.artifact_id, [])
+                for key in fact.semantic_keys:
+                    if key not in values:
+                        values.append(key)
+            bindings = tuple(
+                ArtifactSemanticBinding(artifact_id, tuple(keys))
+                for artifact_id, keys in keys_by_artifact.items()
+                if keys
+            )
+            exposed = bool(bindings) and future.injection_artifact_id is not None
+            source_future = FutureMemoryEvidence(
+                f"opportunity.{future.query_operation_id}",
+                (
+                    ExposureMode.EAGER_SYSTEM_PROMPT
+                    if exposed
+                    else ExposureMode.NOT_EXPOSED
+                ),
+                bindings,
+                future.query_operation_id,
+                future.injection_operation_id if exposed else None,
+            )
+            dataset = self.extraction_feedback_builder.build(
+                record.source,
+                observation,
+                source_future,
+                operation_join=FeedbackOperationJoin(
+                    future.query_operation_id,
+                    outcome.use_operation_id,
+                    outcome.outcome_operation_id,
+                ),
+            )
+            self.extraction_feedback_log.append(dataset)
 
     def _semantic_deployment_observation(
         self,
