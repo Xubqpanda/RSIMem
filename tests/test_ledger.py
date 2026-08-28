@@ -550,6 +550,27 @@ def test_auto_loaded_runtime_evidence_rejects_content_fields(tmp_path: Path) -> 
         build_events(comparison)
 
 
+def test_infra_blocked_episode_with_empty_trace_keeps_unknown_usage(
+    tmp_path: Path,
+) -> None:
+    comparison = _fixture(tmp_path)
+    payload = json.loads(comparison.read_text(encoding="utf-8"))
+    episode = payload["with_persistence"]["episodes"][0]
+    episode["trace"] = ""
+    episode["infra_blocked"] = True
+    episode["token_usage"]["model_request_count"] = None
+    episode["token_usage"]["model_usage_complete"] = False
+    comparison.write_text(json.dumps(payload), encoding="utf-8")
+
+    events = build_events(comparison)
+
+    outcome = next(event for event in events if event["kind"] == "episode_outcome")
+    usage = next(event for event in events if event["kind"] == "model_usage")
+    assert outcome["data"]["infraBlocked"] is True
+    assert usage["data"]["detailedUsageAvailable"] is False
+    assert not any(event["kind"] == "model_call_usage" for event in events)
+
+
 def test_auto_loaded_runtime_event_duplicates_are_idempotent_but_conflicts_fail(
     tmp_path: Path,
 ) -> None:

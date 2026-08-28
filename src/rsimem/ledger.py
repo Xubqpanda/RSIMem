@@ -992,7 +992,7 @@ def _model_call_events(
     root: Path,
 ) -> Iterable[dict[str, Any]]:
     trace_path = resolve_comparison_evidence_path(episode.get("trace", ""), root)
-    if not trace_path.exists():
+    if not trace_path.is_file():
         return
     ordinal = 0
     for line in trace_path.read_text(encoding="utf-8").splitlines():
