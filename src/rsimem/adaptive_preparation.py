@@ -1,4 +1,9 @@
-"""Prepare one offline-screened adaptive retrieval policy from live feedback."""
+"""Prepare a legacy retrieval-threshold artifact for infrastructure replay.
+
+This module is not the extraction-prompt optimizer or a production RSIMem
+adaptive entry point. New method work starts from the extraction-specific
+artifact and experiment contracts.
+"""
 
 from __future__ import annotations
 

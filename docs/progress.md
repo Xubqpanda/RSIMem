@@ -14,7 +14,7 @@ This document tracks implementation progress, the current experimental boundary,
 
 RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for every exposed model request, derive a privacy-safe lifecycle ledger, audit run completeness, and represent Hermes semantic, episodic, and procedural memory through typed backend contracts.
 
-The typed memory runtime is connected to the PAST-Bench Hermes execution path behind explicit opt-in modes. Direct native remains the default. Static and adaptive Mem0-flat semantic writeback are available only through live experiment configuration; adaptive startup additionally requires a prepared, attempt-local store with one ACTIVE artifact that binds to the trusted runtime parameters. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
+The typed memory runtime is connected to the PAST-Bench Hermes execution path behind explicit opt-in modes. Direct native remains the default. Static Mem0-flat semantic writeback is available through live experiment configuration. The older adaptive utility/threshold mode remains only as replayable infrastructure; it is not the extraction-prompt method. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
 
 The Hermes, static semantic writeback, operation graph, feedback store, and
 activation/rollback foundations are complete. The former Phase 2J/2K work is
@@ -22,7 +22,7 @@ complete only as legacy retrieval-threshold infrastructure; extraction-prompt
 adaptation is pending. Stage 1 of the extraction-prompt handoff checklist is
 the active milestone. No new adaptive live batch runs before Stage 1 closes.
 
-Extraction-prompt Stage 1A through 1D are complete. Legacy threshold artifacts now
+Extraction-prompt Stage 1A through 1G are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
 semantic compilation runs directly from a trusted completed-task snapshot,
 independent of keep/evict evaluation; session end creates no second attempt,
@@ -34,8 +34,11 @@ prompt slot and the real Mem0-flat adapter bind the extraction artifact at the
 completion boundary. Composite and matched manifests freeze update, retrieval,
 route, boundary, backend, framework, and model profile. Plain static extraction
 is the explicit parent; native writers and background review are disabled, and
-run-scoped receipt audit rejects unowned semantic drift. Feedback label
-semantics in Stage 1E are the next milestone.
+run-scoped receipt audit rejects unowned semantic drift. Source/set/fact
+feedback, family-specific opportunity/use/outcome contracts, prompt-oriented
+validation, formal extraction manifests, and raw-vector analysis are complete.
+The next milestone is a successful Stage 1H live plain-parent smoke; the first
+attempt was retained as a provider failure after all 27 requests returned 503.
 
 ## Completed Work
 
@@ -206,7 +209,7 @@ Static PAST-Bench semantic writeback is complete for SM01: 9/9 rotated method at
 
 The frozen static utility gate is also complete for SM01. The accepted 3-replicate static/static-utility batch has 6/6 completed scheduled slots, 54 unique traces, exact utility/ingestion joins, and one stable gate/policy/schema identity across utility replicates. Results and limitations are recorded in [`static_utility_sm01_20260827.md`](static_utility_sm01_20260827.md); no quality-superiority or adaptive-policy claim is made.
 
-The delayed-feedback lifecycle join, exposure-bias contracts, and deterministic stage gate are complete. Versioned content-free datasets preserve artifact-specific future evidence, observation cutoffs, four-state labels, attribution provenance, exposure opportunity, candidate/filter disposition, propensity availability, raw resource usage, integrity audit results, aggregate censoring reports, and frozen config identity. These contracts are being rebuilt around source-, extraction-set-, and fact-level prompt feedback before extraction adaptation is enabled.
+The delayed-feedback lifecycle join, exposure-bias contracts, and deterministic stage gate are complete. Versioned content-free datasets preserve artifact-specific future evidence, observation cutoffs, extraction-owned labels, attribution provenance, exposure opportunity, candidate/filter disposition, integrity audit results, aggregate censoring reports, and frozen config identity. Source-, extraction-set-, and attributable fact-level prompt feedback now use separate opportunity/use/outcome contracts; raw resource usage remains outside label and activation payloads.
 
 The former 2J.1 learner produces deterministic retrieval-threshold proposals and retains value as a legacy plumbing fixture. Its artifacts are explicitly marked `legacy_threshold_experiment` and cannot be loaded by the extraction-prompt runtime. The crash-safe artifact lifecycle store remains reusable infrastructure.
 
@@ -214,7 +217,7 @@ Former Phase 2J threshold infrastructure is complete at its deterministic implem
 
 Former Phase 2K.1 execution plumbing covers the legacy threshold preparation boundary. Offline screening and matched activation no longer use resource cost, but the resulting threshold artifact is not a production extraction artifact. Its launchers remain disabled infrastructure until extraction-specific manifests replace them.
 
-Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment infrastructure. Extraction-specific launchers and analysis are pending; raw request, token, storage, injection, and timing vectors remain accounting outputs and do not enter learning or activation.
+Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment infrastructure. The extraction-specific plain-parent feedback launcher, prompt-oriented manifest, split audit, and analyzer are implemented independently. Raw request, token, storage, injection, recovery, and timing vectors remain accounting outputs and do not enter learning or activation. Adaptive extraction launch and ACTIVE artifact binding remain Phase 2 work.
 
 ### Extraction-Prompt Stage 1D Component Boundary
 
@@ -309,7 +312,7 @@ Acceptance criteria:
 - [ ] Version and deploy semantic extraction prompt N+1 while freezing operation, retrieval, routing, and invocation components.
 - [x] Validate proposed policy updates against held-out deployment evidence.
 - [x] Support acceptance, rejection, rollback, and reproducible replay of every policy update.
-- [ ] Compare static and adaptive LightRSI on the cost-quality frontier.
+- [ ] Compare static and adaptive extraction prompts on deployment-observable quality while reporting each raw resource dimension separately.
 
 ### PAST-Bench Task-Family Expansion
 
@@ -337,7 +340,7 @@ Acceptance criteria:
 3. [x] Complete the SM01 learn -> ingest -> validate -> mutate -> restart -> native injection -> downstream-use fixture.
 4. [x] Connect real extraction, retrieval, decision, validation, mutation, verification, injection, use/non-use, and outcome operation evidence.
 5. [x] Run and audit the static SM01 matched comparison.
-6. [ ] Complete extraction-prompt Stage 1A-1H without an adaptive live run.
+6. [ ] Complete the Stage 1H live plain-parent smoke after provider availability; Stage 1A-1G and the full deterministic regression are complete.
 7. [ ] Implement the extraction prompt artifact, optimizer, held-out validation, activation, and rollback path.
 8. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
 9. [ ] Produce dated extraction-method reports before making adaptation claims.
