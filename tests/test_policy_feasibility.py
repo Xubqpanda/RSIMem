@@ -468,6 +468,18 @@ def test_feasibility_evidence_ledger_rejects_corruption_and_conflict(tmp_path) -
         JsonFeasibilityEvidenceLedger(path)
 
 
+def test_feasibility_evidence_schema_bump_rejects_old_payload() -> None:
+    case = _case(
+        "case.schema_bump",
+        FeasibilityOutcome.UNRESOLVED,
+        FeedbackChain(),
+    )
+    payload = FeasibilityEvidenceRecord.from_case(case).payload()
+    payload["schemaVersion"] = 1
+    with pytest.raises(ValueError, match="unsupported feasibility evidence schema|malformed"):
+        FeasibilityEvidenceRecord.from_payload(payload)
+
+
 def test_feasibility_ledger_missing_case_fails_closed(tmp_path) -> None:
     case = _case(
         "case.missing_receipt",
