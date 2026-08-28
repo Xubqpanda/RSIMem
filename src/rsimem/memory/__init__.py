@@ -60,9 +60,11 @@ from .policy_contracts import (
     TriggerDecision,
     TriggerEvent,
     audit_policy_episode,
+    audit_policy_lineage,
     canonical_json as policy_canonical_json,
     content_digest as policy_content_digest,
     validate_policy_episode,
+    validate_policy_lineage,
 )
 from .trigger_policy import (
     SUPPORTED_TRIGGER_TYPES,
@@ -142,9 +144,11 @@ __all__ = [
     "TriggerDecision",
     "TriggerEvent",
     "audit_policy_episode",
+    "audit_policy_lineage",
     "policy_canonical_json",
     "policy_content_digest",
     "validate_policy_episode",
+    "validate_policy_lineage",
     "SUPPORTED_TRIGGER_TYPES",
     "DeterministicTriggerPolicy",
     "HermesTriggerEventAdapter",
