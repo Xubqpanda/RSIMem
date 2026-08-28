@@ -30,6 +30,7 @@ from rsimem.memory.policy_feasibility import (
     PolicyHypothesis,
     feedback_chain_from_extraction_example,
     build_feasibility_report,
+    build_extraction_feedback_interventions,
     validate_feasibility_case,
 )
 from rsimem.memory.policy_replay import DeterministicPolicyReplay
@@ -539,6 +540,18 @@ def test_real_extraction_feedback_examples_project_only_resolved_primary_chain()
     )
     assert projected.outcome is FeasibilityOutcome.USEFUL
     assert projected.feedback.complete_useful
+    projected_batch = build_extraction_feedback_interventions(
+        dataset.examples,
+        parent=parent,
+        candidate=candidate,
+        parent_artifact=_artifact("fixed.extraction.parent.v1", PolicyArtifactKind.FIXED),
+        candidate_artifact=_artifact(
+            "adaptive.extraction.candidate.v1",
+            PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE,
+        ),
+    )
+    assert len(projected_batch) == 1
+    assert projected_batch[0].outcome is FeasibilityOutcome.USEFUL
     fact = next(item for item in dataset.examples if item.level is ExtractionFeedbackLevel.FACT)
     with pytest.raises(ValueError, match="primary extraction-set"):
         LayerIntervention.from_extraction_feedback(
