@@ -376,6 +376,44 @@ class LayerIntervention:
     process_feedback: ProcessFeedback | None = None
     hypothesis: PolicyHypothesis | None = None
 
+    @classmethod
+    def from_extraction_feedback(
+        cls,
+        *,
+        case_id: str,
+        parent: PolicyReplayResult,
+        candidate: PolicyReplayResult,
+        parent_artifact: PolicyArtifactIdentity,
+        candidate_artifact: PolicyArtifactIdentity,
+        example: ExtractionFeedbackExample,
+        process_signal: bool = True,
+    ) -> "LayerIntervention":
+        """Build an extraction intervention from a strict feedback example."""
+
+        if not isinstance(example, ExtractionFeedbackExample):
+            raise TypeError("extraction feasibility requires a feedback example")
+        if not example.primary or example.level is not ExtractionFeedbackLevel.EXTRACTION_SET:
+            raise ValueError("feasibility requires the primary extraction-set example")
+        outcome = {
+            ExtractionFeedbackLabel.USEFUL: FeasibilityOutcome.USEFUL,
+            ExtractionFeedbackLabel.HARMFUL: FeasibilityOutcome.HARMFUL,
+            ExtractionFeedbackLabel.MISSED: FeasibilityOutcome.MISSED,
+            ExtractionFeedbackLabel.UNRESOLVED: FeasibilityOutcome.UNRESOLVED,
+            ExtractionFeedbackLabel.CENSORED: FeasibilityOutcome.CENSORED,
+        }[example.label]
+        return cls(
+            case_id=case_id,
+            target_layer=PolicyLayer.EXTRACTION,
+            parent=parent,
+            candidate=candidate,
+            parent_artifact=parent_artifact,
+            candidate_artifact=candidate_artifact,
+            process_signal=process_signal,
+            outcome=outcome,
+            feedback=feedback_chain_from_extraction_example(example),
+            reason_codes=tuple(example.reason_codes) or ("feedback_projected",),
+        )
+
     def __post_init__(self) -> None:
         if not self.case_id.strip():
             raise ValueError("feasibility case ID must not be empty")
