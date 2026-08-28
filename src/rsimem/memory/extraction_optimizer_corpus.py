@@ -10,6 +10,7 @@ from typing import Mapping
 
 from .extraction_feedback import (
     AttributionConfidence,
+    ExposureMode,
     ExtractionFeedbackLabel,
     ExtractionFeedbackLevel,
     FactDisposition,
@@ -18,8 +19,8 @@ from .optimizer_content_boundary import OptimizerUntrustedText
 from .prompt_components import content_digest
 
 
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 1
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v1"
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 2
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v2"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
@@ -424,6 +425,10 @@ class ExtractionOptimizerCorpusExample:
     primary_unit_id: str
     level: ExtractionFeedbackLevel
     primary: bool
+    feedback_fact_id: str | None
+    feedback_semantic_key: str | None
+    feedback_artifact_ids: tuple[str, ...]
+    exposure_mode: ExposureMode
     label: ExtractionFeedbackLabel
     attribution_confidence: AttributionConfidence
     reason_codes: tuple[str, ...]
@@ -441,6 +446,7 @@ class ExtractionOptimizerCorpusExample:
         _require_digest(self.example_digest, "optimizer corpus example digest")
         _require_id(self.primary_unit_id, "optimizer primary unit ID")
         object.__setattr__(self, "level", ExtractionFeedbackLevel(self.level))
+        object.__setattr__(self, "exposure_mode", ExposureMode(self.exposure_mode))
         object.__setattr__(self, "label", ExtractionFeedbackLabel(self.label))
         object.__setattr__(
             self,
@@ -456,6 +462,17 @@ class ExtractionOptimizerCorpusExample:
             self.level == ExtractionFeedbackLevel.EXTRACTION_SET
         ):
             raise ValueError("optimizer primary unit must be extraction-set level")
+        if (self.level == ExtractionFeedbackLevel.FACT) != (
+            self.feedback_fact_id is not None
+        ):
+            raise ValueError("optimizer fact-level feedback requires a fact ID")
+        if self.feedback_fact_id is not None:
+            _require_id(self.feedback_fact_id, "optimizer feedback fact ID")
+        if self.feedback_semantic_key is not None:
+            _require_id(self.feedback_semantic_key, "optimizer feedback semantic key")
+        _require_unique(self.feedback_artifact_ids, "optimizer feedback artifact IDs")
+        for value in self.feedback_artifact_ids:
+            _require_id(value, "optimizer feedback artifact ID")
         _require_unique(self.reason_codes, "optimizer reason codes")
         for value in self.reason_codes:
             _require_id(value, "optimizer reason code")
@@ -463,6 +480,8 @@ class ExtractionOptimizerCorpusExample:
             raise ValueError("optimizer corpus example requires bounded source messages")
         fact_ids = tuple(value.fact_id for value in self.extracted_facts)
         _require_unique(fact_ids, "optimizer extracted fact IDs")
+        if self.feedback_fact_id is not None and self.feedback_fact_id not in fact_ids:
+            raise ValueError("optimizer feedback fact is absent from extracted facts")
         if self.label in {
             ExtractionFeedbackLabel.USEFUL,
             ExtractionFeedbackLabel.HARMFUL,
@@ -522,6 +541,10 @@ class ExtractionOptimizerCorpusExample:
         primary_unit_id: str,
         level: ExtractionFeedbackLevel,
         primary: bool,
+        feedback_fact_id: str | None,
+        feedback_semantic_key: str | None,
+        feedback_artifact_ids: tuple[str, ...],
+        exposure_mode: ExposureMode,
         label: ExtractionFeedbackLabel,
         attribution_confidence: AttributionConfidence,
         reason_codes: tuple[str, ...],
@@ -535,6 +558,10 @@ class ExtractionOptimizerCorpusExample:
             "primary_unit_id": primary_unit_id,
             "level": ExtractionFeedbackLevel(level),
             "primary": primary,
+            "feedback_fact_id": feedback_fact_id,
+            "feedback_semantic_key": feedback_semantic_key,
+            "feedback_artifact_ids": feedback_artifact_ids,
+            "exposure_mode": ExposureMode(exposure_mode),
             "label": ExtractionFeedbackLabel(label),
             "attribution_confidence": AttributionConfidence(attribution_confidence),
             "reason_codes": reason_codes,
@@ -560,6 +587,10 @@ class ExtractionOptimizerCorpusExample:
             "primary_unit_id": values["primary_unit_id"],
             "level": values["level"].value,
             "primary": values["primary"],
+            "feedback_fact_id": values["feedback_fact_id"],
+            "feedback_semantic_key": values["feedback_semantic_key"],
+            "feedback_artifact_ids": list(values["feedback_artifact_ids"]),
+            "exposure_mode": values["exposure_mode"].value,
             "label": values["label"].value,
             "attribution_confidence": values["attribution_confidence"].value,
             "reason_codes": list(values["reason_codes"]),
@@ -576,6 +607,10 @@ class ExtractionOptimizerCorpusExample:
             "primary_unit_id": self.primary_unit_id,
             "level": self.level,
             "primary": self.primary,
+            "feedback_fact_id": self.feedback_fact_id,
+            "feedback_semantic_key": self.feedback_semantic_key,
+            "feedback_artifact_ids": self.feedback_artifact_ids,
+            "exposure_mode": self.exposure_mode,
             "label": self.label,
             "attribution_confidence": self.attribution_confidence,
             "reason_codes": self.reason_codes,
@@ -597,12 +632,14 @@ class ExtractionOptimizerCorpusExample:
     def from_payload(cls, value: object) -> "ExtractionOptimizerCorpusExample":
         payload = _strict(value, {
             "schema_version", "example_id", "example_digest", "primary_unit_id",
-            "level", "primary", "label", "attribution_confidence",
+            "level", "primary", "feedback_fact_id", "feedback_semantic_key",
+            "feedback_artifact_ids", "exposure_mode", "label", "attribution_confidence",
             "reason_codes", "component_ownership", "audit_join",
             "source_messages", "extracted_facts", "delayed_evidence",
         }, "optimizer corpus example")
         collections = (
             payload["reason_codes"],
+            payload["feedback_artifact_ids"],
             payload["source_messages"],
             payload["extracted_facts"],
         )
@@ -615,6 +652,10 @@ class ExtractionOptimizerCorpusExample:
                 primary_unit_id=payload["primary_unit_id"],
                 level=ExtractionFeedbackLevel(payload["level"]),
                 primary=payload["primary"],
+                feedback_fact_id=payload["feedback_fact_id"],
+                feedback_semantic_key=payload["feedback_semantic_key"],
+                feedback_artifact_ids=tuple(payload["feedback_artifact_ids"]),
+                exposure_mode=ExposureMode(payload["exposure_mode"]),
                 label=ExtractionFeedbackLabel(payload["label"]),
                 attribution_confidence=AttributionConfidence(
                     payload["attribution_confidence"]
