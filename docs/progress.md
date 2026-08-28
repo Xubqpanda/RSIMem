@@ -319,7 +319,7 @@ durable ledger after restart.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `627 passed`.
+- [x] Pass all RSIMem tests: `628 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `397 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
