@@ -166,6 +166,20 @@ def test_resolved_labels_and_useful_three_stage_evidence_fail_closed() -> None:
     )
     with pytest.raises(ValueError, match="three-stage evidence"):
         _example(delayed=incomplete)
+    harmful = _example(label=ExtractionFeedbackLabel.HARMFUL)
+    missed = _example(label=ExtractionFeedbackLabel.MISSED)
+    assert harmful.component_ownership == OptimizerComponentOwnership.EXTRACTION
+    assert missed.component_ownership == OptimizerComponentOwnership.EXTRACTION
+    without_outcome = replace(
+        _delayed(boundary),
+        outcome_operation_id=None,
+        outcome=boundary.project(""),
+    )
+    with pytest.raises(ValueError, match="attribution evidence"):
+        _example(
+            label=ExtractionFeedbackLabel.MISSED,
+            delayed=without_outcome,
+        )
 
 
 def test_future_dates_split_activation_and_tampering_fail_closed() -> None:

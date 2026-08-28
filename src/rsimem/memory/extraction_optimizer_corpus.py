@@ -673,6 +673,8 @@ class ExtractionOptimizerCorpus:
         object.__setattr__(self, "retention", OptimizerCorpusRetention(self.retention))
         if not self.examples:
             raise ValueError("optimizer corpus requires examples")
+        if self.examples != tuple(sorted(self.examples, key=_example_sort_key)):
+            raise ValueError("optimizer corpus examples must be canonically ordered")
         example_ids = tuple(value.example_id for value in self.examples)
         _require_unique(example_ids, "optimizer corpus example IDs")
         cutoff = _parse_utc(self.observation_cutoff)
@@ -712,7 +714,7 @@ class ExtractionOptimizerCorpus:
             "observation_cutoff": observation_cutoff,
             "retention": OptimizerCorpusRetention(retention),
             "activation_artifact_id": activation_artifact_id,
-            "examples": examples,
+            "examples": tuple(sorted(examples, key=_example_sort_key)),
             "corpus_schema": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA,
             "schema_version": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
         }
@@ -786,3 +788,13 @@ class ExtractionOptimizerCorpus:
             )
         except (TypeError, ValueError) as exc:
             raise ValueError("malformed extraction optimizer corpus") from exc
+
+
+def _example_sort_key(
+    value: ExtractionOptimizerCorpusExample,
+) -> tuple[str, str, str]:
+    return (
+        value.audit_join.source_record_id,
+        value.audit_join.feedback_record_id,
+        value.audit_join.feedback_example_id,
+    )
