@@ -35,6 +35,8 @@ from .memory.trigger_policy import (
     HermesTriggerEventAdapter,
     TriggerObservation,
 )
+from .memory.source_selection_policy import DeterministicSourceSelectionPolicy
+from .memory.policy_contracts import SourceSelectionDecision
 from .memory.live_writeback import (
     ExtractionPromptRuntimeScope,
     StaticSemanticBoundaryResult,
@@ -356,6 +358,8 @@ class HermesPastBenchBridge:
         self._trigger_adapter = HermesTriggerEventAdapter()
         self._trigger_policy = DeterministicTriggerPolicy()
         self._trigger_observations: list[TriggerObservation] = []
+        self._source_selection_policy = DeterministicSourceSelectionPolicy()
+        self._source_selection_decisions: list[SourceSelectionDecision] = []
         self._static_results: list[StaticSemanticBoundaryResult] = []
         self._static_failures: list[tuple[str, str]] = []
         self._semantic_futures: list[tuple[SemanticFutureEvidence, str]] = []
@@ -583,6 +587,12 @@ class HermesPastBenchBridge:
         """All observed trigger candidates, including shadow SKIP decisions."""
 
         return tuple(self._trigger_observations)
+
+    @property
+    def source_selection_decisions(self) -> tuple[SourceSelectionDecision, ...]:
+        """Deterministic source choices observed at successful boundaries."""
+
+        return tuple(self._source_selection_decisions)
 
     @property
     def static_results(self) -> tuple[StaticSemanticBoundaryResult, ...]:
@@ -1045,6 +1055,12 @@ class HermesPastBenchBridge:
         observation = self._trigger_policy.decide(trigger_event)
         if not any(item.event.event_id == observation.event.event_id for item in self._trigger_observations):
             self._trigger_observations.append(observation)
+        source_decision = self._source_selection_policy.select(
+            result.snapshot,
+            trigger_event,
+        )
+        if not any(item.decision_id == source_decision.decision_id for item in self._source_selection_decisions):
+            self._source_selection_decisions.append(source_decision)
         return result
 
     def adapter_call(

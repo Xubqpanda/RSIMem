@@ -933,6 +933,9 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
     bridge.close()
 
     assert len(bridge.lifecycle_results) == 1
+    assert len(bridge.trigger_observations) == 1
+    assert len(bridge.source_selection_decisions) == 1
+    assert bridge.source_selection_decisions[0].source_revision == bridge.lifecycle_results[0].snapshot.context_revision
     assert len(bridge.static_results) == 1
     assert len(client.calls) == 2
     serialized = (artifacts / "memory.jsonl").read_text(encoding="utf-8")
