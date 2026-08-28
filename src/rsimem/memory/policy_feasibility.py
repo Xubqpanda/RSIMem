@@ -881,6 +881,7 @@ class LayerFeasibilityCensus:
     outcome_counts: Mapping[str, int]
     unknown_count: int
     complete_feedback_count: int
+    ambiguous_count: int
     status: FeasibilityStatus
     reason_codes: tuple[str, ...]
 
@@ -893,6 +894,7 @@ class LayerFeasibilityCensus:
             (self.outcome_variation_count, "outcome variation count"),
             (self.unknown_count, "unknown count"),
             (self.complete_feedback_count, "complete feedback count"),
+            (self.ambiguous_count, "ambiguous count"),
         ):
             if type(value) is not int or value < 0:
                 raise ValueError(f"{name} must be a non-negative integer")
@@ -902,6 +904,7 @@ class LayerFeasibilityCensus:
             self.outcome_variation_count,
             self.unknown_count,
             self.complete_feedback_count,
+            self.ambiguous_count,
         )):
             raise ValueError("census counts cannot exceed case count")
         object.__setattr__(self, "outcome_counts", MappingProxyType(dict(self.outcome_counts)))
@@ -955,6 +958,10 @@ class LayerFeasibilityCensus:
     def censored_ratio(self) -> float | None:
         return self.censored_count / self.case_count if self.case_count else None
 
+    @property
+    def ambiguous_ratio(self) -> float | None:
+        return self.ambiguous_count / self.case_count if self.case_count else None
+
     def payload(self) -> dict[str, object]:
         return {
             "layer": self.layer.value,
@@ -975,6 +982,8 @@ class LayerFeasibilityCensus:
             "unresolvedRatio": self.unresolved_ratio,
             "censoredCount": self.censored_count,
             "censoredRatio": self.censored_ratio,
+            "ambiguousCount": self.ambiguous_count,
+            "ambiguousRatio": self.ambiguous_ratio,
             "completeFeedbackCount": self.complete_feedback_count,
             "status": self.status.value,
             "reasonCodes": list(self.reason_codes),
@@ -1061,6 +1070,11 @@ def build_feasibility_report(cases: Iterable[LayerIntervention]) -> PolicyFeasib
             1 for case in items
             if case.feedback.complete_useful or case.feedback.complete_missed
         )
+        ambiguous_count = sum(
+            1
+            for case in items
+            if any("ambiguous" in reason.casefold() for reason in case.reason_codes)
+        )
         reasons: list[str] = []
         if not items:
             reasons.append("no_cases")
@@ -1087,6 +1101,7 @@ def build_feasibility_report(cases: Iterable[LayerIntervention]) -> PolicyFeasib
             outcomes,
             unknown_count,
             complete_count,
+            ambiguous_count,
             status,
             tuple(reasons),
         ))
