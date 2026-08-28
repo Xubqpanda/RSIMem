@@ -93,7 +93,7 @@ def test_future_retrieval_miss_is_distinct_from_unexposed_use(tmp_path) -> None:
     registry, log, recorder = _environment(tmp_path, memory=None)
     future = recorder.record_prompt_injection(
         registry,
-        "Base prompt without memory.",
+        "",
         namespace="user",
         parent_operation_ids=("op.learn-verification",),
     )

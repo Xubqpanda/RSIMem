@@ -115,6 +115,7 @@ class _PromptMemoryStore:
             adapter_result,
             lambda: self._native.format_for_system_prompt(target),
         )
+        self._bridge.record_semantic_prompt(adapter_result, target)
         return adapter_result
 
 
@@ -573,12 +574,12 @@ class HermesPastBenchBridge:
         )
 
     def record_semantic_prompt(self, prompt: str | None, namespace: str) -> None:
-        if self.semantic_future_recorder is None or not prompt:
+        if self.semantic_future_recorder is None:
             return
         step_id = f"future-semantic.{namespace}.{len(self._semantic_futures) + 1}"
         future = self.semantic_future_recorder.record_prompt_injection(
             self.runtime.registry,
-            prompt,
+            prompt or "",
             namespace=namespace,
             parent_operation_ids=(),
             step_id=step_id,
@@ -697,15 +698,23 @@ class HermesPastBenchBridge:
                 future.query_operation_id,
                 future.injection_operation_id if exposed else None,
             )
+            operation_join = FeedbackOperationJoin(
+                future.query_operation_id,
+                outcome.use_operation_id,
+                outcome.outcome_operation_id,
+            )
+            missed = self.extraction_feedback_builder.derive_missed(
+                record.source,
+                observation,
+                source_future,
+                operation_join=operation_join,
+            )
             dataset = self.extraction_feedback_builder.build(
                 record.source,
                 observation,
                 source_future,
-                operation_join=FeedbackOperationJoin(
-                    future.query_operation_id,
-                    outcome.use_operation_id,
-                    outcome.outcome_operation_id,
-                ),
+                missed=missed,
+                operation_join=operation_join,
             )
             self.extraction_feedback_log.append(
                 LiveExtractionFeedbackRecord.create(

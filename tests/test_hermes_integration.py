@@ -41,6 +41,14 @@ from rsimem.memory.live_writeback import (
     StaticSemanticBoundaryResult,
     StaticSemanticWritebackConfig,
 )
+from rsimem.memory.extraction_feedback import (
+    ExtractionSetStatus,
+    ExtractionSourceEvidence,
+)
+from rsimem.memory.extraction_projection import (
+    ExtractionSourceRecord,
+    JsonExtractionSourceRecordStore,
+)
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     OperationKind,
@@ -1294,6 +1302,116 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
         "answer_key",
         "reasoning_tokens",
     ))
+
+
+def test_live_bridge_derives_missed_from_empty_past_extraction(tmp_path: Path) -> None:
+    from hermes_state import SessionDB
+
+    home = _hermes_home(tmp_path / "home")
+    (home / "memories" / "MEMORY.md").write_text("", encoding="utf-8")
+    (home / "memories" / "USER.md").write_text("", encoding="utf-8")
+    source = ExtractionSourceEvidence(
+        "source.live-missed",
+        "a" * 64,
+        "extraction-set.live-missed",
+        ExtractionSetStatus.EMPTY,
+        ("preference.summary.tsv",),
+        (),
+    )
+    source_record = ExtractionSourceRecord.create(
+        family_id="SM01_preference_adoption",
+        stage="learn_a",
+        run_id="run-live-missed",
+        episode_id="episode-live-missed-learn",
+        session_id="session-live-missed-learn",
+        task_id="SM01_LEARN_A_001",
+        compilation_id="compilation.live-missed",
+        extraction_artifact_id="prompt-component.live-missed",
+        extraction_artifact_digest="b" * 64,
+        extraction_output_digest="c" * 64,
+        source=source,
+    )
+    JsonExtractionSourceRecordStore(
+        home / ".rsimem" / "extraction_sources.jsonl"
+    ).append(source_record)
+
+    class EmptyNativeStore:
+        def format_for_system_prompt(self, target: str) -> str | None:
+            return None
+
+    db = SessionDB(home / "state.db")
+    session_id = "session-live-missed-eval"
+    db.create_session(session_id, "past_bench", model="fixture-model")
+    db.append_message(
+        session_id,
+        "user",
+        "Extract today's action items and share the source note.",
+    )
+    db.append_message(session_id, "assistant", "I could not prepare the report.")
+    client = FakeCompletionClient({
+        POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id: json.dumps({"facts": []}),
+        POLICY_INTERNAL_OPERATION_PROMPT.artifact.prompt_id: json.dumps({
+            "operations": [],
+        }),
+    })
+    operations_path = tmp_path / "eval" / "operations.jsonl"
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "eval" / "memory.jsonl",
+        run_id="run-live-missed",
+        trace_id="trace-live-missed-eval",
+        episode_id="episode-live-missed-eval",
+        session_id=session_id,
+        task_id="SM01_EVAL_NEAR_001",
+        experiment_variant="static-extraction-rsimem",
+        family_id="SM01_preference_adoption",
+        stage="eval_near",
+        static_writeback_config=StaticSemanticWritebackConfig(
+            mode="static",
+            feedback_contract="sm01_tsv_v1",
+        ),
+        static_completion_client=client,
+        static_operation_evidence_path=operations_path,
+    )
+    agent = SimpleNamespace(
+        _memory_store=EmptyNativeStore(),
+        _session_db=db,
+        session_id=session_id,
+    )
+    bridge.attach(agent)
+    assert agent._memory_store.format_for_system_prompt("user") is None
+    bridge.on_task_completed({
+        "completed": False,
+        "final_response": "I could not prepare the report.",
+        "messages": [{
+            "role": "user",
+            "content": "Extract today's action items and share the source note.",
+        }],
+    })
+    bridge.close()
+    db.close()
+
+    feedback_path = tmp_path / "eval" / "rsimem_extraction_feedback.jsonl"
+    records = [
+        json.loads(line)
+        for line in feedback_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    assert len(records) == 1
+    primary = next(
+        example
+        for example in records[0]["dataset"]["examples"]
+        if example["primary"]
+    )
+    assert primary["label"] == "missed"
+    assert primary["reason_codes"] == ["high_confidence_missed_extraction"]
+    assert primary["source_id"] == source.source_id
+    assert primary["opportunity_operation_id"] is not None
+    assert primary["outcome_operation_id"] is not None
+    serialized = feedback_path.read_text(encoding="utf-8")
+    assert "Always use TSV" not in serialized
+    assert "Extract today's action items" not in serialized
 
 
 def test_feedback_bridge_rejects_duplicate_without_source_record(tmp_path: Path) -> None:

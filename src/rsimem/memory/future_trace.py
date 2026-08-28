@@ -277,8 +277,8 @@ class SemanticFutureTraceRecorder:
         parent_operation_ids: tuple[str, ...],
         step_id: str = "future-semantic",
     ) -> SemanticFutureEvidence:
-        if not model_visible_prompt:
-            raise ValueError("future semantic trace requires a model-visible prompt")
+        if not isinstance(model_visible_prompt, str):
+            raise TypeError("future semantic trace prompt must be a string")
         backend = registry.resolve(MemoryKind.SEMANTIC)
         query_artifact = self._artifact(
             ArtifactKind.QUERY,
