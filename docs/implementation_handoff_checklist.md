@@ -637,49 +637,55 @@ frozen system/safety/schema wrapper
 
 功能需求：
 
-- □ 将 extraction output 与 admission decision 显式拆开：记录候选 fact IDs、被接受/过滤的 fact IDs、`ADD/NONE/UPDATE`、reason codes和当前 backend revision。
-- □ 定义 host-neutral `AdmissionPolicy` 接口；Mem0-flat 当前内部 operation prompt作为 fixed parent admission policy接入，不让其隐式承担 extraction 结果解释。
-- □ 保留 backend 的 duplicate、conflict、temporary、unsupported、empty和unresolved safety rules；policy只能在允许集合内选择 action。
-- □ 将“没有提取到事实”和“提取到了但 admission 选择 NONE”记录为不同状态，二者不得共用一个空 extraction label。
+- √ 将 extraction output 与 admission decision 显式拆开：记录候选 fact IDs、被接受/过滤的 fact IDs、`ADD/NONE/UPDATE`、reason codes和当前 backend revision。
+- √ 定义 host-neutral `AdmissionPolicy` 接口；Mem0-flat 当前内部 operation prompt作为 fixed parent admission policy接入，不让其隐式承担 extraction 结果解释。
+- √ 保留 backend 的 duplicate、conflict、temporary、unsupported、empty和unresolved safety rules；policy只能在允许集合内选择 action。
+- √ 将“没有提取到事实”和“提取到了但 admission 选择 NONE”记录为不同状态，二者不得共用一个空 extraction label。
 - □ candidate不得通过全量ADD、重复ADD或全量NONE获得虚假的 coverage/useful-rate提升。
 
 测试与验收：
 
-- □ extraction有候选但 admission=NONE、extraction为空且 admission=NONE、ADD被backend拒绝、重复ADD和UPDATE冲突均有独立 fixture。
-- □ admission decision可由 input fact digest、existing revision和policy artifact重放。
-- □ 不支持 UPDATE 的 backend不能接受 update decision；不支持 rollback 的 backend不能被声明为可安全执行的adaptive admission。
+- √ extraction有候选但 admission=NONE、extraction为空且 admission=NONE、ADD被backend拒绝、重复ADD和UPDATE冲突均有独立 fixture。
+- √ admission decision可由 input fact digest、existing revision和policy artifact重放。
+- √ 不支持 UPDATE 的 backend不能接受 update decision；不支持 rollback 的 backend不能被声明为可安全执行的adaptive admission。
+
+2D.1 当前实现记录：`DeterministicAdmissionPolicy` 位于 `src/rsimem/memory/admission_policy.py`，Mem0-flat static writeback 的 extraction trace 会生成 admission evidence，并绑定 backend revision、operation IDs 与 receipt lineage。candidate coverage anti-collapse 仍需第三阶段指标 census。
 
 ### 2D.2：Commit Scheduling 与 Mutation Safety Boundary
 
 功能需求：
 
-- □ 将“是否立即提交、是否等待后续 boundary、是否安全重试”建模为 commit scheduling decision；事务实现、CAS、receipt和rollback保持固定。
-- □ 支持 pending/deferred commit 的持久状态、过期 revision、重启恢复、取消和最终状态；不能因为进程退出丢失待提交决策。
-- □ 每次 commit schedule 记录触发 event、目标 mutation IDs、expected revision、执行 boundary和最终 receipt。
-- □ 第一版正式实验固定立即提交；commit scheduling 只做 deterministic/shadow infrastructure，不能与 extraction candidate同时开放。
+- √ 将“是否立即提交、是否等待后续 boundary、是否安全重试”建模为 commit scheduling decision；事务实现、CAS、receipt和rollback保持固定。
+- √ 支持 pending/deferred commit 的持久状态、过期 revision、重启恢复、取消和最终状态；不能因为进程退出丢失待提交决策。
+- √ 每次 commit schedule 记录触发 event、目标 mutation IDs、expected revision、执行 boundary和最终 receipt。
+- √ 第一版正式实验固定立即提交；commit scheduling 只做 deterministic/shadow infrastructure，不能与 extraction candidate同时开放。
 
 测试与验收：
 
-- □ deferred commit不会提前修改backend，重启后可恢复或明确标记失败。
-- □ stale revision、CAS失败、重复提交、进程崩溃和rollback均不产生半提交 memory。
+- √ deferred commit不会提前修改backend，重启后可恢复或明确标记失败。
+- √ stale revision、CAS失败、重复提交、进程崩溃和rollback均不产生半提交 memory。
 - □ commit scheduler不能绕过 mutation validator或把失败伪装成成功。
+
+2D.2 当前实现记录：`CommitScheduler`/`JsonCommitScheduleStore` 提供 crash-safe pending/deferred schedule、CAS revision gate、cancel/failure/terminal idempotency；真实 backend validator 仍由现有 transactional executor 持有，scheduler 不宣称替代该 safety boundary。
 
 ### 2D.3：Exposure 与 Context-Memory Interaction Policy
 
 功能需求：
 
-- □ 将 memory exposure 从 backend read 和 Host injection hook 中拆出 `ExposureDecision`，至少记录 `RUN/SKIP`、selected artifact IDs、排序、注入位置、预算和reason codes。
-- □ 区分 eager system-prompt、selective retrieval、tool-mediated read和not-exposed；不能把 Host 提供的注入能力误报成 policy 已选择的 retrieval。
-- □ Hermes adapter提供真实 injection boundary和context revision；RSIMem决定何时、注入哪些memory以及如何组成memory block。
-- □ 第一版固定当前 eager exposure、注入位置、格式和预算；exposure policy先做 shadow replay，再进入单独 matched ablation。
+- √ 将 memory exposure 从 backend read 和 Host injection hook 中拆出 `ExposureDecision`，至少记录 `RUN/SKIP`、selected artifact IDs、排序、注入位置、预算和reason codes。
+- √ 区分 eager system-prompt、selective retrieval、tool-mediated read和not-exposed；不能把 Host 提供的注入能力误报成 policy 已选择的 retrieval。
+- √ Hermes adapter提供真实 injection boundary和context revision；RSIMem决定何时、注入哪些memory以及如何组成memory block。
+- √ 第一版固定当前 eager exposure、注入位置、格式和预算；exposure policy先做 shadow replay，再进入单独 matched ablation。
 - □ active/current turn、tool closure、schema和context budget是固定安全边界；exposure policy不能删除当前任务必需内容或伪造 memory source。
 
 测试与验收：
 
-- □ `SKIP` 不产生注入，`RUN` 的 artifact IDs与实际注入内容 exact join，not-exposed不能产生memory-use label。
-- □ eager与selective、空memory、多个artifact、预算裁剪和注入失败均有独立 fixture。
-- □ exposure decision变化而formation policy不变时，audit能准确标记为 exposure intervention。
-- □ 注入前后 context revision、artifact digest和render fingerprint可重建；重启后不重复注入或丢失 active pointer。
+- √ `SKIP` 不产生注入，`RUN` 的 artifact IDs与实际注入内容 exact join，not-exposed不能产生memory-use label。
+- √ eager与selective、空memory、多个artifact、预算裁剪和注入失败均有独立 fixture。
+- √ exposure decision变化而formation policy不变时，audit能准确标记为 exposure intervention。
+- √ 注入前后 context revision、artifact digest和render fingerprint可重建；重启后不重复注入或丢失 active pointer。
+
+2D.3 当前实现记录：`DeterministicExposurePolicy` 与 `InjectionReceipt` 位于 `src/rsimem/memory/exposure_policy.py`；Hermes `_PromptMemoryStore.format_for_system_prompt` 记录真实 artifact IDs、context revision 和 render fingerprint，并写入 policy evidence ledger。真实 selective/tool-mediated matched ablation 尚未开放。
 
 ### 2E：Content-Bearing Extraction Optimizer Corpus
 
