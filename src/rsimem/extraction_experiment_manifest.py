@@ -116,14 +116,14 @@ class CleanRepositoryRevision:
 
 
 def resolve_clean_repository(path: Path) -> CleanRepositoryRevision:
-    """Resolve a Git commit/tree and reject tracked or untracked changes."""
+    """Resolve a Git root or vendored subtree and reject scoped changes."""
 
     root = path.expanduser().resolve()
 
-    def git(*arguments: str) -> str:
+    def git_at(directory: Path, *arguments: str) -> str:
         try:
             result = subprocess.run(
-                ("git", "-C", str(root), *arguments),
+                ("git", "-C", str(directory), *arguments),
                 check=True,
                 capture_output=True,
                 text=True,
@@ -132,10 +132,34 @@ def resolve_clean_repository(path: Path) -> CleanRepositoryRevision:
             raise ValueError(f"repository identity cannot be resolved: {root.name}") from exc
         return result.stdout.strip()
 
-    dirty = bool(git("status", "--porcelain", "--untracked-files=normal"))
+    top_level = Path(git_at(root, "rev-parse", "--show-toplevel")).resolve()
+    try:
+        relative = root.relative_to(top_level)
+    except ValueError as exc:
+        raise ValueError("repository path is outside its Git worktree") from exc
+    if relative == Path("."):
+        commit = git_at(top_level, "rev-parse", "HEAD")
+        tree = git_at(top_level, "rev-parse", "HEAD^{tree}")
+        dirty = bool(git_at(
+            top_level, "status", "--porcelain", "--untracked-files=normal"
+        ))
+    else:
+        relative_text = relative.as_posix()
+        commit = git_at(
+            top_level, "log", "-1", "--format=%H", "--", relative_text
+        )
+        tree = git_at(top_level, "rev-parse", f"HEAD:{relative_text}")
+        dirty = bool(git_at(
+            top_level,
+            "status",
+            "--porcelain",
+            "--untracked-files=normal",
+            "--",
+            relative_text,
+        ))
     return CleanRepositoryRevision(
-        commit=git("rev-parse", "HEAD"),
-        tree=git("rev-parse", "HEAD^{tree}"),
+        commit=commit,
+        tree=tree,
         dirty=dirty,
     )
 
