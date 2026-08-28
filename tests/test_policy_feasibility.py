@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from dataclasses import replace
 
 from rsimem.lifecycle.snapshot import (
     ContextSnapshot,
@@ -32,6 +33,7 @@ from rsimem.memory.policy_feasibility import (
     validate_feasibility_case,
 )
 from rsimem.memory.policy_replay import DeterministicPolicyReplay
+from rsimem.memory.policy_audit import PolicyAuditReport
 from rsimem.memory.source_selection_policy import (
     DeterministicSourceSelectionPolicy,
     SourceSelectionConfig,
@@ -317,6 +319,49 @@ def test_hypothesis_must_bind_feedback_and_artifacts() -> None:
             outcome=FeasibilityOutcome.UNRESOLVED,
             reason_codes=("foreign_hypothesis",),
             hypothesis=hypothesis,
+        )
+
+
+def test_missing_process_signal_is_diagnostic_only_without_hypothesis() -> None:
+    parent, candidate = _replays()
+    case = LayerIntervention(
+        case_id="case.no_process_signal",
+        target_layer=PolicyLayer.EXTRACTION,
+        parent=parent,
+        candidate=candidate,
+        parent_artifact=_artifact("fixed.extraction.parent.v1", PolicyArtifactKind.FIXED),
+        candidate_artifact=_artifact("adaptive.extraction.candidate.v1", PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE),
+        process_signal=False,
+        outcome=FeasibilityOutcome.UNRESOLVED,
+        reason_codes=("process_signal_missing",),
+    )
+    assert case.process_feedback is None
+    assert case.hypothesis is None
+    census = next(
+        item for item in build_feasibility_report((case,)).census
+        if item.layer is PolicyLayer.EXTRACTION
+    )
+    assert census.status is FeasibilityStatus.DIAGNOSTIC_ONLY
+    assert "no_process_signal" in census.reason_codes
+
+
+def test_failed_replay_audit_rejects_intervention() -> None:
+    parent, candidate = _replays()
+    failed_parent = replace(
+        parent,
+        audit=PolicyAuditReport(False, 0, 0, (), ("fixture_audit_failure",)),
+    )
+    with pytest.raises(ValueError, match="replay audit must pass"):
+        LayerIntervention(
+            case_id="case.failed_audit",
+            target_layer=PolicyLayer.EXTRACTION,
+            parent=failed_parent,
+            candidate=candidate,
+            parent_artifact=_artifact("fixed.extraction.parent.v1", PolicyArtifactKind.FIXED),
+            candidate_artifact=_artifact("adaptive.extraction.candidate.v1", PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE),
+            process_signal=True,
+            outcome=FeasibilityOutcome.UNRESOLVED,
+            reason_codes=("audit_failure",),
         )
 
 
