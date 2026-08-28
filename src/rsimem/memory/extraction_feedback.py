@@ -7,7 +7,7 @@ import json
 import re
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from typing import Protocol, runtime_checkable
+from typing import Mapping, Protocol, runtime_checkable
 
 
 EXTRACTION_FEEDBACK_SCHEMA_VERSION = 2
@@ -299,6 +299,42 @@ class ObservableToolEvent:
         _require_unique(self.subject_ids, "tool event subjects")
         _require_unique(self.recipient_ids, "tool event recipients")
 
+    def payload(self) -> dict[str, object]:
+        return {
+            "event_id": self.event_id,
+            "tool_name": self.tool_name,
+            "success": self.success,
+            "subject_ids": list(self.subject_ids),
+            "recipient_ids": list(self.recipient_ids),
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ObservableToolEvent":
+        fields = {
+            "event_id",
+            "tool_name",
+            "success",
+            "subject_ids",
+            "recipient_ids",
+        }
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != fields
+            or not isinstance(value["subject_ids"], list)
+            or not isinstance(value["recipient_ids"], list)
+        ):
+            raise ValueError("malformed observable tool event")
+        try:
+            return cls(
+                event_id=value["event_id"],
+                tool_name=value["tool_name"],
+                success=value["success"],
+                subject_ids=tuple(value["subject_ids"]),
+                recipient_ids=tuple(value["recipient_ids"]),
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed observable tool event") from exc
+
 
 @dataclass(frozen=True, slots=True)
 class DeploymentObservation:
@@ -335,6 +371,80 @@ class DeploymentObservation:
             raise TypeError("deployment observation flags must be bool")
         if self.observation_complete == (self.censor_reason is not None):
             raise ValueError("deployment censor reason must match completeness")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "observation_id": self.observation_id,
+            "family_id": self.family_id,
+            "stage": self.stage,
+            "task_id": self.task_id,
+            "current_input_projection_digest": (
+                self.current_input_projection_digest
+            ),
+            "current_input_semantic_keys": list(
+                self.current_input_semantic_keys
+            ),
+            "task_semantic_keys": list(self.task_semantic_keys),
+            "final_response": self.final_response,
+            "tool_events": [value.payload() for value in self.tool_events],
+            "completed": self.completed,
+            "observation_complete": self.observation_complete,
+            "censor_reason": self.censor_reason,
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "DeploymentObservation":
+        fields = {
+            "observation_id",
+            "family_id",
+            "stage",
+            "task_id",
+            "current_input_projection_digest",
+            "current_input_semantic_keys",
+            "task_semantic_keys",
+            "final_response",
+            "tool_events",
+            "completed",
+            "observation_complete",
+            "censor_reason",
+        }
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != fields
+            or any(
+                not isinstance(value[field], list)
+                for field in (
+                    "current_input_semantic_keys",
+                    "task_semantic_keys",
+                    "tool_events",
+                )
+            )
+        ):
+            raise ValueError("malformed deployment observation")
+        try:
+            return cls(
+                observation_id=value["observation_id"],
+                family_id=value["family_id"],
+                stage=value["stage"],
+                task_id=value["task_id"],
+                current_input_projection_digest=value[
+                    "current_input_projection_digest"
+                ],
+                current_input_semantic_keys=tuple(
+                    value["current_input_semantic_keys"]
+                ),
+                task_semantic_keys=tuple(value["task_semantic_keys"]),
+                final_response=value["final_response"],
+                tool_events=tuple(
+                    ObservableToolEvent.from_payload(item)
+                    for item in value["tool_events"]
+                ),
+                completed=value["completed"],
+                observation_complete=value["observation_complete"],
+                censor_reason=value["censor_reason"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed deployment observation") from exc
 
 
 @dataclass(frozen=True, slots=True)
