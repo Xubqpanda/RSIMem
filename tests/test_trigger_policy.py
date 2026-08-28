@@ -76,6 +76,25 @@ def test_unsupported_host_event_is_explicit_and_fail_closed() -> None:
     assert observation.decision.reason_codes == ("unsupported_trigger",)
 
 
+@pytest.mark.parametrize("kind", ["turn_interval", "tool_boundary", "context_pressure", "manual", "session_end"])
+def test_all_non_parent_boundaries_are_shadow_only(kind: str) -> None:
+    adapter = HostTriggerAdapter()
+    policy = DeterministicTriggerPolicy()
+    event = _event(adapter, kind, "rev.1", 2)
+    if kind == "context_pressure":
+        event = adapter.event(
+            kind,
+            source_revision="rev.1",
+            payload={"tokens": 4096},
+            turn_index=2,
+            supported=True,
+        )
+    observation = policy.decide(event)
+    assert observation.shadow_only is True
+    assert observation.decision.action is DecisionAction.SKIP
+    assert observation.decision.reason_codes == ("shadow_only",)
+
+
 def test_adapter_rejects_empty_event_type() -> None:
     with pytest.raises(ValueError, match="event type"):
         HostTriggerAdapter().event("", source_revision="rev.1", payload={})

@@ -863,6 +863,58 @@ def test_live_bridge_persists_pre_snapshot_failure_without_failing_task(tmp_path
     assert PRIVATE_PREFERENCE not in json.dumps(events, ensure_ascii=True)
 
 
+def test_live_bridge_trigger_and_source_decisions_replay_from_persisted_evidence(tmp_path: Path) -> None:
+    from hermes_state import SessionDB
+
+    home = _hermes_home(tmp_path / "home")
+    db = SessionDB(home / "state.db")
+    session_id = "session-policy-replay"
+    db.create_session(session_id, "past_bench", model="fixture-model")
+    db.append_message(session_id, "user", "Replay this completed task.")
+    db.append_message(session_id, "assistant", "Done.")
+    artifacts = tmp_path / "artifacts"
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=artifacts / "memory.jsonl",
+        run_id="run-policy-replay",
+        trace_id="trace-policy-replay",
+        episode_id="episode-policy-replay",
+        session_id=session_id,
+        task_id="task-policy-replay",
+        experiment_variant="with_persistence",
+        lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
+        lifecycle_evidence_path=artifacts / "lifecycle.jsonl",
+        lifecycle_receipt_path=artifacts / "lifecycle-receipts.json",
+    )
+    agent = SimpleNamespace(_memory_store=None, _session_db=db, session_id=session_id)
+    bridge.attach(agent)
+    bridge.on_task_completed({"completed": True})
+    first = bridge.policy_evidence
+    bridge.close()
+    assert {event["layer"] for event in first} == {"trigger", "source_selection"}
+
+    restarted = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=artifacts / "memory.jsonl",
+        run_id="run-policy-replay",
+        trace_id="trace-policy-replay",
+        episode_id="episode-policy-replay",
+        session_id=session_id,
+        task_id="task-policy-replay",
+        experiment_variant="with_persistence",
+        lifecycle_config=HermesLifecycleConfig(evaluator_mode="deterministic"),
+        lifecycle_evidence_path=artifacts / "lifecycle.jsonl",
+        lifecycle_receipt_path=artifacts / "lifecycle-receipts.json",
+    )
+    restarted.attach(agent)
+    restarted.on_task_completed({"completed": True})
+    assert restarted.policy_evidence == first
+    restarted.close()
+    db.close()
+
+
 def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Path) -> None:
     from hermes_state import SessionDB
 
