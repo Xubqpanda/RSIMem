@@ -493,6 +493,33 @@ def test_real_extraction_feedback_examples_project_only_resolved_primary_chain()
     assert primary.level is ExtractionFeedbackLevel.EXTRACTION_SET
     assert chain.complete_useful
     assert chain.opportunity_id == future.future_opportunity_id
+    parent, candidate = _replays()
+    projected = LayerIntervention.from_extraction_feedback(
+        case_id="case.real_feedback_projection",
+        parent=parent,
+        candidate=candidate,
+        parent_artifact=_artifact("fixed.extraction.parent.v1", PolicyArtifactKind.FIXED),
+        candidate_artifact=_artifact(
+            "adaptive.extraction.candidate.v1",
+            PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE,
+        ),
+        example=primary,
+    )
+    assert projected.outcome is FeasibilityOutcome.USEFUL
+    assert projected.feedback.complete_useful
+    fact = next(item for item in dataset.examples if item.level is ExtractionFeedbackLevel.FACT)
+    with pytest.raises(ValueError, match="primary extraction-set"):
+        LayerIntervention.from_extraction_feedback(
+            case_id="case.fact_feedback_rejected",
+            parent=parent,
+            candidate=candidate,
+            parent_artifact=_artifact("fixed.extraction.parent.v1", PolicyArtifactKind.FIXED),
+            candidate_artifact=_artifact(
+                "adaptive.extraction.candidate.v1",
+                PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE,
+            ),
+            example=fact,
+        )
 
     unresolved = next(
         item for item in ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
