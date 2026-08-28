@@ -19,6 +19,8 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 每个 case 都保留 `event -> decision -> receipt/lineage` 的 content-free identity。用例还覆盖：缺少 useful/missed 证据链节点时自动降级为 `unresolved`，candidate 不改变目标层时拒绝，重复 case ID 时拒绝，以及 parent/candidate replay audit 失败时拒绝。
 
+`ProcessFeedback` 进一步将 intervention 绑定到 event、source revision、目标层 parent/candidate decision、执行 receipt 集合和 before/after output digest；`JsonFeasibilityEvidenceLedger` 以原子替换和文件锁持久化该 identity。重启读取、重复写入、损坏记录和冲突记录均 fail closed。ledger 只保存 ID、digest、状态和 reason，不保存 snapshot 或 memory 正文。
+
 ## Census
 
 | layer | cases | signal coverage | action variation | useful | harmful | missed | unresolved | censored | complete feedback | status |
@@ -36,10 +38,10 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 ```text
 PYTHONPATH=src pytest -q tests/test_policy_feasibility.py tests/test_policy_replay.py
-10 passed
+12 passed
 
 .venv/bin/pytest -q tests
-618 passed
+620 passed
 
 cd benchmarks/past-bench && ../../.venv/bin/pytest -q
 397 passed, 2 skipped
