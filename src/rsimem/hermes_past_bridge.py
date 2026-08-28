@@ -37,6 +37,7 @@ from .memory.trigger_policy import (
 )
 from .memory.source_selection_policy import DeterministicSourceSelectionPolicy
 from .memory.policy_contracts import SourceSelectionDecision
+from .memory.policy_evidence import JsonPolicyDecisionLedger
 from .memory.live_writeback import (
     ExtractionPromptRuntimeScope,
     StaticSemanticBoundaryResult,
@@ -360,6 +361,9 @@ class HermesPastBenchBridge:
         self._trigger_observations: list[TriggerObservation] = []
         self._source_selection_policy = DeterministicSourceSelectionPolicy()
         self._source_selection_decisions: list[SourceSelectionDecision] = []
+        self._policy_evidence = JsonPolicyDecisionLedger(
+            self.evidence_path.with_name("rsimem_policy_decisions.jsonl")
+        )
         self._static_results: list[StaticSemanticBoundaryResult] = []
         self._static_failures: list[tuple[str, str]] = []
         self._semantic_futures: list[tuple[SemanticFutureEvidence, str]] = []
@@ -593,6 +597,10 @@ class HermesPastBenchBridge:
         """Deterministic source choices observed at successful boundaries."""
 
         return tuple(self._source_selection_decisions)
+
+    @property
+    def policy_evidence(self) -> tuple[dict[str, object], ...]:
+        return self._policy_evidence.events
 
     @property
     def static_results(self) -> tuple[StaticSemanticBoundaryResult, ...]:
@@ -1055,12 +1063,28 @@ class HermesPastBenchBridge:
         observation = self._trigger_policy.decide(trigger_event)
         if not any(item.event.event_id == observation.event.event_id for item in self._trigger_observations):
             self._trigger_observations.append(observation)
+        self._policy_evidence.record_decision(
+            observation.decision,
+            run_id=result.snapshot.run_id,
+            episode_id=result.snapshot.episode_id,
+            session_id=result.snapshot.session_id,
+            task_id=result.snapshot.task_id,
+            snapshot_id=result.snapshot.snapshot_id,
+        )
         source_decision = self._source_selection_policy.select(
             result.snapshot,
             trigger_event,
         )
         if not any(item.decision_id == source_decision.decision_id for item in self._source_selection_decisions):
             self._source_selection_decisions.append(source_decision)
+        self._policy_evidence.record_decision(
+            source_decision,
+            run_id=result.snapshot.run_id,
+            episode_id=result.snapshot.episode_id,
+            session_id=result.snapshot.session_id,
+            task_id=result.snapshot.task_id,
+            snapshot_id=result.snapshot.snapshot_id,
+        )
         return result
 
     def adapter_call(
