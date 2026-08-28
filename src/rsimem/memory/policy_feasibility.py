@@ -258,6 +258,9 @@ class PolicyFeasibilityReport:
 
 def build_feasibility_report(cases: Iterable[LayerIntervention]) -> PolicyFeasibilityReport:
     normalized = tuple(cases)
+    case_ids = tuple(case.case_id for case in normalized)
+    if len(case_ids) != len(set(case_ids)):
+        raise ValueError("feasibility case IDs must be unique")
     grouped: dict[PolicyLayer, list[LayerIntervention]] = {layer: [] for layer in PolicyLayer}
     for case in normalized:
         grouped[case.target_layer].append(case)
