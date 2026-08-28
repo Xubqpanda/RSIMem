@@ -10,8 +10,8 @@ from enum import StrEnum
 from typing import Protocol, runtime_checkable
 
 
-EXTRACTION_FEEDBACK_SCHEMA_VERSION = 1
-EXTRACTION_FEEDBACK_SCHEMA = "extraction-feedback-v1"
+EXTRACTION_FEEDBACK_SCHEMA_VERSION = 2
+EXTRACTION_FEEDBACK_SCHEMA = "extraction-feedback-v2"
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _SEMANTIC_KEY = re.compile(r"^[a-z][a-z0-9_.:-]{0,127}$")
@@ -340,11 +340,25 @@ class DeploymentObservation:
 @dataclass(frozen=True, slots=True)
 class ArtifactSemanticBinding:
     artifact_id: str
-    semantic_key: str
+    semantic_keys: tuple[str, ...]
 
     def __post_init__(self) -> None:
         _require_id(self.artifact_id, "memory artifact ID")
-        _require_key(self.semantic_key)
+        values = (
+            (self.semantic_keys,)
+            if isinstance(self.semantic_keys, str)
+            else tuple(self.semantic_keys)
+        )
+        object.__setattr__(self, "semantic_keys", values)
+        _require_unique(values, "artifact semantic keys")
+        if not values:
+            raise ValueError("memory artifact binding requires semantic keys")
+        for value in values:
+            _require_key(value)
+
+    @property
+    def semantic_key(self) -> str | None:
+        return self.semantic_keys[0] if len(self.semantic_keys) == 1 else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -373,14 +387,22 @@ class FutureMemoryEvidence:
 @dataclass(frozen=True, slots=True)
 class ExtractedFactEvidence:
     fact_id: str
-    semantic_key: str
+    semantic_keys: tuple[str, ...]
     disposition: FactDisposition
     artifact_id: str | None = None
     quality_issue: ExtractionQualityIssue | None = None
 
     def __post_init__(self) -> None:
         _require_id(self.fact_id, "extracted fact ID")
-        _require_key(self.semantic_key)
+        values = (
+            (self.semantic_keys,)
+            if isinstance(self.semantic_keys, str)
+            else tuple(self.semantic_keys)
+        )
+        object.__setattr__(self, "semantic_keys", values)
+        _require_unique(values, "extracted fact semantic keys")
+        for value in values:
+            _require_key(value)
         object.__setattr__(self, "disposition", FactDisposition(self.disposition))
         if self.artifact_id is not None:
             _require_id(self.artifact_id, "extracted fact artifact ID")
@@ -394,6 +416,10 @@ class ExtractedFactEvidence:
             self.artifact_id is not None
         ):
             raise ValueError("persisted fact disposition must match artifact identity")
+
+    @property
+    def semantic_key(self) -> str | None:
+        return self.semantic_keys[0] if len(self.semantic_keys) == 1 else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -603,9 +629,12 @@ class ExtractionFeedbackBuilder:
             raise ValueError("feedback observation family differs from contract")
         if observation.stage not in contract.opportunity.eligible_stages:
             raise ValueError("feedback observation stage is not contract-eligible")
-        if set(binding.semantic_key for binding in future.artifact_bindings) - set(
-            contract.opportunity.memory_scope_keys
-        ):
+        bound_keys = {
+            semantic_key
+            for binding in future.artifact_bindings
+            for semantic_key in binding.semantic_keys
+        }
+        if bound_keys - set(contract.opportunity.memory_scope_keys):
             raise ValueError("future memory evidence escapes contract scope")
         primary_id = _stable_id("feedback-unit", {
             "source_id": source.source_id,
@@ -646,14 +675,18 @@ class ExtractionFeedbackBuilder:
                 **common,
             ),
         ]
-        facts_by_artifact = {
-            fact.artifact_id: fact
-            for fact in source.facts
-            if fact.artifact_id is not None
-        }
-        uniquely_used = (
-            facts_by_artifact.get(resolution.used_artifact_ids[0])
+        facts_by_artifact: dict[str, list[ExtractedFactEvidence]] = {}
+        for fact in source.facts:
+            if fact.artifact_id is not None:
+                facts_by_artifact.setdefault(fact.artifact_id, []).append(fact)
+        used_facts = (
+            facts_by_artifact.get(resolution.used_artifact_ids[0], [])
             if len(resolution.used_artifact_ids) == 1
+            else []
+        )
+        uniquely_used = (
+            used_facts[0]
+            if len(used_facts) == 1
             else None
         )
         for fact in source.facts:
@@ -745,7 +778,11 @@ class ExtractionFeedbackBuilder:
                 AttributionConfidence.HIGH,
                 tuple(sorted({f"extraction_{value.value}" for value in quality_issues})),
             )
-        extracted_keys = {fact.semantic_key for fact in source.facts}
+        extracted_keys = {
+            semantic_key
+            for fact in source.facts
+            for semantic_key in fact.semantic_keys
+        }
         valid_missed = tuple(
             value for value in missed
             if value.semantic_key in source.available_semantic_keys
@@ -875,7 +912,7 @@ class _NotesFamilyResolver:
         artifact_ids = tuple(
             binding.artifact_id
             for binding in future.artifact_bindings
-            if binding.semantic_key in scope
+            if set(binding.semantic_keys) & scope
         )
         exposed = (
             future.exposure_mode != ExposureMode.NOT_EXPOSED
@@ -1032,3 +1069,45 @@ def detect_current_input_semantic_keys(
     )):
         keys.append("constraint.share.exclude_ava_chen")
     return tuple(keys)
+
+
+def detect_extracted_fact_semantic_keys(
+    family_id: str,
+    fact_content: str,
+) -> tuple[str, ...]:
+    """Project fact content to registered keys without retaining the content."""
+
+    value = fact_content.casefold()
+    keys = []
+    tsv_rule = (
+        "tsv" in value
+        or "tab-separated" in value
+        or all(field in value for field in ("owner", "priority", "task", "due_date"))
+    )
+    if family_id in {
+        "SM01_preference_adoption",
+        "SM05_weak_trigger_preference_adoption",
+    } and tsv_rule:
+        keys.append("preference.summary.tsv")
+    if family_id == "SM05_weak_trigger_preference_adoption":
+        if "priorit" in value and any(token in value for token in (
+            "normaliz",
+            "low",
+            "medium",
+            "high",
+            "critical",
+        )):
+            keys.append("preference.priority.normalized")
+        if "yyyy/mm/dd" in value or "yyyy-mm-dd" in value:
+            keys.append("preference.date.yyyy_mm_dd")
+    if family_id == "SM02_constraint_retention" and (
+        "ava chen" in value or "ava_chen" in value
+    ) and any(phrase in value for phrase in (
+        "do not share",
+        "don't share",
+        "exclude",
+        "never share",
+        "must not share",
+    )):
+        keys.append("constraint.share.exclude_ava_chen")
+    return tuple(dict.fromkeys(keys))

@@ -210,6 +210,51 @@ def test_sm05_multi_fact_success_counts_one_primary_and_no_fact_reward_copy() ->
     }
 
 
+def test_multi_key_fact_and_shared_artifact_remain_set_level_only() -> None:
+    source = ExtractionSourceEvidence(
+        "source.multi-key",
+        _sha("multi-key source"),
+        "extraction-set.multi-key",
+        ExtractionSetStatus.NONEMPTY,
+        SM05_KEYS,
+        (
+            ExtractedFactEvidence(
+                "fact.multi-key",
+                SM05_KEYS,
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.shared",
+            ),
+            ExtractedFactEvidence(
+                "fact.second",
+                (TSV_KEY,),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.shared",
+            ),
+        ),
+    )
+    future = FutureMemoryEvidence(
+        "opportunity.fixture",
+        ExposureMode.EAGER_SYSTEM_PROMPT,
+        (ArtifactSemanticBinding("artifact.shared", SM05_KEYS),),
+        "operation.opportunity",
+        "operation.injection",
+    )
+    dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+        source,
+        _observation(SM05, SM05_KEYS),
+        future,
+    )
+    assert _primary(dataset).label == ExtractionFeedbackLabel.USEFUL
+    fact_examples = tuple(
+        example for example in dataset.examples
+        if example.level == ExtractionFeedbackLevel.FACT
+    )
+    assert fact_examples[0].semantic_key is None
+    assert {example.label for example in fact_examples} == {
+        ExtractionFeedbackLabel.UNRESOLVED
+    }
+
+
 def test_sm02_uses_boundary_parser_and_can_attribute_harmful_share() -> None:
     builder = ExtractionFeedbackBuilder(default_feedback_contract_registry())
     source = _source((BOUNDARY_KEY,))
