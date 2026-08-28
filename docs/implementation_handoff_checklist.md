@@ -952,7 +952,7 @@ bash -n scripts/*.sh
 ## 11. 当前执行入口
 
 当前实现入口已返回 **第二阶段：六层 Memory Policy 优化基建**，尚未进入第三阶段六层 feasibility 验收，也尚未进入真实 adaptive effect run。
-当前已完成 2A 的 host-neutral contract 验收，并完成 2B/2C/2D 子层的 deterministic policy baseline（trigger、source selection、admission、commit scheduling、exposure）；这些实现尚未替代 Hermes 正式 runtime，也不能作为 2B-2D 的最终 adapter/evidence 验收。下一步是把真实 Hermes event/snapshot/injection boundary 接入并完成 matched replay 与 lineage audit。
+当前已完成 2A 的 host-neutral contract 验收，并完成 2B/2C/2D 子层的 deterministic policy baseline（trigger、source selection、admission、commit scheduling、exposure）；Hermes lifecycle 已记录 trigger/source decision，并通过独立的 content-free policy evidence ledger 持久化 decision identity、revision、digest、lineage 和 receipt join。上述实现尚未替代 Hermes 正式 runtime 的 admission/commit/exposure 执行，也不能作为 2B-2D 的最终 adapter/evidence 验收。下一步是把实际 mutation/injection receipt 接入并完成跨重启 matched replay 与 lineage audit。
 第一阶段 1A-1H、原 extraction artifact/runtime binding 基础和低成本 live plain-parent acceptance 已完成，记录在
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
 已有 extraction artifact 的 deterministic contract、content-free evidence assembler、atomic activation、
