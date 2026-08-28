@@ -589,17 +589,19 @@ Adaptive final launcher要求 clean tree，但 static feedback launcher允许 di
 
 功能需求：
 
-- □ 在现有 `ExtractionSourceProjection` 之上增加可审计的 source selection decision，区分“Host可见内容”和“本次policy选择的内容”。
-- □ 支持 whole completed task、selected completed segments和增量 revision三种固定 projection mode；第一版保持 whole completed task作为 parent。
-- □ 记录被选择、被跳过、因 active/current/tool closure/预算而拒绝的 segment IDs及reason codes。
+- √ 在现有 `ExtractionSourceProjection` 之上增加可审计的 source selection decision，区分“Host可见内容”和“本次policy选择的内容”。
+- √ 支持 whole completed task、selected completed segments和增量 revision三种固定 projection mode；第一版保持 whole completed task作为 parent。
+- √ 记录被选择、被跳过、因 active/current/tool closure/预算而拒绝的 segment IDs及reason codes。
 - □ Source selection不能读取 hidden grader、answer key、future test或benchmark-only metadata。
-- □ Source digest、selected IDs、truncation和projection mode进入 extraction request、idempotency和feedback lineage。
+- √ Source digest、selected IDs、truncation和projection mode进入 extraction request、idempotency和feedback lineage。
 
 测试与验收：
 
-- □ 选择集合变化会改变 source digest和extraction identity。
-- □ source selection不能拆开 tool call/result closure，不能包含当前 active turn。
-- □ 同一 snapshot/revision回放得到相同 selection；超预算时行为确定且有记录。
+- √ 选择集合变化会改变 source digest和extraction identity。
+- √ source selection不能拆开 tool call/result closure，不能包含当前 active turn。
+- √ 同一 snapshot/revision回放得到相同 selection；超预算时行为确定且有记录。
+
+2C 当前实现记录：`DeterministicSourceSelectionPolicy` 生成可审计 selected/skipped/rejected decision；`ExtractionSourceProjector` 和 semantic ingest builder 接受 selected IDs 并再次执行 role、unresolved、active/current、tool-closure、budget safety gate。Hermes static writeback 已绑定该 decision，相关测试见 `tests/test_source_selection_policy.py`、`tests/test_extraction_source.py`。hidden/future metadata isolation 和完整 feedback lineage 仍需在后续 feasibility audit 中复核。
 
 ### 2D：Extraction Policy Envelope 与 Artifact
 
