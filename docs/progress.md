@@ -399,7 +399,7 @@ Acceptance criteria:
 ### Adaptive LightRSI Loop
 
 - [x] Collect deployment-observable delayed feedback from retrieval, injection, task completion, tool behavior, retries, supersession, and non-use.
-- [x] Estimate realized future utility without reading hidden task scores into the policy update path.
+- [x] Preserve deployment-observable delayed feedback and strict attribution diagnostics without reading hidden task scores into the policy update path; legacy utility estimates remain historical infrastructure, not the current objective.
 - [ ] Version and deploy semantic extraction prompt N+1 while freezing operation, retrieval, routing, and invocation components.
 - [x] Validate proposed policy updates against held-out deployment evidence.
 - [x] Support acceptance, rejection, rollback, and reproducible replay of every policy update.
