@@ -5,6 +5,7 @@ import pytest
 from rsimem.memory.policy_contracts import DecisionAction, ExecutionStatus
 from rsimem.memory.trigger_policy import (
     DeterministicTriggerPolicy,
+    HermesTriggerEventAdapter,
     HostTriggerAdapter,
     TriggerPolicyConfig,
 )
@@ -78,3 +79,24 @@ def test_unsupported_host_event_is_explicit_and_fail_closed() -> None:
 def test_adapter_rejects_empty_event_type() -> None:
     with pytest.raises(ValueError, match="event type"):
         HostTriggerAdapter().event("", source_revision="rev.1", payload={})
+
+
+def test_hermes_snapshot_adapter_preserves_revision_and_marks_missing_pressure() -> None:
+    class Snapshot:
+        context_revision = "snapshot.rev.1"
+        snapshot_id = "snapshot.fixture"
+        session_id = "session.fixture"
+        task_id = "task.fixture"
+        task_state = "completed"
+        current_turn_id = "turn.2"
+
+    adapter = HermesTriggerEventAdapter()
+    event = adapter.from_snapshot(Snapshot(), "task_completed", turn_index=2)
+    assert event.source_revision == "snapshot.rev.1"
+    assert event.metadata["snapshot_id"] == "snapshot.fixture"
+    assert DeterministicTriggerPolicy().decide(event).decision.action is DecisionAction.RUN
+
+    pressure = adapter.from_snapshot(Snapshot(), "context_pressure")
+    assert pressure.supported is False
+    assert pressure.metadata["unsupported_reason"] == "context_tokens_unobserved"
+    assert DeterministicTriggerPolicy().decide(pressure).decision.reason_codes == ("unsupported_trigger",)

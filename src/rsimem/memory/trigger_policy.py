@@ -133,6 +133,11 @@ class DeterministicTriggerPolicy:
             observation = TriggerObservation(event, decision, False)
             self._record(observation)
             return observation
+        if event.event_type == "task_completed" and event.metadata.get("task_state") not in {None, "completed", "TaskLifecycleState.COMPLETED"}:
+            decision = self._decision(event, DecisionAction.SKIP, "task_not_completed")
+            observation = TriggerObservation(event, decision, False)
+            self._record(observation)
+            return observation
         if event.source_revision == self.state.last_run_source_revision:
             decision = self._decision(event, DecisionAction.SKIP, "duplicate_source_revision")
             observation = TriggerObservation(event, decision, False)
@@ -240,6 +245,61 @@ class HostTriggerAdapter:
         )
 
 
+class HermesTriggerEventAdapter(HostTriggerAdapter):
+    """Project a real RSIMem/Hermes snapshot into a trigger event.
+
+    The adapter reads only stable snapshot identity and lifecycle facts.  It
+    never infers an event that the snapshot does not carry: context-pressure
+    events without an observed token count are explicitly unsupported.
+    """
+
+    def from_snapshot(
+        self,
+        snapshot: object,
+        event_type: str,
+        *,
+        context_tokens: int | None = None,
+        turn_index: int | None = None,
+    ) -> TriggerEvent:
+        try:
+            source_revision = str(snapshot.context_revision)
+            snapshot_id = str(snapshot.snapshot_id)
+            session_id = str(snapshot.session_id)
+            task_id = str(snapshot.task_id)
+            task_state = str(snapshot.task_state)
+        except AttributeError as exc:
+            raise ValueError("Hermes trigger requires a context snapshot") from exc
+        if not source_revision.strip() or not snapshot_id.strip():
+            raise ValueError("Hermes trigger snapshot identity is incomplete")
+        supported = True
+        metadata: dict[str, Any] = {
+            "snapshot_id": snapshot_id,
+            "task_state": task_state,
+        }
+        if event_type == "context_pressure":
+            if context_tokens is None:
+                supported = False
+                metadata["unsupported_reason"] = "context_tokens_unobserved"
+            else:
+                metadata["context_tokens"] = context_tokens
+        return self.event(
+            event_type,
+            source_revision=source_revision,
+            payload={
+                "snapshot_id": snapshot_id,
+                "context_revision": source_revision,
+                "task_state": task_state,
+                "context_tokens": context_tokens,
+            },
+            session_id=session_id,
+            task_id=task_id,
+            turn_id=getattr(snapshot, "current_turn_id", None),
+            turn_index=turn_index,
+            supported=supported,
+            metadata=metadata,
+        )
+
+
 __all__ = [
     "SUPPORTED_TRIGGER_TYPES",
     "TriggerPolicyConfig",
@@ -247,4 +307,5 @@ __all__ = [
     "TriggerObservation",
     "DeterministicTriggerPolicy",
     "HostTriggerAdapter",
+    "HermesTriggerEventAdapter",
 ]
