@@ -68,6 +68,7 @@ from rsimem.memory_systems.mem0_flat import (
 )
 from test_extraction_matched_activation import _offline_decision
 from test_extraction_offline_validation import _candidate, _parent
+from extraction_fingerprint_support import extraction_activation_fixture
 
 
 PRIVATE_PREFERENCE = "Use TSV with owner, priority, task, and due_date."
@@ -1218,6 +1219,13 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
             (),
             (),
         ),
+        activation=extraction_activation_fixture(
+            compilation_id="compilation.feedback-unrelated-empty",
+            extraction_operation_id="extraction-set.feedback-unrelated-empty",
+            component_artifact_id=learned_source.extraction_artifact_id,
+            component_artifact_digest=learned_source.extraction_artifact_digest,
+            parsed_output_digest="d" * 64,
+        ),
     )
     source_store.append(unrelated_empty)
 
@@ -1368,6 +1376,13 @@ def test_live_bridge_derives_missed_from_empty_past_extraction(tmp_path: Path) -
         extraction_artifact_digest="b" * 64,
         extraction_output_digest="c" * 64,
         source=source,
+        activation=extraction_activation_fixture(
+            compilation_id="compilation.live-missed",
+            extraction_operation_id=source.extraction_set_id,
+            component_artifact_id="prompt-component.live-missed",
+            component_artifact_digest="b" * 64,
+            parsed_output_digest="c" * 64,
+        ),
     )
     JsonExtractionSourceRecordStore(
         home / ".rsimem" / "extraction_sources.jsonl"

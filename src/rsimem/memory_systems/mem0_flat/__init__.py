@@ -36,6 +36,7 @@ from .prompt_adapter import (
 from .policy import (
     MEM0_FLAT_POLICY_SCHEMA_VERSION,
     ExtractedSemanticFact,
+    ExtractionInvocationFingerprint,
     FlatRetrievalConfig,
     FlatSemanticCandidateReader,
     Mem0FlatSemanticPolicy,
@@ -80,6 +81,7 @@ __all__ = [
     "Mem0FlatPromptAdapter",
     "MEM0_FLAT_POLICY_SCHEMA_VERSION",
     "ExtractedSemanticFact",
+    "ExtractionInvocationFingerprint",
     "FlatRetrievalConfig",
     "FlatSemanticCandidateReader",
     "Mem0FlatSemanticPolicy",

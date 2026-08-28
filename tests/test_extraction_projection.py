@@ -193,6 +193,7 @@ def test_source_record_store_is_restart_safe_and_fails_closed(tmp_path) -> None:
         record = Mem0FlatExtractionSourceProjector().project_record(
             boundary,
             runtime.policy,
+            runtime.extraction_runtime_binding,
             family_id=FAMILY,
             stage="learn_a",
             available_semantic_keys=(TSV_KEY,),
@@ -200,7 +201,17 @@ def test_source_record_store_is_restart_safe_and_fails_closed(tmp_path) -> None:
         assert record.extraction_artifact_digest == (
             runtime.policy.semantic_manifest.extraction_component_digest
         )
-        with pytest.raises(ValueError, match="record digest mismatch"):
+        assert record.activation.runtime_binding == (
+            runtime.extraction_runtime_binding
+        )
+        assert record.activation.invocation.render_input_digest == (
+            runtime.policy.extraction_invocation(
+                boundary.writeback.ingestion.idempotency_key
+            ).render_input_digest
+        )
+        assert record.activation.semantic_policy == runtime.policy.semantic_manifest
+        assert record.activation.persisted_artifact_ids == record.artifact_ids
+        with pytest.raises(ValueError, match="activation fingerprint differs"):
             replace(record, extraction_output_digest="0" * 64)
         store = JsonExtractionSourceRecordStore(path)
         assert store.append(record) is True
@@ -211,7 +222,11 @@ def test_source_record_store_is_restart_safe_and_fails_closed(tmp_path) -> None:
             opportunity_semantic_keys=(TSV_KEY,),
         )
         assert candidates == (record,)
-        assert PREFERENCE not in path.read_text(encoding="utf-8")
+        serialized = path.read_text(encoding="utf-8")
+        assert PREFERENCE not in serialized
+        assert runtime.extraction_policy_artifact.compiled_body not in serialized
+        assert "render_input_digest" in serialized
+        assert "model_output_digest" in serialized
     finally:
         runtime.close()
 
@@ -226,6 +241,7 @@ def test_empty_source_record_remains_joinable_without_memory_artifact(tmp_path) 
         record = Mem0FlatExtractionSourceProjector().project_record(
             boundary,
             runtime.policy,
+            runtime.extraction_runtime_binding,
             family_id=FAMILY,
             stage="learn_a",
             available_semantic_keys=(TSV_KEY,),

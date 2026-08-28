@@ -679,6 +679,7 @@ class HermesPastBenchBridge:
         record = self.extraction_source_projector.project_record(
             boundary,
             self.static_writeback.policy,
+            self.static_writeback.extraction_runtime_binding,
             family_id=self._family_id,
             stage=self._stage,
             available_semantic_keys=available_keys,

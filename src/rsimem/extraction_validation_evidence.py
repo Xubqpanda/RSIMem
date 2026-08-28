@@ -40,7 +40,12 @@ from .memory.extraction_prompt_validation import (
 from .memory.extraction_validation_adapter import (
     ExtractionValidationObservationAssembler,
 )
-from .memory.prompt_components import canonical_json, content_digest
+from .memory.live_writeback import ExtractionPromptRuntimeScope
+from .memory.prompt_components import (
+    SemanticPolicyManifest,
+    canonical_json,
+    content_digest,
+)
 from .memory_systems.mem0_flat import MEM0_FLAT_EXTRACTION_SLOT
 
 
@@ -513,6 +518,22 @@ def assemble_extraction_matched_evidence_batch(
     parent_component = parent.to_prompt_component(MEM0_FLAT_EXTRACTION_SLOT)
     candidate_component = candidate.to_prompt_component(MEM0_FLAT_EXTRACTION_SLOT)
     expected = manifest["semanticPolicy"]["activeArtifactByMethod"]
+    expected_semantic = {
+        EXTRACTION_METHOD_VARIANTS[0]: SemanticPolicyManifest.from_payload(
+            manifest["semanticPolicy"]["parent"]
+        ),
+        EXTRACTION_METHOD_VARIANTS[1]: SemanticPolicyManifest.from_payload(
+            manifest["semanticPolicy"]["active"]
+        ),
+    }
+    expected_policy_artifacts = {
+        EXTRACTION_METHOD_VARIANTS[0]: parent,
+        EXTRACTION_METHOD_VARIANTS[1]: candidate,
+    }
+    expected_components = {
+        EXTRACTION_METHOD_VARIANTS[0]: parent_component,
+        EXTRACTION_METHOD_VARIANTS[1]: candidate_component,
+    }
     if expected != {
         EXTRACTION_METHOD_VARIANTS[0]: {
             "artifactId": parent_component.artifact_id,
@@ -540,6 +561,14 @@ def assemble_extraction_matched_evidence_batch(
             run_dir / "audit.json"
         )
         expected_artifact = expected[attempt["method"]]
+        expected_policy = expected_semantic[attempt["method"]]
+        expected_policy_artifact = expected_policy_artifacts[attempt["method"]]
+        expected_component = expected_components[attempt["method"]]
+        expected_scope = (
+            ExtractionPromptRuntimeScope.ROOT_STATIC
+            if attempt["method"] == EXTRACTION_METHOD_VARIANTS[0]
+            else ExtractionPromptRuntimeScope.MATCHED_VALIDATION
+        )
         sources_by_id = {value.record_id: value for value in sources}
         if any(
             source.run_id != attempt["runName"]
@@ -547,9 +576,36 @@ def assemble_extraction_matched_evidence_batch(
             or source.extraction_artifact_id != expected_artifact["artifactId"]
             or source.extraction_artifact_digest
             != expected_artifact["artifactDigest"]
+            or source.activation.runtime_binding.policy_artifact_id
+            != expected_policy_artifact.artifact_id
+            or source.activation.runtime_binding.policy_artifact_digest
+            != expected_policy_artifact.artifact_digest
+            or source.activation.runtime_binding.deployment_scope != expected_scope
+            or source.activation.runtime_binding.adapter_id
+            != expected_component.owner_adapter_id
+            or source.activation.runtime_binding.slot_id
+            != expected_policy_artifact.slot_id
+            or source.activation.runtime_binding.slot_contract_digest
+            != expected_policy_artifact.slot_contract_digest
+            or source.activation.runtime_binding.frozen_wrapper_digest
+            != expected_policy_artifact.frozen_wrapper_digest
+            or source.activation.runtime_binding.input_schema_digest
+            != expected_policy_artifact.input_schema_digest
+            or source.activation.runtime_binding.output_schema_digest
+            != expected_policy_artifact.output_schema_digest
+            or source.activation.runtime_binding.model_profile
+            != expected_policy_artifact.model_profile
+            or source.activation.semantic_policy != expected_policy
+            or source.activation.invocation.binding_id
+            != source.activation.runtime_binding.binding_id
+            or source.activation.invocation.rendered_template_digest
+            != source.activation.runtime_binding.rendered_template_digest
+            or source.activation.persisted_artifact_ids != source.artifact_ids
             for source in sources
         ):
-            raise ValueError("validation source identity differs from its run")
+            raise ValueError(
+                "validation source identity differs from its run activation"
+            )
         if {value.source_record_id for value in feedback} != set(sources_by_id):
             raise ValueError("validation sources lack complete feedback closure")
         variant = (
