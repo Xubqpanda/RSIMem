@@ -372,6 +372,13 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
         persisted_before_close = evidence_path.read_text(encoding="utf-8")
         assert '"kind": "query"' in persisted_before_close
         assert '"kind": "injected"' in persisted_before_close
+        policy_path = evidence_path.with_name("rsimem_policy_decisions.jsonl")
+        policy_events = [
+            json.loads(line)
+            for line in policy_path.read_text(encoding="utf-8").splitlines()
+        ]
+        assert any(event["layer"] == "exposure" for event in policy_events)
+        assert all(event["sourceRevision"] for event in policy_events)
     finally:
         bridge.close()
         db.close()
