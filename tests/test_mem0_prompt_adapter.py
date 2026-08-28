@@ -14,6 +14,10 @@ from rsimem.memory.extraction_policy_artifact import (
     ExtractionRuleEditAction,
     serialize_extraction_prompt_artifact,
 )
+from rsimem.memory.extraction_policy_store import (
+    ExtractionPolicyState,
+    JsonExtractionPolicyStore,
+)
 from rsimem.memory.prompt_components import (
     PromptAdapterRegistry,
     PromptComponentArtifact,
@@ -248,6 +252,62 @@ def test_mem0_adapter_binds_rich_child_without_changing_frozen_components() -> N
     )
     assert root_policy.semantic_manifest.retrieval_component_digest == (
         child_policy.semantic_manifest.retrieval_component_digest
+    )
+
+
+def test_mem0_active_child_renders_identically_after_store_restart(tmp_path) -> None:
+    adapter = Mem0FlatPromptAdapter()
+    root = adapter.export_root_policy_artifact(MEM0_FLAT_EXTRACTION_SLOT_ID)
+    child = ExtractionPromptPolicyArtifact.create_child(
+        parent=root,
+        policy_version="candidate-restart-v2",
+        edits=(ExtractionRuleEdit(
+            "edit.restart-scope",
+            ExtractionRuleEditAction.REPLACE,
+            "durable-candidates",
+            ExtractionPolicyRule(
+                "durable-candidates",
+                "Extract minimal durable facts and preferences from a completed "
+                "agent experience.",
+            ),
+        ),),
+        generation_provenance=_generation_provenance(),
+    )
+    store_path = tmp_path / "extraction-policy-store.json"
+    store = JsonExtractionPolicyStore(
+        store_path,
+        trusted_root=root,
+        slot=MEM0_FLAT_EXTRACTION_SLOT,
+    )
+    store.register(child)
+    store.transition(
+        child.artifact_id,
+        to_state=ExtractionPolicyState.ACTIVE,
+        transition_id="transition.activate-restart-v2",
+        reason_code="validation_passed",
+    )
+    before_binding = adapter.bind_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID,
+        child,
+    )
+    before_template = adapter.bound_template(before_binding)
+
+    restarted_store = JsonExtractionPolicyStore(
+        store_path,
+        trusted_root=root,
+        slot=MEM0_FLAT_EXTRACTION_SLOT,
+    )
+    restarted_adapter = Mem0FlatPromptAdapter()
+    after_binding = restarted_adapter.bind_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID,
+        restarted_store.active_or_root(),
+    )
+    after_template = restarted_adapter.bound_template(after_binding)
+
+    assert after_binding == before_binding
+    assert after_template.template == before_template.template
+    assert after_template.artifact.template_digest == (
+        before_template.artifact.template_digest
     )
 
 
