@@ -25,6 +25,8 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 每个有 process signal 的 case 还会生成 `PolicyHypothesis`：它把 past feedback IDs、parent artifact、candidate artifact 和唯一 target layer 固定成稳定的 N+1 proposal identity。hypothesis 不能引用 intervention 外部的 feedback，也不能跨层或复用相同 artifact。
 
+为避免 opaque fixture ID 被误接入正式训练，`feedback_chain_from_extraction_example()` 只接受真实 `ExtractionFeedbackExample` 的 primary extraction-set useful/missed 记录，并要求其 operation identity 完整；fact-level、harmful、unresolved 和 censored 记录返回空链，继续留在诊断桶。
+
 ## Census
 
 | layer | cases | signal coverage | action variation | useful | harmful | missed | unresolved | censored | complete feedback | status |
