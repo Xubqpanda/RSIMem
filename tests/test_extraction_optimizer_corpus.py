@@ -231,6 +231,7 @@ def test_private_store_is_restart_safe_split_gated_and_least_privilege(tmp_path)
     attempt = tmp_path / "outputs" / "batch" / "attempt.001"
     store = JsonExtractionOptimizerCorpusStore(
         attempt,
+        owner_controlled_root=tmp_path / "outputs",
         attempt_id="attempt.001",
         split=OptimizerCorpusSplit.TRAIN,
     )
@@ -239,6 +240,7 @@ def test_private_store_is_restart_safe_split_gated_and_least_privilege(tmp_path)
     assert store.write(corpus) is False
     restarted = JsonExtractionOptimizerCorpusStore(
         attempt,
+        owner_controlled_root=tmp_path / "outputs",
         attempt_id="attempt.001",
         split=OptimizerCorpusSplit.TRAIN,
     )
@@ -270,6 +272,7 @@ def test_future_store_requires_matching_activation_and_detects_corruption(tmp_pa
     )
     store = JsonExtractionOptimizerCorpusStore(
         tmp_path / "outputs" / "attempt.002",
+        owner_controlled_root=tmp_path / "outputs",
         attempt_id="attempt.002",
         split=OptimizerCorpusSplit.FUTURE_TEST,
     )
@@ -299,4 +302,21 @@ def test_future_store_requires_matching_activation_and_detects_corruption(tmp_pa
     with pytest.raises(ValueError, match="malformed optimizer corpus store"):
         store.read_for_future_evaluation(
             active_artifact_id="extraction-prompt.candidate-v2"
+        )
+
+
+def test_private_store_rejects_path_outside_owner_controlled_root(tmp_path) -> None:
+    with pytest.raises(ValueError, match="owner-controlled root"):
+        JsonExtractionOptimizerCorpusStore(
+            tmp_path / "tracked" / "attempt.003",
+            owner_controlled_root=tmp_path / "outputs",
+            attempt_id="attempt.003",
+            split=OptimizerCorpusSplit.TRAIN,
+        )
+    with pytest.raises(ValueError, match="below"):
+        JsonExtractionOptimizerCorpusStore(
+            tmp_path / "outputs",
+            owner_controlled_root=tmp_path / "outputs",
+            attempt_id="attempt.003",
+            split=OptimizerCorpusSplit.TRAIN,
         )
