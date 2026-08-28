@@ -313,11 +313,13 @@ strict extraction-feedback projection, constrained N+1 hypothesis identity,
 and a crash-safe content-free evidence ledger. The fixture classifies
 Extraction as `optimization-ready` and the other five layers as
 `validation-only`; fixture labels are not deployment labels and do not support
-an uplift claim.
+an uplift claim. It can be regenerated with
+`python -m rsimem.memory.policy_feasibility_fixture` and verified against the
+durable ledger after restart.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `626 passed`.
+- [x] Pass all RSIMem tests: `627 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `397 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.

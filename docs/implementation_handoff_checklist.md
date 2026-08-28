@@ -796,7 +796,7 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 ### 3A：Deterministic End-To-End Gate
 
-截至 2026-08-29，已完成第一份 deterministic/shadow feasibility fixture：completed snapshot 同时包含 durable 与 temporary 信息，parent/candidate replay 共享 event、revision、backend 和 lineage；Extraction case 覆盖 useful 与 missed 的完整证据链，缺失任一链节点会 fail-closed 降级为 `unresolved`。该 fixture 结果与限制记录在 [`policy_feasibility_baseline_20260829.md`](policy_feasibility_baseline_20260829.md)，不构成真实 provider 或 PAST-Bench uplift 证据。
+截至 2026-08-29，已完成第一份 deterministic/shadow feasibility fixture，并提供可执行入口 `python -m rsimem.memory.policy_feasibility_fixture`：completed snapshot 同时包含 durable 与 temporary 信息，parent/candidate replay 共享 event、revision、backend 和 lineage；Extraction case 覆盖 useful 与 missed 的完整证据链，缺失任一链节点会 fail-closed 降级为 `unresolved`。该 fixture 结果与限制记录在 [`policy_feasibility_baseline_20260829.md`](policy_feasibility_baseline_20260829.md)，不构成真实 provider 或 PAST-Bench uplift 证据。
 
 - □ 构造一个过去context中含durable与temporary信息、未来任务只使用durable信息的fixture。
 - □ Policy N产生至少一个可归因问题，例如遗漏durable fact或提取temporary fact。
