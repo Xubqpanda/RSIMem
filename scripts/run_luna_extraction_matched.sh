@@ -7,6 +7,7 @@ RSIMEM_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PAST_BENCH_ROOT="${PAST_BENCH_ROOT:-${RSIMEM_ROOT}/benchmarks/past-bench}"
 PAST_BENCH_BIN="${RSIMEM_ROOT}/.venv/bin/past-bench"
 PYTHON_BIN="${RSIMEM_ROOT}/.venv/bin/python"
+AGENT_REGISTRY="${RSIMEM_AGENT_REGISTRY:-${RSIMEM_ROOT}/configs/agents.yaml}"
 TRIAL_CONFIG="${RSIMEM_EXTRACTION_TRIAL_CONFIG:-}"
 EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-}"
 BATCH_ID="${RSIMEM_BATCH_ID:-}"
@@ -31,7 +32,7 @@ mkdir -p "${batch_root}"
 PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.extraction_matched_preflight \
   --manifest "${manifest_path}" --batch-registry "${registry_path}" --batch-id "${BATCH_ID}" \
   --rsimem-root "${RSIMEM_ROOT}" --past-bench-root "${PAST_BENCH_ROOT}" \
-  --family-root "${family_root}" --agent-registry "${RSIMEM_ROOT}/configs/agents.yaml" \
+  --family-root "${family_root}" --agent-registry "${AGENT_REGISTRY}" \
   --run-config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" \
   --experiment-config "${EXPERIMENT_CONFIG}" --trial-config "${TRIAL_CONFIG}"
 
@@ -81,7 +82,7 @@ for replicate in $(seq 1 "${replicates}"); do
       cd "${PAST_BENCH_ROOT}"
       "${PAST_BENCH_BIN}" evolve --family "${TASK_FAMILY}" --agent hermes-luna --runtime local \
         --sandbox --sandbox-tools --persistence-variant with_persistence --no-judge \
-        --config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" --registry "${RSIMEM_ROOT}/configs/agents.yaml" \
+        --config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" --registry "${AGENT_REGISTRY}" \
         --trace-dir "${trace_dir}" --background-review-wait-s 0 \
         --rsimem-mode native+ledger --rsimem-adapter-failure-policy fail_closed \
         --rsimem-lifecycle-evaluator-mode disabled --rsimem-semantic-writeback-mode static \

@@ -10,7 +10,7 @@ PYTHON_BIN="${RSIMEM_ROOT}/.venv/bin/python"
 TASK_FAMILY="memory_ability/SM01_preference_adoption"
 FAMILY_ROOT="${PAST_BENCH_ROOT}/self-evolve-tasks-v2/${TASK_FAMILY}"
 EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-${RSIMEM_ROOT}/configs/extraction_feedback_sm01.json}"
-AGENT_REGISTRY="${RSIMEM_ROOT}/configs/agents.yaml"
+AGENT_REGISTRY="${RSIMEM_AGENT_REGISTRY:-${RSIMEM_ROOT}/configs/agents.yaml}"
 RUN_CONFIG="${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml"
 METHOD="static-extraction-rsimem"
 
