@@ -19,8 +19,8 @@ The typed memory runtime is connected to the PAST-Bench Hermes execution path be
 The Hermes, static semantic writeback, operation graph, feedback store, and
 activation/rollback foundations are complete. The former Phase 2J/2K work is
 complete only as legacy retrieval-threshold infrastructure; extraction-prompt
-adaptation is pending. Stage 1 and the Stage 2A extraction policy envelope are
-closed, and Stage 2B is the active milestone.
+adaptation is pending. Stage 1, the Stage 2A extraction policy envelope, and
+the Stage 2B optimizer corpus are closed; Stage 2C is the active milestone.
 
 Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
@@ -242,23 +242,36 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 - [x] Reload an ACTIVE child after store restart and reproduce the same binding, rendered prompt, and template digest in a fresh adapter.
 - [x] Load the same serialized artifact through a fake adapter projection and fail closed to the trusted root on corrupt lifecycle state or slot-contract drift.
 
+### Extraction-Prompt Stage 2B Optimizer Corpus
+
+- [x] Project bounded source messages, exact extracted fact content, persisted artifact lineage, and deployment-observable opportunity/use/outcome evidence into an owner-controlled content-bearing corpus.
+- [x] Bind every corpus example to the content-free source record, feedback record/dataset/example, operation IDs, mutation IDs, artifact IDs, and content digests.
+- [x] Derive delayed content from the real `DeploymentObservation`; current input is digest-bound, use content is the actual final response, and outcome content is a deterministic completion/tool projection.
+- [x] Preserve source/set/fact level, primary-unit identity, useful/harmful/missed/unresolved/censored labels, attribution confidence, reason codes, and component ownership.
+- [x] Require complete useful and harmful/missed attribution chains; reject missing source, fact, operation, mutation, observation, digest, or future-cutoff joins.
+- [x] Canonically order examples so the same frozen evidence produces the same corpus ID independent of input order.
+- [x] Persist immutable train, validation, and future-test corpora under an explicit owner-controlled attempt root with atomic replacement, `0700` directories, `0600` files, and explicit retention.
+- [x] Keep future-test reads unavailable until the declared extraction artifact is ACTIVE; optimizer and validator APIs cannot read another split.
+- [x] Redact credentials, authorization headers, and machine paths only in the optimizer copy; mark all content as untrusted data and reject grader, answer-key, hidden-expectation, or judge evidence.
+- [x] Audit public source/manifest/ledger/operation payloads for any corpus body leakage without treating stable IDs and digests as content leaks.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `457 passed`.
+- [x] Pass all RSIMem tests: `470 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `394 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Extraction-Prompt Stage 2B**
+### **Current: Extraction-Prompt Stage 2C**
 
 The first optimized component is the semantic fact-extraction prompt. Delayed
 deployment evidence may update prompt body N to N+1 while the operation prompt,
 retrieval configuration, route, invocation boundary, backend, and model profile
 remain frozen. Raw resources are reported separately from the method decision.
 
-The immediate objective is the owner-controlled content-bearing optimizer corpus with exact joins to the content-free audit dataset. Adaptive live runs remain blocked until the corpus, optimizer, held-out validation, activation, rollback, and matched-run gates pass.
+The immediate objective is the controlled meta-optimizer that emits structured rule edits from the training corpus. Adaptive live runs remain blocked until the optimizer, held-out validation, activation, rollback, and matched-run gates pass.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -355,7 +368,7 @@ Acceptance criteria:
 5. [x] Run and audit the static SM01 matched comparison.
 6. [x] Complete and audit the Stage 1H live plain-parent smoke; see `extraction_stage1_acceptance_20260828.md`.
 7. [x] Implement the extraction policy envelope, independent artifact store, Mem0-flat root export, runtime binding, restart replay, and root fallback.
-8. [ ] Build the content-bearing optimizer corpus with exact audit joins and train/validation/future-test isolation.
+8. [x] Build the content-bearing optimizer corpus with exact audit joins and train/validation/future-test isolation.
 9. [ ] Implement the optimizer, held-out validation, activation, and rollback path.
 10. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch only after activation gates pass.
 11. [ ] Produce dated extraction-method reports before making adaptation claims.

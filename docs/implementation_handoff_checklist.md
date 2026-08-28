@@ -484,21 +484,21 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 功能需求：
 
-- □ 每个 example保存 bounded source projection、policy N extracted fact set、persisted fact lineage，以及opportunity/use/outcome三段delayed evidence。
-- □ Example显式标记`useful/harmful/missed/unresolved/censored`、label level（source/set/fact）、attribution confidence、reason codes和component ownership。
-- □ Useful example只在三段证据完整时进入resolved optimizer bucket；harmful和missed必须携带各自的可重建归因链。
-- □ 同时保存对应content-free dataset/example/operation/artifact IDs与digests，支持exact join。
-- □ Corpus区分train、validation和future-test batch；future-test内容在N+1激活前不可达。
-- □ Corpus文件使用attempt-local路径、最小权限和显式retention policy，不进入Git、通用ledger或共享trace。
-- □ Credential、authorization header和机器路径在进入optimizer provider前通过专用secret boundary处理；不改变正常agent context，只保护optimizer副本。
-- □ Source content被作为untrusted data结构化传入optimizer，不能覆盖optimizer system instruction。
+- √ 每个 example保存 bounded source projection、policy N extracted fact set、persisted fact lineage，以及opportunity/use/outcome三段delayed evidence。
+- √ Example显式标记`useful/harmful/missed/unresolved/censored`、label level（source/set/fact）、attribution confidence、reason codes和component ownership。
+- √ Useful example只在三段证据完整时进入resolved optimizer bucket；harmful和missed必须携带各自的可重建归因链。
+- √ 同时保存对应content-free dataset/example/operation/artifact IDs与digests，支持exact join。
+- √ Corpus区分train、validation和future-test batch；future-test内容在N+1激活前不可达。
+- √ Corpus文件使用attempt-local路径、最小权限和显式retention policy，不进入Git、通用ledger或共享trace。
+- √ Credential、authorization header和机器路径在进入optimizer provider前通过专用secret boundary处理；不改变正常agent context，只保护optimizer副本。
+- √ Source content被作为untrusted data结构化传入optimizer，不能覆盖optimizer system instruction。
 
 测试与验收：
 
-- □ 同一frozen source/evidence重建canonical-equivalent corpus。
-- □ Content-free audit与content-bearing corpus任一join缺失、冲突或future-dated时fail closed。
-- □ Tracked-source/manifest/ledger中不存在corpus正文。
-- □ Corpus中不存在official grader、answer key、hidden expectation或future-test内容。
+- √ 同一frozen source/evidence重建canonical-equivalent corpus。
+- √ Content-free audit与content-bearing corpus任一join缺失、冲突或future-dated时fail closed。
+- √ Tracked-source/manifest/ledger中不存在corpus正文。
+- √ Corpus中不存在official grader、answer key、hidden expectation或future-test内容。
 
 ### 2C：Extraction Prompt Optimizer
 
@@ -698,8 +698,8 @@ bash -n scripts/*.sh
 
 ## 10. 当前执行入口
 
-当前位于 **Stage 2B：Content-Bearing Extraction Optimizer Corpus**。Stage 1A-1H
-和 Stage 2A 已经通过，低成本 live plain-parent acceptance 记录在
+当前位于 **Stage 2C：Extraction Prompt Optimizer**。Stage 1A-1H、Stage 2A
+和 Stage 2B 已经通过，低成本 live plain-parent acceptance 记录在
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md)。
 后续顺序仍严格按照：
 
