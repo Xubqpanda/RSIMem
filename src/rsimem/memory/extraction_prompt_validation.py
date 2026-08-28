@@ -556,6 +556,16 @@ class ExtractionQualityMetrics:
             for field in self.__dataclass_fields__
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionQualityMetrics":
+        fields = set(cls.__dataclass_fields__)
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed extraction validation metrics")
+        try:
+            return cls(**value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction validation metrics") from exc
+
 
 @dataclass(frozen=True, slots=True)
 class ExtractionAcceptanceCriteria:
@@ -731,6 +741,65 @@ class ExtractionValidationDecision:
             **self.identity_payload(),
             "decision_id": self.decision_id,
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "ExtractionValidationDecision":
+        fields = {
+            "schema_version",
+            "decision_schema",
+            "decision_id",
+            "accepted",
+            "split_id",
+            "parent_artifact_id",
+            "proposal_artifact_id",
+            "criteria_digest",
+            "parent_metrics",
+            "proposal_metrics",
+            "useful_rate_delta",
+            "harmful_rate_delta",
+            "missed_rate_delta",
+            "changed_extraction_count",
+            "reason_codes",
+            "pair_ids",
+            "observation_ids",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed extraction validation decision")
+        try:
+            reason_codes = value["reason_codes"]
+            pair_ids = value["pair_ids"]
+            observation_ids = value["observation_ids"]
+            if not all(isinstance(items, list) for items in (
+                reason_codes,
+                pair_ids,
+                observation_ids,
+            )):
+                raise TypeError("decision collections must be lists")
+            return cls(
+                decision_id=value["decision_id"],
+                accepted=value["accepted"],
+                split_id=value["split_id"],
+                parent_artifact_id=value["parent_artifact_id"],
+                proposal_artifact_id=value["proposal_artifact_id"],
+                criteria_digest=value["criteria_digest"],
+                parent_metrics=ExtractionQualityMetrics.from_payload(
+                    value["parent_metrics"]
+                ),
+                proposal_metrics=ExtractionQualityMetrics.from_payload(
+                    value["proposal_metrics"]
+                ),
+                useful_rate_delta=value["useful_rate_delta"],
+                harmful_rate_delta=value["harmful_rate_delta"],
+                missed_rate_delta=value["missed_rate_delta"],
+                changed_extraction_count=value["changed_extraction_count"],
+                reason_codes=tuple(reason_codes),
+                pair_ids=tuple(pair_ids),
+                observation_ids=tuple(observation_ids),
+                decision_schema=value["decision_schema"],
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction validation decision") from exc
 
 
 class ExtractionPromptMatchedValidator:
@@ -947,85 +1016,11 @@ class JsonExtractionValidationDecisionStore:
 
     @staticmethod
     def _metrics(value: object) -> ExtractionQualityMetrics:
-        fields = {
-            "completed_source_count",
-            "useful_count",
-            "harmful_count",
-            "missed_count",
-            "unresolved_count",
-            "censored_count",
-            "nonempty_count",
-            "empty_count",
-            "missed_assessable_count",
-            "missed_assessability_complete",
-            "resolved_useful_rate",
-            "observed_harmful_rate",
-            "nonempty_coverage",
-            "empty_extraction_rate",
-            "high_confidence_missed_rate",
-            "safety_failure_count",
-        }
-        if not isinstance(value, Mapping) or set(value) != fields:
-            raise ValueError("malformed extraction validation metrics")
-        try:
-            return ExtractionQualityMetrics(**value)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("malformed extraction validation metrics") from exc
+        return ExtractionQualityMetrics.from_payload(value)
 
     @classmethod
     def _parse(cls, value: object) -> ExtractionValidationDecision:
-        fields = {
-            "schema_version",
-            "decision_schema",
-            "decision_id",
-            "accepted",
-            "split_id",
-            "parent_artifact_id",
-            "proposal_artifact_id",
-            "criteria_digest",
-            "parent_metrics",
-            "proposal_metrics",
-            "useful_rate_delta",
-            "harmful_rate_delta",
-            "missed_rate_delta",
-            "changed_extraction_count",
-            "reason_codes",
-            "pair_ids",
-            "observation_ids",
-        }
-        if not isinstance(value, Mapping) or set(value) != fields:
-            raise ValueError("malformed extraction validation decision")
-        try:
-            reason_codes = value["reason_codes"]
-            pair_ids = value["pair_ids"]
-            observation_ids = value["observation_ids"]
-            if not all(isinstance(items, list) for items in (
-                reason_codes,
-                pair_ids,
-                observation_ids,
-            )):
-                raise TypeError("decision collections must be lists")
-            return ExtractionValidationDecision(
-                decision_id=value["decision_id"],
-                accepted=value["accepted"],
-                split_id=value["split_id"],
-                parent_artifact_id=value["parent_artifact_id"],
-                proposal_artifact_id=value["proposal_artifact_id"],
-                criteria_digest=value["criteria_digest"],
-                parent_metrics=cls._metrics(value["parent_metrics"]),
-                proposal_metrics=cls._metrics(value["proposal_metrics"]),
-                useful_rate_delta=value["useful_rate_delta"],
-                harmful_rate_delta=value["harmful_rate_delta"],
-                missed_rate_delta=value["missed_rate_delta"],
-                changed_extraction_count=value["changed_extraction_count"],
-                reason_codes=tuple(reason_codes),
-                pair_ids=tuple(pair_ids),
-                observation_ids=tuple(observation_ids),
-                decision_schema=value["decision_schema"],
-                schema_version=value["schema_version"],
-            )
-        except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError("malformed extraction validation decision") from exc
+        return ExtractionValidationDecision.from_payload(value)
 
     def get(self, decision_id: str) -> ExtractionValidationDecision | None:
         _require_id(decision_id, "extraction validation decision ID")
