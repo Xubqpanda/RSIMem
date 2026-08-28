@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -356,6 +357,46 @@ def test_builder_exactly_joins_content_and_content_free_evidence() -> None:
     assert audit_optimizer_corpus_isolation(first, {
         "manifest": {"debug": FACT_TEXT},
     }) == ("corpus_content_leak:manifest",)
+
+
+def test_builder_joins_multiple_persisted_artifact_lineages() -> None:
+    _, _, _, _, graph, _, _ = _fixture()
+    second_proposal = replace(
+        graph.operations[1],
+        operation_id="op.proposal-v2",
+    )
+    second_mutation = replace(
+        graph.operations[2],
+        operation_id="op.mutation-v2",
+    )
+    graph = OperationGraph(
+        graph.artifacts,
+        (*graph.operations, second_proposal, second_mutation),
+        (*graph.mutations, MutationEdge(
+            "mutation.persist-v2",
+            "op.mutation-v2",
+            ("op.proposal-v2",),
+            InternalMemoryAction.ADD,
+            "artifact.memory-v2",
+            None,
+            None,
+            text_digest("A second durable fact."),
+            "receipt.persist-v2",
+        )),
+    )
+
+    lineages = ExtractionOptimizerCorpusBuilder._artifact_lineages(
+        SimpleNamespace(artifact_ids=(
+            "artifact.memory-v1",
+            "artifact.memory-v2",
+        )),
+        graph,
+    )
+
+    assert [value.artifact_id for value in lineages] == [
+        "artifact.memory-v1",
+        "artifact.memory-v2",
+    ]
 
 
 @pytest.mark.parametrize("failure", ("source", "fact", "operation", "mutation"))

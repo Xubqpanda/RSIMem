@@ -205,6 +205,53 @@ def _primary_feedback_counts(
     return counts, actionable
 
 
+def _build_optimizer_examples(
+    root: Path,
+    *,
+    sources: tuple[ExtractionSourceRecord, ...],
+    feedback: tuple[LiveExtractionFeedbackRecord, ...],
+    captures: tuple[object, ...],
+) -> tuple[object, ...]:
+    source_by_id = {value.record_id: value for value in sources}
+    source_capture_by_id = {
+        value.source_record_id: value
+        for value in captures
+        if isinstance(value, ExtractionOptimizerSourceCapture)
+    }
+    feedback_capture_by_id = {
+        value.feedback_record_id: value
+        for value in captures
+        if isinstance(value, ExtractionOptimizerFeedbackCapture)
+    }
+    graph = _operation_graph(root)
+    builder = ExtractionOptimizerCorpusBuilder()
+    examples = []
+    for feedback_record in feedback:
+        source = source_by_id.get(feedback_record.source_record_id)
+        source_capture = source_capture_by_id.get(feedback_record.source_record_id)
+        feedback_capture = feedback_capture_by_id.get(feedback_record.record_id)
+        if source is None or source_capture is None or feedback_capture is None:
+            raise ValueError("optimizer corpus capture join is incomplete")
+        if source_capture.source_record_digest != source.content_digest:
+            raise ValueError("optimizer source capture record digest mismatch")
+        if feedback_capture.source_record_id != source.record_id:
+            raise ValueError("optimizer feedback capture source mismatch")
+        examples.extend(builder.build_examples(
+            projection=source_capture.projection,
+            source_record=source,
+            feedback_record=feedback_record,
+            observation=feedback_capture.observation,
+            operation_graph=graph,
+            fact_contents=source_capture.fact_contents,
+            delayed_content=DelayedEvidenceContent(
+                source_capture.captured_at,
+                feedback_capture.captured_at,
+                feedback_capture.current_input,
+            ),
+        ))
+    return tuple(examples)
+
+
 @dataclass(frozen=True, slots=True)
 class ExtractionFeedbackBatchAudit:
     audit_id: str
@@ -311,6 +358,16 @@ def audit_extraction_feedback_batch(
         reasons.append("source_optimizer_capture_missing")
     if not feedback_ids.issubset(captured_feedback_ids):
         reasons.append("feedback_optimizer_capture_missing")
+    if not reasons:
+        try:
+            _build_optimizer_examples(
+                root,
+                sources=_source_records(root),
+                feedback=_feedback_records(root),
+                captures=captures,
+            )
+        except (TypeError, ValueError):
+            reasons.append("optimizer_corpus_join_invalid")
     corpus_ready = not reasons
     optimizer_signal_ready = (
         corpus_ready
@@ -392,43 +449,13 @@ def build_extraction_optimizer_corpus(
     sources = _source_records(root)
     feedback = _feedback_records(root)
     captures = _capture_records(root)
-    source_by_id = {value.record_id: value for value in sources}
-    source_capture_by_id = {
-        value.source_record_id: value
-        for value in captures
-        if isinstance(value, ExtractionOptimizerSourceCapture)
-    }
-    feedback_capture_by_id = {
-        value.feedback_record_id: value
-        for value in captures
-        if isinstance(value, ExtractionOptimizerFeedbackCapture)
-    }
     graph = _operation_graph(root)
-    builder = ExtractionOptimizerCorpusBuilder()
-    examples = []
-    for feedback_record in feedback:
-        source = source_by_id.get(feedback_record.source_record_id)
-        source_capture = source_capture_by_id.get(feedback_record.source_record_id)
-        feedback_capture = feedback_capture_by_id.get(feedback_record.record_id)
-        if source is None or source_capture is None or feedback_capture is None:
-            raise ValueError("optimizer corpus capture join is incomplete")
-        if source_capture.source_record_digest != source.content_digest:
-            raise ValueError("optimizer source capture record digest mismatch")
-        if feedback_capture.source_record_id != source.record_id:
-            raise ValueError("optimizer feedback capture source mismatch")
-        examples.extend(builder.build_examples(
-            projection=source_capture.projection,
-            source_record=source,
-            feedback_record=feedback_record,
-            observation=feedback_capture.observation,
-            operation_graph=graph,
-            fact_contents=source_capture.fact_contents,
-            delayed_content=DelayedEvidenceContent(
-                source_capture.captured_at,
-                feedback_capture.captured_at,
-                feedback_capture.current_input,
-            ),
-        ))
+    examples = _build_optimizer_examples(
+        root,
+        sources=sources,
+        feedback=feedback,
+        captures=captures,
+    )
     corpus = ExtractionOptimizerCorpus.create(
         batch_id=batch_id,
         attempt_id=attempt_id,
