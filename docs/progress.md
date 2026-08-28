@@ -1,6 +1,6 @@
 # RSIMem Progress
 
-Last updated: 2026-08-28
+Last updated: 2026-08-29
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
@@ -14,15 +14,18 @@ This document tracks implementation progress, the current experimental boundary,
 
 RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for every exposed model request, derive a privacy-safe lifecycle ledger, audit run completeness, and represent Hermes semantic, episodic, and procedural memory through typed backend contracts.
 
-The typed memory runtime is connected to the PAST-Bench Hermes execution path behind explicit opt-in modes. Direct native remains the default. Static Mem0-flat semantic writeback is available through live experiment configuration. The older adaptive utility/threshold mode remains only as replayable infrastructure; it is not the extraction-prompt method. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected.
+The typed memory runtime is connected to the PAST-Bench Hermes execution path behind explicit opt-in modes. Direct native remains the default. Static Mem0-flat semantic writeback is available through live experiment configuration. The older adaptive utility/threshold mode remains only as replayable infrastructure; it is not the extraction-prompt method. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected. The current research milestone is deterministic/shadow feasibility for the six host-neutral policy layers, not a live adaptive effect claim.
 
 The Hermes, static semantic writeback, operation graph, feedback store, and
 activation/rollback foundations are complete. The former Phase 2J/2K work is
 complete only as legacy retrieval-threshold infrastructure; extraction-prompt
-adaptation is pending. Stage 1, the Stage 2A extraction policy envelope, and
-the Stage 2B optimizer corpus, and the Stage 2C controlled rule editor are
-closed; Stage 2F deterministic runtime binding is closed, and the remaining
-Stage 2E live matched validation run is the active milestone.
+adaptation remains a later effect experiment. Stage 1, the Stage 2A–2I policy
+infrastructure, and deterministic runtime binding are closed. A first
+third-stage feasibility fixture now records six-layer parent/candidate
+interventions, strict feedback projection, process feedback, N+1 hypothesis
+identity, and restart-safe content-free evidence. Extraction is currently
+`optimization-ready` in that fixture; the other layers remain
+`validation-only` until outcome variation is observed.
 
 Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
@@ -303,23 +306,35 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 
 Detailed deterministic evidence is in [`extraction_stage2f_acceptance_20260828.md`](extraction_stage2f_acceptance_20260828.md). No live provider validation run or production activation is included in this milestone.
 
+The first six-layer deterministic feasibility baseline is recorded in
+[`policy_feasibility_baseline_20260829.md`](policy_feasibility_baseline_20260829.md).
+It includes replay-stable parent/candidate identities, process feedback,
+strict extraction-feedback projection, constrained N+1 hypothesis identity,
+and a crash-safe content-free evidence ledger. The fixture classifies
+Extraction as `optimization-ready` and the other five layers as
+`validation-only`; fixture labels are not deployment labels and do not support
+an uplift claim.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `546 passed`.
+- [x] Pass all RSIMem tests: `626 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `397 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 
 ## Next Milestone
 
-### **Current: Extraction-Prompt Stage 2E Live Matched Validation**
+### **Current: Third-stage deterministic policy feasibility**
 
-The first optimized component is the semantic fact-extraction prompt. Delayed
-deployment evidence may update prompt body N to N+1 while the operation prompt,
-retrieval configuration, route, invocation boundary, backend, and model profile
-remain frozen. Raw resources are reported separately from the method decision.
+The first candidate layer remains the semantic fact-extraction prompt. The
+current gate first verifies that each Trigger/Source/Extraction/Admission/
+Commit/Exposure decision is observable, controllable, replayable, and linked to
+process feedback. Delayed deployment evidence may later update prompt body N to
+N+1 while the operation prompt, retrieval configuration, route, invocation
+boundary, backend, and model profile remain frozen. Raw resources are reported
+separately from the method decision.
 
-Stage 2F now binds the validation-only ACTIVE extraction artifact to the actual Mem0-flat prompt call and records the complete activation fingerprint while freezing the completion client, model profile, update prompt, retrieval config, route, boundary, and backend. The immediate objective is the real predeclared parent/proposal validation batch. Candidate artifacts remain proposals and production activation remains blocked until that live gate passes.
+Stage 2F binds the validation-only ACTIVE extraction artifact to the actual Mem0-flat prompt call and records the complete activation fingerprint while freezing the completion client, model profile, update prompt, retrieval config, route, boundary, and backend. The real predeclared parent/proposal validation batch remains deferred until feasibility gates are sufficient. Candidate artifacts remain proposals and production activation remains blocked until that live gate passes.
 
 The accepted run contains 17 unique physical traces, 68 fully accounted model requests, 34 task/session lifecycle chains, 28 exact native-shadow checks, and zero audit, privacy, projection, bypass, or lifecycle-rejection issues. Direct native remains the default. Phase 2 must preserve the frozen route and invocation boundary and remain opt-in until each later gate passes.
 
@@ -366,7 +381,7 @@ Acceptance criteria:
 - [x] Keep MemBase datasets, runners, evaluation code, graph store, and runtime imports outside RSIMem.
 - [x] Add a bounded MemTrace-inspired, content-free atomic operation graph without importing MemTrace/smartcomment runtime or tracing arbitrary calls.
 - [x] Attribute failures to extraction, internal decision, mutation, or retrieval subgraphs before updating policy.
-- [x] Keep episodic and procedural policy implementation disabled until their separate research gates select a method and matched baseline.
+- [x] Keep episodic/procedural mutation and adaptive learning disabled until their separate research gates select a method and matched baseline; typed read-surface and deterministic policy contracts remain available for feasibility replay.
 - [x] Record ingestion model requests, latency, tokens, internal operations, rejected operations, and stored bytes as lifecycle cost.
 - [x] Add validation, rollback, and idempotency tests for framework-produced internal operations.
 
@@ -421,8 +436,10 @@ Acceptance criteria:
 10. [x] Implement static safety and held-out offline validation for extraction prompt candidates.
 11. [x] Implement the predeclared matched-trial contract, validation-only store, evidence assembler, activation, rejection, restart, and rollback gates.
 12. [x] Bind the validation-only ACTIVE extraction artifact to the real Mem0-flat prompt call and record its runtime fingerprint.
-13. [ ] Return to Stage 2E and run a predeclared matched static-extraction/adaptive-extraction SM01 batch.
-14. [ ] Produce dated extraction-method reports before making adaptation claims.
+13. [x] Build the deterministic six-layer feasibility replay/census with target-layer intervention and process-feedback lineage.
+14. [x] Bind strict primary extraction feedback to feasibility chains and persist replay identities across restart.
+15. [ ] Run a predeclared matched static-extraction/adaptive-extraction SM01 batch after feasibility gates permit it.
+16. [ ] Produce dated extraction-method reports before making adaptation claims.
 
 The backup-provider v10 plain-parent batch completed three clean replicates and
 reconstructed the private optimizer corpus, but all 24 primary labels were
@@ -430,6 +447,9 @@ unresolved. The deterministic signal gate returned `NO_PROPOSAL` with zero
 optimizer calls and no candidate. The matched Stage 2E item therefore remains
 open; details are recorded in
 [`extraction_stage2e_feedback_v10_20260828.md`](extraction_stage2e_feedback_v10_20260828.md).
+It is not a blocker for the deterministic feasibility baseline, but real N+1
+provider validation remains deferred until a family supplies sufficient
+actionable signal.
 
 ## Update Policy
 
