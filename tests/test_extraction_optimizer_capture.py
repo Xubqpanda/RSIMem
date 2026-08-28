@@ -114,6 +114,14 @@ def test_optimizer_capture_round_trips_private_source_and_feedback(
     assert log.append(source) is True
     assert log.append(feedback) is True
     assert log.append(source) is False
+    replay = ExtractionOptimizerSourceCapture.create(
+        captured_at="2026-08-28T01:00:01Z",
+        source_record_id=source.source_record_id,
+        source_record_digest=source.source_record_digest,
+        projection=source.projection,
+        fact_contents=source.fact_contents,
+    )
+    assert log.append(replay) is False
     assert log.records() == (source, feedback)
     assert path.stat().st_mode & 0o777 == 0o600
     assert log.lock_path.stat().st_mode & 0o777 == 0o600
@@ -140,7 +148,12 @@ def test_optimizer_capture_fails_closed_on_conflict_and_malformed_entry(
         source_record_id=source.source_record_id,
         source_record_digest=source.source_record_digest,
         projection=source.projection,
-        fact_contents=(),
+        fact_contents=(ExtractionFactContent(
+            "fact.conflict-v1",
+            "Different content.",
+            True,
+            None,
+        ),),
     )
     with pytest.raises(ValueError, match="identity conflict"):
         log.append(conflict)

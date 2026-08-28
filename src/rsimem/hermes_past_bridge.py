@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Callable, Mapping
@@ -54,6 +55,12 @@ from .memory.extraction_feedback import (
     ObservableToolEvent,
     detect_current_input_semantic_keys,
     detect_source_semantic_keys,
+)
+from .memory.extraction_optimizer_builder import ExtractionFactContent
+from .memory.extraction_optimizer_capture import (
+    ExtractionOptimizerFeedbackCapture,
+    ExtractionOptimizerSourceCapture,
+    JsonExtractionOptimizerCaptureLog,
 )
 from .memory.extraction_projection import (
     JsonLiveExtractionFeedbackRecordLog,
@@ -511,6 +518,13 @@ class HermesPastBenchBridge:
                         "rsimem_extraction_feedback.jsonl"
                     )
                 )
+                self.extraction_optimizer_capture_log = (
+                    JsonExtractionOptimizerCaptureLog(
+                        Path(hermes_home)
+                        / ".rsimem"
+                        / "extraction_optimizer_capture.jsonl"
+                    )
+                )
             else:
                 self.semantic_future_recorder = None
                 self.semantic_feedback_resolver = None
@@ -518,6 +532,7 @@ class HermesPastBenchBridge:
                 self.extraction_source_store = None
                 self.extraction_feedback_builder = None
                 self.extraction_feedback_log = None
+                self.extraction_optimizer_capture_log = None
         else:
             self.static_writeback = None
             self.semantic_future_recorder = None
@@ -526,6 +541,7 @@ class HermesPastBenchBridge:
             self.extraction_source_store = None
             self.extraction_feedback_builder = None
             self.extraction_feedback_log = None
+            self.extraction_optimizer_capture_log = None
         self._closed = False
 
     @property
@@ -634,6 +650,7 @@ class HermesPastBenchBridge:
         ):
             return
         for future, step_id in self._semantic_futures:
+            current_input = self._current_input(result)
             observation = self._semantic_deployment_observation(result)
             resolution = self.semantic_feedback_resolver.resolve(future, observation)
             outcome = self.semantic_future_recorder.record_use_and_outcome(
@@ -643,7 +660,12 @@ class HermesPastBenchBridge:
                 outcome_reason_code=resolution.outcome_reason_code,
                 step_id=step_id,
             )
-            self._record_extraction_feedback(future, observation, outcome)
+            self._record_extraction_feedback(
+                future,
+                observation,
+                outcome,
+                current_input,
+            )
         self._semantic_outcomes_recorded = True
 
     def _record_extraction_source(
@@ -685,12 +707,45 @@ class HermesPastBenchBridge:
             available_semantic_keys=available_keys,
         )
         self.extraction_source_store.append(record)
+        capture_log = self.extraction_optimizer_capture_log
+        if capture_log is None:
+            raise ValueError("optimizer capture log is unavailable")
+        assert boundary.writeback is not None
+        ingestion = boundary.writeback.ingestion
+        if ingestion is None:
+            raise ValueError("optimizer capture requires ingestion evidence")
+        trace = self.static_writeback.policy.operation_trace(
+            ingestion.idempotency_key
+        )
+        if trace is None:
+            raise ValueError("optimizer capture requires extraction trace")
+        fact_contents = []
+        for extracted in trace.fact_extractions:
+            fact = self.static_writeback.policy.fact_for_digest(
+                extracted.content_digest
+            )
+            if fact is None or fact.fact_id != extracted.fact_id:
+                raise ValueError("optimizer fact capture owner mismatch")
+            fact_contents.append(ExtractionFactContent(
+                extracted.fact_id,
+                fact.content,
+                extracted.accepted,
+                extracted.reason_code,
+            ))
+        capture_log.append(ExtractionOptimizerSourceCapture.create(
+            captured_at=self._utc_now(),
+            source_record_id=record.record_id,
+            source_record_digest=record.content_digest,
+            projection=projection,
+            fact_contents=tuple(fact_contents),
+        ))
 
     def _record_extraction_feedback(
         self,
         future: SemanticFutureEvidence,
         observation: DeploymentObservation,
         outcome: SemanticOutcomeEvidence,
+        current_input: str,
     ) -> None:
         if (
             self.semantic_feedback_resolver is None
@@ -757,32 +812,42 @@ class HermesPastBenchBridge:
                 missed=missed,
                 operation_join=operation_join,
             )
-            self.extraction_feedback_log.append(
-                LiveExtractionFeedbackRecord.create(
-                    family_id=self._family_id,
-                    stage=observation.stage,
-                    run_id=self._run_id,
-                    trace_id=self._trace_id,
-                    episode_id=self._episode_id,
-                    session_id=self._session_id,
-                    task_id=self._task_id,
-                    deployment_observation_id=observation.observation_id,
-                    source_record_id=record.record_id,
-                    opportunity_operation_id=future.query_operation_id,
-                    use_operation_id=outcome.use_operation_id,
-                    outcome_operation_id=outcome.outcome_operation_id,
-                    dataset=dataset,
-                )
+            feedback_record = LiveExtractionFeedbackRecord.create(
+                family_id=self._family_id,
+                stage=observation.stage,
+                run_id=self._run_id,
+                trace_id=self._trace_id,
+                episode_id=self._episode_id,
+                session_id=self._session_id,
+                task_id=self._task_id,
+                deployment_observation_id=observation.observation_id,
+                source_record_id=record.record_id,
+                opportunity_operation_id=future.query_operation_id,
+                use_operation_id=outcome.use_operation_id,
+                outcome_operation_id=outcome.outcome_operation_id,
+                dataset=dataset,
             )
+            self.extraction_feedback_log.append(feedback_record)
+            capture_log = self.extraction_optimizer_capture_log
+            if capture_log is None:
+                raise ValueError("optimizer capture log is unavailable")
+            capture_log.append(ExtractionOptimizerFeedbackCapture.create(
+                captured_at=self._utc_now(),
+                feedback_record_id=feedback_record.record_id,
+                source_record_id=record.record_id,
+                observation=observation,
+                current_input=current_input,
+            ))
 
-    def _semantic_deployment_observation(
-        self,
-        result: Mapping[str, Any],
-    ) -> DeploymentObservation:
-        resolver = self.semantic_feedback_resolver
-        if resolver is None or self._family_id is None or self._stage is None:
-            raise ValueError("semantic feedback resolver identity is unavailable")
-        contract = resolver.registry.resolver(self._family_id).contract
+    @staticmethod
+    def _utc_now() -> str:
+        return datetime.now(UTC).isoformat(timespec="microseconds").replace(
+            "+00:00",
+            "Z",
+        )
+
+    @staticmethod
+    def _current_input(result: Mapping[str, Any]) -> str:
         raw_messages = result.get("messages")
         messages = (
             tuple(value for value in raw_messages if isinstance(value, Mapping))
@@ -794,7 +859,23 @@ class HermesPastBenchBridge:
             for message in messages
             if message.get("role") == "user"
         )
-        current_input = user_inputs[-1] if user_inputs else ""
+        return user_inputs[-1] if user_inputs else ""
+
+    def _semantic_deployment_observation(
+        self,
+        result: Mapping[str, Any],
+    ) -> DeploymentObservation:
+        resolver = self.semantic_feedback_resolver
+        if resolver is None or self._family_id is None or self._stage is None:
+            raise ValueError("semantic feedback resolver identity is unavailable")
+        contract = resolver.registry.resolver(self._family_id).contract
+        messages = ()
+        raw_messages = result.get("messages")
+        if isinstance(raw_messages, (list, tuple)):
+            messages = tuple(
+                value for value in raw_messages if isinstance(value, Mapping)
+            )
+        current_input = self._current_input(result)
         current_keys = detect_current_input_semantic_keys(
             self._family_id,
             current_input,
