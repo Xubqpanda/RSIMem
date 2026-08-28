@@ -376,7 +376,11 @@ class HermesPastBenchBridge:
         self._source_selection_policy = DeterministicSourceSelectionPolicy()
         self._source_selection_decisions: list[SourceSelectionDecision] = []
         self._policy_evidence = JsonPolicyDecisionLedger(
-            self.evidence_path.with_name("rsimem_policy_decisions.jsonl")
+            self.evidence_path.with_name("rsimem_policy_decisions.jsonl"),
+            variant=experiment_variant,
+            trace_id=trace_id,
+            family_id=family_id,
+            stage=stage,
         )
         self._admission_policy = DeterministicAdmissionPolicy()
         self._exposure_policy = DeterministicExposurePolicy()
