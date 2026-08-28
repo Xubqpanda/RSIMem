@@ -282,6 +282,34 @@ def test_dirty_repository_and_dirty_revision_fail_before_manifest_creation(
         resolve_clean_repository(repository)
 
 
+def test_vendored_repository_revision_is_scoped_to_subtree(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    vendor = repository / "vendor"
+    vendor.mkdir(parents=True)
+    subprocess.run(("git", "init", "-q", str(repository)), check=True)
+    subprocess.run(("git", "-C", str(repository), "config", "user.email", "test@example.invalid"), check=True)
+    subprocess.run(("git", "-C", str(repository), "config", "user.name", "Test"), check=True)
+    (vendor / "source.txt").write_text("vendor\n", encoding="utf-8")
+    (repository / "root.txt").write_text("root\n", encoding="utf-8")
+    subprocess.run(("git", "-C", str(repository), "add", "."), check=True)
+    subprocess.run(("git", "-C", str(repository), "commit", "-qm", "initial"), check=True)
+
+    revision = resolve_clean_repository(vendor)
+    expected_tree = subprocess.run(
+        ("git", "-C", str(repository), "rev-parse", "HEAD:vendor"),
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert revision.tree == expected_tree
+
+    (repository / "root.txt").write_text("root dirty\n", encoding="utf-8")
+    assert resolve_clean_repository(vendor).dirty is False
+    (vendor / "source.txt").write_text("vendor dirty\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="clean repository"):
+        resolve_clean_repository(vendor)
+
+
 def test_matched_manifest_rejects_non_extraction_identity_drift() -> None:
     parent = _policy("prompt-component.extraction.parent", "a" * 64)
     candidate = _policy("prompt-component.extraction.active", "b" * 64)
