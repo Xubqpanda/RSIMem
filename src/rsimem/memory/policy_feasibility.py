@@ -922,6 +922,22 @@ class LayerFeasibilityCensus:
     def outcome_variation(self) -> float | None:
         return self.outcome_variation_count / self.case_count if self.case_count else None
 
+    @property
+    def unresolved_count(self) -> int:
+        return int(self.outcome_counts.get(FeasibilityOutcome.UNRESOLVED.value, 0))
+
+    @property
+    def censored_count(self) -> int:
+        return int(self.outcome_counts.get(FeasibilityOutcome.CENSORED.value, 0))
+
+    @property
+    def unresolved_ratio(self) -> float | None:
+        return self.unresolved_count / self.case_count if self.case_count else None
+
+    @property
+    def censored_ratio(self) -> float | None:
+        return self.censored_count / self.case_count if self.case_count else None
+
     def payload(self) -> dict[str, object]:
         return {
             "layer": self.layer.value,
@@ -934,6 +950,10 @@ class LayerFeasibilityCensus:
             "outcomeVariation": self.outcome_variation,
             "outcomeCounts": dict(self.outcome_counts),
             "unknownCount": self.unknown_count,
+            "unresolvedCount": self.unresolved_count,
+            "unresolvedRatio": self.unresolved_ratio,
+            "censoredCount": self.censored_count,
+            "censoredRatio": self.censored_ratio,
             "completeFeedbackCount": self.complete_feedback_count,
             "status": self.status.value,
             "reasonCodes": list(self.reason_codes),
