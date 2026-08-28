@@ -1205,8 +1205,10 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
     assert "Always use TSV" not in source_serialized
     source_store = JsonExtractionSourceRecordStore(source_path)
     learned_source = source_store.records()[0]
-    capture_path = home / ".rsimem" / "extraction_optimizer_capture.jsonl"
-    private_captures = JsonExtractionOptimizerCaptureLog(capture_path).records()
+    learn_capture_path = tmp_path / "learn" / "extraction_optimizer_capture.jsonl"
+    private_captures = JsonExtractionOptimizerCaptureLog(
+        learn_capture_path
+    ).records()
     assert len(private_captures) == 1
     assert isinstance(private_captures[0], ExtractionOptimizerSourceCapture)
     assert private_captures[0].source_record_id == learned_source.record_id
@@ -1216,7 +1218,8 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
     assert private_captures[0].fact_contents[0].content.startswith(
         "Always use TSV"
     )
-    assert capture_path.stat().st_mode & 0o777 == 0o600
+    assert learn_capture_path.stat().st_mode & 0o777 == 0o600
+    assert not (home / ".rsimem" / "extraction_optimizer_capture.jsonl").exists()
     unrelated_empty = ExtractionSourceRecord.create(
         family_id="SM01_preference_adoption",
         stage="learn_b",
@@ -1365,7 +1368,12 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
         "answer_key",
         "reasoning_tokens",
     ))
-    private_captures = JsonExtractionOptimizerCaptureLog(capture_path).records()
+    eval_capture_path = tmp_path / "eval" / "extraction_optimizer_capture.jsonl"
+    private_captures = (
+        JsonExtractionOptimizerCaptureLog(learn_capture_path).records()
+        + JsonExtractionOptimizerCaptureLog(eval_capture_path).records()
+    )
+    assert eval_capture_path.stat().st_mode & 0o777 == 0o600
     source_captures = tuple(
         value for value in private_captures
         if isinstance(value, ExtractionOptimizerSourceCapture)
