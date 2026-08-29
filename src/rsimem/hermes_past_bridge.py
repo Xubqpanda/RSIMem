@@ -1576,6 +1576,11 @@ class HermesPastBenchBridge:
             task_id=snapshot.task_id,
             snapshot_id=snapshot.snapshot_id,
             injection_receipt_ids=injection_receipt_ids,
+            # Keep benchmark identity explicit at the bridge boundary.  The
+            # ledger defaults are a convenience for direct callers, not a
+            # substitute for the host's evidence-plane declaration.
+            family_id=self._family_id,
+            stage=self._stage,
         )
         self._policy_decision_ids.add(decision_id)
         # Every policy decision is also projected into the process corpus.  The
