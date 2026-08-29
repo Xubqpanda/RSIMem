@@ -378,6 +378,17 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
             for line in policy_path.read_text(encoding="utf-8").splitlines()
         ]
         assert any(event["layer"] == "exposure" for event in policy_events)
+        process_path = evidence_path.with_name("rsimem_process_feedback.jsonl")
+        process_events = [
+            json.loads(line)
+            for line in process_path.read_text(encoding="utf-8").splitlines()
+        ]
+        assert process_events
+        assert all(event["schema"] == "rsimem-process-feedback-v1" for event in process_events)
+        assert all(event["source_revision"] for event in process_events)
+        # Process feedback is content-free and must not copy the native skill,
+        # conversation or memory body across the audit boundary.
+        assert "Use CSV with an explicit owner column." not in process_path.read_text(encoding="utf-8")
         assert all(event["sourceRevision"] for event in policy_events)
     finally:
         bridge.close()
