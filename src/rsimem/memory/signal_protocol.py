@@ -15,6 +15,10 @@ from typing import Mapping
 
 SIGNAL_PROTOCOL_SCHEMA_VERSION = 1
 SIGNAL_PROTOCOL_SCHEMA = "rsimem-process-signal-protocol-v1"
+PROCESS_SIGNAL_PROTOCOL_FILENAME = "process_signal_protocol.json"
+PROCESS_SIGNAL_OBSERVATION_WINDOW = "completed-task.v1"
+PROCESS_SIGNAL_CASE_DEDUP_RULE = "logical_case_v1"
+PROCESS_SIGNAL_NO_SIGNAL_CASE_ID = "case.no_signal.v1"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _PROVIDER_MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+/-]{0,255}$")
@@ -135,6 +139,70 @@ class ProcessSignalAnalysisProtocol:
             raise ValueError("malformed process signal protocol") from exc
 
 
+def _manifest_provider_model(manifest: Mapping[str, object]) -> str:
+    """Resolve the immutable provider/model identity recorded by a manifest."""
+
+    model = manifest.get("modelProfile")
+    resolved = model.get("resolved") if isinstance(model, Mapping) else None
+    base_url = resolved.get("providerBaseUrl") if isinstance(resolved, Mapping) else None
+    model_id = resolved.get("modelId") if isinstance(resolved, Mapping) else None
+    if (
+        not isinstance(base_url, str)
+        or not base_url
+        or not isinstance(model_id, str)
+        or not model_id
+    ):
+        raise ValueError("manifest provider/model identity is incomplete")
+    return f"{base_url.rstrip('/')}/{model_id}"
+
+
+def protocol_for_extraction_manifest(
+    manifest: Mapping[str, object],
+) -> ProcessSignalAnalysisProtocol:
+    """Build the pre-registered protocol expected for one extraction batch.
+
+    The protocol is deliberately derived from manifest identity and fixed
+    process-census rules.  It contains no result, score, or model output.
+    """
+
+    split = manifest.get("split")
+    if not isinstance(split, Mapping):
+        raise ValueError("manifest split identity is missing")
+    family_id = split.get("familyId")
+    template_id = split.get("taskTemplateGroupId")
+    replicates = manifest.get("replicates")
+    if (
+        not isinstance(family_id, str)
+        or not isinstance(template_id, str)
+        or type(replicates) is not int
+        or replicates < 1
+    ):
+        raise ValueError("manifest process-signal identity is incomplete")
+    return ProcessSignalAnalysisProtocol.create(
+        training_family_ids=(family_id,),
+        task_template_group_ids=(template_id,),
+        provider_model=_manifest_provider_model(manifest),
+        replicate_count=replicates,
+        observation_window=PROCESS_SIGNAL_OBSERVATION_WINDOW,
+        case_dedup_rule=PROCESS_SIGNAL_CASE_DEDUP_RULE,
+        no_signal_case_id=PROCESS_SIGNAL_NO_SIGNAL_CASE_ID,
+    )
+
+
+def validate_protocol_for_extraction_manifest(
+    protocol: ProcessSignalAnalysisProtocol,
+    manifest: Mapping[str, object],
+) -> ProcessSignalAnalysisProtocol:
+    """Fail closed when a frozen protocol does not join its batch manifest."""
+
+    if not isinstance(protocol, ProcessSignalAnalysisProtocol):
+        raise TypeError("process signal protocol is malformed")
+    expected = protocol_for_extraction_manifest(manifest)
+    if protocol != expected:
+        raise ValueError("process signal protocol does not match extraction manifest")
+    return protocol
+
+
 class JsonProcessSignalAnalysisProtocolStore:
     """Freeze one result-independent process-signal analysis protocol.
 
@@ -145,7 +213,9 @@ class JsonProcessSignalAnalysisProtocolStore:
     """
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Keep the final path component unresolved so a symlink cannot be
+        # silently followed into a trusted-looking protocol file.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
 
     @staticmethod
@@ -210,6 +280,12 @@ class JsonProcessSignalAnalysisProtocolStore:
 __all__ = [
     "SIGNAL_PROTOCOL_SCHEMA",
     "SIGNAL_PROTOCOL_SCHEMA_VERSION",
+    "PROCESS_SIGNAL_PROTOCOL_FILENAME",
+    "PROCESS_SIGNAL_OBSERVATION_WINDOW",
+    "PROCESS_SIGNAL_CASE_DEDUP_RULE",
+    "PROCESS_SIGNAL_NO_SIGNAL_CASE_ID",
     "ProcessSignalAnalysisProtocol",
     "JsonProcessSignalAnalysisProtocolStore",
+    "protocol_for_extraction_manifest",
+    "validate_protocol_for_extraction_manifest",
 ]

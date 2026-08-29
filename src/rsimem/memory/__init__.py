@@ -201,10 +201,16 @@ from .final_evaluation import (
     JsonFinalEvaluationStore,
 )
 from .signal_protocol import (
+    PROCESS_SIGNAL_CASE_DEDUP_RULE,
+    PROCESS_SIGNAL_NO_SIGNAL_CASE_ID,
+    PROCESS_SIGNAL_OBSERVATION_WINDOW,
+    PROCESS_SIGNAL_PROTOCOL_FILENAME,
     SIGNAL_PROTOCOL_SCHEMA,
     SIGNAL_PROTOCOL_SCHEMA_VERSION,
     JsonProcessSignalAnalysisProtocolStore,
     ProcessSignalAnalysisProtocol,
+    protocol_for_extraction_manifest,
+    validate_protocol_for_extraction_manifest,
 )
 
 __all__ = [
@@ -362,8 +368,14 @@ __all__ = [
     "JsonFinalEvaluationStore",
     "SIGNAL_PROTOCOL_SCHEMA",
     "SIGNAL_PROTOCOL_SCHEMA_VERSION",
+    "PROCESS_SIGNAL_PROTOCOL_FILENAME",
+    "PROCESS_SIGNAL_OBSERVATION_WINDOW",
+    "PROCESS_SIGNAL_CASE_DEDUP_RULE",
+    "PROCESS_SIGNAL_NO_SIGNAL_CASE_ID",
     "JsonProcessSignalAnalysisProtocolStore",
     "ProcessSignalAnalysisProtocol",
+    "protocol_for_extraction_manifest",
+    "validate_protocol_for_extraction_manifest",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",

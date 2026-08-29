@@ -38,6 +38,12 @@ from .memory.process_signal import (
     ProcessSignalCase,
     census_process_signal_cases,
 )
+from .memory.signal_protocol import (
+    PROCESS_SIGNAL_PROTOCOL_FILENAME,
+    JsonProcessSignalAnalysisProtocolStore,
+    ProcessSignalAnalysisProtocol,
+    validate_protocol_for_extraction_manifest,
+)
 from .memory.pure_process import (
     JsonPureProcessCorpusStore,
     PureProcessEvent,
@@ -216,6 +222,25 @@ def _process_signal_cases(run_dir: Path) -> tuple[ProcessSignalCase, ...]:
                 )
             by_id[case.case_id] = case
     return tuple(by_id[case_id] for case_id in sorted(by_id))
+
+
+def _process_signal_protocol(
+    batch_root: Path,
+    manifest: dict[str, Any],
+) -> ProcessSignalAnalysisProtocol:
+    """Load and bind the frozen process-signal protocol for this batch.
+
+    Every analyzed batch must carry this frozen, result-independent contract.
+    Empty/provider-failed batches therefore fail closed as well: otherwise a
+    later process-signal file could be attached to an analysis that was never
+    pre-registered.
+    """
+
+    path = batch_root / PROCESS_SIGNAL_PROTOCOL_FILENAME
+    protocol = JsonProcessSignalAnalysisProtocolStore(path).get()
+    if protocol is None:
+        raise ValueError("process signal protocol is missing")
+    return validate_protocol_for_extraction_manifest(protocol, manifest)
 
 
 def _terminal_attempts(manifest: dict[str, Any]) -> tuple[dict[str, Any], ...]:
@@ -929,6 +954,7 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
             key=lambda value: (value["replicate"], value["ordinal"]),
         )
     )
+    process_signal_protocol = _process_signal_protocol(root, manifest)
     by_method = {
         method: tuple(row for row in rows if row["method"] == method)
         for method in manifest["methods"]
@@ -998,6 +1024,10 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
         "activationFunnel": funnel,
         "processCorpus": _process_corpus_summary(rows),
         "processSignalCases": _process_signal_case_summary(rows),
+        "processSignalProtocol": (
+            process_signal_protocol.payload()
+            if process_signal_protocol is not None else None
+        ),
         "pureProcessCorpus": _pure_process_corpus_summary(rows),
         "evidencePlanes": _evidence_plane_summary(rows, by_method),
         "pairedRawUsageDelta": _paired_usage_delta(rows),

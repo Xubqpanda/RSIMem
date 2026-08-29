@@ -7,6 +7,8 @@ import pytest
 from rsimem.memory.signal_protocol import (
     JsonProcessSignalAnalysisProtocolStore,
     ProcessSignalAnalysisProtocol,
+    protocol_for_extraction_manifest,
+    validate_protocol_for_extraction_manifest,
 )
 
 
@@ -76,3 +78,38 @@ def test_protocol_store_fails_closed_on_corruption(tmp_path) -> None:
     path.write_text("not-json\n", encoding="utf-8")
     with pytest.raises(ValueError, match="malformed process signal protocol store"):
         JsonProcessSignalAnalysisProtocolStore(path).get()
+
+
+def test_protocol_store_fails_closed_on_symlink(tmp_path) -> None:
+    target = tmp_path / "target.json"
+    target.write_text(json.dumps(_protocol().payload()), encoding="utf-8")
+    path = tmp_path / "signal-protocol.json"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink|malformed process signal protocol store"):
+        JsonProcessSignalAnalysisProtocolStore(path).get()
+
+
+def test_protocol_manifest_binding_is_deterministic_and_result_independent() -> None:
+    manifest = {
+        "split": {
+            "familyId": "SM02_constraint_retention",
+            "taskTemplateGroupId": "sm02-process-pilot-train-v1",
+        },
+        "replicates": 3,
+        "modelProfile": {
+            "resolved": {
+                "providerBaseUrl": "https://coding.tu-zi.com/v1",
+                "modelId": "gpt-5.6-luna",
+            },
+        },
+    }
+    protocol = protocol_for_extraction_manifest(manifest)
+    assert validate_protocol_for_extraction_manifest(protocol, manifest) == protocol
+    assert protocol.training_family_ids == ("SM02_constraint_retention",)
+    assert protocol.task_template_group_ids == ("sm02-process-pilot-train-v1",)
+    assert protocol.provider_model == "https://coding.tu-zi.com/v1/gpt-5.6-luna"
+
+    changed = dict(manifest)
+    changed["replicates"] = 4
+    with pytest.raises(ValueError, match="does not match extraction manifest"):
+        validate_protocol_for_extraction_manifest(protocol, changed)

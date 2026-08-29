@@ -53,6 +53,23 @@ PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.extraction_matched_pre
   --experiment-config "${EXPERIMENT_CONFIG}" --trial-config "${TRIAL_CONFIG}" \
   "${split_plan_args[@]}"
 
+# Freeze the result-independent process-signal contract before any task run.
+PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${manifest_path}" "${batch_root}" <<'PY'
+import sys
+from pathlib import Path
+from rsimem.extraction_experiment_manifest import load_extraction_manifest
+from rsimem.memory.signal_protocol import (
+    PROCESS_SIGNAL_PROTOCOL_FILENAME,
+    JsonProcessSignalAnalysisProtocolStore,
+    protocol_for_extraction_manifest,
+)
+manifest_path, batch_root = map(Path, sys.argv[1:])
+manifest = load_extraction_manifest(manifest_path)
+JsonProcessSignalAnalysisProtocolStore(
+    batch_root / PROCESS_SIGNAL_PROTOCOL_FILENAME
+).freeze(protocol_for_extraction_manifest(manifest))
+PY
+
 # Keep provider connectivity outside the matched task/accounting surface and
 # fail before any parent/candidate task starts when completion content is not
 # available.  Only the content-free probe result is persisted.
@@ -152,6 +169,7 @@ from rsimem.memory.process_signal import (
     JsonProcessSignalCaseStore,
     build_process_signal_cases,
 )
+from rsimem.memory.signal_protocol import PROCESS_SIGNAL_OBSERVATION_WINDOW
 run_dir, manifest_path = map(Path, sys.argv[1:])
 events = tuple(
     event
@@ -190,7 +208,7 @@ cases = build_process_signal_cases(
     frozen_policy_digest=policy_digest,
     source_task_template_id="source." + split["taskTemplateGroupId"],
     future_task_template_id="future." + split["taskTemplateGroupId"],
-    observation_window="completed-task.v1",
+    observation_window=PROCESS_SIGNAL_OBSERVATION_WINDOW,
     replicate_id="replicate." + str(attempt["replicate"]),
 )
 if not cases:

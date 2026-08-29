@@ -86,6 +86,23 @@ PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" \
   --experiment-config "${EXPERIMENT_CONFIG}" \
   --split-plan "${SPLIT_PLAN}"
 
+# Freeze the result-independent process-signal contract before any task run.
+PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${manifest_path}" "${batch_root}" <<'PY'
+import sys
+from pathlib import Path
+from rsimem.extraction_experiment_manifest import load_extraction_manifest
+from rsimem.memory.signal_protocol import (
+    PROCESS_SIGNAL_PROTOCOL_FILENAME,
+    JsonProcessSignalAnalysisProtocolStore,
+    protocol_for_extraction_manifest,
+)
+manifest_path, batch_root = map(Path, sys.argv[1:])
+manifest = load_extraction_manifest(manifest_path)
+JsonProcessSignalAnalysisProtocolStore(
+    batch_root / PROCESS_SIGNAL_PROTOCOL_FILENAME
+).freeze(protocol_for_extraction_manifest(manifest))
+PY
+
 PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.preflight \
   --state-dir "${batch_root}/provider_preflight" \
   --past-bench-root "${PAST_BENCH_ROOT}" \
@@ -238,6 +255,7 @@ from rsimem.memory.process_signal import (
     JsonProcessSignalCaseStore,
     build_process_signal_cases,
 )
+from rsimem.memory.signal_protocol import PROCESS_SIGNAL_OBSERVATION_WINDOW
 run_dir = Path(sys.argv[1])
 audit = json.loads((run_dir / "audit.json").read_text(encoding="utf-8"))
 if audit.get("ok") is not True or audit.get("issues") != []:
@@ -286,7 +304,7 @@ cases = build_process_signal_cases(
     frozen_policy_digest=policy_digest,
     source_task_template_id="source." + split["taskTemplateGroupId"],
     future_task_template_id="future." + split["taskTemplateGroupId"],
-    observation_window="completed-task.v1",
+    observation_window=PROCESS_SIGNAL_OBSERVATION_WINDOW,
     replicate_id="replicate." + str(attempt["replicate"]),
 )
 if not cases:
