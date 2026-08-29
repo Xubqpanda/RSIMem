@@ -236,6 +236,30 @@ def test_request_deduplicates_content_and_bounds_unresolved_context() -> None:
     assert all(unit["delayed_evidence_ref"] is None for unit in groups["unresolved"])
 
 
+def test_request_compacts_replicates_only_after_budget_overflow() -> None:
+    corpus = _multi_corpus(
+        (ExtractionFeedbackLabel.USEFUL,) * 4,
+        same_source=True,
+    )
+    # The uncompressed request is above this deliberately small fixture
+    # budget, while deterministic replica compaction fits.  Every primary ID
+    # remains in the request identity and the merged unit records its count.
+    config = replace(
+        FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+        maximum_input_chars=11_000,
+    )
+    request = build_extraction_optimizer_request(_parent(), corpus, config=config)
+    payload = json.loads(request.input_json)
+    units = payload["evidence_groups"]["useful"]
+    assert len(units) == 1
+    assert units[0]["replica_count"] == 4
+    assert len(units[0]["replica_primary_example_ids"]) == 4
+    assert set(request.primary_example_ids) == {
+        value.example_id for value in corpus.examples if value.primary
+    }
+    assert "feedback_level_counts" in units[0]
+
+
 def test_frozen_config_and_nontraining_requests_fail_before_completion() -> None:
     config = ExtractionOptimizerConfig()
     assert config.input_schema_digest == EXTRACTION_OPTIMIZER_INPUT_SCHEMA_DIGEST
