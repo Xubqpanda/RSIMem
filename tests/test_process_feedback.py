@@ -358,7 +358,16 @@ def test_process_corpus_is_separate_from_evaluation_score_and_restart_safe(tmp_p
     assert JsonProcessCorpusStore(path).get() == corpus
     with pytest.raises(ValueError, match="evaluation-only"):
         ensure_process_corpus_has_no_evaluation_fields({"task_score": 1.0})
-    for field in ("taskScore", "officialScore", "answerKey", "hidden-expectation"):
+    for field in (
+        "taskScore",
+        "officialScore",
+        "answerKey",
+        "hidden-expectation",
+        "judge_feedback",
+        "graderFeedback",
+        "goldAnswer",
+        "ground_truth",
+    ):
         with pytest.raises(ValueError, match="evaluation-only"):
             ensure_process_corpus_has_no_evaluation_fields({"nested": {field: 1}})
 
