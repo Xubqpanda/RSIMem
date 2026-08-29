@@ -82,6 +82,20 @@ def test_process_ledger_is_restart_safe_and_conflict_checked(tmp_path) -> None:
         JsonProcessFeedbackLedger(path).events
 
 
+def test_process_ledger_reserves_one_concurrent_writer(tmp_path) -> None:
+    _, _, replay = _replay()
+    path = tmp_path / "process-concurrent.jsonl"
+    event = replay.process_events[0]
+
+    def record_once() -> bool:
+        return JsonProcessFeedbackLedger(path).record(event)[1]
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        created = tuple(executor.map(lambda _: record_once(), range(8)))
+    assert sum(created) == 1
+    assert JsonProcessFeedbackLedger(path).events == (event,)
+
+
 def test_full_replay_process_chain_survives_restart(tmp_path) -> None:
     _, _, replay = _replay()
     path = tmp_path / "full-process.jsonl"
