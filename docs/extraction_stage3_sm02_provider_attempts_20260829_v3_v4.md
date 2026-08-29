@@ -28,6 +28,10 @@ The reusable probe was run again after the completion-probe gate was added; it
 timed out with `transport_error` after 20 seconds (no HTTP status, content, or
 usage).  This provider-only result likewise did not start a benchmark batch.
 
+The latest probe still returns `http_error` with status 503 and no completion or
+usage payload.  The formal launchers therefore remain correctly gated and no
+new SM02 attempt is created from this check.
+
 ## Batch outcomes
 
 | batch | endpoint | completed traces | requests | retries | input tokens | output tokens | audit | disposition |
