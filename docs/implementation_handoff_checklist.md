@@ -1038,9 +1038,14 @@ feedback 全部为 `unresolved`，strict corpus 返回 `NO_PROPOSAL`，因此仍
 clean parent replicate，产生 8 条 contract-resolved `missed` 和 16 条
 `unresolved`；没有 useful/harmful variation，不能直接生成可激活 candidate。
 其 content-bearing corpus 已通过重复上下文压缩保持在冻结 optimizer 输入预算
-内，但 provider 两次返回 malformed optimizer JSON，严格 schema 拒绝且未写入
-candidate。详细记录见
-[`extraction_stage3_sm02_feedback_v5_20260829.md`](extraction_stage3_sm02_feedback_v5_20260829.md)。
+内；早期 `json_object` 响应两次缺少 `reason_codes`，严格 schema 拒绝。随后
+provider 恢复后，commit `d2d06fc` 将 adapter 固定为冻结的 strict JSON Schema
+response contract，同一 corpus 成功产生一个经过 static-safety 检查的 proposal
+candidate。candidate 仍未 ACTIVE、未进入 matched validation，也不构成 uplift
+证据。详细记录见
+[`extraction_stage3_sm02_feedback_v5_20260829.md`](extraction_stage3_sm02_feedback_v5_20260829.md)
+和
+[`extraction_stage3_sm02_optimizer_retry_20260829.md`](extraction_stage3_sm02_optimizer_retry_20260829.md)。
 后续顺序仍严格按照：
 
 ```text
