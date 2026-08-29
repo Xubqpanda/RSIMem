@@ -43,8 +43,12 @@ class CommitSchedule:
         ):
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must not be empty")
+        if not isinstance(self.mutation_ids, (tuple, list)):
+            raise ValueError("commit schedule mutation IDs are invalid")
         mutation_ids = tuple(self.mutation_ids)
-        if not mutation_ids or len(mutation_ids) != len(set(mutation_ids)) or any(not item.strip() for item in mutation_ids):
+        if any(not isinstance(item, str) or not item.strip() for item in mutation_ids):
+            raise ValueError("commit schedule mutation IDs are invalid")
+        if not mutation_ids or len(mutation_ids) != len(set(mutation_ids)):
             raise ValueError("commit schedule mutation IDs are invalid")
         object.__setattr__(self, "mutation_ids", mutation_ids)
         object.__setattr__(self, "status", CommitScheduleStatus(self.status))
@@ -149,6 +153,8 @@ class JsonCommitScheduleStore:
     @staticmethod
     def _decode(raw: object) -> CommitSchedule:
         if not isinstance(raw, dict):
+            raise ValueError("malformed commit schedule entry")
+        if not isinstance(raw.get("mutation_ids"), list):
             raise ValueError("malformed commit schedule entry")
         try:
             return CommitSchedule(
