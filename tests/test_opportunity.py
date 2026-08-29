@@ -46,6 +46,13 @@ def test_application_schema_is_frozen_and_versioned() -> None:
         version="v1",
         requirement_ids=("resource.share.recipient_policy",),
     )
+    assert ApplicationOpportunitySchema.from_payload(
+        json.loads(json.dumps(schema.payload()))
+    ) == schema
+    tampered_schema = schema.payload()
+    tampered_schema["requirement_ids"] = ["resource.other_policy"]
+    with pytest.raises(ValueError, match="malformed application opportunity schema"):
+        ApplicationOpportunitySchema.from_payload(tampered_schema)
     evidence = OpportunityEvidence.create(
         source_surface=OpportunitySurface.APPLICATION_SCHEMA,
         semantic_requirement="resource.share.recipient_policy",
