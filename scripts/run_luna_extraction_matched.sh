@@ -19,6 +19,7 @@ PAST_BASE_URL="${RSIMEM_PAST_BASE_URL:-https://coding.tu-zi.com/v1}"
 # here as a compatibility marker; it must not be used for the PAST schema.)
 TRIAL_CONFIG="${RSIMEM_EXTRACTION_TRIAL_CONFIG:-}"
 EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-}"
+SPLIT_PLAN="${RSIMEM_EXTRACTION_SPLIT_PLAN:-}"
 BATCH_ID="${RSIMEM_BATCH_ID:-}"
 TASK_FAMILY="${RSIMEM_EXTRACTION_TASK_FAMILY:-}"
 
@@ -31,6 +32,11 @@ export OPENAI_API_KEY="${OPENAI_API_KEY:-${GPT_LUNA_API_KEY}}"
 [[ -x "${PAST_BENCH_BIN}" && -x "${PYTHON_BIN}" ]] || { echo "RSIMem virtual environment is incomplete." >&2; exit 2; }
 [[ -z "$(git -C "${RSIMEM_ROOT}" status --porcelain)" ]] || { echo "Formal matched validation requires a clean RSIMem tree." >&2; exit 2; }
 [[ -z "$(git -C "${PAST_BENCH_ROOT}" status --porcelain)" ]] || { echo "Formal matched validation requires a clean PAST-Bench tree." >&2; exit 2; }
+split_plan_args=()
+if [[ -n "${SPLIT_PLAN}" ]]; then
+  [[ -f "${SPLIT_PLAN}" ]] || { echo "RSIMEM_EXTRACTION_SPLIT_PLAN does not exist." >&2; exit 2; }
+  split_plan_args=(--split-plan "${SPLIT_PLAN}")
+fi
 
 family_root="${PAST_BENCH_ROOT}/self-evolve-tasks-v2/${TASK_FAMILY}"
 [[ -f "${family_root}/family.yaml" ]] || { echo "Requested PAST family is incomplete." >&2; exit 2; }
@@ -44,7 +50,8 @@ PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.extraction_matched_pre
   --rsimem-root "${RSIMEM_ROOT}" --past-bench-root "${PAST_BENCH_ROOT}" \
   --family-root "${family_root}" --agent-registry "${AGENT_REGISTRY}" \
   --run-config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" \
-  --experiment-config "${EXPERIMENT_CONFIG}" --trial-config "${TRIAL_CONFIG}"
+  --experiment-config "${EXPERIMENT_CONFIG}" --trial-config "${TRIAL_CONFIG}" \
+  "${split_plan_args[@]}"
 
 # Keep provider connectivity outside the matched task/accounting surface and
 # fail before any parent/candidate task starts when completion content is not
