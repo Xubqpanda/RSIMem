@@ -72,6 +72,10 @@ trace; both audits therefore failed closed as `incomplete_model_usage`. Their
 manifests and raw traces are retained, but neither attempt is a task negative
 or optimizer input. See
 [`extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md`](extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md).
+The same report includes a deduplicated process-signal census: the primary
+attempt still emitted all six policy-stage events, while the backup emitted
+only retrieval, exposure, and task-failure events. This diagnostic is not a
+formal training or validation batch.
 
 The PAST-Bench Hermes adapter now transports only content-free process-corpus
 identity (`event_ids` and a stable digest) in `StepResponse`; it never exposes
