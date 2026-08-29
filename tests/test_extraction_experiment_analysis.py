@@ -319,6 +319,16 @@ def test_analysis_reports_quality_raw_unknown_usage_and_complete_funnel(
 
     assert report["qualityReady"] is True
     assert report["processCorpus"]["evaluationScoreAccessible"] is False
+    assert report["evidencePlanes"]["pureProcess"]["familyIdentityPresent"] is False
+    assert report["evidencePlanes"]["pureProcess"]["stageIdentityPresent"] is False
+    assert report["evidencePlanes"]["benchmarkAudit"][
+        "qualityLabelsAreAuditOnly"
+    ] is True
+    assert report["evidencePlanes"]["finalEvaluation"] == {
+        "present": False,
+        "consumer": "final_reporter_only",
+        "officialScoreAccessible": False,
+    }
     assert "task_score" not in report["processCorpus"]
     assert report["usageComplete"] is False
     assert report["failedAttempts"] == [{

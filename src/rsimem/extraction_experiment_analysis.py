@@ -778,6 +778,40 @@ def _pure_process_corpus_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, 
     }
 
 
+def _evidence_plane_summary(
+    rows: tuple[dict[str, Any], ...],
+    by_method: dict[str, tuple[dict[str, Any], ...]],
+) -> dict[str, Any]:
+    """Expose process, audit, and final-evaluation planes separately.
+
+    Quality labels are retained for benchmark diagnostics, but this structure
+    makes it explicit that they are not part of the pure-process corpus and
+    that no final score has been consumed by the analyzer.
+    """
+
+    return {
+        "pureProcess": _pure_process_corpus_summary(rows),
+        "benchmarkAudit": {
+            "qualityLabelsAreAuditOnly": bool(rows) and all(
+                bool(row["quality"]["qualityLabelsAreBenchmarkAuditOnly"])
+                for row in rows
+            ),
+            "methods": {
+                method: {
+                    "sampleSize": len(method_rows),
+                    "quality": _quality_summary(method_rows),
+                }
+                for method, method_rows in by_method.items()
+            },
+        },
+        "finalEvaluation": {
+            "present": False,
+            "consumer": "final_reporter_only",
+            "officialScoreAccessible": False,
+        },
+    }
+
+
 def _paired_usage_delta(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
     by_method: dict[str, dict[int, dict[str, Any]]] = defaultdict(dict)
     for row in rows:
@@ -867,6 +901,14 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
         for replicate in range(1, manifest["replicates"] + 1)
         for method in manifest["methods"]
     }
+    quality_summaries = {
+        method: {
+            "sampleSize": len(method_rows),
+            "quality": _quality_summary(method_rows),
+            "rawUsage": _usage_summary(method_rows),
+        }
+        for method, method_rows in by_method.items()
+    }
     return {
         "schemaVersion": EXTRACTION_ANALYSIS_SCHEMA_VERSION,
         "analysisSchema": EXTRACTION_ANALYSIS_SCHEMA,
@@ -907,17 +949,11 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
                 event.payload() for event in row.get("pureProcessEvents", ())
             ],
         } for row in rows],
-        "summaryByMethod": {
-            method: {
-                "sampleSize": len(method_rows),
-                "quality": _quality_summary(method_rows),
-                "rawUsage": _usage_summary(method_rows),
-            }
-            for method, method_rows in by_method.items()
-        },
+        "summaryByMethod": quality_summaries,
         "activationFunnel": funnel,
         "processCorpus": _process_corpus_summary(rows),
         "pureProcessCorpus": _pure_process_corpus_summary(rows),
+        "evidencePlanes": _evidence_plane_summary(rows, by_method),
         "pairedRawUsageDelta": _paired_usage_delta(rows),
         "claimGate": {
             "operationAttributedExtractionAdaptation": _claim(
