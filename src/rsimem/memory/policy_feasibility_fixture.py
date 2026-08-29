@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
@@ -19,7 +20,12 @@ from ..lifecycle.snapshot import (
     TaskLifecycleState,
 )
 from .contracts import MemoryAccessMode, MemoryBackendDescriptor, MemoryKind, MemoryKindCapability
-from .policy_contracts import PolicyArtifactIdentity, PolicyArtifactKind, PolicyLayer
+from .policy_contracts import (
+    PolicyArtifactIdentity,
+    PolicyArtifactKind,
+    PolicyLayer,
+    content_digest,
+)
 from .policy_feasibility import (
     FeasibilityOutcome,
     FeedbackChain,
@@ -31,6 +37,165 @@ from .policy_feasibility import (
 from .policy_replay import DeterministicPolicyReplay
 from .source_selection_policy import DeterministicSourceSelectionPolicy, SourceSelectionConfig
 from .trigger_policy import DeterministicTriggerPolicy, HostTriggerAdapter, TriggerPolicyConfig
+from .extraction_feedback import (
+    ArtifactSemanticBinding,
+    DeploymentObservation,
+    ExtractedFactEvidence,
+    ExtractionFeedbackBuilder,
+    ExtractionFeedbackDataset,
+    ExtractionFeedbackLabel,
+    ExtractionSetStatus,
+    ExtractionSourceEvidence,
+    FactDisposition,
+    FeedbackOperationJoin,
+    FutureMemoryEvidence,
+    MissedExtractionEvidence,
+    ObservableToolEvent,
+    ExposureMode,
+    default_feedback_contract_registry,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class DeterministicExtractionFeedbackFixture:
+    """A replayable past-context/late-outcome extraction fixture.
+
+    The source and delayed observation are content-bearing only inside the
+    owner-controlled fixture.  Any feasibility report built from this object
+    should project stable IDs and digests, never the message or memory text.
+    """
+
+    past_snapshot: ContextSnapshot
+    source: ExtractionSourceEvidence
+    observation: DeploymentObservation
+    future: FutureMemoryEvidence
+    operation_join: FeedbackOperationJoin
+    missed: tuple[MissedExtractionEvidence, ...]
+    dataset: ExtractionFeedbackDataset
+
+
+_TSV_KEY = "preference.summary.tsv"
+
+
+def build_extraction_feedback_fixture(
+    *,
+    outcome: ExtractionFeedbackLabel = ExtractionFeedbackLabel.MISSED,
+) -> DeterministicExtractionFeedbackFixture:
+    """Build deterministic SM01 useful or missed delayed feedback.
+
+    The past snapshot includes one durable preference and one temporary
+    request.  The future task requires only the durable preference.  ``MISSED``
+    models policy N omitting that fact; ``USEFUL`` models the same fact being
+    exposed and explicitly used.  No grader, answer, benchmark score, or
+    resource quantity is reachable from this contract.
+    """
+
+    outcome = ExtractionFeedbackLabel(outcome)
+    if outcome not in {ExtractionFeedbackLabel.MISSED, ExtractionFeedbackLabel.USEFUL}:
+        raise ValueError("deterministic extraction fixture supports useful or missed")
+    source_digest = content_digest({
+        "fixture": "sm01-preference",
+        "snapshot_id": build_fixture_snapshot().snapshot_id,
+        "segments": [segment.segment_id for segment in build_fixture_snapshot().segments],
+    })
+    if outcome is ExtractionFeedbackLabel.USEFUL:
+        facts = (ExtractedFactEvidence(
+            "fact.feasibility.tsv",
+            (_TSV_KEY,),
+            FactDisposition.PERSISTED,
+            artifact_id="artifact.feasibility.tsv",
+        ),)
+        source_status = ExtractionSetStatus.NONEMPTY
+        future = FutureMemoryEvidence(
+            "opportunity.feasibility.useful",
+            ExposureMode.EAGER_SYSTEM_PROMPT,
+            (ArtifactSemanticBinding("artifact.feasibility.tsv", (_TSV_KEY,)),),
+            "op.opportunity.feasibility",
+            "op.injection.feasibility",
+        )
+        observation = DeploymentObservation(
+            "observation.feasibility.useful",
+            "SM01_preference_adoption",
+            "eval_near",
+            "task.feasibility.future",
+            content_digest("Prepare the task report."),
+            (),
+            (_TSV_KEY,),
+            "owner\tpriority\ttask\tdue_date\nA\thigh\tShip\t2026/09/01",
+            (ObservableToolEvent(
+                "tool.feasibility.share",
+                "notes_share",
+                True,
+                recipient_ids=("owner",),
+            ),),
+            True,
+        )
+        missed = ()
+    else:
+        facts = ()
+        source_status = ExtractionSetStatus.EMPTY
+        future = FutureMemoryEvidence(
+            "opportunity.feasibility.missed",
+            ExposureMode.NOT_EXPOSED,
+            (),
+            "op.opportunity.feasibility",
+            None,
+        )
+        observation = DeploymentObservation(
+            "observation.feasibility.missed",
+            "SM01_preference_adoption",
+            "eval_near",
+            "task.feasibility.future",
+            content_digest("Prepare the task report."),
+            (),
+            (_TSV_KEY,),
+            "I will prepare the report.",
+            (),
+            True,
+        )
+        missed = ()
+    source = ExtractionSourceEvidence(
+        "source.feasibility.sm01",
+        source_digest,
+        "extraction-set.feasibility.sm01",
+        source_status,
+        (_TSV_KEY,),
+        facts,
+    )
+    operation_join = FeedbackOperationJoin(
+        "op.opportunity.feasibility",
+        "op.use.feasibility",
+        "op.outcome.feasibility",
+    )
+    if outcome is ExtractionFeedbackLabel.MISSED:
+        missed = ExtractionFeedbackBuilder(
+            default_feedback_contract_registry()
+        ).derive_missed(
+            source,
+            observation,
+            future,
+            operation_join=operation_join,
+        )
+    dataset = ExtractionFeedbackBuilder(
+        default_feedback_contract_registry()
+    ).build(
+        source,
+        observation,
+        future,
+        missed=missed,
+        operation_join=operation_join,
+    )
+    if dataset.examples[0].label is not outcome:
+        raise AssertionError("deterministic extraction fixture produced wrong label")
+    return DeterministicExtractionFeedbackFixture(
+        build_fixture_snapshot(),
+        source,
+        observation,
+        future,
+        operation_join,
+        tuple(missed),
+        dataset,
+    )
 
 
 def build_fixture_snapshot() -> ContextSnapshot:
@@ -213,8 +378,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 __all__ = [
+    "DeterministicExtractionFeedbackFixture",
     "build_fixture_snapshot",
     "build_fixture_backend",
+    "build_extraction_feedback_fixture",
     "build_default_feasibility_cases",
     "run_default_feasibility_census",
     "main",

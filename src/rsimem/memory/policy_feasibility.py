@@ -155,7 +155,10 @@ def feedback_chain_from_extraction_example(
         return FeedbackChain(
             source_id=example.source_id,
             demand_id=example.future_opportunity_id,
-            absence_id=example.outcome_operation_id,
+            # The corpus carries the absence attribution on the outcome
+            # operation.  Keep a distinct logical absence identity so the
+            # resulting hypothesis evidence tuple remains duplicate-free.
+            absence_id=f"absence.{example.outcome_operation_id}",
             outcome_id=example.outcome_operation_id,
         )
     return FeedbackChain()
