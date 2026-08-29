@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 
-from rsimem.provider_probe import probe_provider
+import pytest
+
+from rsimem.provider_probe import ProviderProbeResult, probe_provider
 
 
 def test_probe_accepts_content_and_keeps_secret_out_of_result() -> None:
@@ -81,3 +83,22 @@ def test_probe_rejects_missing_credential_and_invalid_url() -> None:
     assert missing.error_code == "credential_missing"
     invalid = probe_provider("provider.example/v1", "secret", "model")
     assert invalid.error_code == "invalid_base_url"
+
+
+def test_probe_result_rejects_inconsistent_manual_states() -> None:
+    with pytest.raises(ValueError, match="requires a 2xx status"):
+        ProviderProbeResult(
+            "https://provider.example/v1",
+            "model",
+            503,
+            True,
+            False,
+        )
+    with pytest.raises(ValueError, match="requires an error code"):
+        ProviderProbeResult(
+            "https://provider.example/v1",
+            "model",
+            200,
+            False,
+            False,
+        )
