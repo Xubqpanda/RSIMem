@@ -1634,14 +1634,7 @@ class HermesPastBenchBridge:
         observation = self._trigger_policy.decide(trigger_event)
         if not any(item.event.event_id == observation.event.event_id for item in self._trigger_observations):
             self._trigger_observations.append(observation)
-        self._policy_evidence.record_decision(
-            observation.decision,
-            run_id=snapshot.run_id,
-            episode_id=snapshot.episode_id,
-            session_id=snapshot.session_id,
-            task_id=snapshot.task_id,
-            snapshot_id=snapshot.snapshot_id,
-        )
+        self._record_policy_decision(observation.decision, snapshot)
         source_decision = (
             self._source_selection_policy.select(snapshot, trigger_event)
             if observation.decision.action == DecisionAction.RUN
@@ -1653,14 +1646,7 @@ class HermesPastBenchBridge:
         )
         if not any(item.decision_id == source_decision.decision_id for item in self._source_selection_decisions):
             self._source_selection_decisions.append(source_decision)
-        self._policy_evidence.record_decision(
-            source_decision,
-            run_id=snapshot.run_id,
-            episode_id=snapshot.episode_id,
-            session_id=snapshot.session_id,
-            task_id=snapshot.task_id,
-            snapshot_id=snapshot.snapshot_id,
-        )
+        self._record_policy_decision(source_decision, snapshot)
         return source_decision
 
     def adapter_call(

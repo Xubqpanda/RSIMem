@@ -386,6 +386,9 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
         assert process_events
         assert all(event["schema"] == "rsimem-process-feedback-v1" for event in process_events)
         assert all(event["source_revision"] for event in process_events)
+        assert {event["policy_layer"] for event in process_events if event["policy_layer"]} == {
+            "exposure",
+        }
         # Process feedback is content-free and must not copy the native skill,
         # conversation or memory body across the audit boundary.
         assert "Use CSV with an explicit owner column." not in process_path.read_text(encoding="utf-8")
@@ -1020,6 +1023,15 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
         "commit",
     }
     assert all(event["lineageId"] for event in policy_events)
+    process_events = [
+        json.loads(line)
+        for line in (artifacts / "rsimem_process_feedback.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert {event["policy_layer"] for event in process_events if event["policy_layer"]} >= {
+        "trigger", "source_selection", "extraction", "admission", "commit",
+    }
     assert len(bridge.static_results) == 1
     assert len(client.calls) == 2
     serialized = (artifacts / "memory.jsonl").read_text(encoding="utf-8")
