@@ -6,6 +6,7 @@ import pytest
 
 from rsimem.extraction_experiment_manifest import CleanRepositoryRevision
 from rsimem.extraction_matched_preflight import (
+    build_parser,
     initialize_formal_matched_validation_batch,
 )
 from rsimem.extraction_validation_runtime import (
@@ -155,3 +156,20 @@ def test_matched_preflight_requires_validation_split_assignment(tmp_path: Path) 
             trial_config_path=trial_root / "extraction-matched-trial.json",
             split_plan_path=split_path,
         )
+
+
+def test_matched_preflight_cli_requires_split_plan() -> None:
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args([
+            "--manifest", "manifest.json",
+            "--batch-registry", "registry.json",
+            "--batch-id", "batch.v1",
+            "--rsimem-root", ".",
+            "--past-bench-root", ".",
+            "--family-root", "family",
+            "--agent-registry", "agents.yaml",
+            "--run-config", "run.yaml",
+            "--experiment-config", "experiment.json",
+            "--trial-config", "trial.json",
+        ])
