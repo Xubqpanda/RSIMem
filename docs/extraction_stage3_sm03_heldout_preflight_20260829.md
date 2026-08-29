@@ -37,6 +37,6 @@ produce a complete process corpus and audit.
 Verification at this revision:
 
 - RSIMem: `703 passed`
-- vendored PAST-Bench: `397 passed, 2 skipped`
+- vendored PAST-Bench: `398 passed, 2 skipped`
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`: passed
 - split-plan digest replay against all three vendored family roots: passed
