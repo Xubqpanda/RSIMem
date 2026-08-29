@@ -49,6 +49,12 @@ def _require_unique(values: tuple[str, ...], name: str) -> None:
         raise ValueError(f"{name} must be unique")
 
 
+def _normalized_recipient_id(value: str) -> str:
+    """Normalize human-readable recipient names for deterministic contracts."""
+
+    return re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
+
+
 class ExtractionFeedbackLabel(StrEnum):
     USEFUL = "useful"
     HARMFUL = "harmful"
@@ -1378,9 +1384,19 @@ class _NotesFamilyResolver:
                 if event.tool_name == "notes_share" and event.success
             )
             explicit_use = bool(shares) and all(
-                "ava_chen" not in event.recipient_ids for event in shares
+                "ava_chen" not in {
+                    _normalized_recipient_id(value)
+                    for value in event.recipient_ids
+                }
+                for event in shares
             )
-            harmful = any("ava_chen" in event.recipient_ids for event in shares)
+            harmful = any(
+                "ava_chen" in {
+                    _normalized_recipient_id(value)
+                    for value in event.recipient_ids
+                }
+                for event in shares
+            )
         else:
             raise ValueError("unknown family feedback parser")
         opportunity_id = future.opportunity_operation_id if relevant_task else None

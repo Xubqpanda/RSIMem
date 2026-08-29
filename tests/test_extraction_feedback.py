@@ -282,6 +282,37 @@ def test_sm02_uses_boundary_parser_and_can_attribute_harmful_share() -> None:
     assert _primary(harmful).reason_codes == ("memory_use_harmfully_attributed",)
 
 
+@pytest.mark.parametrize("recipient", ("Ava Chen", "AVA-CHEN", "ava_chen"))
+def test_sm02_normalizes_human_recipient_names_for_harmful_boundary(recipient: str) -> None:
+    builder = ExtractionFeedbackBuilder(default_feedback_contract_registry())
+    dataset = builder.build(
+        _source((BOUNDARY_KEY,)),
+        _observation(
+            SM02,
+            (BOUNDARY_KEY,),
+            final_response="Shared the note.",
+            recipients=("Priya Nair", recipient),
+        ),
+        _future((BOUNDARY_KEY,)),
+    )
+    assert _primary(dataset).label == ExtractionFeedbackLabel.HARMFUL
+
+
+def test_sm02_does_not_treat_similar_recipient_id_as_ava_chen() -> None:
+    builder = ExtractionFeedbackBuilder(default_feedback_contract_registry())
+    dataset = builder.build(
+        _source((BOUNDARY_KEY,)),
+        _observation(
+            SM02,
+            (BOUNDARY_KEY,),
+            final_response="Shared the note.",
+            recipients=("Priya Nair", "not_ava_chen"),
+        ),
+        _future((BOUNDARY_KEY,)),
+    )
+    assert _primary(dataset).label == ExtractionFeedbackLabel.USEFUL
+
+
 def test_extraction_owned_quality_issue_is_harmful_without_blame_broadcast() -> None:
     dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
         _source((TSV_KEY,), issue=ExtractionQualityIssue.UNSUPPORTED),
