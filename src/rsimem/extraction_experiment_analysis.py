@@ -33,7 +33,11 @@ from .memory.operation_graph import (
     materialize_operation_graph,
 )
 from .memory.process_corpus import JsonProcessCorpusStore, census_process_events
-from .memory.process_feedback import JsonProcessFeedbackLedger, ProcessEvent
+from .memory.process_feedback import (
+    JsonProcessFeedbackLedger,
+    ProcessEvent,
+    audit_process_events,
+)
 
 
 EXTRACTION_ANALYSIS_SCHEMA_VERSION = 1
@@ -483,6 +487,12 @@ def _run_evidence(
     sources = _source_records(run_dir)
     feedback = _feedback_records(run_dir)
     process_events = _process_events(run_dir)
+    if process_events:
+        process_errors = audit_process_events(process_events)
+        if process_errors:
+            raise ValueError(
+                "process feedback audit failed: " + "; ".join(process_errors)
+            )
     split = manifest["split"]
     expected_artifact = manifest["semanticPolicy"]["activeArtifactByMethod"][
         attempt["method"]
