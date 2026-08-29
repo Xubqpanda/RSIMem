@@ -110,6 +110,8 @@ def test_pure_process_rebuild_preserves_lifecycle_without_family_or_stage() -> N
 def test_pure_process_payload_rejects_evaluation_fields() -> None:
     with pytest.raises(ValueError, match="forbidden evaluation fields"):
         validate_pure_process_payload({"nested": {"officialScore": 0.5}})
+    with pytest.raises(ValueError, match="forbidden evaluation fields"):
+        validate_pure_process_payload({"nested": {"score": 1.0}})
 
 
 def test_previous_pure_process_schema_is_not_silently_migrated() -> None:

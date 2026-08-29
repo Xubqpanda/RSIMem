@@ -477,6 +477,50 @@ def test_past_bench_bridge_records_runtime_opportunity_without_family_leakage(
         restarted.close()
 
 
+def test_past_bench_runtime_observation_does_not_run_family_semantic_parser(
+    tmp_path: Path,
+) -> None:
+    bridge = HermesPastBenchBridge(
+        _hermes_home(tmp_path),
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-runtime-observation",
+        trace_id="trace-runtime-observation",
+        episode_id="episode-runtime-observation",
+        session_id="session-runtime-observation",
+        task_id="task-runtime-observation",
+        experiment_variant="native+adapter+ledger",
+        family_id="SM01_preference_adoption",
+        stage="eval_near",
+        static_writeback_config=StaticSemanticWritebackConfig(
+            mode="static",
+            feedback_contract="sm01_tsv_v1",
+        ),
+        static_completion_client=FakeCompletionClient({}),
+    )
+    result = {
+        "messages": [{
+            "role": "user",
+            "content": "Use TSV with owner, priority, task, and due_date for this report.",
+        }],
+        "completed": True,
+        "final_response": "",
+    }
+    try:
+        runtime = bridge._semantic_deployment_observation(result)
+        assert runtime.current_input_semantic_keys == ()
+        assert runtime.task_semantic_keys == ()
+
+        audit = bridge._semantic_audit_observation(
+            runtime,
+            current_input="Use TSV with owner, priority, task, and due_date for this report.",
+        )
+        assert audit.current_input_semantic_keys
+        assert audit.task_semantic_keys
+    finally:
+        bridge.close()
+
+
 def test_past_bench_bridge_records_generic_memory_use_join(tmp_path: Path) -> None:
     bridge = HermesPastBenchBridge(
         _hermes_home(tmp_path),

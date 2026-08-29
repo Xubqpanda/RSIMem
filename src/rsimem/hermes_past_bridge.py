@@ -1115,7 +1115,10 @@ class HermesPastBenchBridge:
                 # contract-scoped projection for audit attribution, but that
                 # projection remains local to this benchmark-audit path and
                 # is never emitted as pure-process evidence.
-                audit_observation = self._semantic_audit_observation(observation)
+                audit_observation = self._semantic_audit_observation(
+                    observation,
+                    current_input=current_input,
+                )
                 resolution = self.semantic_feedback_resolver.resolve(
                     future,
                     audit_observation,
@@ -1955,10 +1958,6 @@ class HermesPastBenchBridge:
         # Do this before constructing the benchmark-audit projection so the
         # two evidence planes cannot be conflated.
         self._record_runtime_opportunities(result)
-        current_keys = detect_current_input_semantic_keys(
-            self._family_id,
-            current_input,
-        )
         observation_complete = not (
             result.get("partial") is True or result.get("interrupted") is True
         )
@@ -1981,7 +1980,12 @@ class HermesPastBenchBridge:
             current_input_projection_digest=hashlib.sha256(
                 current_input.encode("utf-8")
             ).hexdigest(),
-            current_input_semantic_keys=current_keys,
+            # Pure runtime observations do not run benchmark-family semantic
+            # parsers.  Current-input requirements may be supplied by an
+            # application-owned opportunity provider and are kept in the
+            # separate audit projection when a registered benchmark contract
+            # is explicitly requested.
+            current_input_semantic_keys=(),
             # Task semantic requirements are application-owned runtime
             # evidence.  A benchmark family contract is not allowed to
             # manufacture them at the bridge boundary.
@@ -1996,6 +2000,8 @@ class HermesPastBenchBridge:
     def _semantic_audit_observation(
         self,
         observation: DeploymentObservation,
+        *,
+        current_input: str = "",
     ) -> DeploymentObservation:
         """Attach frozen benchmark scope only for audit attribution.
 
@@ -2015,6 +2021,10 @@ class HermesPastBenchBridge:
             return observation
         return replace(
             observation,
+            current_input_semantic_keys=detect_current_input_semantic_keys(
+                observation.family_id,
+                current_input,
+            ),
             task_semantic_keys=contract.opportunity.memory_scope_keys,
         )
 

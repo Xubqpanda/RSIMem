@@ -196,6 +196,30 @@ def test_optimizer_request_rejects_benchmark_audit_examples() -> None:
         require_optimizer_plane(diagnostic.evidence_plane)
 
 
+def test_optimizer_store_rejects_benchmark_audit_corpus_at_read_boundary(
+    tmp_path,
+) -> None:
+    diagnostic = _example(evidence_plane=EvidencePlane.BENCHMARK_AUDIT)
+    corpus = ExtractionOptimizerCorpus.create(
+        batch_id="batch.audit-v1",
+        attempt_id="attempt.audit-v1",
+        split=OptimizerCorpusSplit.TRAIN,
+        observation_cutoff="2026-08-21T00:00:00Z",
+        retention=OptimizerCorpusRetention.DELETE_AFTER_POLICY_DECISION,
+        examples=(diagnostic,),
+    )
+    attempt = tmp_path / "outputs" / "attempt.audit-v1"
+    store = JsonExtractionOptimizerCorpusStore(
+        attempt,
+        owner_controlled_root=tmp_path / "outputs",
+        attempt_id="attempt.audit-v1",
+        split=OptimizerCorpusSplit.TRAIN,
+    )
+    assert store.write(corpus) is True
+    with pytest.raises(ValueError, match="optimizer requires pure_process"):
+        store.read_for_optimizer()
+
+
 def test_resolved_labels_and_useful_three_stage_evidence_fail_closed() -> None:
     boundary = OptimizerSecretBoundary()
     with pytest.raises(ValueError, match="extraction-owned"):

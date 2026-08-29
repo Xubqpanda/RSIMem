@@ -35,7 +35,11 @@ from .extraction_policy_artifact import (
 )
 from .prompt_components import content_digest, text_digest
 from .revocation import JsonRevocationRegistry
-from .evidence_planes import EvidencePlane, EvidenceSourceKind
+from .evidence_planes import (
+    EvidencePlane,
+    EvidenceSourceKind,
+    require_optimizer_plane,
+)
 
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
@@ -220,6 +224,12 @@ class ExtractionPromptOptimizer:
         parent: ExtractionPromptPolicyArtifact,
         corpus: ExtractionOptimizerCorpus,
     ) -> ExtractionOptimizerResult:
+        if not isinstance(corpus, ExtractionOptimizerCorpus):
+            raise TypeError("optimizer requires an extraction optimizer corpus")
+        planes = {EvidencePlane(example.evidence_plane) for example in corpus.examples}
+        if len(planes) != 1:
+            raise ValueError("optimizer corpus mixes evidence planes")
+        require_optimizer_plane(next(iter(planes)))
         if self.revocation_registry is not None:
             self.revocation_registry.assert_active(
                 artifact_id=parent.artifact_id,
