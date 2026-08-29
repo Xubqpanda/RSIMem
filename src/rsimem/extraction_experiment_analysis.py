@@ -346,6 +346,16 @@ def _quality(
     status = Counter(record.source.status.value for record in sources)
     primary = _primary_feedback(feedback)
     labels = Counter(example.label.value for example in primary)
+    plane_labels: Counter[str] = Counter()
+    source_planes: Counter[str] = Counter()
+    for record in feedback:
+        plane = record.dataset.evidence_plane.value
+        source_planes[
+            f"{plane}:{record.dataset.evidence_source.value}"
+        ] += 1
+        for example in record.dataset.examples:
+            if example.primary:
+                plane_labels[f"{plane}:{example.label.value}"] += 1
     nonempty = status[ExtractionSetStatus.NONEMPTY.value]
     empty = status[ExtractionSetStatus.EMPTY.value]
     resolved = (
@@ -392,6 +402,15 @@ def _quality(
             for value in ExtractionQualityIssue
         },
         "schemaSafetyFailureCount": safety_failures,
+        # Keep legacy quality counters for benchmark-audit compatibility, but
+        # expose their evidence plane explicitly so they cannot be mistaken
+        # for pure-process attribution by downstream analyzers.
+        "labelEvidencePlaneCounts": dict(sorted(plane_labels.items())),
+        "datasetEvidencePlaneCounts": dict(sorted(source_planes.items())),
+        "qualityLabelsAreBenchmarkAuditOnly": all(
+            record.dataset.evidence_plane.value == "benchmark_audit"
+            for record in feedback
+        ),
     }
 
 
@@ -443,6 +462,32 @@ def _quality_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, object]:
         "highConfidenceMissedRate": None,
         "missedAssessability": "unknown",
         "qualityIssueCounts": issues,
+        "labelEvidencePlaneCounts": {
+            plane: sum(
+                int(row["quality"]["labelEvidencePlaneCounts"].get(plane, 0))
+                for row in rows
+            )
+            for plane in sorted({
+                plane
+                for row in rows
+                for plane in row["quality"]["labelEvidencePlaneCounts"]
+            })
+        },
+        "datasetEvidencePlaneCounts": {
+            plane: sum(
+                int(row["quality"]["datasetEvidencePlaneCounts"].get(plane, 0))
+                for row in rows
+            )
+            for plane in sorted({
+                plane
+                for row in rows
+                for plane in row["quality"]["datasetEvidencePlaneCounts"]
+            })
+        },
+        "qualityLabelsAreBenchmarkAuditOnly": all(
+            bool(row["quality"]["qualityLabelsAreBenchmarkAuditOnly"])
+            for row in rows
+        ),
     }
 
 
