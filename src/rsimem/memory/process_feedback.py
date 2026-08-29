@@ -20,7 +20,12 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
-from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
+from .evidence_planes import (
+    EvidencePlane,
+    EvidenceSourceKind,
+    validate_plane_source,
+    validate_pure_process_payload,
+)
 from .policy_contracts import PolicyDecision, PolicyLayer, content_digest
 
 
@@ -305,6 +310,14 @@ class ProcessEvent:
         family_id: str | None = None,
         stage: str | None = None,
     ) -> "ProcessEvent":
+        # A runtime event is a learner-visible pure-process boundary.  Reject
+        # evaluation metadata before hashing it so callers cannot smuggle a
+        # score/grader/answer field through an otherwise content-free digest.
+        # Benchmark-audit events are explicitly scoped by family/stage and
+        # remain available to the separate audit plane.
+        if family_id is None and stage is None:
+            validate_pure_process_payload(input_payload)
+            validate_pure_process_payload(output_payload)
         input_digest = input_digest or content_digest(input_payload)
         output_digest = output_digest or content_digest(output_payload)
         _digest(input_digest, "process event input digest")
