@@ -572,6 +572,22 @@ def test_feedback_and_hypothesis_collections_require_json_lists() -> None:
         type(case.hypothesis).from_payload(hypothesis)
 
 
+def test_feasibility_replay_rejects_unhashable_id_values() -> None:
+    case = _case(
+        "case.unhashable_replay",
+        FeasibilityOutcome.UNRESOLVED,
+        FeedbackChain(),
+    )
+    payload = case.replay_payload
+    payload["reason_codes"] = [{"reason": "not-a-string"}]
+    with pytest.raises(ValueError, match="malformed feasibility evidence record"):
+        FeasibilityEvidenceRecord.from_payload({
+            "schemaVersion": 2,
+            "recordId": "feasibility-record.invalid",
+            "replayPayload": payload,
+        })
+
+
 def test_executable_feasibility_census_replays_and_persists(tmp_path) -> None:
     evidence = tmp_path / "fixture-evidence.jsonl"
     first = run_default_feasibility_census(evidence_path=evidence)
