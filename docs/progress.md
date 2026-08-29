@@ -91,6 +91,14 @@ The same report includes a deduplicated process-signal census: the primary
 attempt still emitted all six policy-stage events, while the backup emitted
 only retrieval, exposure, and task-failure events. This diagnostic is not a
 formal training or validation batch.
+The subsequent clean primary-endpoint train rerun
+`sm02-feedback-20260829-rerun-main` completed three audited replicates and
+reconstructed 24 primary feedback records (12 `missed`, 12 `unresolved`). A
+single bounded optimizer request returned a schema-valid proposal, but the
+candidate content gate rejected corpus-specific value copying; the preparation
+path now persists that rejection and raw usage without a deployable artifact.
+No N+1 candidate or matched validation was produced. Details are in
+[`extraction_stage3_sm02_feedback_rerun_20260829.md`](extraction_stage3_sm02_feedback_rerun_20260829.md).
 The reusable `rsimem.provider_probe` entry now performs a bounded completion
 check without exposing credentials or response content; it reports endpoint,
 content, and usage availability only and remains outside benchmark accounting.
