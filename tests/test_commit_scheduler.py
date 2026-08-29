@@ -49,11 +49,44 @@ def test_stale_revision_fails_without_apply() -> None:
 
 
 def test_apply_failure_and_retry_terminal_state_are_recorded() -> None:
-    scheduler = CommitScheduler(InMemoryCommitScheduleStore())
+    scheduler = CommitScheduler(
+        InMemoryCommitScheduleStore(),
+        mutation_validator=lambda schedule: None,
+    )
     schedule = scheduler.schedule(_decision(), boundary="session_end")
     failed = scheduler.execute(schedule.schedule_id, current_revision="backend.rev.1", apply=lambda ids: (_ for _ in ()).throw(RuntimeError("boom")))
     assert failed.status is CommitScheduleStatus.FAILED
     assert scheduler.execute(schedule.schedule_id, current_revision="backend.rev.1", apply=lambda ids: "receipt.ignored") == failed
+
+
+def test_missing_or_failed_mutation_validator_cannot_call_apply() -> None:
+    scheduler = CommitScheduler(InMemoryCommitScheduleStore())
+    schedule = scheduler.schedule(_decision(), boundary="session_end")
+    called: list[tuple[str, ...]] = []
+    failed = scheduler.execute(
+        schedule.schedule_id,
+        current_revision="backend.rev.1",
+        apply=lambda ids: called.append(ids) or "receipt.unsafe",
+    )
+    assert failed.status is CommitScheduleStatus.FAILED
+    assert failed.failure_reason == "mutation_validator_missing"
+    assert called == []
+
+    scheduler = CommitScheduler(
+        InMemoryCommitScheduleStore(),
+        mutation_validator=lambda schedule: (_ for _ in ()).throw(
+            ValueError("invalid mutation")
+        ),
+    )
+    schedule = scheduler.schedule(_decision(), boundary="session_end")
+    failed = scheduler.execute(
+        schedule.schedule_id,
+        current_revision="backend.rev.1",
+        apply=lambda ids: called.append(ids) or "receipt.unsafe",
+    )
+    assert failed.status is CommitScheduleStatus.FAILED
+    assert failed.failure_reason == "ValueError"
+    assert called == []
 
 
 def test_commit_can_be_cancelled_without_mutation() -> None:
