@@ -462,6 +462,8 @@ def test_audit_run_reports_policy_evidence_and_identity(tmp_path: Path) -> None:
         policy_path,
         variant="with_persistence",
         trace_id="trace-1",
+        family_id="family-1",
+        stage="learn",
     ).record_decision(
         decision,
         run_id="run-1",
@@ -500,6 +502,8 @@ def test_audit_run_reports_and_validates_process_evidence(tmp_path: Path) -> Non
         input_payload={"query": "digest-only"},
         output_payload={"count": 1},
         execution_receipt_ids=("receipt-retrieval-1",),
+        family_id="family-1",
+        stage="learn",
     )
     process_path.write_text(json.dumps(event.payload()) + "\n", encoding="utf-8")
     write_ledger(comparison, comparison.parent / "ledger.jsonl", judge_enabled=False)
@@ -515,7 +519,7 @@ def test_audit_run_reports_and_validates_process_evidence(tmp_path: Path) -> Non
         status=ProcessEventStatus.SUCCESS,
         run_id="run-1",
         variant="with_persistence",
-        trace_id="trace-1",
+        trace_id="trace-other",
         episode_id="episode-1",
         session_id="session-1",
         task_id="task-1",
@@ -527,11 +531,18 @@ def test_audit_run_reports_and_validates_process_evidence(tmp_path: Path) -> Non
         policy_decision_id="decision.missing",
         policy_layer="exposure",
         execution_receipt_ids=("receipt-retrieval-2",),
+        family_id="family-1",
+        stage="learn",
     )
     process_path.write_text(json.dumps(invalid.payload()) + "\n", encoding="utf-8")
     report = audit_run(comparison.parent)
     assert report["ok"] is False
     assert any(issue["kind"] == "process_feedback_audit_failed" for issue in report["issues"])
+    assert any(
+        "trace_id does not match expected identity" in error
+        for row in report["processEvidence"]["reports"]
+        for error in row["errors"]
+    )
 
 
 def test_static_utility_evidence_rejects_content_and_policy_drift(
