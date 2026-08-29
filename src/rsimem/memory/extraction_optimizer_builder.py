@@ -62,10 +62,13 @@ class ExtractionOptimizerCorpusBuilder:
         self,
         boundary: OptimizerSecretBoundary | None = None,
         *,
-        evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS,
+        evidence_plane: EvidencePlane | None = None,
     ) -> None:
         self.boundary = boundary or OptimizerSecretBoundary()
-        self.evidence_plane = require_optimizer_plane(evidence_plane)
+        self.evidence_plane = (
+            require_optimizer_plane(evidence_plane)
+            if evidence_plane is not None else None
+        )
 
     def build_examples(
         self,
@@ -80,6 +83,9 @@ class ExtractionOptimizerCorpusBuilder:
         forbidden_values: tuple[str, ...] = (),
     ) -> tuple[ExtractionOptimizerCorpusExample, ...]:
         self._validate_record_join(projection, source_record, feedback_record)
+        evidence_plane = self.evidence_plane or EvidencePlane(
+            feedback_record.dataset.evidence_plane
+        )
         self._validate_observation(feedback_record, observation, delayed_content)
         facts = self._project_facts(
             source_record,
@@ -187,7 +193,7 @@ class ExtractionOptimizerCorpusBuilder:
                 source_messages=source_messages,
                 extracted_facts=facts,
                 delayed_evidence=delayed,
-                evidence_plane=self.evidence_plane,
+                evidence_plane=evidence_plane,
             ))
         return tuple(examples)
 
