@@ -318,6 +318,8 @@ def test_analysis_reports_quality_raw_unknown_usage_and_complete_funnel(
     report = analyze_extraction_batch(_batch(tmp_path, changed=True))
 
     assert report["qualityReady"] is True
+    assert report["processCorpus"]["evaluationScoreAccessible"] is False
+    assert "task_score" not in report["processCorpus"]
     assert report["usageComplete"] is False
     assert report["failedAttempts"] == [{
         "replicate": 1,
