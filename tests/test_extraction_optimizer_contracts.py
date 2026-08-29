@@ -16,6 +16,7 @@ from rsimem.memory.extraction_feedback import (
 )
 from rsimem.memory.extraction_optimizer_contracts import (
     EXTRACTION_OPTIMIZER_INPUT_SCHEMA_DIGEST,
+    EXTRACTION_OPTIMIZER_OUTPUT_SCHEMA,
     EXTRACTION_OPTIMIZER_OUTPUT_SCHEMA_DIGEST,
     EXTRACTION_OPTIMIZER_SYSTEM_DIGEST,
     EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION,
@@ -627,7 +628,14 @@ def test_openai_compatible_client_freezes_messages_parameters_and_usage() -> Non
         "temperature": 0.0,
         "max_tokens": 4_096,
         "timeout": 120,
-        "response_format": {"type": "json_object"},
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "extraction_optimizer_result",
+                "strict": True,
+                "schema": EXTRACTION_OPTIMIZER_OUTPUT_SCHEMA,
+            },
+        },
     }
     assert completion.output_text == output
     assert completion.usage == RawResourceUsage(
