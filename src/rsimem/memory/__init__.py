@@ -143,6 +143,7 @@ from .use_attribution import (
 )
 from .opportunity import (
     ApplicationOpportunitySchema,
+    JsonApplicationOpportunitySchemaRegistry,
     JsonOpportunityEvidenceLog,
     OPPORTUNITY_SCHEMA,
     OpportunityEvidence,
@@ -314,6 +315,7 @@ __all__ = [
     "resolve_memory_use",
     "OPPORTUNITY_SCHEMA",
     "ApplicationOpportunitySchema",
+    "JsonApplicationOpportunitySchemaRegistry",
     "JsonOpportunityEvidenceLog",
     "OpportunityEvidence",
     "OpportunityResolution",
