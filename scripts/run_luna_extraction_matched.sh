@@ -148,9 +148,6 @@ events = tuple(
 )
 if not events:
     raise ValueError("formal matched run emitted no process feedback corpus")
-process_errors = audit_process_events(events)
-if process_errors:
-    raise ValueError("formal process feedback audit failed: " + "; ".join(process_errors))
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 split = manifest["split"]
 corpus = ProcessCorpus.create(
@@ -160,6 +157,12 @@ corpus = ProcessCorpus.create(
     task_template_group_id=split["taskTemplateGroupId"],
     task_manifest_digest=split["taskManifestDigest"],
 )
+# Shared-cold traces may be present under both the nested shared directory and
+# the attempt directory.  Collapse exact logical duplicates before auditing;
+# ProcessCorpus.create still rejects conflicting payloads for one event ID.
+process_errors = audit_process_events(corpus.events)
+if process_errors:
+    raise ValueError("formal process feedback audit failed: " + "; ".join(process_errors))
 JsonProcessCorpusStore(run_dir / "process_corpus.json").put(corpus)
 PY
     then

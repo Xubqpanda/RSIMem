@@ -23,6 +23,9 @@ def test_formal_feedback_launcher_uses_plain_extraction_profile() -> None:
     assert 'rglob("extraction_sources.jsonl")' in script
     assert "audit_process_events" in script
     assert "formal process feedback audit failed" in script
+    assert script.index("corpus = ProcessCorpus.create(") < script.index(
+        "audit_process_events(corpus.events)"
+    )
     assert "rsimem.provider_probe" in script
     assert "provider_probe.json" in script
     assert "static_utility" not in script
@@ -43,6 +46,9 @@ def test_formal_launchers_use_one_overridable_agent_registry() -> None:
         assert '--registry "${AGENT_REGISTRY}"' in script
         assert "rsimem.provider_probe" in script
         assert "provider_probe.json" in script
+        assert script.index("corpus = ProcessCorpus.create(") < script.index(
+            "audit_process_events(corpus.events)"
+        )
 
 
 def test_backup_agent_registry_contains_no_credential() -> None:
