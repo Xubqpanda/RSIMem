@@ -453,6 +453,8 @@ class HermesPastBenchBridge:
         )
         self._tool_handlers: dict[str, Callable[..., str]] = {}
         self._tool_call_result_joins: dict[str, ToolCallResultJoin] = {}
+        self._tool_call_ids_seen: set[str] = set()
+        self._tool_result_ids_seen: set[str] = set()
         self._agent: object | None = None
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
@@ -473,6 +475,18 @@ class HermesPastBenchBridge:
         self._process_feedback = JsonProcessFeedbackLedger(
             process_feedback_path
             or self.evidence_path.with_name("rsimem_process_feedback.jsonl")
+        )
+        self._tool_call_ids_seen.update(
+            event.tool_call_id
+            for event in self._process_feedback.events
+            if event.kind is ProcessEventKind.TOOL_CALL
+            and event.tool_call_id is not None
+        )
+        self._tool_result_ids_seen.update(
+            event.tool_result_id
+            for event in self._process_feedback.events
+            if event.kind is ProcessEventKind.TOOL_RESULT
+            and event.tool_result_id is not None
         )
         self._admission_policy = DeterministicAdmissionPolicy()
         self._exposure_policy = DeterministicExposurePolicy()
@@ -1313,8 +1327,9 @@ class HermesPastBenchBridge:
         messages = tuple(value for value in raw_messages if isinstance(value, Mapping))
         calls: dict[str, list[tuple[str, str, str, str]]] = {}
         call_counts: dict[str, int] = {}
-        duplicate_call_ids: set[str] = set()
+        duplicate_call_ids: set[str] = set(self._tool_call_ids_seen)
         emitted_result_ids: set[str] = set()
+        duplicate_result_ids: set[str] = set(self._tool_result_ids_seen)
         joins: list[ToolCallResultJoin] = []
         host_event_id = self._last_host_event_id or "event.tool-observation"
         source_revision = self._last_host_source_revision or self._exposure_context_revision()
@@ -1334,8 +1349,6 @@ class HermesPastBenchBridge:
                 raw_call_id = str(call.get("id") or f"tool-call-{ordinal}")
                 count = call_counts.get(raw_call_id, 0)
                 call_counts[raw_call_id] = count + 1
-                if count:
-                    duplicate_call_ids.add(raw_call_id)
                 retry_identity = (
                     "retry."
                     + hashlib.sha256(
@@ -1348,6 +1361,8 @@ class HermesPastBenchBridge:
                     "tool-call."
                     + hashlib.sha256(raw_call_id.encode("utf-8")).hexdigest()[:24]
                 )
+                if count or call_id in self._tool_call_ids_seen:
+                    duplicate_call_ids.add(raw_call_id)
                 calls.setdefault(raw_call_id, []).append(
                     (
                         call_id,
@@ -1383,7 +1398,10 @@ class HermesPastBenchBridge:
                 "tool-result."
                 + hashlib.sha256(result_seed.encode("utf-8")).hexdigest()[:24]
             ))
-            duplicate_result = result_id in emitted_result_ids
+            duplicate_result = (
+                result_id in emitted_result_ids
+                or result_id in duplicate_result_ids
+            )
             emitted_result_ids.add(result_id)
             if not call_occurrences:
                 orphan_call_id = (
@@ -1478,6 +1496,14 @@ class HermesPastBenchBridge:
                 stage=self._stage,
             ):
                 self._process_feedback.record(event)
+        self._tool_call_ids_seen.update(
+            join.call_id for join in joins if join.call_present and join.call_id is not None
+        )
+        self._tool_result_ids_seen.update(
+            join.result_id
+            for join in joins
+            if join.result_present and join.result_id is not None
+        )
 
     def _record_extraction_source(
         self,

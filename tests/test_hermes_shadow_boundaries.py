@@ -205,3 +205,36 @@ def test_duplicate_tool_call_id_without_result_remains_duplicate_missing_closure
         resolve_tool_call_result(join).status is ToolJoinResolutionStatus.DUPLICATE
         for join in joins
     )
+
+
+def test_replayed_tool_identity_is_marked_duplicate_across_bridge_calls(tmp_path) -> None:
+    bridge = _bridge(tmp_path, [])
+    result = {
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-replayed-1",
+                    "function": {"name": "inspect", "arguments": "{}"},
+                }],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-replayed-1",
+                "id": "result-replayed-1",
+                "content": "{\"success\": true}",
+            },
+        ],
+    }
+    try:
+        bridge._record_tool_call_results(result)
+        bridge._record_tool_call_results(result)
+        joins = bridge.tool_call_result_joins
+        assert len(joins) == 2
+        assert any(not join.duplicate_call and not join.duplicate_result for join in joins)
+        assert any(join.duplicate_call and join.duplicate_result for join in joins)
+        statuses = tuple(resolve_tool_call_result(join).status for join in joins)
+        assert statuses.count(ToolJoinResolutionStatus.COMPLETE) == 1
+        assert statuses.count(ToolJoinResolutionStatus.DUPLICATE) == 1
+    finally:
+        bridge.close()
