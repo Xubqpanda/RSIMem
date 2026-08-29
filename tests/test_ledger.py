@@ -524,6 +524,8 @@ def test_audit_run_reports_and_validates_process_evidence(tmp_path: Path) -> Non
         input_payload={"query": "digest-only"},
         output_payload={"count": 0},
         reason_codes=("retrieval_miss",),
+        policy_decision_id="decision.missing",
+        policy_layer="exposure",
         execution_receipt_ids=("receipt-retrieval-2",),
     )
     process_path.write_text(json.dumps(invalid.payload()) + "\n", encoding="utf-8")
