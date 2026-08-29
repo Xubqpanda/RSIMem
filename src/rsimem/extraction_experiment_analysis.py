@@ -33,6 +33,10 @@ from .memory.operation_graph import (
     materialize_operation_graph,
 )
 from .memory.process_corpus import JsonProcessCorpusStore, census_process_events
+from .memory.pure_process import (
+    JsonPureProcessCorpusStore,
+    PureProcessEvent,
+)
 from .memory.process_feedback import (
     JsonProcessFeedbackLedger,
     ProcessEvent,
@@ -170,6 +174,27 @@ def _process_events(run_dir: Path) -> tuple[ProcessEvent, ...]:
                 records.append(event)
                 seen[event.event_id] = canonical
     return tuple(records)
+
+
+def _pure_process_events(run_dir: Path) -> tuple[PureProcessEvent, ...]:
+    """Read the family-free process projection when a run emitted one."""
+
+    paths = tuple(sorted(run_dir.rglob("pure_process_corpus.json")))
+    if not paths:
+        return ()
+    by_id: dict[str, PureProcessEvent] = {}
+    for path in paths:
+        corpus = JsonPureProcessCorpusStore(path).get()
+        if corpus is None:
+            raise ValueError("pure process corpus disappeared during analysis")
+        for event in corpus.events:
+            previous = by_id.get(event.event_id)
+            if previous is not None and previous != event:
+                raise ValueError(
+                    f"conflicting pure-process event identity: {event.event_id}"
+                )
+            by_id[event.event_id] = event
+    return tuple(by_id[event_id] for event_id in sorted(by_id))
 
 
 def _terminal_attempts(manifest: dict[str, Any]) -> tuple[dict[str, Any], ...]:
@@ -532,6 +557,7 @@ def _run_evidence(
     sources = _source_records(run_dir)
     feedback = _feedback_records(run_dir)
     process_events = _process_events(run_dir)
+    pure_process_events = _pure_process_events(run_dir)
     if process_events:
         process_errors = audit_process_events(process_events)
         if process_errors:
@@ -602,6 +628,7 @@ def _run_evidence(
         "sources": sources,
         "feedback": feedback,
         "processEvents": process_events,
+        "pureProcessEvents": pure_process_events,
         "quality": _quality(sources, feedback, safety),
         "rawUsage": _raw_usage(comparison, audit, ledger, run_dir),
     }
@@ -732,6 +759,25 @@ def _process_corpus_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
     }
 
 
+def _pure_process_corpus_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+    """Summarize family-free process evidence independently of audit labels."""
+
+    events = [event for row in rows for event in row.get("pureProcessEvents", ())]
+    by_kind = Counter(event.kind.value for event in events)
+    by_status = Counter(event.status.value for event in events)
+    by_reason = Counter(reason for event in events for reason in event.reason_codes)
+    return {
+        "eventCount": len(events),
+        "eventIds": sorted(event.event_id for event in events),
+        "byKind": dict(sorted(by_kind.items())),
+        "byStatus": dict(sorted(by_status.items())),
+        "byReason": dict(sorted(by_reason.items())),
+        "familyIdentityPresent": False,
+        "stageIdentityPresent": False,
+        "evaluationScoreAccessible": False,
+    }
+
+
 def _paired_usage_delta(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
     by_method: dict[str, dict[int, dict[str, Any]]] = defaultdict(dict)
     for row in rows:
@@ -857,6 +903,9 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
             "quality": row["quality"],
             "rawUsage": row["rawUsage"],
             "processFeedback": [event.payload() for event in row["processEvents"]],
+            "pureProcessFeedback": [
+                event.payload() for event in row.get("pureProcessEvents", ())
+            ],
         } for row in rows],
         "summaryByMethod": {
             method: {
@@ -868,6 +917,7 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
         },
         "activationFunnel": funnel,
         "processCorpus": _process_corpus_summary(rows),
+        "pureProcessCorpus": _pure_process_corpus_summary(rows),
         "pairedRawUsageDelta": _paired_usage_delta(rows),
         "claimGate": {
             "operationAttributedExtractionAdaptation": _claim(
