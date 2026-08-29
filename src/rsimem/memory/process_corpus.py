@@ -8,10 +8,12 @@ boundary rather than relying on convention.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import re
 import tempfile
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -197,36 +199,49 @@ class JsonProcessCorpusStore:
 
     def __init__(self, path: Path) -> None:
         self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+
+    @contextmanager
+    def _lock(self):
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def put(self, corpus: ProcessCorpus) -> tuple[Path, bool]:
         if not isinstance(corpus, ProcessCorpus):
             raise TypeError("process corpus has the wrong type")
         canonical = json.dumps(corpus.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        if self.path.exists():
-            if self.path.read_text(encoding="utf-8") != canonical:
-                raise ValueError("process corpus conflicts with existing file")
-            return self.path, False
-        fd, temporary = tempfile.mkstemp(prefix=self.path.name + ".", dir=self.path.parent)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(canonical)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, self.path)
-        finally:
-            if os.path.exists(temporary):
-                os.unlink(temporary)
+        with self._lock():
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            if self.path.exists():
+                if self.path.read_text(encoding="utf-8") != canonical:
+                    raise ValueError("process corpus conflicts with existing file")
+                return self.path, False
+            fd, temporary = tempfile.mkstemp(prefix=self.path.name + ".", dir=self.path.parent)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                    handle.write(canonical)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, self.path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
         return self.path, True
 
     def get(self) -> ProcessCorpus | None:
-        if not self.path.exists():
-            return None
-        try:
-            value = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            raise ValueError("malformed process corpus JSON") from exc
-        return ProcessCorpus.from_payload(value)
+        with self._lock():
+            if not self.path.exists():
+                return None
+            try:
+                value = json.loads(self.path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ValueError("malformed process corpus JSON") from exc
+            return ProcessCorpus.from_payload(value)
 
 
 @dataclass(frozen=True, slots=True)
