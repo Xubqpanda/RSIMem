@@ -19,6 +19,7 @@ from rsimem.memory.extraction_policy_artifact import (
     compile_extraction_policy_spec,
     serialize_extraction_prompt_artifact,
 )
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.prompt_components import (
     PromptPolicyStage,
     PromptSlotDescriptor,
@@ -116,6 +117,9 @@ def test_root_and_child_artifacts_round_trip_and_replay_exactly() -> None:
     assert root.parent_artifact_id is None
     assert child.parent_artifact_id == root.artifact_id
     assert child.parent_spec_digest == root.spec.spec_digest
+    assert child.generation_provenance is not None
+    assert child.generation_provenance.evidence_plane is EvidencePlane.PURE_PROCESS
+    assert child.generation_provenance.evidence_source is EvidenceSourceKind.RUNTIME_OBSERVATION
     assert child.compiler_digest == EXTRACTION_POLICY_COMPILER_DIGEST
     assert child.compiled_body == compile_extraction_policy_spec(
         apply_extraction_rule_edits(root.spec, edits)
@@ -177,6 +181,29 @@ def test_duplicate_rule_and_edit_ids_fail_closed() -> None:
     )
     with pytest.raises(ValueError, match="duplicate edit"):
         apply_extraction_rule_edits(_spec(), (edit, edit))
+
+
+def test_generation_provenance_rejects_diagnostic_plane() -> None:
+    with pytest.raises(ValueError, match="pure_process runtime evidence"):
+        _provenance_with_plane(EvidencePlane.BENCHMARK_AUDIT)
+
+
+def _provenance_with_plane(plane: EvidencePlane) -> ExtractionGenerationProvenance:
+    return ExtractionGenerationProvenance(
+        optimizer_model="optimizer-model-v1",
+        optimizer_config_digest="4" * 64,
+        training_corpus_id="corpus.train-v1",
+        training_cutoff="operation.cutoff-v1",
+        proposal_request_digest="5" * 64,
+        completion_digest="6" * 64,
+        usage=RawResourceUsage(input_tokens=100, output_tokens=20, model_requests=1),
+        evidence_plane=plane,
+        evidence_source=(
+            EvidenceSourceKind.BENCHMARK_CONTRACT
+            if plane is EvidencePlane.BENCHMARK_AUDIT
+            else EvidenceSourceKind.RUNTIME_OBSERVATION
+        ),
+    )
 
 
 def test_artifact_tampering_oversize_schema_and_slot_drift_fail_closed() -> None:
