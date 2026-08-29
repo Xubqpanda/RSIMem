@@ -16,6 +16,7 @@ from .extraction_feedback import (
     FactDisposition,
 )
 from .optimizer_content_boundary import OptimizerUntrustedText
+from .evidence_planes import EvidencePlane, require_optimizer_plane
 from .prompt_components import content_digest
 
 
@@ -489,6 +490,7 @@ class ExtractionOptimizerCorpusExample:
     source_messages: tuple[OptimizerSourceMessage, ...]
     extracted_facts: tuple[OptimizerExtractedFact, ...]
     delayed_evidence: OptimizerDelayedEvidence
+    evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
     schema_version: int = EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -509,6 +511,11 @@ class ExtractionOptimizerCorpusExample:
             self,
             "component_ownership",
             OptimizerComponentOwnership(self.component_ownership),
+        )
+        object.__setattr__(
+            self,
+            "evidence_plane",
+            require_optimizer_plane(self.evidence_plane),
         )
         if type(self.primary) is not bool or self.primary != (
             self.level == ExtractionFeedbackLevel.EXTRACTION_SET
@@ -605,6 +612,7 @@ class ExtractionOptimizerCorpusExample:
         source_messages: tuple[OptimizerSourceMessage, ...],
         extracted_facts: tuple[OptimizerExtractedFact, ...],
         delayed_evidence: OptimizerDelayedEvidence,
+        evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS,
     ) -> "ExtractionOptimizerCorpusExample":
         values = {
             "primary_unit_id": primary_unit_id,
@@ -622,6 +630,7 @@ class ExtractionOptimizerCorpusExample:
             "source_messages": source_messages,
             "extracted_facts": extracted_facts,
             "delayed_evidence": delayed_evidence,
+            "evidence_plane": require_optimizer_plane(evidence_plane),
             "schema_version": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
         }
         identity = cls._identity(values)
@@ -651,6 +660,7 @@ class ExtractionOptimizerCorpusExample:
             "source_messages": [value.payload() for value in values["source_messages"]],
             "extracted_facts": [value.payload() for value in values["extracted_facts"]],
             "delayed_evidence": values["delayed_evidence"].payload(),
+            "evidence_plane": values["evidence_plane"].value,
         }
 
     def identity_payload(self) -> dict[str, object]:
@@ -671,6 +681,7 @@ class ExtractionOptimizerCorpusExample:
             "source_messages": self.source_messages,
             "extracted_facts": self.extracted_facts,
             "delayed_evidence": self.delayed_evidence,
+            "evidence_plane": self.evidence_plane,
         })
 
     def payload(self) -> dict[str, object]:
@@ -688,6 +699,7 @@ class ExtractionOptimizerCorpusExample:
             "feedback_artifact_ids", "exposure_mode", "label", "attribution_confidence",
             "reason_codes", "component_ownership", "audit_join",
             "source_messages", "extracted_facts", "delayed_evidence",
+            "evidence_plane",
         }, "optimizer corpus example")
         collections = (
             payload["reason_codes"],
@@ -728,6 +740,7 @@ class ExtractionOptimizerCorpusExample:
                 delayed_evidence=OptimizerDelayedEvidence.from_payload(
                     payload["delayed_evidence"]
                 ),
+                evidence_plane=EvidencePlane(payload["evidence_plane"]),
                 schema_version=payload["schema_version"],
             )
         except (TypeError, ValueError) as exc:

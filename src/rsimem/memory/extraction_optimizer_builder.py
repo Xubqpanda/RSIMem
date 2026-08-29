@@ -9,6 +9,7 @@ from .extraction_feedback import (
     ExtractionFeedbackLabel,
     FactDisposition,
 )
+from .evidence_planes import EvidencePlane, require_optimizer_plane
 from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpusExample,
     OptimizerArtifactLineage,
@@ -57,8 +58,14 @@ class DelayedEvidenceContent:
 
 
 class ExtractionOptimizerCorpusBuilder:
-    def __init__(self, boundary: OptimizerSecretBoundary | None = None) -> None:
+    def __init__(
+        self,
+        boundary: OptimizerSecretBoundary | None = None,
+        *,
+        evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS,
+    ) -> None:
         self.boundary = boundary or OptimizerSecretBoundary()
+        self.evidence_plane = require_optimizer_plane(evidence_plane)
 
     def build_examples(
         self,
@@ -180,6 +187,7 @@ class ExtractionOptimizerCorpusBuilder:
                 source_messages=source_messages,
                 extracted_facts=facts,
                 delayed_evidence=delayed,
+                evidence_plane=self.evidence_plane,
             ))
         return tuple(examples)
 
