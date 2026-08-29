@@ -110,6 +110,8 @@ fallback native call also fails, preserving both `adapter_failure` and the
 stage-specific `retrieval_failure`/`tool_failure`/`injection_failure` reason.
 The standard process audit also verifies that each policy-bound event's host
 event matches the `triggerEventId` recorded by the policy ledger.
+Unbound `SKIPPED`/`DEFERRED` process events now require an explicit `absence` or
+`unsupported_boundary` reason; otherwise the event is rejected as unexplained.
 
 ## Completed Work
 
