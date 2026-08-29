@@ -32,3 +32,19 @@ matched validation was started.
 
 This batch is useful process-signal evidence, but remains a no-candidate
 provider/model-output result rather than a task negative or an effect claim.
+
+The 267-event process corpus also gives the following layer census (across all
+three replicates):
+
+| layer | events | distinct output digests | status/action observation |
+| --- | ---: | ---: | --- |
+| trigger | 21 | 1 | all `pending`; no action variation |
+| source selection | 21 | 21 | identity variation, no resolved outcome |
+| extraction | 21 | 7 | output variation, outcomes unresolved/missed only |
+| admission | 21 | 2 | ADD/NONE variation, no resolved outcome |
+| commit | 21 | 21 | receipt identity variation, no resolved outcome |
+| exposure | 60 | 9 | `success`/`skipped`/`pending`, no resolved useful/harmful variation |
+
+These process observations support the current `validation-only` status for the
+non-extraction layers; they do not turn status or digest variation into a
+quality label.
