@@ -318,6 +318,27 @@ def test_previous_process_feedback_schema_is_not_silently_migrated() -> None:
         ProcessEvent.from_payload(payload)
 
 
+def test_runtime_process_event_rejects_evaluation_payload_before_digest() -> None:
+    common = dict(
+        kind=ProcessEventKind.HOST_LIFECYCLE,
+        status=ProcessEventStatus.SUCCESS,
+        run_id="run.process-payload",
+        variant="native+ledger",
+        trace_id="trace.process-payload",
+        episode_id="episode.process-payload",
+        session_id="session.process-payload",
+        task_id="task.process-payload",
+        host_event_id="event.process-payload",
+        source_revision="revision.process-payload",
+        input_payload={"visible": True},
+        output_payload={"official_score": 1.0},
+    )
+    with pytest.raises(ValueError, match="forbidden evaluation fields"):
+        ProcessEvent.create(**common)
+    with pytest.raises(ValueError, match="forbidden evaluation fields"):
+        ProcessEvent.create(**{**common, "output_payload": {"nested": {"answer": "x"}}})
+
+
 def test_process_corpus_is_separate_from_evaluation_score_and_restart_safe(tmp_path) -> None:
     _, _, replay = _replay()
     corpus = ProcessCorpus.create(
