@@ -1722,7 +1722,35 @@ class HermesPastBenchBridge:
                         + hashlib.sha256(operation.encode("utf-8")).hexdigest()[:24],
                     ),
                 )
-                return native_call()
+                try:
+                    return native_call()
+                except Exception as native_exc:
+                    stage_reason = (
+                        "retrieval_failure"
+                        if operation == "session_search"
+                        else "tool_failure"
+                        if operation.startswith("skill")
+                        else "injection_failure"
+                    )
+                    self._record_process_observation(
+                        kind=process_kind,
+                        status=ProcessEventStatus.FAILED,
+                        host_event_id=self._last_host_event_id or f"event.native-bypass.{operation}",
+                        source_revision=self._last_host_source_revision or self._exposure_context_revision(),
+                        input_payload={"operation": operation, "route": "native_bypass"},
+                        output_payload={
+                            "adapter_failure_type": failure_type,
+                            "native_failure_type": type(native_exc).__name__,
+                        },
+                        reason_codes=("adapter_failure", stage_reason),
+                        execution_receipt_ids=(
+                            "receipt.native-bypass-failure."
+                            + hashlib.sha256(
+                                f"{operation}:{failure_type}:{type(native_exc).__name__}".encode("utf-8")
+                            ).hexdigest()[:24],
+                        ),
+                    )
+                    raise
             process_kind = (
                 ProcessEventKind.RETRIEVAL
                 if operation == "session_search"
