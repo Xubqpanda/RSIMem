@@ -12,6 +12,32 @@ class EvidencePlane(StrEnum):
     FINAL_EVALUATION = "final_evaluation"
 
 
+class EvidenceSourceKind(StrEnum):
+    RUNTIME_OBSERVATION = "runtime_observation"
+    APPLICATION_CONTRACT = "application_contract"
+    BENCHMARK_CONTRACT = "benchmark_contract"
+    FINAL_REPORTER = "final_reporter"
+
+
+def validate_plane_source(
+    plane: EvidencePlane | str,
+    source: EvidenceSourceKind | str,
+) -> tuple[EvidencePlane, EvidenceSourceKind]:
+    resolved_plane = EvidencePlane(plane)
+    resolved_source = EvidenceSourceKind(source)
+    allowed = {
+        EvidencePlane.PURE_PROCESS: {
+            EvidenceSourceKind.RUNTIME_OBSERVATION,
+            EvidenceSourceKind.APPLICATION_CONTRACT,
+        },
+        EvidencePlane.BENCHMARK_AUDIT: {EvidenceSourceKind.BENCHMARK_CONTRACT},
+        EvidencePlane.FINAL_EVALUATION: {EvidenceSourceKind.FINAL_REPORTER},
+    }
+    if resolved_source not in allowed[resolved_plane]:
+        raise ValueError("evidence plane and source identity are inconsistent")
+    return resolved_plane, resolved_source
+
+
 _FORBIDDEN_PROCESS_KEYS = frozenset({
     "family_id", "familyId", "stage", "grader", "answer_key", "answerKey",
     "hidden_expectation", "hiddenExpectation", "official_score", "officialScore",
@@ -49,4 +75,10 @@ def require_optimizer_plane(plane: EvidencePlane | str) -> EvidencePlane:
     return resolved
 
 
-__all__ = ["EvidencePlane", "require_optimizer_plane", "validate_pure_process_payload"]
+__all__ = [
+    "EvidencePlane",
+    "EvidenceSourceKind",
+    "require_optimizer_plane",
+    "validate_plane_source",
+    "validate_pure_process_payload",
+]

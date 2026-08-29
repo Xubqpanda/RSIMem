@@ -6,7 +6,9 @@ import pytest
 
 from rsimem.memory.evidence_planes import (
     EvidencePlane,
+    EvidenceSourceKind,
     require_optimizer_plane,
+    validate_plane_source,
     validate_pure_process_payload,
 )
 from rsimem.memory.policy_contracts import PolicyLayer
@@ -59,6 +61,22 @@ def test_pure_process_projection_strips_benchmark_identity_and_replays(tmp_path)
 def test_pure_process_payload_rejects_evaluation_fields() -> None:
     with pytest.raises(ValueError, match="forbidden evaluation fields"):
         validate_pure_process_payload({"nested": {"officialScore": 0.5}})
+
+
+def test_evidence_plane_source_identity_is_least_privilege() -> None:
+    assert validate_plane_source(
+        EvidencePlane.PURE_PROCESS,
+        EvidenceSourceKind.RUNTIME_OBSERVATION,
+    ) == (EvidencePlane.PURE_PROCESS, EvidenceSourceKind.RUNTIME_OBSERVATION)
+    assert validate_plane_source(
+        EvidencePlane.BENCHMARK_AUDIT,
+        EvidenceSourceKind.BENCHMARK_CONTRACT,
+    )[0] == EvidencePlane.BENCHMARK_AUDIT
+    with pytest.raises(ValueError, match="plane and source identity"):
+        validate_plane_source(
+            EvidencePlane.PURE_PROCESS,
+            EvidenceSourceKind.BENCHMARK_CONTRACT,
+        )
 
 
 @pytest.mark.parametrize("plane", (EvidencePlane.BENCHMARK_AUDIT, EvidencePlane.FINAL_EVALUATION))
