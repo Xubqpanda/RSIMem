@@ -1161,8 +1161,24 @@ class HermesPastBenchBridge:
             result.get("partial") is True or result.get("interrupted") is True
         )
         outcome_kind = self._outcome_kind(result)
+        matching_binding = next(
+            (
+                binding
+                for binding in self.artifact_set_bindings
+                if binding.complete
+                and set(binding.member_artifact_ids)
+                == set(future.memory_artifact_ids)
+            ),
+            None,
+        )
         evidence = MemoryUseEvidence.create(
-            artifact_ids=tuple(future.memory_artifact_ids),
+            artifact_ids=(
+                () if matching_binding is not None
+                else tuple(future.memory_artifact_ids)
+            ),
+            artifact_set_id=(
+                matching_binding.binding_id if matching_binding is not None else None
+            ),
             retrieval_operation_id=future.retrieval_operation_id,
             retrieved_artifact_ids=tuple(future.memory_artifact_ids),
             injection_operation_id=(
@@ -1189,7 +1205,11 @@ class HermesPastBenchBridge:
             graph = materialize_operation_graph(
                 self.static_writeback.operation_log.events
             )
-            joined = resolve_memory_use(evidence, operation_graph=graph)
+            joined = resolve_memory_use(
+                evidence,
+                artifact_set_binding=matching_binding,
+                operation_graph=graph,
+            )
             if joined.reason_code == "operation_join_invalid":
                 raise ValueError("semantic memory-use operation join is invalid")
         self._memory_use_evidence_log.append(evidence)
