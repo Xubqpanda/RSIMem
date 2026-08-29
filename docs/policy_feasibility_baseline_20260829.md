@@ -58,6 +58,13 @@ case。missed chain 使用独立的 logical absence ID，避免与 outcome opera
 
 每层报告同时保留 U/H/M、unresolved、censored 原始计数以及 `resolvedUsefulRate`；resolved denominator 为 U+H，分母为零时输出 unknown（JSON `null`）。
 
+`LayerFeasibilityCensus` 还记录 process-signal、action/outcome variation、
+ambiguity 和失败 reason。coverage、empty、missed 等 extraction-specific
+指标不从 policy fixture 猜测，而由 offline validation 的
+`OfflineRatioEvidence` 提供 numerator/denominator/unknown。raw calls/tokens/
+retry/latency/storage 继续使用 lifecycle `RawResourceUsage`，injection 与
+recovery 使用独立 ledger events；这些维度不被压成一个混合成本分数。
+
 ## 验证
 
 ```text

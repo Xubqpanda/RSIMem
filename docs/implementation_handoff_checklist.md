@@ -837,9 +837,9 @@ Family规则：
 - □ 所有variant使用matched task manifest、model、budget、order、sandbox和persistence isolation。
 - □ 每个 feasibility case 完成预设 replay/fixture，failed/provider run保留并单独报告。
 - √ 每个 deterministic candidate 至少一次改变目标层的 decision或输入/输出 fingerprint；不要求真实任务分数提升。
-- □ 报告每层的 process-signal coverage、action variation、outcome variation、unresolved/censored比例和具体失败原因。
-- □ 报告U/H/M/unresolved/censored原始计数、resolved useful rate及其分子分母、coverage和empty rate；不把unknown silently drop。
-- □ 报告raw calls/tokens/retry/latency/storage/injection/recovery，不生成无定义的混合cost结论。
+- √ `LayerFeasibilityCensus` 报告每层 process-signal coverage、action variation、outcome variation、unresolved/censored 比例、ambiguity 和具体失败原因。
+- √ census 报告 U/H/M/unresolved/censored 原始计数以及 resolved useful rate 的分子分母；extraction-specific coverage、empty、missed 和 unknown 分母由 `ExtractionOfflineValidationDecision` 的 ratio evidence 单独报告，不把 unknown silently drop。
+- √ raw calls/tokens/retry/latency/storage 由 lifecycle `RawResourceUsage` 记录，injection/recovery 由对应 receipt/ledger event 记录并独立 join；当前不生成未经定义的混合 cost 结论。
 - □ 只有后续效果实验才能声明observed uplift、layer superiority或联合版本优势。
 - □ 不要求N+2，不声明recursive self-improvement。
 
