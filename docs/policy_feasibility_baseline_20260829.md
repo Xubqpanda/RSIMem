@@ -106,4 +106,7 @@ quality gate 和 `JsonExtractionPolicyStore` 的 restart reload。验证结果�
 阶段完成。该测试还用 `FeasibilityInterventionPath` 将 projection 与
 target-layer replay fingerprint 写入独立 JSONL ledger，重启读取和重复写入
 均保持幂等；ledger 只保存 identity、状态和 reason，不保存 source 或 memory
-正文。
+正文。同一集成测试还覆盖了 `NO_PROPOSAL`、rejected candidate、restart 后拒绝
+再次激活，以及 ACTIVE candidate 的 operator rollback；这些路径只验证 policy
+artifact state machine 和 evidence identity，不把它们误报为真实 memory mutation
+recovery。
