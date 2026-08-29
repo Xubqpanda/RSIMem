@@ -99,6 +99,13 @@ from .policy_evidence import (
     JsonPolicyDecisionLedger,
     PolicyDecisionEvidence,
 )
+from .evidence_planes import (
+    EvidencePlane,
+    EvidenceSourceKind,
+    require_optimizer_plane,
+    validate_plane_source,
+    validate_pure_process_payload,
+)
 from .policy_audit import (
     PolicyAuditReport,
     audit_policy_evidence,
@@ -132,6 +139,15 @@ from .use_attribution import (
     MemoryUseResolutionStatus,
     OutcomeEvidenceKind,
     resolve_memory_use,
+)
+from .opportunity import (
+    ApplicationOpportunitySchema,
+    OPPORTUNITY_SCHEMA,
+    OpportunityEvidence,
+    OpportunityResolution,
+    OpportunityResolutionStatus,
+    OpportunitySurface,
+    resolve_opportunity,
 )
 from .artifact_set import (
     ARTIFACT_SET_SCHEMA,
@@ -266,6 +282,11 @@ __all__ = [
     "POLICY_EVIDENCE_SCHEMA_VERSION",
     "JsonPolicyDecisionLedger",
     "PolicyDecisionEvidence",
+    "EvidencePlane",
+    "EvidenceSourceKind",
+    "require_optimizer_plane",
+    "validate_plane_source",
+    "validate_pure_process_payload",
     "PolicyAuditReport",
     "audit_policy_evidence",
     "audit_policy_evidence_or_raise",
@@ -285,6 +306,13 @@ __all__ = [
     "MemoryUseResolutionStatus",
     "OutcomeEvidenceKind",
     "resolve_memory_use",
+    "OPPORTUNITY_SCHEMA",
+    "ApplicationOpportunitySchema",
+    "OpportunityEvidence",
+    "OpportunityResolution",
+    "OpportunityResolutionStatus",
+    "OpportunitySurface",
+    "resolve_opportunity",
     "ARTIFACT_SET_SCHEMA",
     "ARTIFACT_SET_SCHEMA_VERSION",
     "ArtifactSetResolution",
