@@ -33,6 +33,12 @@ from rsimem.memory.prompt_components import (
     SemanticPolicyManifest,
     text_digest,
 )
+from rsimem.memory.process_corpus import JsonProcessCorpusStore, ProcessCorpus
+from rsimem.memory.process_feedback import (
+    ProcessEvent,
+    ProcessEventKind,
+    ProcessEventStatus,
+)
 from rsimem.memory_systems.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT,
     MEM0_FLAT_EXTRACTION_SLOT_ID,
@@ -159,6 +165,30 @@ def _batch(tmp_path: Path):
                 matched_validation=adaptive,
                 policy_artifact=(candidate if adaptive else parent),
             )
+            process_event = ProcessEvent.create(
+                kind=ProcessEventKind.HOST_LIFECYCLE,
+                status=ProcessEventStatus.PENDING,
+                run_id=run_name,
+                variant="with_persistence",
+                trace_id=f"trace.{run_name}",
+                episode_id=f"episode.{run_name}",
+                session_id=f"session.{run_name}",
+                task_id=f"task.{run_name}",
+                host_event_id=f"event.{run_name}",
+                source_revision="revision.validation",
+                input_payload={"boundary": "task_completed"},
+                output_payload={"observed": True},
+                family_id="SM01_preference_adoption",
+                stage="validation",
+            )
+            process_corpus = ProcessCorpus.create(
+                (process_event,),
+                split_role="validation",
+                family_id="SM01_preference_adoption",
+                task_template_group_id="sm01.formal-matched-v1",
+                task_manifest_digest=task_manifest_digest,
+            )
+            JsonProcessCorpusStore(run / "process_corpus.json").put(process_corpus)
             record_extraction_attempt(
                 root / "batch_manifest.json",
                 replicate=replicate,
@@ -575,4 +605,40 @@ def test_validation_evidence_rejects_incomplete_slots_and_wrong_split(tmp_path) 
             candidate=candidate,
             offline_decision=offline,
             split=wrong_split,
+        )
+
+
+def test_validation_evidence_requires_process_corpus_and_declared_identity(tmp_path) -> None:
+    root, parent, candidate, offline, split = _batch(tmp_path)
+    process_path = root / "r01_static_extraction_rsimem" / "process_corpus.json"
+    process_path.unlink()
+    with pytest.raises(ValueError, match="incomplete process evidence"):
+        assemble_extraction_matched_evidence_batch(
+            root,
+            parent=parent,
+            candidate=candidate,
+            offline_decision=offline,
+            split=split,
+        )
+
+    root, parent, candidate, offline, split = _batch(tmp_path / "identity")
+    process_path = root / "r01_static_extraction_rsimem" / "process_corpus.json"
+    original = JsonProcessCorpusStore(process_path).get()
+    assert original is not None
+    replacement = ProcessCorpus.create(
+        original.events,
+        split_role="pilot",
+        family_id=original.family_id,
+        task_template_group_id=original.task_template_group_id,
+        task_manifest_digest=original.task_manifest_digest,
+    )
+    process_path.unlink()
+    JsonProcessCorpusStore(process_path).put(replacement)
+    with pytest.raises(ValueError, match="process corpus identity differs"):
+        assemble_extraction_matched_evidence_batch(
+            root,
+            parent=parent,
+            candidate=candidate,
+            offline_decision=offline,
+            split=split,
         )

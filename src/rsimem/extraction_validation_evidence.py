@@ -41,6 +41,11 @@ from .memory.extraction_validation_adapter import (
     ExtractionValidationObservationAssembler,
 )
 from .memory.live_writeback import ExtractionPromptRuntimeScope
+from .memory.process_corpus import (
+    JsonProcessCorpusStore,
+    ensure_process_corpus_has_no_evaluation_fields,
+)
+from .memory.process_feedback import audit_process_events
 from .memory.prompt_components import (
     SemanticPolicyManifest,
     canonical_json,
@@ -557,6 +562,27 @@ def assemble_extraction_matched_evidence_batch(
         feedback = _feedback_records(run_dir)
         if not sources or not feedback:
             raise ValueError("validation run has incomplete extraction evidence")
+        process_corpus = JsonProcessCorpusStore(
+            run_dir / "process_corpus.json"
+        ).get()
+        if process_corpus is None:
+            raise ValueError("validation run has incomplete process evidence")
+        if (
+            process_corpus.split_role != "validation"
+            or process_corpus.family_id != manifest["split"]["familyId"]
+            or process_corpus.task_template_group_id
+            != manifest["split"]["taskTemplateGroupId"]
+            or process_corpus.task_manifest_digest
+            != manifest["split"]["taskManifestDigest"]
+        ):
+            raise ValueError("validation process corpus identity differs")
+        process_errors = audit_process_events(process_corpus.events)
+        if process_errors:
+            raise ValueError(
+                "validation process evidence audit failed: "
+                + "; ".join(process_errors)
+            )
+        ensure_process_corpus_has_no_evaluation_fields(process_corpus.payload())
         audit_id, audit_digest, failure_counts = _audit_safety(
             run_dir / "audit.json"
         )
