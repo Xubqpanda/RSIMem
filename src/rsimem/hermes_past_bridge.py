@@ -681,6 +681,22 @@ class HermesPastBenchBridge:
         return self._process_feedback.events
 
     @property
+    def process_feedback_event_ids(self) -> tuple[str, ...]:
+        return tuple(event.event_id for event in self.process_feedback)
+
+    @property
+    def process_feedback_digest(self) -> str:
+        """Stable identity for the content-free process corpus in this run."""
+
+        return hashlib.sha256(
+            json.dumps(
+                list(self.process_feedback_event_ids),
+                ensure_ascii=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+
+    @property
     def static_results(self) -> tuple[StaticSemanticBoundaryResult, ...]:
         return tuple(self._static_results)
 

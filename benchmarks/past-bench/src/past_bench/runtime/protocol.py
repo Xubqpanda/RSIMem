@@ -83,6 +83,11 @@ class StepResponse(BaseModel):
     final_output: str | None = None
     error: str | None = None
     model_time_s: float = 0.0
+    # Content-free RSIMem process evidence identity.  This is deliberately
+    # separate from benchmark/evaluation score fields, which are owned by the
+    # runner and reporter rather than the policy learner.
+    process_feedback_event_ids: list[str] = Field(default_factory=list)
+    process_feedback_digest: str | None = None
 
 
 class InterruptRequest(BaseModel):
