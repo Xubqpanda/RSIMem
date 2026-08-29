@@ -1302,6 +1302,33 @@ class JsonExtractionValidationObservationStore:
 class ExtractionValidationReplay:
     """Require a stored decision to equal a fresh raw-observation evaluation."""
 
+    def verify_store(
+        self,
+        decision: ExtractionValidationDecision,
+        *,
+        store: JsonExtractionValidationObservationStore,
+        parent_artifact_id: str,
+        proposal_artifact_id: str,
+        criteria: ExtractionAcceptanceCriteria,
+    ) -> None:
+        """Recompute a decision exclusively from persisted observations."""
+
+        if not isinstance(store, JsonExtractionValidationObservationStore):
+            raise TypeError("validation replay requires an observation store")
+        observations = store.records()
+        expected_ids = set(decision.observation_ids)
+        actual_ids = {value.observation_id for value in observations}
+        if actual_ids != expected_ids:
+            raise ValueError("stored validation observations do not match decision")
+        self.verify(
+            decision,
+            split=store.split,
+            observations=observations,
+            parent_artifact_id=parent_artifact_id,
+            proposal_artifact_id=proposal_artifact_id,
+            criteria=criteria,
+        )
+
     def verify(
         self,
         decision: ExtractionValidationDecision,

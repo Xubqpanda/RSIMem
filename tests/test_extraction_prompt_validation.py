@@ -154,6 +154,31 @@ def test_validation_observation_store_is_restart_safe_and_split_bound(tmp_path: 
         restarted.put(outside)
 
 
+def test_validation_replay_store_rejects_observation_set_drift(tmp_path: Path) -> None:
+    split = _split()
+    observations = tuple(
+        _observation(variant, 1, ExtractionFeedbackLabel.USEFUL)
+        for variant in ExtractionValidationVariant
+    )
+    decision = ExtractionPromptMatchedValidator().evaluate(
+        split=split,
+        observations=observations,
+        parent_artifact_id=PARENT,
+        proposal_artifact_id=PROPOSAL,
+        criteria=_criteria(minimum_matched_pairs=1, minimum_resolved_examples=1),
+    )
+    store = JsonExtractionValidationObservationStore(tmp_path / "observations", split=split)
+    store.put(observations[0])
+    with pytest.raises(ValueError, match="do not match decision"):
+        ExtractionValidationReplay().verify_store(
+            decision,
+            store=store,
+            parent_artifact_id=PARENT,
+            proposal_artifact_id=PROPOSAL,
+            criteria=_criteria(minimum_matched_pairs=1, minimum_resolved_examples=1),
+        )
+
+
 def _criteria(**overrides) -> ExtractionAcceptanceCriteria:
     values = {
         "minimum_matched_pairs": 3,
@@ -612,6 +637,11 @@ def test_validation_decision_store_and_raw_observation_replay(tmp_path) -> None:
         proposal_artifact_id=PROPOSAL,
         criteria=criteria,
     )
+    observation_store = JsonExtractionValidationObservationStore(
+        tmp_path / "observations", split=split
+    )
+    for observation in observations:
+        observation_store.put(observation)
     store = JsonExtractionValidationDecisionStore(tmp_path / "decisions")
     path, created = store.put(decision)
     assert created is True
@@ -622,6 +652,13 @@ def test_validation_decision_store_and_raw_observation_replay(tmp_path) -> None:
         tmp_path / "decisions"
     ).get(decision.decision_id)
     assert restored == decision
+    ExtractionValidationReplay().verify_store(
+        restored,
+        store=observation_store,
+        parent_artifact_id=PARENT,
+        proposal_artifact_id=PROPOSAL,
+        criteria=criteria,
+    )
     ExtractionValidationReplay().verify(
         restored,
         split=split,
