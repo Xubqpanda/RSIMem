@@ -13,6 +13,7 @@ from rsimem.memory.opportunity import (
     resolve_opportunity,
 )
 from rsimem.memory.evidence_planes import EvidenceSourceKind
+from rsimem.memory import OpportunityEvidence as ExportedOpportunityEvidence
 
 
 def _evidence() -> OpportunityEvidence:
@@ -28,6 +29,7 @@ def _evidence() -> OpportunityEvidence:
 
 def test_opportunity_evidence_is_stable_and_has_no_benchmark_identity() -> None:
     first = _evidence()
+    assert ExportedOpportunityEvidence is OpportunityEvidence
     second = OpportunityEvidence.from_payload(json.loads(json.dumps(first.payload())))
     assert first == second
     serialized = json.dumps(first.payload(), ensure_ascii=True)
