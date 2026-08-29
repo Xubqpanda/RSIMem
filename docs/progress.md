@@ -71,7 +71,7 @@ official score or grader fields to the policy path. An evaluator-free static
 writeback fixture verifies trigger, source, extraction, admission, commit,
 exposure, and task-outcome events, receipt joins, and process-ledger auditing.
 The focused contract is in `tests/test_rsimem_hermes_adapter.py`; current
-regression results are RSIMem `656 passed` and PAST-Bench `397 passed, 2
+regression results are RSIMem `665 passed` and PAST-Bench `397 passed, 2
 skipped`.
 
 Both formal extraction launchers now run `audit_process_events()` before
@@ -370,7 +370,7 @@ This is process-signal infrastructure, not a live adaptive-effect result.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `656 passed`.
+- [x] Pass all RSIMem tests: `665 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `397 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
