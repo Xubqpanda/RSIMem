@@ -10,29 +10,24 @@ resource cost. Raw usage below is accounting only.
 
 The batch ran the fixed `native+ledger` Hermes path with static semantic
 extraction, judge disabled, and three replicates. The provider/model were
-`https://coding.tu-zi.com/v1` and `gpt-5.6-luna`. The batch manifest records
-RSIMem revision `643dce1939db7e58b4dd36f1c60ad7afbc25f935` and PAST-Bench
-revision `75d898a9f8dc9c05a3809b746acb08da052f0b78`; these are the revisions of
-the recorded run, not a claim about the current checkout.
-
-Replicate 3's first attempt timed out. The manifest retains that failed
-infrastructure attempt, and attempt 2 completed successfully; only the
-completed attempt is used for the r03 census.
+the configured OpenAI-compatible endpoint and `gpt-5.6-luna`. The batch
+manifest records RSIMem revision `8b4422e132ba4a56bdaacb54372dc8d18fd3281e`
+and PAST-Bench revision `75d898a9f8dc9c05a3809b746acb08da052f0b78`; these are
+the revisions of the recorded run, not a claim about the current checkout.
 
 | replicate | selected run | status | process events | audit | model requests | input tokens | output tokens |
 | --- | --- | --- | ---: | --- | ---: | ---: | ---: |
-| r01 | `..._r01_static_extraction_rsimem` | completed | 125 | clean | 40 | 55,427 | 4,898 |
-| r02 | `..._r02_static_extraction_rsimem` | completed | 119 | clean | 37 | 56,362 | 4,213 |
-| r03 | `..._r03_static_extraction_rsimem_attempt02` | completed | 117 | clean | 35 | 54,595 | 4,172 |
+| r01 | `..._r01_static_extraction_rsimem` | completed | 125 | clean | 38 | 50,926 | 4,338 |
+| r02 | `..._r02_static_extraction_rsimem` | completed | 119 | clean | 40 | 51,290 | 4,335 |
+| r03 | `..._r03_static_extraction_rsimem` | completed | 135 | clean | 41 | 49,956 | 4,892 |
 
 All three selected audits report `ok=true`, zero issues, zero projection
 mismatches, zero native bypasses, zero unresolved memory injections, and nine
-traces. The failed r03 attempt is retained only in `batch_manifest.json` as an
-infrastructure event.
+traces.
 
 ## Aggregate process evidence
 
-The three completed pure-process corpora contain 361 physical events. Every
+The three completed pure-process corpora contain 379 physical events. Every
 event has the expected `family_id=SM02_constraint_retention`, actual stage,
 task/session/trace identity, and `variant=with_persistence`.
 
@@ -47,18 +42,18 @@ Event counts:
 | commit | 24 |
 | retrieval | 42 |
 | exposure | 66 |
-| tool call | 65 |
-| tool result | 65 |
+| tool call | 74 |
+| tool result | 74 |
 | task outcome | 27 |
 
-Status counts are `pending=66`, `executed=107`, `skipped=54`, `failed=95`, and
-`success=39`. Reason counts are `decision_observed=215`, `tool_failure=65`,
+Status counts are `pending=66`, `executed=116`, `skipped=54`, `failed=104`, and
+`success=39`. Reason counts are `decision_observed=224`, `tool_failure=74`,
 `retrieval_miss=30`, `task_completed=27`, and `absence=24`.
 
-There are 138 policy-bound events (38.23%), 295 receipt-bound events
-(81.72%), and 40 distinct source revisions. Tool closures are exact in every
-replicate: 65 calls pair one-to-one with 65 results, with no orphan,
-duplicate, or scope mismatch. All 65 observed tool results have
+There are 138 policy-bound events (36.41%), 313 receipt-bound events
+(82.59%), and 40 distinct source revisions. Tool closures are exact in every
+replicate: 74 calls pair one-to-one with 74 results, with no orphan,
+duplicate, or scope mismatch. All 74 observed tool results have
 `tool_success=false`; this is recorded process state and is not attributed to
 semantic extraction.
 
