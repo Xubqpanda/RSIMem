@@ -32,7 +32,7 @@ from .memory.operation_graph import (
     OperationKind,
     materialize_operation_graph,
 )
-from .memory.process_corpus import JsonProcessCorpusStore
+from .memory.process_corpus import JsonProcessCorpusStore, census_process_events
 from .memory.process_feedback import JsonProcessFeedbackLedger, ProcessEvent
 
 
@@ -666,11 +666,13 @@ def _process_corpus_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
     events = [event for row in rows for event in row["processEvents"]]
     by_kind = Counter(event.kind.value for event in events)
     by_reason = Counter(reason for event in events for reason in event.reason_codes)
+    census = census_process_events(events) if events else None
     return {
         "eventCount": len(events),
         "eventIds": sorted(event.event_id for event in events),
         "byKind": dict(sorted(by_kind.items())),
         "byReason": dict(sorted(by_reason.items())),
+        "census": census.payload() if census is not None else None,
         "evaluationScoreAccessible": False,
     }
 

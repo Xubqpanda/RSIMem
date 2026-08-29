@@ -20,6 +20,7 @@ from rsimem.memory.process_feedback import (
 from rsimem.memory.process_corpus import (
     JsonProcessCorpusStore,
     ProcessCorpus,
+    census_process_events,
     ensure_process_corpus_has_no_evaluation_fields,
 )
 from rsimem.memory.trigger_policy import HostTriggerAdapter
@@ -168,6 +169,17 @@ def test_process_corpus_rejects_duplicate_or_cross_family_events() -> None:
             task_template_group_id="sm01-process-pilot",
             task_manifest_digest="a" * 64,
         )
+
+
+def test_process_census_reports_layer_and_receipt_coverage() -> None:
+    _, _, replay = _replay()
+    census = census_process_events(replay.process_events)
+    assert census.event_count == len(replay.process_events)
+    assert census.policy_bound_count == census.event_count
+    assert census.receipt_bound_count >= 2  # commit and exposure
+    assert census.host_event_count == 1
+    assert set(census.layer_counts) == {item.layer.value for item in replay.decisions}
+    assert census.signal_coverage == 1.0
     foreign = ProcessEvent.create(
         kind=ProcessEventKind.HOST_LIFECYCLE,
         status=ProcessEventStatus.PENDING,

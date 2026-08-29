@@ -17,7 +17,10 @@ from pathlib import Path
 from typing import Iterable, Mapping
 
 from .policy_contracts import content_digest
-from .process_feedback import JsonProcessFeedbackLedger, ProcessEvent
+from .process_feedback import (
+    JsonProcessFeedbackLedger,
+    ProcessEvent,
+)
 
 
 PROCESS_CORPUS_SCHEMA_VERSION = 1
@@ -209,6 +212,95 @@ class JsonProcessCorpusStore:
         return ProcessCorpus.from_payload(value)
 
 
+@dataclass(frozen=True, slots=True)
+class ProcessSignalCensus:
+    """Stage/process coverage summary for one content-free corpus."""
+
+    event_count: int
+    policy_bound_count: int
+    receipt_bound_count: int
+    host_event_count: int
+    kind_counts: Mapping[str, int]
+    status_counts: Mapping[str, int]
+    reason_counts: Mapping[str, int]
+    layer_counts: Mapping[str, int]
+    distinct_source_revision_count: int
+
+    def __post_init__(self) -> None:
+        values = (
+            self.event_count,
+            self.policy_bound_count,
+            self.receipt_bound_count,
+            self.host_event_count,
+            self.distinct_source_revision_count,
+        )
+        if any(type(value) is not int or value < 0 for value in values):
+            raise ValueError("process census counts must be non-negative integers")
+        if any(value > self.event_count for value in values[1:4]):
+            raise ValueError("process census counts cannot exceed event count")
+        for mapping in (self.kind_counts, self.status_counts, self.reason_counts, self.layer_counts):
+            if any(not isinstance(key, str) or type(value) is not int or value < 0 for key, value in mapping.items()):
+                raise ValueError("process census buckets are invalid")
+        object.__setattr__(self, "kind_counts", dict(sorted(self.kind_counts.items())))
+        object.__setattr__(self, "status_counts", dict(sorted(self.status_counts.items())))
+        object.__setattr__(self, "reason_counts", dict(sorted(self.reason_counts.items())))
+        object.__setattr__(self, "layer_counts", dict(sorted(self.layer_counts.items())))
+
+    @property
+    def signal_coverage(self) -> float | None:
+        return self.policy_bound_count / self.event_count if self.event_count else None
+
+    @property
+    def receipt_coverage(self) -> float | None:
+        return self.receipt_bound_count / self.event_count if self.event_count else None
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "eventCount": self.event_count,
+            "policyBoundCount": self.policy_bound_count,
+            "policyBoundCoverage": self.signal_coverage,
+            "receiptBoundCount": self.receipt_bound_count,
+            "receiptBoundCoverage": self.receipt_coverage,
+            "hostEventCount": self.host_event_count,
+            "kindCounts": dict(self.kind_counts),
+            "statusCounts": dict(self.status_counts),
+            "reasonCounts": dict(self.reason_counts),
+            "layerCounts": dict(self.layer_counts),
+            "distinctSourceRevisionCount": self.distinct_source_revision_count,
+        }
+
+
+def census_process_events(events: Iterable[ProcessEvent]) -> ProcessSignalCensus:
+    """Count process signals without using application score or content."""
+
+    items = tuple(events)
+    if any(not isinstance(item, ProcessEvent) for item in items):
+        raise TypeError("process census requires ProcessEvent values")
+    kinds: dict[str, int] = {}
+    statuses: dict[str, int] = {}
+    reasons: dict[str, int] = {}
+    layers: dict[str, int] = {}
+    for event in items:
+        kinds[event.kind.value] = kinds.get(event.kind.value, 0) + 1
+        statuses[event.status.value] = statuses.get(event.status.value, 0) + 1
+        for reason in event.reason_codes:
+            reasons[reason] = reasons.get(reason, 0) + 1
+        if event.policy_layer is not None:
+            layer = event.policy_layer.value
+            layers[layer] = layers.get(layer, 0) + 1
+    return ProcessSignalCensus(
+        event_count=len(items),
+        policy_bound_count=sum(item.policy_decision_id is not None for item in items),
+        receipt_bound_count=sum(bool(item.execution_receipt_ids) for item in items),
+        host_event_count=len({item.host_event_id for item in items}),
+        kind_counts=kinds,
+        status_counts=statuses,
+        reason_counts=reasons,
+        layer_counts=layers,
+        distinct_source_revision_count=len({item.source_revision for item in items}),
+    )
+
+
 def ensure_process_corpus_has_no_evaluation_fields(value: object) -> None:
     """Reject score/grader/answer fields before learner ingestion."""
 
@@ -236,5 +328,7 @@ __all__ = [
     "PROCESS_CORPUS_SCHEMA",
     "ProcessCorpus",
     "JsonProcessCorpusStore",
+    "ProcessSignalCensus",
+    "census_process_events",
     "ensure_process_corpus_has_no_evaluation_fields",
 ]
