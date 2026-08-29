@@ -28,6 +28,7 @@ from rsimem.memory_systems.mem0_flat import (
 )
 
 from test_extraction_optimizer_contracts import (
+    _corpus,
     _multi_corpus,
     _parent,
     _proposal_output,
@@ -40,6 +41,7 @@ from test_extraction_offline_validation import (
     _split,
 )
 from rsimem.memory.extraction_feedback import ExtractionFeedbackLabel
+from rsimem.memory.policy_feasibility import OptimizerHypothesisDecision
 
 
 def test_optimizer_to_offline_gate_to_restart_safe_future_candidate(tmp_path) -> None:
@@ -137,3 +139,92 @@ def test_optimizer_to_offline_gate_to_restart_safe_future_candidate(tmp_path) ->
     assert restarted_paths.records == (path,)
     _, replayed = restarted_paths.put(path)
     assert replayed is False
+
+
+def test_nplus1_rejection_no_proposal_and_rollback_paths_are_restart_safe(tmp_path) -> None:
+    parent = _parent()
+    no_signal = ExtractionPromptOptimizer(
+        CapturedExtractionOptimizerClient(_proposal_output)
+    ).propose(parent, _corpus())
+    projection = project_optimizer_result(
+        no_signal,
+        _corpus(),
+        parent_artifact_id=parent.artifact_id,
+    )
+    assert projection.decision is OptimizerHypothesisDecision.NO_PROPOSAL
+    assert projection.candidate_artifact_id is None
+
+    proposal = ExtractionPromptOptimizer(
+        CapturedExtractionOptimizerClient(_proposal_output)
+    ).propose(parent, _multi_corpus((ExtractionFeedbackLabel.USEFUL,) * 3))
+    assert proposal.candidate is not None
+
+    rejected_path = tmp_path / "rejected-policy.json"
+    rejected_store = JsonExtractionPolicyStore(
+        rejected_path,
+        trusted_root=parent,
+        slot=MEM0_FLAT_EXTRACTION_SLOT,
+    )
+    rejected_store.initialize()
+    rejected_store.register(proposal.candidate)
+    rejected_store.transition(
+        proposal.candidate.artifact_id,
+        to_state=ExtractionPolicyState.REJECTED,
+        transition_id="transition.feasibility.rejected",
+        reason_code="offline_gate_rejected",
+    )
+    restarted_rejected = JsonExtractionPolicyStore(
+        rejected_path,
+        trusted_root=_parent(),
+        slot=MEM0_FLAT_EXTRACTION_SLOT,
+    )
+    rejected_snapshot = restarted_rejected.snapshot()
+    rejected_record = next(
+        record for record in rejected_snapshot.records
+        if record.artifact_id == proposal.candidate.artifact_id
+    )
+    assert rejected_record.state is ExtractionPolicyState.REJECTED
+    try:
+        restarted_rejected.transition(
+            proposal.candidate.artifact_id,
+            to_state=ExtractionPolicyState.ACTIVE,
+            transition_id="transition.feasibility.rejected-active",
+            reason_code="must_fail",
+        )
+    except ValueError:
+        pass
+    else:  # pragma: no cover - defensive assertion for the state machine
+        raise AssertionError("rejected candidate became active")
+
+    rollback_path = tmp_path / "rollback-policy.json"
+    rollback_store = JsonExtractionPolicyStore(
+        rollback_path,
+        trusted_root=_parent(),
+        slot=MEM0_FLAT_EXTRACTION_SLOT,
+    )
+    rollback_store.initialize()
+    rollback_store.register(proposal.candidate)
+    rollback_store.transition(
+        proposal.candidate.artifact_id,
+        to_state=ExtractionPolicyState.ACTIVE,
+        transition_id="transition.feasibility.active",
+        reason_code="matched_trial_passed",
+    )
+    rollback_store.transition(
+        proposal.candidate.artifact_id,
+        to_state=ExtractionPolicyState.ROLLED_BACK,
+        transition_id="transition.feasibility.rollback",
+        reason_code="operator_rollback",
+    )
+    restarted_rollback = JsonExtractionPolicyStore(
+        rollback_path,
+        trusted_root=_parent(),
+        slot=MEM0_FLAT_EXTRACTION_SLOT,
+    )
+    rollback_snapshot = restarted_rollback.snapshot()
+    assert rollback_snapshot.active_artifact_id is None
+    rolled_back = next(
+        record for record in rollback_snapshot.records
+        if record.artifact_id == proposal.candidate.artifact_id
+    )
+    assert rolled_back.state is ExtractionPolicyState.ROLLED_BACK
