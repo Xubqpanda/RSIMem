@@ -177,6 +177,11 @@ from .final_evaluation import (
     FINAL_EVALUATION_SCHEMA_VERSION,
     FinalEvaluationRecord,
 )
+from .signal_protocol import (
+    SIGNAL_PROTOCOL_SCHEMA,
+    SIGNAL_PROTOCOL_SCHEMA_VERSION,
+    ProcessSignalAnalysisProtocol,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -312,6 +317,9 @@ __all__ = [
     "FINAL_EVALUATION_SCHEMA",
     "FINAL_EVALUATION_SCHEMA_VERSION",
     "FinalEvaluationRecord",
+    "SIGNAL_PROTOCOL_SCHEMA",
+    "SIGNAL_PROTOCOL_SCHEMA_VERSION",
+    "ProcessSignalAnalysisProtocol",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
