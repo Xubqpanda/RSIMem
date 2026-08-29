@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import copy
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -230,6 +231,26 @@ def test_process_corpus_is_separate_from_evaluation_score_and_restart_safe(tmp_p
     for field in ("taskScore", "officialScore", "answerKey", "hidden-expectation"):
         with pytest.raises(ValueError, match="evaluation-only"):
             ensure_process_corpus_has_no_evaluation_fields({"nested": {field: 1}})
+
+
+def test_process_corpus_store_reserves_one_concurrent_writer(tmp_path) -> None:
+    _, _, replay = _replay()
+    corpus = ProcessCorpus.create(
+        replay.process_events,
+        split_role="pilot",
+        family_id="SM01_preference_adoption",
+        task_template_group_id="sm01-process-pilot",
+        task_manifest_digest="a" * 64,
+    )
+    path = tmp_path / "corpus.json"
+
+    def put_once() -> bool:
+        return JsonProcessCorpusStore(path).put(corpus)[1]
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        created = tuple(executor.map(lambda _: put_once(), range(8)))
+    assert sum(created) == 1
+    assert JsonProcessCorpusStore(path).get() == corpus
 
 
 def test_process_corpus_rejects_duplicate_or_cross_family_events() -> None:
