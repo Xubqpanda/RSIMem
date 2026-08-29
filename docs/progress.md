@@ -102,6 +102,9 @@ Policy `SKIP`/`DEFER` reasons are projected through a bounded mapping so
 Hermes process feedback identity now has an explicit restart replay fixture:
 the event set, canonical ID ordering, and digest remain unchanged after a
 second bridge instance observes the same completed boundary.
+Native-bypass handling now records a second failed process event when the
+fallback native call also fails, preserving both `adapter_failure` and the
+stage-specific `retrieval_failure`/`tool_failure`/`injection_failure` reason.
 
 ## Completed Work
 
