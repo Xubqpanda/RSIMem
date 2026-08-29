@@ -329,9 +329,19 @@ an uplift claim. It can be regenerated with
 `python -m rsimem.memory.policy_feasibility_fixture` and verified against the
 durable ledger after restart.
 
+The runtime also emits an independent host-neutral process-feedback ledger
+(`rsimem_process_feedback.jsonl`) for every RSIMem bridge attempt. Trigger,
+source, extraction, admission, commit, retrieval, exposure, tool and task
+outcome observations carry stable host-event, source-revision, policy-decision,
+lineage, digest and receipt identities without copying memory or prompt text.
+The JSONL store is lock-protected, atomically replaced and idempotent across
+restart; `audit_process_events()` keeps retrieval misses, adapter failures,
+tool failures, injection failures and task failures as distinct reason codes.
+This is process-signal infrastructure, not a live adaptive-effect result.
+
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `645 passed`.
+- [x] Pass all RSIMem tests: `649 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `397 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
