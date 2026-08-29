@@ -11,6 +11,7 @@ it is not an input to prompt learning or activation.
 The initial evaluation uses [PAST-Bench](https://github.com/Gen-Verse/PAST-Bench), an interactive benchmark with ordered cross-session tasks, real tools, sandbox execution, and matched persistence controls.
 
 See [`docs/progress.md`](docs/progress.md) for current status and next tasks, [`docs/implementation_handoff_checklist.md`](docs/implementation_handoff_checklist.md) for the complete serial implementation and acceptance checklist, [`docs/dataset_selection.md`](docs/dataset_selection.md) for the benchmark rationale, [`docs/experiment_plan.md`](docs/experiment_plan.md) for the staged evaluation plan, [`docs/memory_adapters.md`](docs/memory_adapters.md) for the typed backend and compiler architecture, [`docs/lifecycle_controller.md`](docs/lifecycle_controller.md) for the context evaluation control plane, [`docs/usage_accounting.md`](docs/usage_accounting.md) for the request-level accounting contract, and [`docs/smoke_20260820.md`](docs/smoke_20260820.md) for the first end-to-end Hermes/GPT-Luna smoke report.
+Before a formal provider batch, use the secret-free [completion probe](docs/provider_probe.md) against the exact base URL and model; a probe failure must stop the batch before benchmark execution.
 
 ## Local Setup
 
