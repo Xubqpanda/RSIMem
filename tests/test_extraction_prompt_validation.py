@@ -119,6 +119,7 @@ def test_validation_observation_store_is_restart_safe_and_split_bound(tmp_path: 
     store = JsonExtractionValidationObservationStore(tmp_path / "observations", split=split)
     path, created = store.put(observation)
     assert created is True
+    assert path.stat().st_mode & 0o777 == 0o600
     assert store.put(observation) == (path, False)
     restarted = JsonExtractionValidationObservationStore(
         tmp_path / "observations", split=split
