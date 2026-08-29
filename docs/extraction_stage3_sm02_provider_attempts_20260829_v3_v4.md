@@ -20,6 +20,10 @@ Both configured endpoints returned HTTP 200 for an authenticated `/models`
 health probe immediately before the attempts.  A health response is not
 treated as evidence that a completion batch is usable.
 
+A later provider-only completion probe against the primary endpoint returned
+HTTP 503 with no completion or usage payload.  No benchmark batch was started
+from that probe, and it is not included in any experiment accounting.
+
 ## Batch outcomes
 
 | batch | endpoint | completed traces | requests | retries | input tokens | output tokens | audit | disposition |
