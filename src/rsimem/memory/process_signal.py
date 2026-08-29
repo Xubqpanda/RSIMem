@@ -252,7 +252,12 @@ def census_process_signal_cases(cases: Iterable[ProcessSignalCase]) -> ProcessSi
     if any(not isinstance(value, ProcessSignalCase) for value in values):
         raise TypeError("process signal census requires ProcessSignalCase values")
     by_logical: dict[str, list[ProcessSignalCase]] = {}
+    physical_seen: set[str] = set()
     for case in values:
+        overlap = physical_seen.intersection(case.physical_observation_ids)
+        if overlap:
+            raise ValueError("duplicate physical observation identity")
+        physical_seen.update(case.physical_observation_ids)
         by_logical.setdefault(case.logical_case_id, []).append(case)
     statuses: dict[str, int] = {}
     conflicts = 0
