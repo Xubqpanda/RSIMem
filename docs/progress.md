@@ -96,6 +96,9 @@ crossing the learner boundary.
 Process audit terminal semantics now also require an execution receipt for
 `REJECTED` events; non-executing `SKIPPED`/`DEFERRED` decisions remain explicit
 and receipt-free by contract.
+Policy `SKIP`/`DEFER` reasons are projected through a bounded mapping so
+`absence` and `unsupported_boundary` remain distinguishable from generic
+`decision_observed` process evidence.
 
 ## Completed Work
 
