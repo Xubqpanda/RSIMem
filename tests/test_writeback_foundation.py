@@ -640,6 +640,24 @@ def test_lifecycle_usage_preserves_all_raw_request_buckets() -> None:
     }
 
 
+@pytest.mark.parametrize("field", (
+    "input_tokens",
+    "output_tokens",
+    "cache_read_tokens",
+    "cache_write_tokens",
+    "reasoning_tokens",
+    "model_requests",
+    "retry_count",
+    "duration_ms",
+    "storage_bytes",
+))
+def test_lifecycle_usage_rejects_non_integer_quantities(field: str) -> None:
+    with pytest.raises(TypeError, match="must be an integer"):
+        RawResourceUsage(**{field: True})
+    with pytest.raises(TypeError, match="must be an integer"):
+        RawResourceUsage(**{field: 1.5})
+
+
 def test_plan_exit_evidence_and_usage_schema_mismatch_fail_closed() -> None:
     fixture = run_sm01_preference_fixture()
     plan = fixture.plans[0]

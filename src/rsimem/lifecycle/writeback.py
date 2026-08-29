@@ -90,18 +90,21 @@ class RawResourceUsage:
     def __post_init__(self) -> None:
         _require_current_schema(self.schema_version, "raw resource usage")
         values = (
-            self.input_tokens,
-            self.output_tokens,
-            self.cache_read_tokens,
-            self.cache_write_tokens,
-            self.reasoning_tokens,
-            self.model_requests,
-            self.retry_count,
-            self.duration_ms,
-            self.storage_bytes,
+            ("input_tokens", self.input_tokens),
+            ("output_tokens", self.output_tokens),
+            ("cache_read_tokens", self.cache_read_tokens),
+            ("cache_write_tokens", self.cache_write_tokens),
+            ("reasoning_tokens", self.reasoning_tokens),
+            ("model_requests", self.model_requests),
+            ("retry_count", self.retry_count),
+            ("duration_ms", self.duration_ms),
+            ("storage_bytes", self.storage_bytes),
         )
-        if any(value is not None and value < 0 for value in values):
-            raise ValueError("raw resource quantities must not be negative")
+        for name, value in values:
+            if value is not None and type(value) is not int:
+                raise TypeError(f"raw resource quantity {name} must be an integer or null")
+            if value is not None and value < 0:
+                raise ValueError("raw resource quantities must not be negative")
 
     def to_dict(self) -> dict[str, int | None]:
         return {
