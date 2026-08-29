@@ -676,7 +676,7 @@ frozen system/safety/schema wrapper
 - √ 区分 eager system-prompt、selective retrieval、tool-mediated read和not-exposed；不能把 Host 提供的注入能力误报成 policy 已选择的 retrieval。
 - √ Hermes adapter提供真实 injection boundary和context revision；RSIMem决定何时、注入哪些memory以及如何组成memory block。
 - √ 第一版固定当前 eager exposure、注入位置、格式和预算；exposure policy先做 shadow replay，再进入单独 matched ablation。
-- □ active/current turn、tool closure、schema和context budget是固定安全边界；exposure policy不能删除当前任务必需内容或伪造 memory source。
+- √ exposure decision 可接收 runtime-owned `SafetyBoundary`；schema/CAS/transaction/rollback/credential/writer 任一安全条件失效时 fail closed 为无注入 `SKIP`，并继续由固定 context/tool-closure 与 token budget 边界约束，不能伪造 memory source。
 
 测试与验收：
 
@@ -685,7 +685,7 @@ frozen system/safety/schema wrapper
 - √ exposure decision变化而formation policy不变时，audit能准确标记为 exposure intervention。
 - √ 注入前后 context revision、artifact digest和render fingerprint可重建；重启后不重复注入或丢失 active pointer。
 
-2D.3 当前实现记录：`DeterministicExposurePolicy` 与 `InjectionReceipt` 位于 `src/rsimem/memory/exposure_policy.py`；Hermes `_PromptMemoryStore.format_for_system_prompt` 记录真实 artifact IDs、context revision 和 render fingerprint，并写入 policy evidence ledger。真实 selective/tool-mediated matched ablation 尚未开放。
+2D.3 当前实现记录：`DeterministicExposurePolicy` 与 `InjectionReceipt` 位于 `src/rsimem/memory/exposure_policy.py`；Hermes `_PromptMemoryStore.format_for_system_prompt` 记录真实 artifact IDs、context revision 和 render fingerprint，并写入 policy evidence ledger。无效 `SafetyBoundary` 会在注入前返回空 `SKIP`；真实 selective/tool-mediated matched ablation 尚未开放。
 
 ### 2E：Content-Bearing Extraction Optimizer Corpus
 
