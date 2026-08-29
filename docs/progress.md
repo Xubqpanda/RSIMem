@@ -84,6 +84,8 @@ corresponding policy-decision ledger and fail closed when that ledger is absent
 or missing the referenced decision. Standard audit also checks each event's
 `runId`, `variant`, `traceId`, `taskId`, `familyId`, and `stage` against the
 comparison trace context.
+Raw lifecycle usage buckets now reject booleans and non-integer values while
+preserving provider-unknown buckets as `null`.
 
 ## Completed Work
 
