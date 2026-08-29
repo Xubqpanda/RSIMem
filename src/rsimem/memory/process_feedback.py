@@ -77,6 +77,7 @@ class ProcessEventKind(StrEnum):
 
 class ProcessEventStatus(StrEnum):
     PENDING = "pending"
+    EXECUTED = "executed"
     SUCCESS = "success"
     FAILED = "failed"
     SKIPPED = "skipped"
@@ -483,7 +484,11 @@ def audit_process_events(
             expected_revision = source_revisions.get(event.host_event_id)
             if expected_revision is not None and expected_revision != event.source_revision:
                 errors.append(f"{event.event_id}: source revision does not match host event")
-        if event.status in {ProcessEventStatus.SUCCESS, ProcessEventStatus.FAILED} and not event.execution_receipt_ids:
+        if event.status in {
+            ProcessEventStatus.EXECUTED,
+            ProcessEventStatus.SUCCESS,
+            ProcessEventStatus.FAILED,
+        } and not event.execution_receipt_ids:
             # A failed observation may be a host event with no runtime receipt;
             # it must then explain the failure explicitly rather than looking
             # like a successful execution.
