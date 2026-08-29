@@ -180,6 +180,40 @@ def test_validation_replay_store_rejects_observation_set_drift(tmp_path: Path) -
         )
 
 
+def test_validation_replay_store_rejects_split_identity_drift(tmp_path: Path) -> None:
+    split = _split()
+    observations = tuple(
+        _observation(variant, 1, ExtractionFeedbackLabel.USEFUL)
+        for variant in ExtractionValidationVariant
+    )
+    criteria = _criteria(minimum_matched_pairs=1, minimum_resolved_examples=1)
+    decision = ExtractionPromptMatchedValidator().evaluate(
+        split=split,
+        observations=observations,
+        parent_artifact_id=PARENT,
+        proposal_artifact_id=PROPOSAL,
+        criteria=criteria,
+    )
+    store = JsonExtractionValidationObservationStore(tmp_path / "observations", split=split)
+    for observation in observations:
+        store.put(observation)
+    wrong_split = ExtractionPromptValidationSplit(
+        "split.other-v1",
+        split.assignments,
+    )
+    wrong_store = JsonExtractionValidationObservationStore(
+        tmp_path / "observations", split=wrong_split
+    )
+    with pytest.raises(ValueError, match="split does not match decision"):
+        ExtractionValidationReplay().verify_store(
+            decision,
+            store=wrong_store,
+            parent_artifact_id=PARENT,
+            proposal_artifact_id=PROPOSAL,
+            criteria=criteria,
+        )
+
+
 def _criteria(**overrides) -> ExtractionAcceptanceCriteria:
     values = {
         "minimum_matched_pairs": 3,
