@@ -477,6 +477,7 @@ def audit_process_events(
     *,
     required_identity: Mapping[str, str | None] | None = None,
     policy_decision_ids: Iterable[str] = (),
+    policy_trigger_event_ids: Mapping[str, str] | None = None,
     source_revisions: Mapping[str, str] | None = None,
 ) -> tuple[str, ...]:
     """Return deterministic errors for a process corpus.
@@ -505,6 +506,10 @@ def audit_process_events(
                 errors.append(f"{event.event_id}: {field} does not match expected identity")
         if event.policy_decision_id is not None and known_decisions and event.policy_decision_id not in known_decisions:
             errors.append(f"{event.event_id}: policy decision is absent")
+        if event.policy_decision_id is not None and policy_trigger_event_ids is not None:
+            expected_host_event = policy_trigger_event_ids.get(event.policy_decision_id)
+            if expected_host_event is not None and event.host_event_id != expected_host_event:
+                errors.append(f"{event.event_id}: host event does not match policy trigger")
         if source_revisions is not None:
             expected_revision = source_revisions.get(event.host_event_id)
             if expected_revision is not None and expected_revision != event.source_revision:

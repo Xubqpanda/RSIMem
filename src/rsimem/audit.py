@@ -359,6 +359,13 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
                     for item in _read_jsonl(policy_path)
                     if isinstance(item.get("decisionId"), str)
                 } if policy_path.exists() else set()
+                policy_triggers = {
+                    str(item["decisionId"]): str(item["triggerEventId"])
+                    for item in _read_jsonl(policy_path)
+                    if isinstance(item.get("decisionId"), str)
+                    and isinstance(item.get("triggerEventId"), str)
+                    and item.get("triggerEventId")
+                } if policy_path.exists() else {}
                 process_errors = audit_process_events(
                     process_events,
                     required_identity={
@@ -370,6 +377,7 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
                         "stage": context.get("stage"),
                     },
                     policy_decision_ids=policy_ids,
+                    policy_trigger_event_ids=policy_triggers,
                 )
                 if any(
                     event.policy_decision_id is not None
