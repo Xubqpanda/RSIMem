@@ -280,7 +280,7 @@ def census_process_signal_cases(cases: Iterable[ProcessSignalCase]) -> ProcessSi
         if len(labels) > 1:
             conflicts += 1
     return ProcessSignalCaseCensus(
-        physical_observation_count=len(values),
+        physical_observation_count=len(physical_seen),
         logical_case_count=len(by_logical),
         status_counts=statuses,
         conflict_case_count=conflicts,
