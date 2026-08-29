@@ -808,7 +808,13 @@ class MemoryExposurePolicy(Protocol):
     @property
     def artifact_identity(self) -> PolicyArtifactIdentity: ...
 
-    def decide_exposure(self, event: TriggerEvent, artifact_ids: Sequence[str], budget_tokens: int | None = None) -> ExposureDecision: ...
+    def decide_exposure(
+        self,
+        event: TriggerEvent,
+        artifact_ids: Sequence[str],
+        budget_tokens: int | None = None,
+        safety: SafetyBoundary | None = None,
+    ) -> ExposureDecision: ...
 
 
 @dataclass(frozen=True, slots=True)

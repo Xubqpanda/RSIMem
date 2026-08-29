@@ -14,6 +14,7 @@ from .policy_contracts import (
     PolicyArtifactIdentity,
     PolicyArtifactKind,
     PolicyLayer,
+    SafetyBoundary,
     TriggerEvent,
     content_digest,
 )
@@ -104,6 +105,7 @@ class DeterministicExposurePolicy:
         *,
         artifact_token_counts: Sequence[int] | None = None,
         budget_tokens: int | None = None,
+        safety: SafetyBoundary | None = None,
     ) -> ExposureDecision:
         if budget_tokens is not None and (type(budget_tokens) is not int or budget_tokens < 0):
             raise ValueError("exposure budget must be non-negative")
@@ -117,6 +119,30 @@ class DeterministicExposurePolicy:
         else:
             token_counts = (0,) * len(ids)
         limit = budget_tokens if budget_tokens is not None else self.config.max_tokens
+        if safety is not None and not safety.safe:
+            return ExposureDecision.create(
+                policy_version=self.config.policy_version,
+                source_revision=event.source_revision,
+                input_payload={
+                    "event_id": event.event_id,
+                    "artifact_ids": list(ids),
+                    "safety_digest": safety.digest,
+                },
+                output_payload={
+                    "selected": [],
+                    "skipped": list(ids),
+                    "reason": "safety_boundary_invalid",
+                },
+                action=DecisionAction.SKIP,
+                execution_status=ExecutionStatus.SKIPPED,
+                reason_codes=("safety_boundary_invalid",),
+                lineage_id=f"lineage.{event.event_id}",
+                trigger_event_id=event.event_id,
+                exposure_mode=ExposureMode.NOT_EXPOSED,
+                selected_artifact_ids=(),
+                ordering=(),
+                budget_tokens=limit,
+            )
         selected: list[str] = []
         used = 0
         skipped: list[str] = []
