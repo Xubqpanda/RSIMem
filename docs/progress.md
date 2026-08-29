@@ -16,6 +16,10 @@ RSIMem can run the vendored PAST-Bench with Hermes and GPT-Luna, account for eve
 
 The typed memory runtime is connected to the PAST-Bench Hermes execution path behind explicit opt-in modes. Direct native remains the default. Static Mem0-flat semantic writeback is available through live experiment configuration. The older adaptive utility/threshold mode remains only as replayable infrastructure; it is not the extraction-prompt method. The active implementation scope is semantic-first over Hermes native semantic storage. Episodic and procedural adapters remain verified read surfaces, but their policy implementations are deferred until methods are selected. The current research milestone is deterministic/shadow feasibility for the six host-neutral policy layers, not a live adaptive effect claim.
 
+Raw extraction-validation observations now have a separate crash-safe,
+frozen-split-bound store, so prompt-quality decisions remain reconstructible
+from persisted observations rather than depending on a derived decision file.
+
 The Hermes, static semantic writeback, operation graph, feedback store, and
 activation/rollback foundations are complete. The former Phase 2J/2K work is
 complete only as legacy retrieval-threshold infrastructure; extraction-prompt
