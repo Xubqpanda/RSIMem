@@ -97,3 +97,10 @@ and candidate artifact identity、training corpus digest、actionable evidence
 IDs 和 reason codes；`NO_PROPOSAL` 明确没有 candidate。proposal 写入前会
 通过 `project_optimizer_result()` 的 parent/corpus/ownership/schema gate，因而
 不会把一个未验证的 optimizer-result.json 当成 N+1 intervention。
+
+`tests/test_policy_feasibility_nplus1.py` 进一步把 proposal 接到
+`ExtractionCandidateStaticValidator`、deterministic extraction suite、offline
+quality gate 和 `JsonExtractionPolicyStore` 的 restart reload。验证结果是
+`ACCEPTED_FOR_MATCHED_TRIAL`，candidate 仍保持 `PROPOSAL` 状态，未被本阶段
+提前切换为 ACTIVE；真实 future-task intervention 与 matched effect 仍待后续
+阶段完成。
