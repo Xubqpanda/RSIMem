@@ -267,6 +267,8 @@ def test_frozen_config_and_nontraining_requests_fail_before_completion() -> None
     assert config.system_instruction_digest == EXTRACTION_OPTIMIZER_SYSTEM_DIGEST
     assert config.temperature == 0
     assert config.model_id == "gpt-5.6-luna"
+    assert "abstract and reusable" in EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION
+    assert "concrete names" in EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION
     with pytest.raises(ValueError, match="model ID"):
         replace(config, model_id="other-model")
     with pytest.raises(ValueError, match="temperature"):

@@ -17,11 +17,11 @@ from .extraction_policy_artifact import ExtractionPromptPolicyArtifact
 from .prompt_components import canonical_json, content_digest, text_digest
 
 
-EXTRACTION_OPTIMIZER_SCHEMA_VERSION = 1
-EXTRACTION_OPTIMIZER_CONFIG_SCHEMA = "extraction-prompt-optimizer-config-v1"
-EXTRACTION_OPTIMIZER_REQUEST_SCHEMA = "extraction-prompt-optimizer-request-v1"
-EXTRACTION_OPTIMIZER_COMPLETION_SCHEMA = "extraction-prompt-optimizer-completion-v1"
-EXTRACTION_OPTIMIZER_ID = "extraction-prompt-rule-editor-v1"
+EXTRACTION_OPTIMIZER_SCHEMA_VERSION = 2
+EXTRACTION_OPTIMIZER_CONFIG_SCHEMA = "extraction-prompt-optimizer-config-v2"
+EXTRACTION_OPTIMIZER_REQUEST_SCHEMA = "extraction-prompt-optimizer-request-v2"
+EXTRACTION_OPTIMIZER_COMPLETION_SCHEMA = "extraction-prompt-optimizer-completion-v2"
+EXTRACTION_OPTIMIZER_ID = "extraction-prompt-rule-editor-v2"
 EXTRACTION_OPTIMIZER_MODEL_ID = "gpt-5.6-luna"
 EXTRACTION_OPTIMIZER_MODEL_PROFILE = "gpt-5.6-luna-optimizer-v1"
 EXTRACTION_OPTIMIZER_TEMPERATURE = 0.0
@@ -35,6 +35,7 @@ Harmful and missed examples may guide edits only when component_ownership is ext
 Unresolved and censored examples are context, not negative labels.
 Improve future resolved useful proportion while preserving harmful rate, non-empty coverage, empty rate, and high-confidence missed rate.
 Do not use costs, task scores, graders, answer keys, hidden expectations, benchmark names, family-specific shortcuts, credentials, or future-test evidence.
+Rule text must be abstract and reusable across tasks. Never repeat or mention concrete names, dates, IDs, quoted strings, domain-specific values, or source/fact phrases from the evidence; express a generic extraction principle instead.
 Return exactly one JSON object matching the frozen output schema. Return either NO_PROPOSAL with no edits, or PROPOSE with structured rule edits. Never return a compiled policy body or wire prompt."""
 
 EXTRACTION_OPTIMIZER_INPUT_SCHEMA = {
