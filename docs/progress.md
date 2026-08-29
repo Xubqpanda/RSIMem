@@ -76,6 +76,9 @@ The same report includes a deduplicated process-signal census: the primary
 attempt still emitted all six policy-stage events, while the backup emitted
 only retrieval, exposure, and task-failure events. This diagnostic is not a
 formal training or validation batch.
+The reusable `rsimem.provider_probe` entry now performs a bounded completion
+check without exposing credentials or response content; it reports endpoint,
+content, and usage availability only and remains outside benchmark accounting.
 
 The PAST-Bench Hermes adapter now transports only content-free process-corpus
 identity (`event_ids` and a stable digest) in `StepResponse`; it never exposes
