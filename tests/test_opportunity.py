@@ -7,6 +7,7 @@ import pytest
 
 from rsimem.memory.opportunity import (
     ApplicationOpportunitySchema,
+    JsonApplicationOpportunitySchemaRegistry,
     JsonOpportunityEvidenceLog,
     OpportunityEvidence,
     OpportunityResolutionStatus,
@@ -93,6 +94,74 @@ def test_application_schema_cannot_be_relabelled_as_runtime_observation() -> Non
     )
     with pytest.raises(ValueError, match="application-schema opportunity"):
         replace(evidence, evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION)
+
+
+def test_application_schema_replay_requires_trusted_registry(tmp_path) -> None:
+    schema = ApplicationOpportunitySchema.create(
+        schema_id="resource-policy",
+        version="v1",
+        requirement_ids=("resource.share.recipient_policy",),
+    )
+    evidence = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.APPLICATION_SCHEMA,
+        semantic_requirement="resource.share.recipient_policy",
+        observation_time="2026-08-30T01:02:03Z",
+        operation_id="op.application-schema.registry",
+        provenance_id="provenance.application.registry",
+        source_payload={"schema_event": "published"},
+        application_schema=schema,
+    )
+    payload = json.loads(json.dumps(evidence.payload()))
+    with pytest.raises(ValueError, match="malformed opportunity evidence"):
+        OpportunityEvidence.from_payload(payload)
+    assert OpportunityEvidence.from_payload(
+        payload,
+        application_schema=schema,
+    ) == evidence
+
+    registry = JsonApplicationOpportunitySchemaRegistry(
+        tmp_path / "application-schemas.jsonl"
+    )
+    assert registry.register(schema) is True
+    assert registry.register(schema) is False
+    assert JsonApplicationOpportunitySchemaRegistry(
+        tmp_path / "application-schemas.jsonl"
+    ).records() == (schema,)
+    conflicting = ApplicationOpportunitySchema.create(
+        schema_id="resource-policy",
+        version="v1",
+        requirement_ids=("resource.delete.confirmation",),
+    )
+    with pytest.raises(ValueError, match="conflicting application opportunity schema"):
+        registry.register(conflicting)
+
+    evidence_log_path = tmp_path / "opportunities.jsonl"
+    evidence_log = JsonOpportunityEvidenceLog(
+        evidence_log_path,
+        schema_registry=registry,
+    )
+    assert evidence_log.append(evidence) is True
+    assert JsonOpportunityEvidenceLog(
+        evidence_log_path,
+        schema_registry=JsonApplicationOpportunitySchemaRegistry(
+            tmp_path / "application-schemas.jsonl"
+        ),
+    ).records() == (evidence,)
+    with pytest.raises(ValueError, match="malformed opportunity evidence"):
+        JsonOpportunityEvidenceLog(evidence_log_path)
+
+
+def test_application_schema_create_rejects_untyped_contract() -> None:
+    with pytest.raises(TypeError, match="wrong type"):
+        OpportunityEvidence.create(
+            source_surface=OpportunitySurface.APPLICATION_SCHEMA,
+            semantic_requirement="resource.share.recipient_policy",
+            observation_time="2026-08-30T01:02:03Z",
+            operation_id="op.application-schema.wrong-type",
+            provenance_id="provenance.application.wrong-type",
+            source_payload={"schema_event": "published"},
+            application_schema="resource-policy",  # type: ignore[arg-type]
+        )
 
 
 def test_opportunity_resolution_distinguishes_confounded_censored_and_absent() -> None:

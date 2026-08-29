@@ -27,8 +27,8 @@ from .evidence_planes import (
 )
 
 
-OPPORTUNITY_SCHEMA_VERSION = 1
-OPPORTUNITY_SCHEMA = "rsimem-opportunity-evidence-v1"
+OPPORTUNITY_SCHEMA_VERSION = 2
+OPPORTUNITY_SCHEMA = "rsimem-opportunity-evidence-v2"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
 _REQUIREMENT = re.compile(r"^[a-z][a-z0-9_.:-]{0,127}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -196,6 +196,117 @@ class ApplicationOpportunitySchema:
             raise ValueError("malformed application opportunity schema") from exc
 
 
+class JsonApplicationOpportunitySchemaRegistry:
+    """Append-only registry for trusted application opportunity schemas.
+
+    An opportunity evidence payload intentionally carries only the schema ID,
+    version and digest.  The registry is the ownership boundary that binds
+    those strings to a previously published, immutable application contract during
+    replay.  A schema ID/version pair may be registered repeatedly only when
+    the canonical payload is identical; a conflicting replacement fails
+    closed.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+        self._records: dict[tuple[str, str], str] = {}
+        self._load()
+
+    @staticmethod
+    def _canonical(value: Mapping[str, object]) -> str:
+        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+    @staticmethod
+    def _key(schema: ApplicationOpportunitySchema) -> tuple[str, str]:
+        return (schema.schema_id, schema.version)
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        for line_number, line in enumerate(
+            self.path.read_text(encoding="utf-8").splitlines(), 1
+        ):
+            if not line.strip():
+                continue
+            try:
+                schema = ApplicationOpportunitySchema.from_payload(json.loads(line))
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"malformed application opportunity schema at line {line_number}"
+                ) from exc
+            canonical = self._canonical(schema.payload())
+            key = self._key(schema)
+            previous = self._records.get(key)
+            if previous is not None and previous != canonical:
+                raise ValueError("conflicting application opportunity schema")
+            self._records[key] = canonical
+
+    def records(self) -> tuple[ApplicationOpportunitySchema, ...]:
+        """Return the canonical registry contents in stable key order."""
+
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
+            try:
+                self._records.clear()
+                self._load()
+                return tuple(
+                    ApplicationOpportunitySchema.from_payload(json.loads(value))
+                    for _, value in sorted(self._records.items())
+                )
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def register(self, schema: ApplicationOpportunitySchema) -> bool:
+        """Persist ``schema`` once; return ``False`` for an exact replay."""
+
+        if not isinstance(schema, ApplicationOpportunitySchema):
+            raise TypeError("schema registry accepts ApplicationOpportunitySchema only")
+        serialized = self._canonical(schema.payload())
+        key = self._key(schema)
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                self._records.clear()
+                self._load()
+                previous = self._records.get(key)
+                if previous is not None:
+                    if previous != serialized:
+                        raise ValueError("conflicting application opportunity schema")
+                    return False
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    handle.write(serialized + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                self._records[key] = serialized
+                return True
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def resolve(
+        self,
+        schema_id: str,
+        version: str,
+        schema_digest: str,
+    ) -> ApplicationOpportunitySchema:
+        """Resolve an identity and reject unknown or conflicting contracts."""
+
+        _id(schema_id, "application opportunity schema ID")
+        _id(version, "application opportunity schema version")
+        _digest(schema_digest, "application opportunity schema digest")
+        self.records()
+        serialized = self._records.get((schema_id, version))
+        if serialized is None:
+            raise ValueError("unknown application opportunity schema")
+        schema = ApplicationOpportunitySchema.from_payload(json.loads(serialized))
+        if schema.schema_digest != schema_digest:
+            raise ValueError("application opportunity schema digest conflict")
+        return schema
+
+
 @dataclass(frozen=True, slots=True)
 class OpportunityEvidence:
     evidence_id: str
@@ -206,6 +317,7 @@ class OpportunityEvidence:
     provenance_id: str
     source_digest: str
     application_schema_id: str | None = None
+    application_schema_version: str | None = None
     application_schema_digest: str | None = None
     schema_version: int = OPPORTUNITY_SCHEMA_VERSION
     evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
@@ -235,10 +347,27 @@ class OpportunityEvidence:
         _timestamp(self.observation_time, "opportunity observation time")
         _digest(self.source_digest, "opportunity source digest")
         if self.source_surface == OpportunitySurface.APPLICATION_SCHEMA:
-            if self.application_schema_id is None or self.application_schema_digest is None:
+            if (
+                self.application_schema_id is None
+                or self.application_schema_version is None
+                or self.application_schema_digest is None
+            ):
                 raise ValueError("application opportunity requires schema identity")
+        elif any(
+            value is not None
+            for value in (
+                self.application_schema_id,
+                self.application_schema_version,
+                self.application_schema_digest,
+            )
+        ):
+            raise ValueError(
+                "runtime opportunity cannot carry application schema identity"
+            )
         if self.application_schema_id is not None:
             _id(self.application_schema_id, "application opportunity schema ID")
+        if self.application_schema_version is not None:
+            _id(self.application_schema_version, "application opportunity schema version")
         if self.application_schema_digest is not None:
             _digest(self.application_schema_digest, "application opportunity schema digest")
         expected = f"opportunity-evidence.{self._identity_digest()[:40]}"
@@ -255,6 +384,7 @@ class OpportunityEvidence:
             "provenance_id": self.provenance_id,
             "source_digest": self.source_digest,
             "application_schema_id": self.application_schema_id,
+            "application_schema_version": self.application_schema_version,
             "application_schema_digest": self.application_schema_digest,
             "evidence_plane": self.evidence_plane.value,
             "evidence_source": self.evidence_source.value,
@@ -276,6 +406,10 @@ class OpportunityEvidence:
         application_schema: ApplicationOpportunitySchema | None = None,
     ) -> "OpportunityEvidence":
         surface = OpportunitySurface(source_surface)
+        if application_schema is not None and not isinstance(
+            application_schema, ApplicationOpportunitySchema
+        ):
+            raise TypeError("application opportunity schema has the wrong type")
         # Even deployment-visible payloads are untrusted at this boundary:
         # reject benchmark/grader metadata before deriving the source digest.
         validate_pure_process_payload(source_payload)
@@ -295,6 +429,7 @@ class OpportunityEvidence:
             "provenance_id": provenance_id,
             "source_digest": source_digest,
             "application_schema_id": application_schema.schema_id if application_schema else None,
+            "application_schema_version": application_schema.version if application_schema else None,
             "application_schema_digest": application_schema.schema_digest if application_schema else None,
             "schema_version": OPPORTUNITY_SCHEMA_VERSION,
             "evidence_plane": EvidencePlane.PURE_PROCESS,
@@ -313,6 +448,7 @@ class OpportunityEvidence:
             "provenance_id": values["provenance_id"],
             "source_digest": source_digest,
             "application_schema_id": values["application_schema_id"],
+            "application_schema_version": values["application_schema_version"],
             "application_schema_digest": values["application_schema_digest"],
             "evidence_plane": EvidencePlane.PURE_PROCESS.value,
             "evidence_source": values["evidence_source"].value,
@@ -330,25 +466,49 @@ class OpportunityEvidence:
         }
 
     @classmethod
-    def from_payload(cls, value: object) -> "OpportunityEvidence":
+    def from_payload(
+        cls,
+        value: object,
+        *,
+        application_schema: ApplicationOpportunitySchema | None = None,
+    ) -> "OpportunityEvidence":
         fields = {
             "schema", "schema_version", "evidence_id", "source_surface",
             "semantic_requirement", "observation_time", "operation_id",
             "provenance_id", "source_digest", "application_schema_id",
-            "application_schema_digest", "evidence_plane", "evidence_source",
+            "application_schema_version", "application_schema_digest",
+            "evidence_plane", "evidence_source",
         }
         if not isinstance(value, Mapping) or set(value) != fields or value["schema"] != OPPORTUNITY_SCHEMA:
             raise ValueError("malformed opportunity evidence")
         try:
+            surface = OpportunitySurface(value["source_surface"])
+            if surface is OpportunitySurface.APPLICATION_SCHEMA:
+                if application_schema is None:
+                    raise ValueError(
+                        "application opportunity schema registry is required"
+                    )
+                if (
+                    application_schema.schema_id != value["application_schema_id"]
+                    or application_schema.version
+                    != value["application_schema_version"]
+                    or application_schema.schema_digest
+                    != value["application_schema_digest"]
+                    or not application_schema.permits(value["semantic_requirement"])
+                ):
+                    raise ValueError(
+                        "application opportunity schema does not match evidence"
+                    )
             return cls(
                 evidence_id=value["evidence_id"],
-                source_surface=OpportunitySurface(value["source_surface"]),
+                source_surface=surface,
                 semantic_requirement=value["semantic_requirement"],
                 observation_time=value["observation_time"],
                 operation_id=value["operation_id"],
                 provenance_id=value["provenance_id"],
                 source_digest=value["source_digest"],
                 application_schema_id=value["application_schema_id"],
+                application_schema_version=value["application_schema_version"],
                 application_schema_digest=value["application_schema_digest"],
                 schema_version=value["schema_version"],
                 evidence_plane=EvidencePlane(value["evidence_plane"]),
@@ -366,9 +526,19 @@ class JsonOpportunityEvidenceLog:
     not accept benchmark-family labels or final-evaluation fields.
     """
 
-    def __init__(self, path: Path) -> None:
+    def __init__(
+        self,
+        path: Path,
+        *,
+        schema_registry: JsonApplicationOpportunitySchemaRegistry | None = None,
+    ) -> None:
         self.path = Path(path).expanduser().resolve()
         self.lock_path = self.path.with_name(self.path.name + ".lock")
+        if schema_registry is not None and not isinstance(
+            schema_registry, JsonApplicationOpportunitySchemaRegistry
+        ):
+            raise TypeError("opportunity log schema registry has the wrong type")
+        self.schema_registry = schema_registry
         self._records: dict[str, str] = {}
         self._load()
 
@@ -383,7 +553,26 @@ class JsonOpportunityEvidenceLog:
             if not line.strip():
                 continue
             try:
-                evidence = OpportunityEvidence.from_payload(json.loads(line))
+                payload = json.loads(line)
+                application_schema = None
+                if (
+                    isinstance(payload, Mapping)
+                    and payload.get("source_surface")
+                    == OpportunitySurface.APPLICATION_SCHEMA.value
+                ):
+                    if self.schema_registry is None:
+                        raise ValueError(
+                            "application opportunity schema registry is required"
+                        )
+                    application_schema = self.schema_registry.resolve(
+                        payload["application_schema_id"],
+                        payload["application_schema_version"],
+                        payload["application_schema_digest"],
+                    )
+                evidence = OpportunityEvidence.from_payload(
+                    payload,
+                    application_schema=application_schema,
+                )
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
                 raise ValueError(
                     f"malformed opportunity evidence at line {line_number}"
@@ -402,10 +591,30 @@ class JsonOpportunityEvidenceLog:
                 # observe records written since construction.
                 self._records.clear()
                 self._load()
-                return tuple(
-                    OpportunityEvidence.from_payload(json.loads(value))
-                    for _, value in sorted(self._records.items())
-                )
+                result = []
+                for _, value in sorted(self._records.items()):
+                    payload = json.loads(value)
+                    application_schema = None
+                    if (
+                        payload.get("source_surface")
+                        == OpportunitySurface.APPLICATION_SCHEMA.value
+                    ):
+                        if self.schema_registry is None:
+                            raise ValueError(
+                                "application opportunity schema registry is required"
+                            )
+                        application_schema = self.schema_registry.resolve(
+                            payload["application_schema_id"],
+                            payload["application_schema_version"],
+                            payload["application_schema_digest"],
+                        )
+                    result.append(
+                        OpportunityEvidence.from_payload(
+                            payload,
+                            application_schema=application_schema,
+                        )
+                    )
+                return tuple(result)
             finally:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
@@ -508,6 +717,7 @@ def resolve_opportunity(
 
 __all__ = [
     "ApplicationOpportunitySchema",
+    "JsonApplicationOpportunitySchemaRegistry",
     "OPPORTUNITY_SCHEMA",
     "OpportunityEvidence",
     "JsonOpportunityEvidenceLog",
