@@ -3584,6 +3584,7 @@ def main(argv: list[str] | None = None) -> None:
             "disabled",
             "sm01_tsv_v1",
             "sm02_boundary_v1",
+            "sm03_fact_correction_v1",
             "sm05_normalized_tsv_v1",
         ],
         default=None,
