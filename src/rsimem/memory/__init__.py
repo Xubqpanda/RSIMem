@@ -123,6 +123,7 @@ from .process_corpus import (
     census_process_events,
     ensure_process_corpus_has_no_evaluation_fields,
 )
+from .extraction_prompt_validation import JsonExtractionValidationObservationStore
 
 __all__ = [
     "MemoryAccessMode",
@@ -218,6 +219,7 @@ __all__ = [
     "ProcessEventKind",
     "ProcessEventStatus",
     "audit_process_events",
+    "JsonExtractionValidationObservationStore",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
