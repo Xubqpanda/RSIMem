@@ -141,6 +141,14 @@ from .artifact_set import (
     ArtifactSetSemanticBinding,
     resolve_artifact_set,
 )
+from .tool_exact_join import (
+    TOOL_EXACT_JOIN_SCHEMA,
+    TOOL_EXACT_JOIN_SCHEMA_VERSION,
+    ToolCallResultJoin,
+    ToolJoinResolution,
+    ToolJoinResolutionStatus,
+    resolve_tool_call_result,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -250,6 +258,12 @@ __all__ = [
     "ArtifactSetResolutionStatus",
     "ArtifactSetSemanticBinding",
     "resolve_artifact_set",
+    "TOOL_EXACT_JOIN_SCHEMA",
+    "TOOL_EXACT_JOIN_SCHEMA_VERSION",
+    "ToolCallResultJoin",
+    "ToolJoinResolution",
+    "ToolJoinResolutionStatus",
+    "resolve_tool_call_result",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
