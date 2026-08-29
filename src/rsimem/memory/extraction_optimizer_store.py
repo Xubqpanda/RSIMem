@@ -17,6 +17,7 @@ from .extraction_optimizer_corpus import (
     OptimizerCorpusRetention,
     OptimizerCorpusSplit,
 )
+from .evidence_planes import EvidencePlane, require_optimizer_plane
 from .prompt_components import canonical_json
 
 
@@ -117,7 +118,12 @@ class JsonExtractionOptimizerCorpusStore:
     def read_for_optimizer(self) -> ExtractionOptimizerCorpus:
         if self.split != OptimizerCorpusSplit.TRAIN:
             raise PermissionError("optimizer can read only the training corpus")
-        return self._read_required()
+        corpus = self._read_required()
+        planes = {EvidencePlane(example.evidence_plane) for example in corpus.examples}
+        if len(planes) != 1:
+            raise ValueError("optimizer corpus mixes evidence planes")
+        require_optimizer_plane(next(iter(planes)))
+        return corpus
 
     def read_for_validation(self) -> ExtractionOptimizerCorpus:
         if self.split != OptimizerCorpusSplit.VALIDATION:

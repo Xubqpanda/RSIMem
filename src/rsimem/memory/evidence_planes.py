@@ -41,7 +41,8 @@ def validate_plane_source(
 _FORBIDDEN_PROCESS_KEYS = frozenset({
     "family_id", "familyId", "stage", "grader", "answer_key", "answerKey",
     "hidden_expectation", "hiddenExpectation", "official_score", "officialScore",
-    "task_score", "taskScore",
+    "official_evaluation", "officialEvaluation", "task_score", "taskScore",
+    "score", "answer", "judge", "expectation",
 })
 
 

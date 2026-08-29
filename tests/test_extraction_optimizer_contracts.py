@@ -506,6 +506,45 @@ def test_low_sample_no_signal_and_conflict_do_not_call_optimizer_client() -> Non
     assert client.requests == []
 
 
+def test_optimizer_proposal_rejects_benchmark_audit_before_model_call() -> None:
+    baseline = _corpus()
+    diagnostic_examples = tuple(
+        ExtractionOptimizerCorpusExample.create(
+            primary_unit_id=example.primary_unit_id,
+            level=example.level,
+            primary=example.primary,
+            feedback_fact_id=example.feedback_fact_id,
+            feedback_semantic_key=example.feedback_semantic_key,
+            feedback_artifact_ids=example.feedback_artifact_ids,
+            exposure_mode=example.exposure_mode,
+            label=example.label,
+            attribution_confidence=example.attribution_confidence,
+            reason_codes=example.reason_codes,
+            component_ownership=example.component_ownership,
+            audit_join=example.audit_join,
+            source_messages=example.source_messages,
+            extracted_facts=example.extracted_facts,
+            delayed_evidence=example.delayed_evidence,
+            evidence_plane=EvidencePlane.BENCHMARK_AUDIT,
+        )
+        for example in baseline.examples
+    )
+    diagnostic = ExtractionOptimizerCorpus.create(
+        batch_id=baseline.batch_id,
+        attempt_id=baseline.attempt_id,
+        split=baseline.split,
+        observation_cutoff=baseline.observation_cutoff,
+        retention=baseline.retention,
+        examples=diagnostic_examples,
+    )
+    client = CapturedExtractionOptimizerClient(
+        '{"decision":"NO_PROPOSAL","reason_codes":["x"],"edits":[]}'
+    )
+    with pytest.raises(ValueError, match="optimizer requires pure_process"):
+        ExtractionPromptOptimizer(client).propose(_parent(), diagnostic)
+    assert client.requests == []
+
+
 def test_optimizer_revocation_gate_runs_before_provider_call(tmp_path) -> None:
     parent = _parent()
     registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
