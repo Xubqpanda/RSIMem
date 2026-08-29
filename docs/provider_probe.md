@@ -21,3 +21,8 @@ status, and every unsuccessful result must carry an explicit error code.
 An `empty_content`, `invalid_json`, `http_error`, or `transport_error` result
 must not be used to start a formal batch.  Probe output is provider diagnostics,
 not task feedback or optimizer input.
+
+The formal feedback and matched launchers run this probe automatically after
+manifest/preflight registration and before the first PAST-Bench task.  The
+content-free result is saved as `provider_probe.json` in the batch directory;
+failed probes leave the registered attempt without starting benchmark work.

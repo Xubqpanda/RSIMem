@@ -82,6 +82,9 @@ content, and usage availability only and remains outside benchmark accounting.
 Its result contract rejects inconsistent manually constructed states, so a
 successful probe always has a 2xx status and a failed probe always has an
 explicit diagnostic code.
+Both formal extraction launchers now run the probe after manifest/preflight
+registration and before the first benchmark task, persisting only the safe
+`provider_probe.json` result and stopping early on failure.
 
 The PAST-Bench Hermes adapter now transports only content-free process-corpus
 identity (`event_ids` and a stable digest) in `StepResponse`; it never exposes
