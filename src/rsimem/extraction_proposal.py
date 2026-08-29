@@ -23,6 +23,7 @@ from .memory.extraction_prompt_optimizer import (
 )
 from .memory.policy_feasibility import project_optimizer_result
 from .memory.prompt_components import canonical_json, content_digest
+from .memory.revocation import JsonRevocationRegistry
 from .memory_systems.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT,
     MEM0_FLAT_EXTRACTION_SLOT_ID,
@@ -113,6 +114,7 @@ def prepare_extraction_proposal(
     corpus_store: JsonExtractionOptimizerCorpusStore,
     output_root: Path,
     client,
+    revocation_registry: JsonRevocationRegistry | None = None,
 ) -> ExtractionOptimizerResult:
     corpus = corpus_store.read_for_optimizer()
     parent = Mem0FlatPromptAdapter().export_root_policy_artifact(
@@ -122,6 +124,7 @@ def prepare_extraction_proposal(
         result = ExtractionPromptOptimizer(
             client,
             config=FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+            revocation_registry=revocation_registry,
         ).propose(parent, corpus)
     except OptimizerCompletionValidationError as exc:
         # Persist the rejected completion metadata and usage before building
@@ -175,6 +178,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--api-key-file", type=Path)
     parser.add_argument("--base-url", default="https://coding.tu-zi.com/v1")
+    parser.add_argument(
+        "--revocation-registry",
+        type=Path,
+        help="append-only artifact revocation registry required for production proposals",
+    )
     return parser
 
 
@@ -184,6 +192,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.api_key_file,
         args.base_url,
     )
+    revocation_registry = None
+    if args.revocation_registry is not None:
+        revocation_registry = JsonRevocationRegistry(args.revocation_registry)
     store = JsonExtractionOptimizerCorpusStore(
         args.corpus_attempt_root,
         owner_controlled_root=args.owner_controlled_root,
@@ -194,6 +205,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         corpus_store=store,
         output_root=args.output,
         client=client,
+        revocation_registry=revocation_registry,
     )
     print(canonical_json({
         "resultId": result.result_id,

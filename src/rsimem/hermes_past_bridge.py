@@ -1313,6 +1313,7 @@ class HermesPastBenchBridge:
         messages = tuple(value for value in raw_messages if isinstance(value, Mapping))
         calls: dict[str, tuple[str, str, str, str]] = {}
         call_counts: dict[str, int] = {}
+        duplicate_call_ids: set[str] = set()
         emitted_result_ids: set[str] = set()
         joins: list[ToolCallResultJoin] = []
         host_event_id = self._last_host_event_id or "event.tool-observation"
@@ -1333,6 +1334,8 @@ class HermesPastBenchBridge:
                 raw_call_id = str(call.get("id") or f"tool-call-{ordinal}")
                 count = call_counts.get(raw_call_id, 0)
                 call_counts[raw_call_id] = count + 1
+                if count:
+                    duplicate_call_ids.add(raw_call_id)
                 retry_identity = (
                     "retry."
                     + hashlib.sha256(
@@ -1429,6 +1432,7 @@ class HermesPastBenchBridge:
                 call_receipt_id=call_receipt,
                 result_receipt_id="receipt.tool-result."
                 + hashlib.sha256(result_id.encode("utf-8")).hexdigest()[:24],
+                duplicate_call=raw_call_id in duplicate_call_ids,
                 duplicate_result=duplicate_result,
             ))
         represented_calls = {join.call_id for join in joins if join.call_present}
@@ -1453,6 +1457,7 @@ class HermesPastBenchBridge:
                 call_receipt_id=call_receipt,
                 call_present=True,
                 result_present=False,
+                duplicate_call=raw_call_id in duplicate_call_ids,
             ))
         for join in joins:
             previous = self._tool_call_result_joins.get(join.join_id)

@@ -106,6 +106,26 @@ def test_operation_graph_proves_retrieval_injection_use_outcome_chain() -> None:
     assert result.reason_code == "operation_join_invalid"
 
 
+def test_operation_graph_rejects_cross_task_chain() -> None:
+    graph = _operation_graph()
+    cross_task = OperationGraph(
+        graph.artifacts,
+        tuple(
+            replace(
+                item,
+                context=replace(item.context, task_id="task.other-v1"),
+            )
+            if item.operation_id == "op.downstream.v1"
+            else item
+            for item in graph.operations
+        ),
+        graph.mutations,
+    )
+    result = resolve_memory_use(_evidence(), operation_graph=cross_task)
+    assert result.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert result.reason_code == "operation_join_invalid"
+
+
 def test_exposure_and_behavioral_consistency_do_not_become_use() -> None:
     exposed = _evidence(downstream_operation_id=None, used_artifact_ids=())
     result = resolve_memory_use(exposed)
