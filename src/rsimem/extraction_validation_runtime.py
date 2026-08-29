@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
 
 from .memory.extraction_offline_validation import (
+    CandidateStaticSafetyReport,
+    DeterministicExtractionSuiteReport,
     ExtractionOfflineDecisionStatus,
     ExtractionOfflineValidationDecision,
 )
@@ -37,6 +39,11 @@ EXTRACTION_PRODUCTION_SCOPE = "production"
 EXTRACTION_TRIAL_CONFIG_FILE = "extraction-matched-trial.json"
 EXTRACTION_TRIAL_POLICY_STORE_FILE = "extraction-trial-policies.json"
 EXTRACTION_TRIAL_OFFLINE_DECISION_FILE = "offline-validation-decision.json"
+EXTRACTION_OFFLINE_VALIDATION_SCHEMA_VERSION = 1
+EXTRACTION_OFFLINE_VALIDATION_SCHEMA = "extraction-offline-validation-runtime-v1"
+EXTRACTION_OFFLINE_VALIDATION_SCOPE = "offline_validation_only"
+EXTRACTION_OFFLINE_CONFIG_FILE = "extraction-offline-validation.json"
+EXTRACTION_OFFLINE_CANDIDATE_FILE = "candidate-artifact.json"
 _ALLOWED_RUNTIME_SCOPES = {
     EXTRACTION_MATCHED_TRIAL_SCOPE,
     EXTRACTION_PRODUCTION_SCOPE,
@@ -84,6 +91,7 @@ def _write_immutable_json(path: Path, value: object) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, path)
+        os.chmod(path, 0o600)
         directory = os.open(path.parent, os.O_RDONLY)
         try:
             os.fsync(directory)
@@ -168,6 +176,192 @@ class ResolvedExtractionMatchedTrialRuntime:
             "policyStoreDigest": _file_digest(self.policy_store_path),
             "offlineDecisionDigest": _file_digest(self.offline_decision_path),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedExtractionOfflineValidationRuntime:
+    """Candidate binding used only to collect independent offline observations.
+
+    This bundle deliberately has no offline decision and no ACTIVE policy
+    pointer.  It is therefore usable to run a candidate against a held-out
+    family, but cannot satisfy the matched-trial or production loader.
+    """
+
+    config_path: Path
+    candidate_artifact_path: Path
+    validation_id: str
+    parent: ExtractionPromptPolicyArtifact
+    candidate: ExtractionPromptPolicyArtifact
+    static_safety_report_id: str
+    deterministic_suite_report_id: str
+
+    def profile(self) -> dict[str, object]:
+        return {
+            "schemaVersion": EXTRACTION_OFFLINE_VALIDATION_SCHEMA_VERSION,
+            "preparation": "extraction_offline_validation_store",
+            "deploymentScope": EXTRACTION_OFFLINE_VALIDATION_SCOPE,
+            "officialEvaluation": False,
+            "validationOnly": True,
+            "productionActivationAllowed": False,
+            "validationId": self.validation_id,
+            "slotId": MEM0_FLAT_EXTRACTION_SLOT_ID,
+            "parentArtifactId": self.parent.artifact_id,
+            "parentArtifactDigest": self.parent.artifact_digest,
+            "candidateArtifactId": self.candidate.artifact_id,
+            "candidateArtifactDigest": self.candidate.artifact_digest,
+            "staticSafetyReportId": self.static_safety_report_id,
+            "deterministicSuiteReportId": self.deterministic_suite_report_id,
+            "configDigest": _file_digest(self.config_path),
+            "candidateArtifactFileDigest": _file_digest(self.candidate_artifact_path),
+        }
+
+
+def _validate_offline_candidate_bundle(
+    parent: ExtractionPromptPolicyArtifact,
+    candidate: ExtractionPromptPolicyArtifact,
+    static_safety: CandidateStaticSafetyReport,
+    deterministic_suite: DeterministicExtractionSuiteReport,
+) -> None:
+    expected_root = Mem0FlatPromptAdapter().export_root_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID
+    )
+    if parent != expected_root or parent.parent_artifact_id is not None:
+        raise ValueError("offline validation parent is not the trusted root")
+    if candidate.parent_artifact_id != parent.artifact_id:
+        raise ValueError("offline validation candidate parent differs")
+    if (
+        static_safety.parent_artifact_id != parent.artifact_id
+        or static_safety.candidate_artifact_id != candidate.artifact_id
+        or static_safety.candidate_artifact_digest != candidate.artifact_digest
+        or not static_safety.passed
+    ):
+        raise ValueError("offline validation static safety is incomplete")
+    if (
+        deterministic_suite.parent_artifact_id != parent.artifact_id
+        or deterministic_suite.candidate_artifact_id != candidate.artifact_id
+        or not deterministic_suite.passed
+    ):
+        raise ValueError("offline validation deterministic suite is incomplete")
+    parent.to_prompt_component(MEM0_FLAT_EXTRACTION_SLOT)
+    candidate.to_prompt_component(MEM0_FLAT_EXTRACTION_SLOT)
+
+
+def prepare_extraction_offline_validation_runtime(
+    *,
+    parent: ExtractionPromptPolicyArtifact,
+    candidate: ExtractionPromptPolicyArtifact,
+    static_safety: CandidateStaticSafetyReport,
+    deterministic_suite: DeterministicExtractionSuiteReport,
+    validation_id: str,
+    output_root: Path,
+) -> dict[str, object]:
+    """Create a non-activating candidate bundle for offline observation runs."""
+
+    if not isinstance(validation_id, str) or not validation_id.strip():
+        raise ValueError("offline validation ID must not be empty")
+    _validate_offline_candidate_bundle(
+        parent, candidate, static_safety, deterministic_suite
+    )
+    output = output_root.expanduser().resolve()
+    config_path = output / EXTRACTION_OFFLINE_CONFIG_FILE
+    candidate_path = output / EXTRACTION_OFFLINE_CANDIDATE_FILE
+    with _exclusive_lock(output / ".extraction-offline-validation.lock"):
+        _write_immutable_json(candidate_path, candidate.payload())
+        identity = {
+            "schemaVersion": EXTRACTION_OFFLINE_VALIDATION_SCHEMA_VERSION,
+            "configSchema": EXTRACTION_OFFLINE_VALIDATION_SCHEMA,
+            "deploymentScope": EXTRACTION_OFFLINE_VALIDATION_SCOPE,
+            "officialEvaluation": False,
+            "validationOnly": True,
+            "productionActivationAllowed": False,
+            "validationId": validation_id,
+            "slotId": MEM0_FLAT_EXTRACTION_SLOT_ID,
+            "slotContractDigest": MEM0_FLAT_EXTRACTION_SLOT.contract_digest,
+            "frozenWrapperDigest": MEM0_FLAT_EXTRACTION_SLOT.frozen_wrapper_digest,
+            "parentArtifactId": parent.artifact_id,
+            "parentArtifactDigest": parent.artifact_digest,
+            "candidateArtifactId": candidate.artifact_id,
+            "candidateArtifactDigest": candidate.artifact_digest,
+            "candidateArtifactFile": EXTRACTION_OFFLINE_CANDIDATE_FILE,
+            "candidateArtifactFileDigest": _file_digest(candidate_path),
+            "staticSafetyReportId": static_safety.report_id,
+            "deterministicSuiteReportId": deterministic_suite.report_id,
+        }
+        _write_immutable_json(config_path, identity)
+    return ResolvedExtractionOfflineValidationRuntime(
+        config_path,
+        candidate_path,
+        validation_id,
+        parent,
+        candidate,
+        static_safety.report_id,
+        deterministic_suite.report_id,
+    ).profile()
+
+
+def load_extraction_offline_validation_profile(
+    config_path: Path,
+) -> ResolvedExtractionOfflineValidationRuntime:
+    """Load and validate a non-activating offline candidate bundle."""
+
+    path = config_path.expanduser().resolve()
+    fields = {
+        "schemaVersion", "configSchema", "deploymentScope",
+        "officialEvaluation", "validationOnly", "productionActivationAllowed",
+        "validationId", "slotId", "slotContractDigest", "frozenWrapperDigest",
+        "parentArtifactId", "parentArtifactDigest", "candidateArtifactId",
+        "candidateArtifactDigest", "candidateArtifactFile",
+        "candidateArtifactFileDigest", "staticSafetyReportId",
+        "deterministicSuiteReportId",
+    }
+    config = dict(_strict_mapping(
+        _read_json(path, "offline extraction runtime config"),
+        fields,
+        "offline extraction runtime config",
+    ))
+    if (
+        config["schemaVersion"] != EXTRACTION_OFFLINE_VALIDATION_SCHEMA_VERSION
+        or config["configSchema"] != EXTRACTION_OFFLINE_VALIDATION_SCHEMA
+        or config["deploymentScope"] != EXTRACTION_OFFLINE_VALIDATION_SCOPE
+        or config["officialEvaluation"] is not False
+        or config["validationOnly"] is not True
+        or config["productionActivationAllowed"] is not False
+        or config["slotId"] != MEM0_FLAT_EXTRACTION_SLOT_ID
+        or config["slotContractDigest"] != MEM0_FLAT_EXTRACTION_SLOT.contract_digest
+        or config["frozenWrapperDigest"] != MEM0_FLAT_EXTRACTION_SLOT.frozen_wrapper_digest
+        or config["candidateArtifactFile"] != EXTRACTION_OFFLINE_CANDIDATE_FILE
+    ):
+        raise ValueError("offline extraction runtime config identity mismatch")
+    candidate_path = (path.parent / config["candidateArtifactFile"]).resolve()
+    if not candidate_path.is_relative_to(path.parent):
+        raise ValueError("offline candidate artifact escapes its bundle")
+    if _file_digest(candidate_path) != config["candidateArtifactFileDigest"]:
+        raise ValueError("offline candidate artifact file digest mismatch")
+    parent = Mem0FlatPromptAdapter().export_root_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID
+    )
+    candidate = ExtractionPromptPolicyArtifact.from_payload(
+        _read_json(candidate_path, "offline candidate artifact")
+    )
+    if (
+        config["parentArtifactId"] != parent.artifact_id
+        or config["parentArtifactDigest"] != parent.artifact_digest
+        or config["candidateArtifactId"] != candidate.artifact_id
+        or config["candidateArtifactDigest"] != candidate.artifact_digest
+        or candidate.parent_artifact_id != parent.artifact_id
+    ):
+        raise ValueError("offline candidate artifact identity mismatch")
+    parent.to_prompt_component(MEM0_FLAT_EXTRACTION_SLOT)
+    candidate.to_prompt_component(MEM0_FLAT_EXTRACTION_SLOT)
+    return ResolvedExtractionOfflineValidationRuntime(
+        path,
+        candidate_path,
+        config["validationId"],
+        parent,
+        candidate,
+        config["staticSafetyReportId"],
+        config["deterministicSuiteReportId"],
+    )
 
 
 def prepare_extraction_matched_trial_runtime(
