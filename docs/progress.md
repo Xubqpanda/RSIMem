@@ -37,7 +37,7 @@ interventions, strict feedback projection, process feedback, N+1 hypothesis
 identity, and restart-safe content-free evidence. Extraction is currently
 `optimization-ready` in that fixture; the other layers remain
 `validation-only` until outcome variation is observed. The latest regression
-counts are RSIMem `703 passed` and vendored PAST-Bench `398 passed, 2 skipped`.
+counts are RSIMem `706 passed` and vendored PAST-Bench `398 passed, 2 skipped`.
 
 Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
@@ -109,8 +109,8 @@ official score or grader fields to the policy path. An evaluator-free static
 writeback fixture verifies trigger, source, extraction, admission, commit,
 exposure, and task-outcome events, receipt joins, and process-ledger auditing.
 The focused contract is in `tests/test_rsimem_hermes_adapter.py`; current
-regression results are RSIMem `676 passed` and PAST-Bench `397 passed, 2
-skipped`.
+an earlier process-audit snapshot recorded RSIMem `676 passed` and PAST-Bench
+`397 passed, 2 skipped`; the current regression is reported above.
 
 Both formal extraction launchers now run `audit_process_events()` before
 persisting `process_corpus.json`; malformed terminal receipt joins or
@@ -450,8 +450,8 @@ This is process-signal infrastructure, not a live adaptive-effect result.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `676 passed`.
-- [x] Pass the vendored PAST-Bench regression suite: `397 passed, 2 skipped`.
+- [x] Pass all RSIMem tests: `706 passed`.
+- [x] Pass the vendored PAST-Bench regression suite: `398 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
 

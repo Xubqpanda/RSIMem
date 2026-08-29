@@ -34,9 +34,14 @@ trusted offline decision and trial profile, both repository trees must be
 clean, the provider probe must pass, and every parent/proposal replicate must
 produce a complete process corpus and audit.
 
-Verification at this revision:
+Verification at the original preflight revision:
 
 - RSIMem: `703 passed`
 - vendored PAST-Bench: `398 passed, 2 skipped`
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`: passed
 - split-plan digest replay against all three vendored family roots: passed
+
+The repository has since added durable-observation replay and split-identity
+guards. The current full regression is RSIMem `706 passed` and vendored
+PAST-Bench `398 passed, 2 skipped`; the counts above remain the historical
+preflight snapshot and are not a claim that matched validation has run.
