@@ -74,6 +74,10 @@ The focused contract is in `tests/test_rsimem_hermes_adapter.py`; current
 regression results are RSIMem `655 passed` and PAST-Bench `397 passed, 2
 skipped`.
 
+Both formal extraction launchers now run `audit_process_events()` before
+persisting `process_corpus.json`; malformed terminal receipt joins or
+stage-specific failure semantics fail the attempt instead of entering analysis.
+
 ## Completed Work
 
 ### Repository And Benchmark Foundation
