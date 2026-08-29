@@ -23,6 +23,7 @@ from .process_feedback import (
     JsonProcessFeedbackLedger,
     ProcessEvent,
 )
+from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 
 
 PROCESS_CORPUS_SCHEMA_VERSION = 1
@@ -52,11 +53,18 @@ class ProcessCorpus:
     task_template_group_id: str
     task_manifest_digest: str
     events: tuple[ProcessEvent, ...]
+    evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
     schema_version: int = PROCESS_CORPUS_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         if self.schema_version != PROCESS_CORPUS_SCHEMA_VERSION:
             raise ValueError("unsupported process corpus schema version")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        if plane != EvidencePlane.BENCHMARK_AUDIT or source != EvidenceSourceKind.BENCHMARK_CONTRACT:
+            raise ValueError("family-bound process corpus must be benchmark_audit evidence")
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         if self.split_role not in _SPLITS:
             raise ValueError("invalid process corpus split role")
         for value, name in (
@@ -116,6 +124,8 @@ class ProcessCorpus:
             "task_template_group_id": task_template_group_id,
             "task_manifest_digest": task_manifest_digest,
             "event_ids": [event.event_id for event in ordered],
+            "evidence_plane": EvidencePlane.BENCHMARK_AUDIT.value,
+            "evidence_source": EvidenceSourceKind.BENCHMARK_CONTRACT.value,
         }
         return cls(
             corpus_id=f"process-corpus.{content_digest(identity)[:40]}",
@@ -151,6 +161,8 @@ class ProcessCorpus:
             "task_template_group_id": self.task_template_group_id,
             "task_manifest_digest": self.task_manifest_digest,
             "event_ids": [event.event_id for event in self.events],
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
         }
 
     def payload(self) -> dict[str, object]:
@@ -167,6 +179,7 @@ class ProcessCorpus:
         fields = {
             "schema_version", "schema", "corpus_id", "split_role", "family_id",
             "task_template_group_id", "task_manifest_digest", "event_ids", "events",
+            "evidence_plane", "evidence_source",
         }
         if not isinstance(value, Mapping) or set(value) != fields:
             raise ValueError("malformed process corpus")
@@ -183,6 +196,8 @@ class ProcessCorpus:
                 task_template_group_id=value["task_template_group_id"],
                 task_manifest_digest=value["task_manifest_digest"],
                 events=events,
+                evidence_plane=value["evidence_plane"],
+                evidence_source=value["evidence_source"],
                 schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:

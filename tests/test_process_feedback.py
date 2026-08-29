@@ -25,6 +25,7 @@ from rsimem.memory.process_corpus import (
     census_process_events,
     ensure_process_corpus_has_no_evaluation_fields,
 )
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.trigger_policy import DeterministicTriggerPolicy, HostTriggerAdapter
 
 
@@ -272,6 +273,8 @@ def test_process_corpus_is_separate_from_evaluation_score_and_restart_safe(tmp_p
         task_template_group_id="sm01-process-pilot",
         task_manifest_digest="a" * 64,
     )
+    assert corpus.evidence_plane == EvidencePlane.BENCHMARK_AUDIT
+    assert corpus.evidence_source == EvidenceSourceKind.BENCHMARK_CONTRACT
     ensure_process_corpus_has_no_evaluation_fields(corpus.payload())
     path = tmp_path / "corpus.json"
     store = JsonProcessCorpusStore(path)
