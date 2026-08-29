@@ -71,3 +71,29 @@ def test_corrupt_or_conflicting_registry_fails_closed(tmp_path) -> None:
             evidence_plane=EvidencePlane.BENCHMARK_AUDIT,
             evidence_source=EvidenceSourceKind.BENCHMARK_CONTRACT,
         )
+
+
+def test_same_artifact_with_different_digest_is_a_registry_conflict(tmp_path) -> None:
+    registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    registry.initialize()
+    first = _entry()
+    conflicting = RevocationEntry.create(
+        artifact_id=first.artifact_id,
+        artifact_schema_version=first.artifact_schema_version,
+        artifact_digest="b" * 64,
+        evidence_plane=first.evidence_plane,
+        evidence_source=first.evidence_source,
+        revoked_at="2026-08-30T01:02:04Z",
+        reason_code="digest_mismatch",
+    )
+    assert registry.append(first) is True
+    with pytest.raises(ValueError, match="conflicting revocation identity"):
+        registry.append(conflicting)
+    with pytest.raises(ValueError, match="conflicting revocation identity"):
+        registry.assert_active(
+            artifact_id=first.artifact_id,
+            artifact_schema_version=first.artifact_schema_version,
+            artifact_digest=conflicting.artifact_digest,
+            evidence_plane=conflicting.evidence_plane,
+            evidence_source=conflicting.evidence_source,
+        )

@@ -203,6 +203,25 @@ class JsonRevocationRegistry:
                 if previous != serialized:
                     raise ValueError("conflicting revocation entry")
                 return False
+            # Artifact IDs are content-addressed identities.  Two entries for
+            # the same artifact/schema must agree on its digest and evidence
+            # plane; otherwise a malformed registry could make one revoked
+            # incarnation look active.
+            for existing_serialized in records.values():
+                existing = RevocationEntry.from_payload(
+                    json.loads(existing_serialized)
+                )
+                if (
+                    existing.artifact_id == entry.artifact_id
+                    and existing.artifact_schema_version
+                    == entry.artifact_schema_version
+                    and (
+                        existing.artifact_digest != entry.artifact_digest
+                        or existing.evidence_plane != entry.evidence_plane
+                        or existing.evidence_source != entry.evidence_source
+                    )
+                ):
+                    raise ValueError("conflicting revocation identity")
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as handle:
                 handle.write(serialized + "\n")
@@ -228,6 +247,16 @@ class JsonRevocationRegistry:
             records = self._read()
         for serialized in records.values():
             entry = RevocationEntry.from_payload(json.loads(serialized))
+            if (
+                entry.artifact_id == artifact_id
+                and entry.artifact_schema_version == artifact_schema_version
+                and (
+                    entry.artifact_digest != artifact_digest
+                    or entry.evidence_plane != plane
+                    or entry.evidence_source != source
+                )
+            ):
+                raise ValueError("conflicting revocation identity")
             if (
                 entry.artifact_id == artifact_id
                 and entry.artifact_schema_version == artifact_schema_version
