@@ -12,12 +12,15 @@ from rsimem.memory.extraction_prompt_optimizer import (
 )
 from rsimem.memory.extraction_optimizer_contracts import (
     EXTRACTION_OPTIMIZER_OUTPUT_SCHEMA_DIGEST,
+    FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+    build_extraction_optimizer_request,
 )
 from rsimem.memory.extraction_optimizer_corpus import (
     OptimizerCorpusRetention,
     OptimizerCorpusSplit,
 )
 from rsimem.extraction_proposal import (
+    _DeferredExtractionOptimizerClient,
     _read_api_key_file,
     main,
     prepare_extraction_proposal,
@@ -183,6 +186,23 @@ def test_proposal_revocation_registry_rejects_parent_before_provider_call(
             revocation_registry=registry,
         )
     assert client.requests == []
+
+
+def test_formal_provider_entry_requires_revocation_registry_before_credentials(
+    tmp_path: Path,
+) -> None:
+    request = build_extraction_optimizer_request(
+        _parent(),
+        _multi_corpus(("useful", "useful")),
+    )
+    key_file = tmp_path / "api-key"
+    key_file.write_text("should-not-be-read\n", encoding="utf-8")
+    client = _DeferredExtractionOptimizerClient(
+        key_file,
+        "https://coding.tu-zi.com/v1",
+    )
+    with pytest.raises(ValueError, match="revocation registry"):
+        client.complete(request, FROZEN_EXTRACTION_OPTIMIZER_CONFIG)
 
 
 def test_malformed_completion_is_persisted_without_deployable_artifact(

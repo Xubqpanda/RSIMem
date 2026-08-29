@@ -34,15 +34,36 @@ from .memory_systems.mem0_flat import (
 class _DeferredExtractionOptimizerClient:
     """Keep credentials and provider transport unreachable on NO_PROPOSAL."""
 
-    def __init__(self, api_key_file: Path | None, base_url: str) -> None:
+    def __init__(
+        self,
+        api_key_file: Path | None,
+        base_url: str,
+        revocation_registry: JsonRevocationRegistry | None = None,
+    ) -> None:
         self.api_key_file = api_key_file
         self.base_url = base_url
+        self.revocation_registry = revocation_registry
 
     def complete(
         self,
         request: ExtractionOptimizerRequest,
         config: ExtractionOptimizerConfig,
     ):
+        # This deferred client is the formal provider entry point.  A local
+        # deterministic gate may return NO_PROPOSAL without credentials, but
+        # any actual model call must bind the parent artifact to an explicit,
+        # owner-controlled revocation registry first.
+        if self.revocation_registry is None:
+            raise ValueError(
+                "optimizer provider proposal requires a revocation registry"
+            )
+        self.revocation_registry.assert_active(
+            artifact_id=request.parent_artifact_id,
+            artifact_schema_version=1,
+            artifact_digest=request.parent_artifact_digest,
+            evidence_plane="pure_process",
+            evidence_source="runtime_observation",
+        )
         if self.api_key_file is None:
             raise ValueError("optimizer provider API key file is required")
         api_key = _read_api_key_file(self.api_key_file)
@@ -188,13 +209,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    client = _DeferredExtractionOptimizerClient(
-        args.api_key_file,
-        args.base_url,
-    )
     revocation_registry = None
     if args.revocation_registry is not None:
         revocation_registry = JsonRevocationRegistry(args.revocation_registry)
+    client = _DeferredExtractionOptimizerClient(
+        args.api_key_file,
+        args.base_url,
+        revocation_registry,
+    )
     store = JsonExtractionOptimizerCorpusStore(
         args.corpus_attempt_root,
         owner_controlled_root=args.owner_controlled_root,
