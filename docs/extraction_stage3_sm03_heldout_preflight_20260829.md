@@ -18,6 +18,11 @@ only the deployment-observable corrected Phoenix freeze-date key
 current-input-confounded, outcome-unattributable and censored observations.
 It does not read grader, answer key, official score or benchmark-only labels.
 
+The formal matched-preflight API and launcher now require this split plan;
+omitting it is a fail-closed configuration error.  The launcher defaults to
+this checked-in plan but accepts an explicitly supplied immutable replacement
+for a separately authored experiment.
+
 This is a preflight and contract result, not a validation result.  No provider
 matched batch has been started.  Before running one, the candidate must have a
 trusted offline decision and trial profile, both repository trees must be
@@ -30,4 +35,3 @@ Verification at this revision:
 - vendored PAST-Bench: `397 passed, 2 skipped`
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`: passed
 - split-plan digest replay against all three vendored family roots: passed
-
