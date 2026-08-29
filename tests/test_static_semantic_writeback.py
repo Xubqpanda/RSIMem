@@ -152,6 +152,11 @@ def test_static_config_is_default_disabled_and_strict() -> None:
         "feedback_contract": "sm01_tsv_v1",
     })
     assert feedback.feedback_contract.value == "sm01_tsv_v1"
+    sm03_feedback = StaticSemanticWritebackConfig.from_mapping({
+        "mode": "static",
+        "feedback_contract": "sm03_fact_correction_v1",
+    })
+    assert sm03_feedback.feedback_contract.value == "sm03_fact_correction_v1"
     with pytest.raises(ValueError, match="configuration is incomplete"):
         StaticSemanticWritebackConfig.from_mapping({"mode": "adaptive_utility"})
     with pytest.raises(ValueError, match="require adaptive_utility"):
