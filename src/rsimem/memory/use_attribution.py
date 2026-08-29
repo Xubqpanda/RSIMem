@@ -22,6 +22,7 @@ from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_s
 
 if TYPE_CHECKING:
     from .artifact_set import ArtifactSetSemanticBinding
+    from .operation_graph import OperationGraph
 
 
 MEMORY_USE_EVIDENCE_SCHEMA_VERSION = 1
@@ -336,6 +337,7 @@ def resolve_memory_use(
     evidence: MemoryUseEvidence,
     *,
     artifact_set_binding: "ArtifactSetSemanticBinding | None" = None,
+    operation_graph: "OperationGraph | None" = None,
 ) -> MemoryUseResolution:
     """Resolve a use claim conservatively from exact operation joins.
 
@@ -348,6 +350,23 @@ def resolve_memory_use(
 
     if not isinstance(evidence, MemoryUseEvidence):
         raise TypeError("memory-use resolver requires MemoryUseEvidence")
+    if operation_graph is not None:
+        from .operation_graph import OperationGraph
+
+        if not isinstance(operation_graph, OperationGraph):
+            raise TypeError("operation graph has the wrong type")
+        join_error = _operation_join_error(evidence, operation_graph)
+        if join_error is not None:
+            return MemoryUseResolution(
+                evidence.evidence_id,
+                MemoryUseResolutionStatus.UNRESOLVED,
+                join_error,
+                bool(evidence.injected_artifact_ids),
+                evidence.behavioral_consistency,
+                False,
+                evidence.outcome_success,
+                evidence.observation_complete,
+            )
     exposure = bool(evidence.injected_artifact_ids)
     if not evidence.observation_complete:
         return MemoryUseResolution(
@@ -548,6 +567,68 @@ def resolve_memory_use(
         evidence.outcome_success,
         True,
     )
+
+
+def _operation_join_error(
+    evidence: MemoryUseEvidence,
+    operation_graph: "OperationGraph",
+) -> str | None:
+    """Validate operation kinds/parentage when a graph is available.
+
+    IDs in ``MemoryUseEvidence`` are intentionally content-free.  Supplying
+    the owner-controlled operation graph lets callers prove that those IDs are
+    the expected retrieval -> injection -> use -> outcome chain instead of
+    merely matching arbitrary strings.
+    """
+
+    from .operation_graph import OperationKind
+
+    operations = {item.operation_id: item for item in operation_graph.operations}
+
+    def require(operation_id: str | None, kind: OperationKind) -> object | None:
+        if operation_id is None:
+            return None
+        operation = operations.get(operation_id)
+        if operation is None or operation.kind is not kind:
+            return None
+        return operation
+
+    retrieval = require(evidence.retrieval_operation_id, OperationKind.RETRIEVAL)
+    if evidence.retrieval_operation_id is not None and retrieval is None:
+        return "operation_join_invalid"
+    injection = require(evidence.injection_operation_id, OperationKind.INJECTION)
+    if evidence.injection_operation_id is not None and injection is None:
+        return "operation_join_invalid"
+    downstream = require(evidence.downstream_operation_id, OperationKind.USE)
+    if evidence.downstream_operation_id is not None and downstream is None:
+        return "operation_join_invalid"
+    outcome = require(evidence.outcome_operation_id, OperationKind.DOWNSTREAM_OUTCOME)
+    if evidence.outcome_operation_id is not None and outcome is None:
+        return "operation_join_invalid"
+
+    if retrieval is not None and evidence.retrieved_artifact_ids and not set(
+        evidence.retrieved_artifact_ids
+    ).issubset(set(retrieval.output_artifact_ids) | set(retrieval.input_artifact_ids)):
+        return "operation_join_invalid"
+    if injection is not None and evidence.injected_artifact_ids and not set(
+        evidence.injected_artifact_ids
+    ).issubset(set(injection.output_artifact_ids) | set(injection.input_artifact_ids)):
+        return "operation_join_invalid"
+    if downstream is not None and evidence.used_artifact_ids and not set(
+        evidence.used_artifact_ids
+    ).issubset(set(downstream.input_artifact_ids) | set(downstream.output_artifact_ids)):
+        return "operation_join_invalid"
+
+    def has_parent(operation: object, parent_id: str | None) -> bool:
+        return parent_id is None or parent_id in operation.parent_operation_ids
+
+    if injection is not None and not has_parent(injection, evidence.retrieval_operation_id):
+        return "operation_join_invalid"
+    if downstream is not None and not has_parent(downstream, evidence.injection_operation_id):
+        return "operation_join_invalid"
+    if outcome is not None and not has_parent(outcome, evidence.downstream_operation_id):
+        return "operation_join_invalid"
+    return None
 
 
 __all__ = [

@@ -406,6 +406,14 @@ def test_missed_requires_exact_source_opportunity_and_absence_outcome_chain() ->
     )
     dataset = builder.build(source, observation, future, missed=(missed,))
     assert _primary(dataset).label == ExtractionFeedbackLabel.MISSED
+    assert missed.evidence_plane is EvidencePlane.BENCHMARK_AUDIT
+    assert missed.evidence_source is EvidenceSourceKind.BENCHMARK_CONTRACT
+    with pytest.raises(ValueError, match="family-bound missed evidence"):
+        replace(
+            missed,
+            evidence_plane=EvidencePlane.PURE_PROCESS,
+            evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        )
 
     wrong_outcome = replace(missed, absence_outcome_operation_id="outcome.wrong")
     unresolved = builder.build(source, observation, future, missed=(wrong_outcome,))
