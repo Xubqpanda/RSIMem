@@ -835,7 +835,7 @@ Family规则：
 最终效果验收：
 
 - □ 所有variant使用matched task manifest、model、budget、order、sandbox和persistence isolation。
-- □ 每个 feasibility case 完成预设 replay/fixture，failed/provider run保留并单独报告。
+- √ deterministic feasibility cases 与首个真实 provider feedback pilot 均完成预设 replay/trace/audit；provider pilot 的完整 attempt、raw usage 和 no-signal 结果单独保存在 [`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md)，没有把 unresolved 当成 negative。
 - √ 每个 deterministic candidate 至少一次改变目标层的 decision或输入/输出 fingerprint；不要求真实任务分数提升。
 - √ `LayerFeasibilityCensus` 报告每层 process-signal coverage、action variation、outcome variation、unresolved/censored 比例、ambiguity 和具体失败原因。
 - √ census 报告 U/H/M/unresolved/censored 原始计数以及 resolved useful rate 的分子分母；extraction-specific coverage、empty、missed 和 unknown 分母由 `ExtractionOfflineValidationDecision` 的 ratio evidence 单独报告，不把 unknown silently drop。

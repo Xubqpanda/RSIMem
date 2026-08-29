@@ -103,6 +103,11 @@ PAST-Bench replicate）；仅 raw usage 保存在 ignored
 `outputs/provider_connectivity_smoke_20260829.json`，没有保留 prompt/response
 正文。
 
+随后完成了首个真实 provider 的 parent-only SM01 feedback pilot（3 个 clean
+replicate）。它的 24 条 primary feedback 全部为 `unresolved`，因此严格 gate
+返回 `NO_PROPOSAL`，没有 candidate 或 activation；详细 raw resource、manifest
+和 audit 结果见 [`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md)。
+
 Stage 2E 的 `rsimem.extraction_proposal` 现在也会写出
 `feasibility-hypothesis.json`。该文件只包含 optimizer result/request、parent
 and candidate artifact identity、training corpus digest、actionable evidence
