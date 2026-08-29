@@ -80,6 +80,11 @@ def test_missing_receipt_identity_is_not_exact() -> None:
     assert result.reason_code == "missing_receipt_identity"
 
 
+def test_unknown_result_success_is_not_reported_as_failure() -> None:
+    events = _join(success=None).process_events()
+    assert events[-1].status.value == "unknown"
+
+
 def test_strict_success_flag() -> None:
     with pytest.raises(TypeError, match="success must be bool"):
         _join(success="true")
