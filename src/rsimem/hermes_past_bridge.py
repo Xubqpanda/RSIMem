@@ -48,6 +48,12 @@ from .memory.policy_contracts import (
 from .memory.admission_policy import DeterministicAdmissionPolicy
 from .memory.exposure_policy import DeterministicExposurePolicy
 from .memory.policy_evidence import JsonPolicyDecisionLedger
+from .memory.process_feedback import (
+    JsonProcessFeedbackLedger,
+    ProcessEvent,
+    ProcessEventKind,
+    ProcessEventStatus,
+)
 from .memory.live_writeback import (
     ExtractionPromptRuntimeScope,
     StaticSemanticBoundaryResult,
@@ -331,6 +337,7 @@ class HermesPastBenchBridge:
         lifecycle_config: HermesLifecycleConfig | None = None,
         lifecycle_evidence_path: Path | None = None,
         lifecycle_receipt_path: Path | None = None,
+        process_feedback_path: Path | None = None,
         lifecycle_complete: Callable[[str], str] | None = None,
         static_writeback_config: StaticSemanticWritebackConfig | None = None,
         static_completion_client: CompletionClient | None = None,
@@ -381,6 +388,10 @@ class HermesPastBenchBridge:
             trace_id=trace_id,
             family_id=family_id,
             stage=stage,
+        )
+        self._process_feedback = JsonProcessFeedbackLedger(
+            process_feedback_path
+            or self.evidence_path.with_name("rsimem_process_feedback.jsonl")
         )
         self._admission_policy = DeterministicAdmissionPolicy()
         self._exposure_policy = DeterministicExposurePolicy()
@@ -626,6 +637,12 @@ class HermesPastBenchBridge:
     @property
     def policy_evidence(self) -> tuple[dict[str, object], ...]:
         return self._policy_evidence.events
+
+    @property
+    def process_feedback(self) -> tuple[ProcessEvent, ...]:
+        """Content-free process observations captured for this bridge run."""
+
+        return self._process_feedback.events
 
     @property
     def static_results(self) -> tuple[StaticSemanticBoundaryResult, ...]:
@@ -902,29 +919,49 @@ class HermesPastBenchBridge:
         )
 
     def _record_semantic_outcomes(self, result: Mapping[str, Any]) -> None:
-        if (
-            self.semantic_future_recorder is None
-            or self.semantic_feedback_resolver is None
-            or self._semantic_outcomes_recorded
-        ):
+        if self._semantic_outcomes_recorded:
             return
-        for future, step_id in self._semantic_futures:
-            current_input = self._current_input(result)
-            observation = self._semantic_deployment_observation(result)
-            resolution = self.semantic_feedback_resolver.resolve(future, observation)
-            outcome = self.semantic_future_recorder.record_use_and_outcome(
-                future,
-                used_artifact_ids=resolution.used_artifact_ids,
-                outcome_status=resolution.outcome_status,
-                outcome_reason_code=resolution.outcome_reason_code,
-                step_id=step_id,
-            )
-            self._record_extraction_feedback(
-                future,
-                observation,
-                outcome,
-                current_input,
-            )
+        if self.semantic_future_recorder is not None and self.semantic_feedback_resolver is not None:
+            for future, step_id in self._semantic_futures:
+                current_input = self._current_input(result)
+                observation = self._semantic_deployment_observation(result)
+                resolution = self.semantic_feedback_resolver.resolve(future, observation)
+                outcome = self.semantic_future_recorder.record_use_and_outcome(
+                    future,
+                    used_artifact_ids=resolution.used_artifact_ids,
+                    outcome_status=resolution.outcome_status,
+                    outcome_reason_code=resolution.outcome_reason_code,
+                    step_id=step_id,
+                )
+                self._record_extraction_feedback(
+                    future,
+                    observation,
+                    outcome,
+                    current_input,
+                )
+        completed = result.get("completed") is True
+        outcome_digest = hashlib.sha256(
+            json.dumps(
+                {
+                    "completed": completed,
+                    "partial": result.get("partial") is True,
+                    "interrupted": result.get("interrupted") is True,
+                },
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
+        self._record_process_observation(
+            kind=ProcessEventKind.TASK_OUTCOME,
+            status=(ProcessEventStatus.SUCCESS if completed else ProcessEventStatus.FAILED),
+            host_event_id=f"event.task-outcome.{outcome_digest[:40]}",
+            source_revision=self._exposure_context_revision(),
+            input_payload={"task_id": self._task_id},
+            output_payload={"outcome_digest": outcome_digest},
+            reason_codes=("task_completed",) if completed else ("task_failure",),
+            execution_receipt_ids=(f"receipt.task-outcome.{outcome_digest[:24]}",),
+        )
         self._semantic_outcomes_recorded = True
 
     def _record_extraction_source(
@@ -1118,6 +1155,74 @@ class HermesPastBenchBridge:
             injection_receipt_ids=injection_receipt_ids,
         )
         self._policy_decision_ids.add(decision_id)
+        # Every policy decision is also projected into the process corpus.  The
+        # projection carries the exact decision fingerprints and receipt join,
+        # but never copies source, prompt, response or memory content.
+        from .memory.policy_contracts import PolicyDecision
+
+        if isinstance(decision, PolicyDecision):
+            host_event_id = decision.trigger_event_id or (
+                "event.snapshot."
+                + hashlib.sha256(snapshot.snapshot_id.encode("utf-8")).hexdigest()[:40]
+            )
+            self._process_feedback.record(ProcessEvent.from_policy_decision(
+                decision,
+                run_id=snapshot.run_id,
+                variant=self.ledger.variant,
+                trace_id=self._trace_id,
+                episode_id=snapshot.episode_id,
+                session_id=snapshot.session_id,
+                task_id=snapshot.task_id,
+                host_event_id=host_event_id,
+                family_id=self._family_id,
+                stage=self._stage,
+                execution_receipt_ids=injection_receipt_ids,
+            ))
+
+    def _record_process_observation(
+        self,
+        *,
+        kind: ProcessEventKind,
+        status: ProcessEventStatus,
+        host_event_id: str,
+        source_revision: str,
+        input_payload: object,
+        output_payload: object,
+        reason_codes: tuple[str, ...],
+        execution_receipt_ids: tuple[str, ...] = (),
+        policy_decision_id: str | None = None,
+        policy_layer: object | None = None,
+        lineage_id: str | None = None,
+    ) -> None:
+        """Append one non-policy host/process observation.
+
+        This helper is used for retrieval, tool and downstream outcome events
+        where no learned policy decision exists at the observation boundary.
+        The host event and source revision remain mandatory, and all payloads
+        are reduced to digests by :class:`ProcessEvent`.
+        """
+
+        self._process_feedback.record(ProcessEvent.create(
+            kind=kind,
+            status=status,
+            run_id=self._run_id,
+            variant=self.ledger.variant,
+            trace_id=self._trace_id,
+            episode_id=self._episode_id,
+            session_id=self._session_id,
+            task_id=self._task_id,
+            host_event_id=host_event_id,
+            source_revision=source_revision,
+            input_payload=input_payload,
+            output_payload=output_payload,
+            reason_codes=reason_codes,
+            execution_receipt_ids=execution_receipt_ids,
+            policy_decision_id=policy_decision_id,
+            policy_layer=policy_layer,
+            lineage_id=lineage_id,
+            family_id=self._family_id,
+            stage=self._stage,
+        ))
 
     def _record_extraction_feedback(
         self,
@@ -1551,6 +1656,30 @@ class HermesPastBenchBridge:
             ))
             if surface and hits:
                 self.runtime.mark_injected(hits, surface=surface)
+            self._record_process_observation(
+                kind=ProcessEventKind.RETRIEVAL,
+                status=(ProcessEventStatus.SUCCESS if hits else ProcessEventStatus.FAILED),
+                host_event_id=(
+                    "event.query."
+                    + hashlib.sha256(
+                        json.dumps(
+                            {"kind": kind.value, "namespace": namespace, "query_digest": hashlib.sha256(text.encode("utf-8")).hexdigest(), "limit": limit},
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest()[:40]
+                ),
+                source_revision=self._exposure_context_revision(),
+                input_payload={"query_digest": hashlib.sha256(text.encode("utf-8")).hexdigest(), "namespace": namespace, "limit": limit},
+                output_payload={"hit_count": len(hits), "surface": surface},
+                reason_codes=("retrieval_miss",) if not hits else ("decision_observed",),
+                execution_receipt_ids=(
+                    "receipt.query."
+                    + hashlib.sha256(
+                        f"{kind.value}:{namespace}:{text}:{limit}".encode("utf-8")
+                    ).hexdigest()[:24],
+                ),
+            )
         except Exception:
             return
 
@@ -1577,6 +1706,17 @@ class HermesPastBenchBridge:
             content_chars=sum(len(str(item.get("content") or "")) for item in results),
             attributes={"count": len(results)},
         ))
+        query_digest = hashlib.sha256(query.encode("utf-8")).hexdigest()
+        self._record_process_observation(
+            kind=ProcessEventKind.RETRIEVAL,
+            status=ProcessEventStatus.SUCCESS if results else ProcessEventStatus.FAILED,
+            host_event_id=f"event.native-search.{query_digest[:40]}",
+            source_revision=self._exposure_context_revision(),
+            input_payload={"query_digest": query_digest, "limit": limit},
+            output_payload={"result_count": len(results)},
+            reason_codes=("decision_observed",) if results else ("retrieval_miss",),
+            execution_receipt_ids=(f"receipt.native-search.{query_digest[:24]}",),
+        )
 
     def _wrap_skill_handlers(self) -> None:
         from tools.registry import registry
@@ -1604,6 +1744,7 @@ class HermesPastBenchBridge:
                         limit=100 if _tool_name == "skills_list" else 5,
                         surface=_tool_name,
                     )
+                    self._record_skill_process(_tool_name, query, result)
                     return result
 
                 def adapter_read() -> str:
@@ -1639,9 +1780,32 @@ class HermesPastBenchBridge:
                     adapter_result,
                     native_call,
                 )
+                self._record_skill_process(_tool_name, query, adapter_result)
                 return adapter_result
 
             entry.handler = handler
+
+    def _record_skill_process(self, tool_name: str, query: str, result: str) -> None:
+        """Record a tool result without persisting the returned skill text."""
+
+        try:
+            payload = json.loads(result)
+        except (TypeError, json.JSONDecodeError):
+            payload = {}
+        success = isinstance(payload, Mapping) and payload.get("success") is True
+        digest = hashlib.sha256(
+            f"{tool_name}:{query}".encode("utf-8")
+        ).hexdigest()
+        self._record_process_observation(
+            kind=ProcessEventKind.TOOL_RESULT,
+            status=ProcessEventStatus.SUCCESS if success else ProcessEventStatus.FAILED,
+            host_event_id=f"event.skill.{digest[:40]}",
+            source_revision=self._exposure_context_revision(),
+            input_payload={"tool": tool_name, "query_digest": hashlib.sha256(query.encode("utf-8")).hexdigest()},
+            output_payload={"success": success},
+            reason_codes=("decision_observed",) if success else ("tool_failure",),
+            execution_receipt_ids=(f"receipt.skill.{digest[:24]}",),
+        )
 
     def close(self) -> None:
         if self._closed:
