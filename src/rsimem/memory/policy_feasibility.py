@@ -808,9 +808,13 @@ class LayerIntervention:
         if type(self.process_signal) is not bool:
             raise ValueError("process_signal must be bool")
         outcome = FeasibilityOutcome(self.outcome)
-        reasons = tuple(self.reason_codes)
-        if not reasons or len(reasons) != len(set(reasons)) or any(not item.strip() for item in reasons):
-            raise ValueError("feasibility reason codes are required and unique")
+        try:
+            reasons = _normalize_strings(
+                self.reason_codes,
+                "feasibility reason codes",
+            )
+        except ValueError as exc:
+            raise ValueError("feasibility reason codes are required and unique") from exc
         # A caller may construct a provisional useful/missed label before all
         # delayed evidence has arrived.  Never let that incomplete label enter
         # a reward denominator: fail closed to unresolved and retain an
@@ -1039,10 +1043,16 @@ class FeasibilityEvidenceRecord:
             raise ValueError("policy hypothesis requires process signal")
         for field in ("parent_decision_ids", "candidate_decision_ids", "feedback_ids", "reason_codes"):
             values = payload[field]
-            if not isinstance(values, list) or len(values) != len(set(values)) or any(
-                not isinstance(value, str) or not value.strip() for value in values
-            ):
+            if not isinstance(values, list):
                 raise ValueError("feasibility replay ID lists are invalid")
+            try:
+                _normalize_strings(
+                    values,
+                    f"feasibility replay {field}",
+                    allow_empty=field == "feedback_ids",
+                )
+            except ValueError as exc:
+                raise ValueError("feasibility replay ID lists are invalid") from exc
         for field in ("parent_audit_ok", "candidate_audit_ok", "process_signal"):
             if type(payload[field]) is not bool:
                 raise ValueError("feasibility replay flags are invalid")
@@ -1211,9 +1221,14 @@ class LayerFeasibilityCensus:
         )):
             raise ValueError("census counts cannot exceed case count")
         object.__setattr__(self, "outcome_counts", MappingProxyType(dict(self.outcome_counts)))
-        reasons = tuple(self.reason_codes)
-        if len(reasons) != len(set(reasons)) or any(not isinstance(item, str) or not item.strip() for item in reasons):
-            raise ValueError("census reason codes must be unique non-empty strings")
+        try:
+            reasons = _normalize_strings(
+                self.reason_codes,
+                "census reason codes",
+                allow_empty=True,
+            )
+        except ValueError as exc:
+            raise ValueError("census reason codes must be unique non-empty strings") from exc
         object.__setattr__(self, "reason_codes", reasons)
 
     @property
