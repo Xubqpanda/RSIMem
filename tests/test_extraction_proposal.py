@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from rsimem.memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStore
 from rsimem.memory.extraction_prompt_optimizer import (
     CapturedExtractionOptimizerClient,
@@ -21,6 +23,8 @@ from rsimem.extraction_proposal import (
     prepare_extraction_proposal,
 )
 from rsimem.memory.prompt_components import canonical_json
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
+from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
 from test_extraction_optimizer_contracts import _multi_corpus, _parent, _proposal_output
 
 
@@ -151,6 +155,34 @@ def test_rejected_candidate_is_persisted_without_deployable_artifact(
     )
     assert hypothesis["decision"] == "NO_PROPOSAL"
     assert hypothesis["candidate_artifact_id"] is None
+
+
+def test_proposal_revocation_registry_rejects_parent_before_provider_call(
+    tmp_path: Path,
+) -> None:
+    corpus = _multi_corpus(("useful", "useful"))
+    store, owner = _store(tmp_path, corpus)
+    parent = _parent()
+    registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    registry.initialize()
+    registry.append(RevocationEntry.create(
+        artifact_id=parent.artifact_id,
+        artifact_schema_version=parent.schema_version,
+        artifact_digest=parent.artifact_digest,
+        evidence_plane=EvidencePlane.PURE_PROCESS,
+        evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        revoked_at="2026-08-30T01:02:03Z",
+        reason_code="stale_schema",
+    ))
+    client = CapturedExtractionOptimizerClient(_proposal_output)
+    with pytest.raises(ValueError, match="artifact is revoked"):
+        prepare_extraction_proposal(
+            corpus_store=store,
+            output_root=owner / "proposal-revoked",
+            client=client,
+            revocation_registry=registry,
+        )
+    assert client.requests == []
 
 
 def test_malformed_completion_is_persisted_without_deployable_artifact(

@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from rsimem.hermes_past_bridge import HermesPastBenchBridge
 from rsimem.hermes_integration import HermesExecutionMode, HermesExperimentConfig
 from rsimem.lifecycle import HermesLifecycleConfig, TaskLifecycleState
+from rsimem.memory.tool_exact_join import ToolJoinResolutionStatus, resolve_tool_call_result
 
 
 def _home(tmp_path):
@@ -129,3 +130,71 @@ def test_task_result_projects_every_tool_call_and_result_without_content(tmp_pat
     serialized = json.dumps([event.payload() for event in events], ensure_ascii=True)
     assert "private" not in serialized
     assert "secret" not in serialized
+
+
+def test_duplicate_tool_call_id_is_marked_duplicate_and_fails_closed(tmp_path) -> None:
+    bridge = _bridge(tmp_path, [])
+    result = {
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-duplicate-1",
+                    "function": {"name": "inspect", "arguments": "{}"},
+                }],
+            },
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-duplicate-1",
+                    "function": {"name": "inspect", "arguments": "{}"},
+                }],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-duplicate-1",
+                "content": "{\"success\": true}",
+            },
+        ],
+    }
+    try:
+        bridge._record_tool_call_results(result)
+    finally:
+        bridge.close()
+    joins = bridge.tool_call_result_joins
+    assert len(joins) == 1
+    assert joins[0].duplicate_call is True
+    resolution = resolve_tool_call_result(joins[0])
+    assert resolution.status is ToolJoinResolutionStatus.DUPLICATE
+
+
+def test_duplicate_tool_call_id_without_result_remains_duplicate_missing_closure(tmp_path) -> None:
+    bridge = _bridge(tmp_path, [])
+    result = {
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-duplicate-open",
+                    "function": {"name": "inspect", "arguments": "{}"},
+                }],
+            },
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-duplicate-open",
+                    "function": {"name": "inspect", "arguments": "{}"},
+                }],
+            },
+        ],
+    }
+    try:
+        bridge._record_tool_call_results(result)
+    finally:
+        bridge.close()
+    joins = bridge.tool_call_result_joins
+    assert len(joins) == 1
+    assert joins[0].duplicate_call is True
+    assert joins[0].result_present is False
+    resolution = resolve_tool_call_result(joins[0])
+    assert resolution.status is ToolJoinResolutionStatus.DUPLICATE

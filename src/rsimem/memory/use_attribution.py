@@ -680,6 +680,27 @@ def _operation_join_error(
     if evidence.outcome_operation_id is not None and outcome is None:
         return "operation_join_invalid"
 
+    # Operation IDs are opaque outside the owner-controlled graph.  Require
+    # every present stage to belong to the same execution context so an
+    # otherwise well-shaped retrieval/use chain cannot be assembled across
+    # tasks, sessions, or runs.
+    chain = tuple(
+        operation
+        for operation in (retrieval, injection, downstream, outcome)
+        if operation is not None
+    )
+    contexts = {
+        (
+            operation.context.run_id,
+            operation.context.episode_id,
+            operation.context.session_id,
+            operation.context.task_id,
+        )
+        for operation in chain
+    }
+    if len(contexts) > 1:
+        return "operation_join_invalid"
+
     if retrieval is not None and evidence.retrieved_artifact_ids and not set(
         evidence.retrieved_artifact_ids
     ).issubset(set(retrieval.output_artifact_ids) | set(retrieval.input_artifact_ids)):
