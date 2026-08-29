@@ -23,6 +23,16 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 当前 feasibility evidence ledger schema 为 v2；此前只保存 ID 的 v1 记录不会被静默迁移，而是明确 fail closed。
 
+`build_extraction_feedback_fixture()` 提供了同一 past snapshot 的两个确定性
+delayed outcome：`MISSED` 分支让 Policy N 省略 durable TSV preference，未来
+任务需要该 preference 但没有 memory exposure；`USEFUL` 分支保留该 fact、通过
+eager exposure 注入并记录成功的 `notes_share`。两个分支都通过已注册的
+SM01 opportunity/use/outcome contract 和 operation join 生成 source、set、fact
+以及 attribution evidence，随后可由
+`build_extraction_feedback_interventions()` 投影为 content-free feasibility
+case。missed chain 使用独立的 logical absence ID，避免与 outcome operation
+重复占用同一 hypothesis evidence identity。
+
 `ProcessFeedback` 进一步将 intervention 绑定到 event、source revision、目标层 parent/candidate decision、执行 receipt 集合和 before/after output digest；`JsonFeasibilityEvidenceLedger` 以原子替换和文件锁持久化该 identity。重启读取、重复写入、损坏记录和冲突记录均 fail closed。ledger 只保存 ID、digest、状态和 reason，不保存 snapshot 或 memory 正文。
 
 每个有 process signal 的 case 还会生成 `PolicyHypothesis`：它把 past feedback IDs、parent artifact、candidate artifact 和唯一 target layer 固定成稳定的 N+1 proposal identity。hypothesis 不能引用 intervention 外部的 feedback，也不能跨层或复用相同 artifact。
@@ -52,10 +62,10 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 ```text
 PYTHONPATH=src pytest -q tests/test_policy_feasibility.py tests/test_policy_replay.py
-26 passed
+32 passed
 
 .venv/bin/pytest -q tests
-634 passed
+640 passed
 
 cd benchmarks/past-bench && ../../.venv/bin/pytest -q
 397 passed, 2 skipped

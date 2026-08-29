@@ -798,22 +798,22 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 截至 2026-08-29，已完成第一份 deterministic/shadow feasibility fixture，并提供可执行入口 `python -m rsimem.memory.policy_feasibility_fixture`：completed snapshot 同时包含 durable 与 temporary 信息，parent/candidate replay 共享 event、revision、backend 和 lineage；Extraction case 覆盖 useful 与 missed 的完整证据链，缺失任一链节点会 fail-closed 降级为 `unresolved`。该 fixture 结果与限制记录在 [`policy_feasibility_baseline_20260829.md`](policy_feasibility_baseline_20260829.md)，不构成真实 provider 或 PAST-Bench uplift 证据。
 
-- □ 构造一个过去context中含durable与temporary信息、未来任务只使用durable信息的fixture。
-- □ Policy N产生至少一个可归因问题，例如遗漏durable fact或提取temporary fact。
+- √ `build_extraction_feedback_fixture()` 构造一个过去context中含durable与temporary信息、未来任务只使用durable信息的 SM01 fixture；`MISSED` 分支由 Policy N 的空 extraction 结果表示，`USEFUL` 分支由同一 durable fact 的显式曝光和使用表示。
+- √ Policy N 在 deterministic fixture 中产生至少一个可归因问题（遗漏 durable fact），并由注册的 family contract 解析为 `MISSED`，不是手工写入 reward 标签。
 - √ Fixture分别构造完整`opportunity -> use -> successful outcome` useful链和`source -> no equivalent extraction -> future demand -> absence-attributed outcome` missed链（当前为 fixture-local opaque IDs，不是部署标签）。
 - √ 删除任一useful/missed链节点后label退化为unresolved，而不是继续贡献optimizer reward。
-- □ End-to-end feedback保留完整轨迹，strict resolver同时生成attribution diagnosis；即使resolved attribution不足，也能验证exploratory optimizer是否提出extraction-only hypothesis。
+- √ End-to-end feedback fixture 保留 source、future opportunity/use/outcome operation join、exposure、extraction-set 和 fact-level 轨迹；strict resolver 同时保留 `UNRESOLVED/CENSORED` 诊断，resolved primary 才能投影 extraction hypothesis。
 - √ Delayed feedback构建optimizer corpus并生成受限的、只针对当前开放层的N+1 hypothesis；`extraction_proposal` 现在持久化经 parent/corpus/ownership gate 校验的 `feasibility-hypothesis.json`，没有真实 uplift 也不判定 feasibility 失败。
 - □ N+1通过offline replay、schema、安全和layer-boundary validation；是否激活属于后续效果实验，不属于本阶段最低验收。
 - □ Future fixture可以加载N+1并记录 intervention path；是否改善deployment-observable outcome作为后续效果实验结果，不作为六层基建的前置假设。
-- □ 全链不读取grader/answer，不使用cost信号，不修改update/retrieval policy。
+- √ fixture 到 feasibility projection 的链路不读取 grader/answer，不使用 cost 信号，也不修改 update/retrieval policy；content-bearing source 只停留在 owner-controlled fixture/corpus 边界。
 - □ Restart、rejection、no-proposal和rollback反向路径全部通过。
 
 验收：只有结构化证据可以重建`N -> past feedback -> N+1 hypothesis -> target-layer intervention`，并确认candidate只改变预注册的policy layer时，才可以把该层标记为 `optimization-ready`。真实 provider uplift 仍属于后续效果实验，严格 attribution 不再是探索性 candidate 的唯一前置门槛。
 
 ### 3B：六层 Policy 可优化性验收
 
-第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。每个 intervention 现在由 `ProcessFeedback` 绑定 event、source revision、parent/candidate decision、receipt 和 before/after digest，并由独立 feasibility ledger 跨 restart 保存；ledger 支持 `verify_case()`，缺失或冲突 receipt fail closed；有 process signal 的 case 还生成绑定 past feedback 与目标层的 `PolicyHypothesis`，并持久化完整 hypothesis payload，显式覆盖 `N -> feedback -> N+1 -> intervention` identity。真实 extraction feedback 只能通过 `feedback_chain_from_extraction_example()`、`LayerIntervention.from_extraction_feedback()`、`build_extraction_feedback_interventions()` 和 `build_optimizer_corpus_interventions()` 投影 primary useful/missed 链，其他状态继续保留为 unresolved/censored 诊断；census 同时报告 U/H/M、unresolved/censored 原始计数、ambiguity 计数和 zero-denominator unknown。该结果只是可行性状态，不代表任何层已完成在线优化；后续仍需补充 process corpus、独立 matched validation 和失败/provider run 保留。当前验证：RSIMem `.venv` 测试 `634 passed`，PAST-Bench `397 passed, 2 skipped`。
+第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。每个 intervention 现在由 `ProcessFeedback` 绑定 event、source revision、parent/candidate decision、receipt 和 before/after digest，并由独立 feasibility ledger 跨 restart 保存；ledger 支持 `verify_case()`，缺失或冲突 receipt fail closed；有 process signal 的 case 还生成绑定 past feedback 与目标层的 `PolicyHypothesis`，并持久化完整 hypothesis payload，显式覆盖 `N -> feedback -> N+1 -> intervention` identity。真实 extraction feedback 只能通过 `feedback_chain_from_extraction_example()`、`LayerIntervention.from_extraction_feedback()`、`build_extraction_feedback_interventions()` 和 `build_optimizer_corpus_interventions()` 投影 primary useful/missed 链，其他状态继续保留为 unresolved/censored 诊断；census 同时报告 U/H/M、unresolved/censored 原始计数、ambiguity 计数和 zero-denominator unknown。当前新增的 `build_extraction_feedback_fixture()` 将 durable/temporary past context 与 future task 的 registered SM01 contract 串成可重放 useful/missed case。该结果只是可行性状态，不代表任何层已完成在线优化；后续仍需补充 process corpus、独立 matched validation 和失败/provider run 保留。当前验证：RSIMem `.venv` 测试 `640 passed`，PAST-Bench `397 passed, 2 skipped`。
 
 当前第三阶段的主要任务是 feasibility，不要求一次性完成六层 online optimization。每层分别完成以下验收：
 
