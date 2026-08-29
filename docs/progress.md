@@ -65,6 +65,15 @@ errors; incomplete attempts remain excluded from optimizer and activation. Raw
 usage and process-corpus diagnostics are recorded in
 [`extraction_stage3_sm02_process_pilot_20260829.md`](extraction_stage3_sm02_process_pilot_20260829.md).
 
+The PAST-Bench Hermes adapter now transports only content-free process-corpus
+identity (`event_ids` and a stable digest) in `StepResponse`; it never exposes
+official score or grader fields to the policy path. An evaluator-free static
+writeback fixture verifies trigger, source, extraction, admission, commit,
+exposure, and task-outcome events, receipt joins, and process-ledger auditing.
+The focused contract is in `tests/test_rsimem_hermes_adapter.py`; current
+regression results are RSIMem `655 passed` and PAST-Bench `397 passed, 2
+skipped`.
+
 ## Completed Work
 
 ### Repository And Benchmark Foundation
