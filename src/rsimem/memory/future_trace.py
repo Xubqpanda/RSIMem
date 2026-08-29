@@ -105,7 +105,24 @@ class SemanticFeedbackResolver:
                 False,
                 False,
             )
-        scope = resolver.contract.opportunity.memory_scope_keys
+        # The benchmark contract is an audit-time allowlist, not an
+        # opportunity generator.  Runtime observations must carry a visible
+        # semantic requirement; otherwise a family/stage match alone would
+        # manufacture demand and leak benchmark semantics into the process
+        # signal.
+        scope = tuple(
+            key
+            for key in observation.task_semantic_keys
+            if key in resolver.contract.opportunity.memory_scope_keys
+        )
+        if not scope:
+            return SemanticFeedbackResolution(
+                (),
+                OperationStatus.NONE,
+                "opportunity_not_observed",
+                False,
+                True,
+            )
         if len(scope) == 1:
             semantic_keys = tuple((scope[0],) for _ in future.memory_artifact_ids)
         elif len(scope) == len(future.memory_artifact_ids):
