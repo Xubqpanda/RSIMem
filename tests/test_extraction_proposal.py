@@ -15,7 +15,11 @@ from rsimem.memory.extraction_optimizer_corpus import (
     OptimizerCorpusRetention,
     OptimizerCorpusSplit,
 )
-from rsimem.extraction_proposal import main, prepare_extraction_proposal
+from rsimem.extraction_proposal import (
+    _read_api_key_file,
+    main,
+    prepare_extraction_proposal,
+)
 from rsimem.memory.prompt_components import canonical_json
 from test_extraction_optimizer_contracts import _multi_corpus, _parent, _proposal_output
 
@@ -31,6 +35,18 @@ def _store(tmp_path: Path, corpus):
     )
     store.write(corpus)
     return store, owner
+
+
+def test_optimizer_key_reader_accepts_operator_config_without_endpoint_metadata(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "api_key.md"
+    path.write_text('key: "secret-token"\nurl: https://provider.invalid/v1\n')
+    assert _read_api_key_file(path) == "secret-token"
+
+    plain = tmp_path / "plain.key"
+    plain.write_text("plain-token\n")
+    assert _read_api_key_file(plain) == "plain-token"
 
 
 def test_proposal_persists_candidate_and_request_without_recalling_provider(

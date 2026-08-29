@@ -19,6 +19,7 @@ from rsimem.memory.extraction_optimizer_contracts import (
     EXTRACTION_OPTIMIZER_OUTPUT_SCHEMA_DIGEST,
     EXTRACTION_OPTIMIZER_SYSTEM_DIGEST,
     EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION,
+    FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
     ExtractionOptimizerCompletion,
     ExtractionOptimizerConfig,
     build_extraction_optimizer_request,
@@ -209,6 +210,29 @@ def test_request_groups_one_primary_unit_with_source_set_fact_annotations() -> N
     assert "official_grader" not in request.input_json
     assert EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION not in request.input_json
     assert build_extraction_optimizer_request(_parent(), _corpus()) == request
+
+
+def test_request_deduplicates_content_and_bounds_unresolved_context() -> None:
+    """Replicated evidence shares content without silently dropping units."""
+
+    corpus = _multi_corpus(("useful", "useful", "unresolved", "unresolved"), same_source=True)
+    request = build_extraction_optimizer_request(_parent(), corpus)
+    payload = json.loads(request.input_json)
+
+    assert len(request.input_json) < FROZEN_EXTRACTION_OPTIMIZER_CONFIG.maximum_input_chars
+    catalog = payload["content_catalog"]
+    assert set(catalog) == {
+        "source_projections",
+        "extracted_fact_sets",
+        "delayed_evidence",
+    }
+    groups = payload["evidence_groups"]
+    assert len(groups["useful"]) == 2
+    assert len(groups["unresolved"]) == 2
+    assert all(unit["source_projection_ref"] for unit in groups["useful"])
+    assert all(unit["source_projection_ref"] is None for unit in groups["unresolved"])
+    assert all(unit["delayed_evidence_ref"] for unit in groups["useful"])
+    assert all(unit["delayed_evidence_ref"] is None for unit in groups["unresolved"])
 
 
 def test_frozen_config_and_nontraining_requests_fail_before_completion() -> None:
