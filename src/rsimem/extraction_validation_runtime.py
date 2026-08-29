@@ -25,6 +25,8 @@ from .memory.extraction_policy_store import (
     JsonExtractionPolicyStore,
 )
 from .memory.prompt_components import canonical_json, content_digest
+from .memory.evidence_planes import EvidencePlane, EvidenceSourceKind
+from .memory.revocation import JsonRevocationRegistry
 from .memory_systems.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT,
     MEM0_FLAT_EXTRACTION_SLOT_ID,
@@ -370,10 +372,20 @@ def prepare_extraction_matched_trial_runtime(
     candidate: ExtractionPromptPolicyArtifact,
     offline_decision: ExtractionOfflineValidationDecision,
     output_root: Path,
+    revocation_registry: JsonRevocationRegistry | None = None,
 ) -> dict[str, object]:
     """Activate one candidate only inside a validation-scoped policy store."""
 
     _validate_offline_join(parent, candidate, offline_decision)
+    if revocation_registry is not None:
+        for artifact in (parent, candidate):
+            revocation_registry.assert_active(
+                artifact_id=artifact.artifact_id,
+                artifact_schema_version=artifact.schema_version,
+                artifact_digest=artifact.artifact_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
     output = output_root.expanduser().resolve()
     config_path = output / EXTRACTION_TRIAL_CONFIG_FILE
     store_path = output / EXTRACTION_TRIAL_POLICY_STORE_FILE

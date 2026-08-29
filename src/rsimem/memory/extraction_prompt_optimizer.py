@@ -33,6 +33,8 @@ from .extraction_policy_artifact import (
     ExtractionRuleEditAction,
 )
 from .prompt_components import content_digest, text_digest
+from .revocation import JsonRevocationRegistry
+from .evidence_planes import EvidencePlane, EvidenceSourceKind
 
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
@@ -206,15 +208,25 @@ class ExtractionPromptOptimizer:
         client: ExtractionOptimizerClient,
         *,
         config: ExtractionOptimizerConfig = FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+        revocation_registry: JsonRevocationRegistry | None = None,
     ) -> None:
         self.client = client
         self.config = config
+        self.revocation_registry = revocation_registry
 
     def propose(
         self,
         parent: ExtractionPromptPolicyArtifact,
         corpus: ExtractionOptimizerCorpus,
     ) -> ExtractionOptimizerResult:
+        if self.revocation_registry is not None:
+            self.revocation_registry.assert_active(
+                artifact_id=parent.artifact_id,
+                artifact_schema_version=parent.schema_version,
+                artifact_digest=parent.artifact_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
         primary = tuple(value for value in corpus.examples if value.primary)
         actionable = tuple(value for value in primary if _is_actionable(value))
         if len(actionable) < self.config.minimum_actionable_primary_examples:
