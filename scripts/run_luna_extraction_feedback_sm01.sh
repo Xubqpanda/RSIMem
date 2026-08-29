@@ -11,16 +11,27 @@ TASK_FAMILY="${RSIMEM_EXTRACTION_TASK_FAMILY:-memory_ability/SM01_preference_ado
 FAMILY_ROOT="${PAST_BENCH_ROOT}/self-evolve-tasks-v2/${TASK_FAMILY}"
 EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-${RSIMEM_ROOT}/configs/extraction_feedback_sm01.json}"
 AGENT_REGISTRY="${RSIMEM_AGENT_REGISTRY:-${RSIMEM_ROOT}/configs/agents.yaml}"
+PAST_AGENT_REGISTRY="${RSIMEM_PAST_AGENT_REGISTRY:-${PAST_BENCH_ROOT}/configs/agents.yaml}"
+PAST_AGENT="${RSIMEM_PAST_AGENT:-hermes}"
+PAST_AGENT_PROFILE="${RSIMEM_PAST_AGENT_PROFILE:-openai}"
+PAST_MODEL="${RSIMEM_PAST_MODEL:-gpt-5.6-luna}"
+PAST_BASE_URL="${RSIMEM_PAST_BASE_URL:-https://coding.tu-zi.com/v1}"
 RUN_CONFIG="${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml"
 METHOD="static-extraction-rsimem"
 FEEDBACK_CONTRACT="${RSIMEM_EXTRACTION_FEEDBACK_CONTRACT:-}"
 # The default SM01 invocation resolves to --rsimem-semantic-feedback-contract sm01_tsv_v1;
 # other registered families may be selected explicitly through the environment.
+# RSIMem preflight uses --agent-registry "${AGENT_REGISTRY}"; PAST runtime uses
+# --registry "${PAST_AGENT_REGISTRY}" so the two registry schemas cannot be confused.
 
 if [[ -z "${GPT_LUNA_API_KEY:-}" ]]; then
   echo "GPT_LUNA_API_KEY is required." >&2
   exit 2
 fi
+# The vendored Hermes registry's OpenAI-compatible profile reads
+# OPENAI_API_KEY.  Bridge the explicitly supplied provider credential through
+# the environment; it is never placed on the command line or in a manifest.
+export OPENAI_API_KEY="${OPENAI_API_KEY:-${GPT_LUNA_API_KEY}}"
 if [[ -z "${RSIMEM_BATCH_ID:-}" ]]; then
   echo "RSIMEM_BATCH_ID is required for a formal feedback batch." >&2
   exit 2
@@ -134,14 +145,17 @@ for replicate in $(seq 1 "${replicates}"); do
     cd "${PAST_BENCH_ROOT}"
     "${PAST_BENCH_BIN}" evolve \
       --family "${TASK_FAMILY}" \
-      --agent hermes-luna \
+      --agent "${PAST_AGENT}" \
+      --agent-profile "${PAST_AGENT_PROFILE}" \
+      --model "${PAST_MODEL}" \
+      --base-url "${PAST_BASE_URL}" \
       --runtime local \
       --sandbox \
       --sandbox-tools \
       --persistence-variant with_persistence \
       --no-judge \
       --config "${RUN_CONFIG}" \
-      --registry "${AGENT_REGISTRY}" \
+      --registry "${PAST_AGENT_REGISTRY}" \
       --trace-dir "${trace_dir}" \
       --background-review-wait-s 0 \
       --rsimem-mode native+ledger \
