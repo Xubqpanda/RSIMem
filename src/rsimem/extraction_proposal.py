@@ -43,11 +43,33 @@ class _DeferredExtractionOptimizerClient:
     ):
         if self.api_key_file is None:
             raise ValueError("optimizer provider API key file is required")
-        api_key = self.api_key_file.read_text(encoding="utf-8").strip()
+        api_key = _read_api_key_file(self.api_key_file)
         return OpenAICompatibleExtractionOptimizerClient(
             api_key=api_key,
             base_url=self.base_url,
         ).complete(request, config)
+
+
+def _read_api_key_file(path: Path) -> str:
+    """Read a credential from either a plain file or ``key: ...`` config.
+
+    The repository's operator-managed ``api_key.md`` also contains endpoint
+    metadata.  Passing that whole document to an HTTP client is both invalid
+    and an avoidable credential-boundary mistake, so only the explicit key
+    field is accepted when present.
+    """
+
+    raw = path.read_text(encoding="utf-8")
+    candidates = []
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if stripped.lower().startswith("key:"):
+            candidates.append(stripped.split(":", 1)[1].strip())
+    value = candidates[0] if candidates else raw.strip()
+    value = value.strip('"').strip("'").strip()
+    if not value or any(char.isspace() for char in value):
+        raise ValueError("optimizer provider API key file is malformed")
+    return value
 
 
 def _write_immutable(path: Path, value: object) -> None:

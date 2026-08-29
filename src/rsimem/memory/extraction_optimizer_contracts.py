@@ -329,6 +329,14 @@ def build_extraction_optimizer_request(
     for example in corpus.examples:
         by_unit.setdefault(example.primary_unit_id, []).append(example)
     units = []
+    # Replicated runs commonly carry the same bounded source projection and
+    # delayed evidence text.  Keep those content-bearing values once in a
+    # deterministic catalog and let each evidence unit refer to them.  This
+    # preserves the full optimizer context while respecting the frozen input
+    # character budget; it is not lossy truncation or silent sample dropping.
+    source_catalog: dict[str, object] = {}
+    fact_catalog: dict[str, object] = {}
+    delayed_catalog: dict[str, object] = {}
     primary_ids = []
     for primary_unit_id in sorted(by_unit):
         values = by_unit[primary_unit_id]
@@ -337,11 +345,51 @@ def build_extraction_optimizer_request(
             raise ValueError("optimizer evidence unit requires one primary example")
         primary = primaries[0]
         primary_ids.append(primary.example_id)
+        actionable = primary.label in {
+            ExtractionFeedbackLabel.USEFUL,
+            ExtractionFeedbackLabel.HARMFUL,
+            ExtractionFeedbackLabel.MISSED,
+        }
+        source_payload = [value.payload() for value in primary.source_messages]
+        fact_payload = [value.payload() for value in primary.extracted_facts]
+        delayed_payload = primary.delayed_evidence.payload()
+        # Identity-bearing operation/timestamp fields are retained on the
+        # unit.  The catalog stores the untrusted textual evidence itself,
+        # allowing repeated replicas to share one copy safely.
+        delayed_text_payload = {
+            key: delayed_payload[key]
+            for key in ("opportunity", "use", "outcome")
+        }
+        source_ref = f"optimizer-source.{content_digest(source_payload)[:40]}"
+        fact_ref = f"optimizer-facts.{content_digest(fact_payload)[:40]}"
+        delayed_ref = f"optimizer-evidence.{content_digest(delayed_text_payload)[:40]}"
+        if actionable:
+            source_catalog[source_ref] = source_payload
+            fact_catalog[fact_ref] = fact_payload
+            delayed_catalog[delayed_ref] = delayed_text_payload
         levels = sorted(values, key=lambda item: (
             item.level.value,
             item.feedback_fact_id or "",
             item.example_id,
         ))
+        delayed_identity = {
+            "observation_id": delayed_payload["observation_id"],
+            "future_opportunity_id": delayed_payload["future_opportunity_id"],
+        }
+        # Unresolved/censored units are retained as diagnostic context, but
+        # their operation/timestamp identity is not needed by the optimizer
+        # and would needlessly consume the bounded request budget.  Resolved
+        # actionable units retain the complete attribution join.
+        if actionable:
+            delayed_identity = {
+                "observation_id": delayed_payload["observation_id"],
+                "source_completed_at": delayed_payload["source_completed_at"],
+                "observed_at": delayed_payload["observed_at"],
+                "future_opportunity_id": delayed_payload["future_opportunity_id"],
+                "opportunity_operation_id": delayed_payload["opportunity_operation_id"],
+                "use_operation_id": delayed_payload["use_operation_id"],
+                "outcome_operation_id": delayed_payload["outcome_operation_id"],
+            }
         units.append({
             "primary_unit_id": primary_unit_id,
             "primary_example_id": primary.example_id,
@@ -349,13 +397,10 @@ def build_extraction_optimizer_request(
             "attribution_confidence": primary.attribution_confidence.value,
             "reason_codes": list(primary.reason_codes),
             "component_ownership": primary.component_ownership.value,
-            "source_messages": [
-                value.payload() for value in primary.source_messages
-            ],
-            "extracted_facts": [
-                value.payload() for value in primary.extracted_facts
-            ],
-            "delayed_evidence": primary.delayed_evidence.payload(),
+            "source_projection_ref": source_ref if actionable else None,
+            "extracted_fact_set_ref": fact_ref if actionable else None,
+            "delayed_evidence_ref": delayed_ref if actionable else None,
+            "delayed_evidence_identity": delayed_identity,
             "feedback_levels": [{
                 "example_id": value.example_id,
                 "level": value.level.value,
@@ -403,6 +448,11 @@ def build_extraction_optimizer_request(
             "maximum_rule_edits": config.maximum_rule_edits,
         },
         "evidence_groups": groups,
+        "content_catalog": {
+            "source_projections": dict(sorted(source_catalog.items())),
+            "extracted_fact_sets": dict(sorted(fact_catalog.items())),
+            "delayed_evidence": dict(sorted(delayed_catalog.items())),
+        },
     }
     input_json = canonical_json(input_payload)
     if len(input_json) > config.maximum_input_chars:
