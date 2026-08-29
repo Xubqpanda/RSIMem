@@ -90,7 +90,24 @@ class ProcessCorpus:
         task_template_group_id: str,
         task_manifest_digest: str,
     ) -> "ProcessCorpus":
-        ordered = tuple(sorted(tuple(events), key=lambda event: event.event_id))
+        # Shared-cold PAST traces can expose the same logical event through an
+        # outer and a nested attempt directory.  Exact duplicates are
+        # idempotent and collapsed here; an event ID with a different payload
+        # is a conflict and must fail closed.
+        canonical_by_id: dict[str, str] = {}
+        unique: list[ProcessEvent] = []
+        for event in events:
+            if not isinstance(event, ProcessEvent):
+                raise TypeError("process corpus events have the wrong type")
+            canonical = json.dumps(event.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+            previous = canonical_by_id.get(event.event_id)
+            if previous is not None:
+                if previous != canonical:
+                    raise ValueError("conflicting process corpus event identity")
+                continue
+            canonical_by_id[event.event_id] = canonical
+            unique.append(event)
+        ordered = tuple(sorted(unique, key=lambda event: event.event_id))
         identity = {
             "split_role": split_role,
             "family_id": family_id,
