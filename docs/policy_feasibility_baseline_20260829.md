@@ -84,6 +84,10 @@ git diff --check
 
 完整回归已在仓库 `.venv` 项目实验环境中完成。系统 Python 3.12 环境缺少 Hermes/PAST-Bench 运行时依赖，不能用系统解释器复现这些结果；实验命令应使用 `.venv`，PAST-Bench 测试应从其目录运行。
 
+后续 process-audit、trace-join 和 raw-usage contract 回归将报告基线更新为：
+RSIMem `665 passed`，PAST-Bench `397 passed, 2 skipped`；上面的 `645 passed`
+是本报告最初生成时的历史快照。
+
 实现入口：`src/rsimem/memory/policy_feasibility.py`；测试 fixture：`tests/test_policy_feasibility.py`。
 
 ## Executable runner
