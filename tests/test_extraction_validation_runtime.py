@@ -27,6 +27,8 @@ from rsimem.memory.extraction_policy_store import (
     ExtractionPolicyState,
     JsonExtractionPolicyStore,
 )
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
+from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
 from rsimem.memory_systems.mem0_flat import MEM0_FLAT_EXTRACTION_SLOT
 from rsimem.memory.prompt_components import content_digest
 from test_extraction_matched_activation import _offline_decision
@@ -252,6 +254,33 @@ def test_offline_runtime_binds_candidate_and_replays_across_restart(tmp_path) ->
     assert resolved.candidate == candidate
     assert resolved.validation_id == "sm03-heldout-v1"
     assert resolved.profile()["deploymentScope"] == "offline_validation_only"
+
+
+def test_offline_runtime_revocation_gate_runs_before_bundle_write(tmp_path) -> None:
+    parent, candidate, static, suite = _offline_bundle_inputs()
+    registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    registry.initialize()
+    registry.append(RevocationEntry.create(
+        artifact_id=candidate.artifact_id,
+        artifact_schema_version=candidate.schema_version,
+        artifact_digest=candidate.artifact_digest,
+        evidence_plane=EvidencePlane.PURE_PROCESS,
+        evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        revoked_at="2026-08-30T01:02:03Z",
+        reason_code="stale_schema",
+    ))
+    output = tmp_path / "offline-revoked"
+    with pytest.raises(ValueError, match="artifact is revoked"):
+        prepare_extraction_offline_validation_runtime(
+            parent=parent,
+            candidate=candidate,
+            static_safety=static,
+            deterministic_suite=suite,
+            validation_id="sm03-heldout-revoked-v1",
+            output_root=output,
+            revocation_registry=registry,
+        )
+    assert not output.exists()
 
 
 @pytest.mark.parametrize(
