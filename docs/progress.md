@@ -131,6 +131,9 @@ Policy decision envelopes now reject a `RUN` action carrying a non-executing
 status, and content-free audit rejects execution receipts on `SKIPPED` or
 `DEFERRED` decisions.  Pending, failed, and rejected run states remain
 available for normal scheduling and recovery.
+The persistent idempotency store also has a regression guard proving that a
+malformed receipt cannot be overwritten by a later reservation; it fails closed
+before any mutation reservation is recorded.
 
 ## Completed Work
 
