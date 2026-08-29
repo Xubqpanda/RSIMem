@@ -419,8 +419,10 @@ def logical_case_id_for_example(
     repeated retrieval boundaries and provider replicates must contribute
     physical evidence to one case, not extra optimizer reward.  The source
     projection digest stands in for the frozen extraction set, while the
-    policy body digest and task/stage identities prevent cross-policy or
-    cross-window merges.
+    policy body digest and task identity prevent cross-policy or cross-task
+    merges.  The feedback stage is deliberately excluded: near/far (or
+    repeated) retrieval boundaries for one future task are observations of
+    the same semantic case.
     """
 
     if not isinstance(example, ExtractionOptimizerCorpusExample):
@@ -432,7 +434,7 @@ def logical_case_id_for_example(
         "source_task_template_id": join.source_task_id,
         "source_extraction_set_digest": join.source_projection_digest,
         "future_task_template_id": join.feedback_task_id,
-        "observation_window": join.feedback_stage,
+        "observation_window": join.feedback_task_id,
     }
     return f"logical-case.{content_digest(identity)[:40]}"
 
