@@ -179,6 +179,7 @@ class JsonCommitScheduleStore:
 
 
 ApplyCommit = Callable[[tuple[str, ...]], str]
+ValidateCommit = Callable[[CommitSchedule], None]
 
 
 def _same_schedule_identity(first: CommitSchedule, second: CommitSchedule) -> bool:
@@ -200,8 +201,14 @@ def _same_schedule_identity(first: CommitSchedule, second: CommitSchedule) -> bo
 
 
 class CommitScheduler:
-    def __init__(self, store: CommitScheduleStore | None = None) -> None:
+    def __init__(
+        self,
+        store: CommitScheduleStore | None = None,
+        *,
+        mutation_validator: ValidateCommit | None = None,
+    ) -> None:
         self.store = store or InMemoryCommitScheduleStore()
+        self.mutation_validator = mutation_validator
 
     def schedule(self, decision: CommitDecision, *, boundary: str) -> CommitSchedule | None:
         if decision.action.value != "RUN":
@@ -245,15 +252,28 @@ class CommitScheduler:
             failed = CommitSchedule(**{**schedule.payload(), "status": CommitScheduleStatus.FAILED, "failure_reason": "stale_revision"})
             self.store.put(failed)
             return failed
+        if self.mutation_validator is None:
+            failed = CommitSchedule(**{
+                **schedule.payload(),
+                "status": CommitScheduleStatus.FAILED,
+                "failure_reason": "mutation_validator_missing",
+            })
+            self.store.put(failed)
+            return failed
         try:
+            self.mutation_validator(schedule)
             receipt_id = apply(schedule.mutation_ids)
             if not isinstance(receipt_id, str) or not receipt_id.strip():
                 raise ValueError("commit executor returned an invalid receipt")
             committed = CommitSchedule(**{**schedule.payload(), "status": CommitScheduleStatus.COMMITTED, "receipt_id": receipt_id, "failure_reason": None})
         except Exception as exc:
-            committed = CommitSchedule(**{**schedule.payload(), "status": CommitScheduleStatus.FAILED, "failure_reason": type(exc).__name__})
-        self.store.put(committed)
-        return committed
+            failed = CommitSchedule(**{
+                **schedule.payload(),
+                "status": CommitScheduleStatus.FAILED,
+                "failure_reason": type(exc).__name__,
+            })
+            self.store.put(failed)
+            return failed
 
     def cancel(self, schedule_id: str) -> CommitSchedule:
         schedule = self.store.get(schedule_id)
@@ -273,4 +293,5 @@ __all__ = [
     "InMemoryCommitScheduleStore",
     "JsonCommitScheduleStore",
     "CommitScheduler",
+    "ValidateCommit",
 ]
