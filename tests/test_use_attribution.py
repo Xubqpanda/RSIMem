@@ -5,6 +5,7 @@ from dataclasses import replace
 
 import pytest
 
+from rsimem.lifecycle import RawResourceUsage
 from rsimem.memory.use_attribution import (
     MemoryUseEvidence,
     MemoryUseResolutionStatus,
@@ -12,6 +13,13 @@ from rsimem.memory.use_attribution import (
     resolve_memory_use,
 )
 from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
+from rsimem.memory.operation_graph import (
+    OperationContext,
+    OperationGraph,
+    OperationKind,
+    OperationRecord,
+    OperationStatus,
+)
 
 
 def _evidence(**overrides: object) -> MemoryUseEvidence:
@@ -33,12 +41,59 @@ def _evidence(**overrides: object) -> MemoryUseEvidence:
     return MemoryUseEvidence.create(**values)
 
 
+def _operation_graph() -> OperationGraph:
+    context = OperationContext(
+        "run.use-graph-v1", "episode.use-graph-v1", "session.use-graph-v1",
+        "task.use-graph-v1", "policy.use-v1", "prompt.use-v1", "framework.use-v1",
+    )
+
+    def op(operation_id: str, kind: OperationKind, parents: tuple[str, ...], inputs: tuple[str, ...], outputs: tuple[str, ...]) -> OperationRecord:
+        return OperationRecord(
+            operation_id, kind, context, parents, inputs, outputs,
+            "retry.use-graph-v1", OperationStatus.SUCCESS, None, 0, RawResourceUsage(),
+        )
+
+    artifact = "artifact.preference.v1"
+    return OperationGraph(
+        (),
+        (
+            op("op.retrieve.v1", OperationKind.RETRIEVAL, (), (), (artifact,)),
+            op("op.inject.v1", OperationKind.INJECTION, ("op.retrieve.v1",), (artifact,), (artifact,)),
+            op("op.downstream.v1", OperationKind.USE, ("op.inject.v1",), (artifact,), ()),
+            op("op.outcome.v1", OperationKind.DOWNSTREAM_OUTCOME, ("op.downstream.v1",), (artifact,), ()),
+        ),
+        (),
+    )
+
+
 def test_exact_join_resolves_attributable_use_and_replays() -> None:
     evidence = _evidence()
     resolution = resolve_memory_use(evidence)
     assert resolution.status == MemoryUseResolutionStatus.ATTRIBUTABLE_USE
     assert resolution.attributable_use is True
     assert MemoryUseEvidence.from_payload(json.loads(json.dumps(evidence.payload()))) == evidence
+
+
+def test_operation_graph_proves_retrieval_injection_use_outcome_chain() -> None:
+    evidence = _evidence()
+    assert resolve_memory_use(
+        evidence,
+        operation_graph=_operation_graph(),
+    ).status == MemoryUseResolutionStatus.ATTRIBUTABLE_USE
+    graph = _operation_graph()
+    broken = OperationGraph(
+        graph.artifacts,
+        tuple(
+            replace(item, parent_operation_ids=())
+            if item.operation_id == "op.inject.v1"
+            else item
+            for item in graph.operations
+        ),
+        graph.mutations,
+    )
+    result = resolve_memory_use(evidence, operation_graph=broken)
+    assert result.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert result.reason_code == "operation_join_invalid"
 
 
 def test_exposure_and_behavioral_consistency_do_not_become_use() -> None:

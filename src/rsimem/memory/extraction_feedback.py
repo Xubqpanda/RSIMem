@@ -666,8 +666,17 @@ class MissedExtractionEvidence:
     future_opportunity_id: str
     absence_outcome_operation_id: str
     deterministically_attributed: bool
+    evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
 
     def __post_init__(self) -> None:
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        if plane is not EvidencePlane.BENCHMARK_AUDIT or source is not EvidenceSourceKind.BENCHMARK_CONTRACT:
+            raise ValueError(
+                "family-bound missed evidence must be benchmark_audit evidence"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         _require_id(self.missed_id, "missed extraction ID")
         _require_key(self.semantic_key)
         _require_digest(self.source_span_digest, "missed source span digest")
@@ -702,6 +711,8 @@ class MissedExtractionEvidence:
             future_opportunity_id,
             absence_outcome_operation_id,
             True,
+            EvidencePlane.BENCHMARK_AUDIT,
+            EvidenceSourceKind.BENCHMARK_CONTRACT,
         )
 
 
