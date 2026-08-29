@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+import re
 from typing import Mapping
 
 
@@ -42,8 +43,12 @@ _FORBIDDEN_PROCESS_KEYS = frozenset({
     "family_id", "familyId", "stage", "grader", "answer_key", "answerKey",
     "hidden_expectation", "hiddenExpectation", "official_score", "officialScore",
     "official_evaluation", "officialEvaluation", "task_score", "taskScore",
-    "score", "answer", "judge", "expectation",
+    "score", "answer", "judge", "judge_feedback", "expectation",
 })
+_FORBIDDEN_PROCESS_KEYS_NORMALIZED = frozenset(
+    re.sub(r"[^a-z0-9]", "", key.lower())
+    for key in _FORBIDDEN_PROCESS_KEYS
+)
 
 
 def validate_pure_process_payload(value: object) -> None:
@@ -51,7 +56,13 @@ def validate_pure_process_payload(value: object) -> None:
 
     def walk(item: object) -> None:
         if isinstance(item, Mapping):
-            overlap = _FORBIDDEN_PROCESS_KEYS.intersection(item)
+            # Treat casing and separators as presentation details.  This
+            # closes aliases such as ``Task-Score``/``official.Score`` while
+            # still allowing non-evaluation fields such as ``score_digest``.
+            overlap = _FORBIDDEN_PROCESS_KEYS_NORMALIZED.intersection(
+                re.sub(r"[^a-z0-9]", "", str(key).lower())
+                for key in item
+            )
             if overlap:
                 raise ValueError(
                     "pure-process evidence contains forbidden evaluation fields: "
