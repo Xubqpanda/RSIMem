@@ -8,6 +8,7 @@ from typing import Protocol, runtime_checkable
 
 from ..lifecycle import RawResourceUsage
 from .extraction_feedback import ExtractionFeedbackLabel
+from .evidence_planes import EvidencePlane, require_optimizer_plane
 from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
     ExtractionOptimizerCorpusExample,
@@ -411,6 +412,10 @@ def build_extraction_optimizer_request(
 ) -> ExtractionOptimizerRequest:
     if corpus.split != OptimizerCorpusSplit.TRAIN:
         raise ValueError("optimizer request requires the training corpus")
+    planes = {EvidencePlane(example.evidence_plane) for example in corpus.examples}
+    if len(planes) != 1:
+        raise ValueError("optimizer corpus mixes evidence planes")
+    require_optimizer_plane(next(iter(planes)))
     extraction_digests = {
         example.audit_join.extraction_artifact_digest
         for example in corpus.examples
