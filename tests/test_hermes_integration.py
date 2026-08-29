@@ -48,9 +48,12 @@ from rsimem.memory.live_writeback import (
     StaticSemanticWritebackConfig,
 )
 from rsimem.memory.extraction_feedback import (
+    ExtractedFactEvidence,
     ExtractionSetStatus,
     ExtractionSourceEvidence,
+    FactDisposition,
 )
+from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
 from rsimem.memory.extraction_projection import (
     ExtractionSourceRecord,
     JsonExtractionSourceRecordStore,
@@ -513,6 +516,68 @@ def test_past_bench_bridge_records_generic_memory_use_join(tmp_path: Path) -> No
         serialized = json.dumps(evidence[0].payload(), ensure_ascii=True)
         assert "SM02" not in serialized
         assert "stage" not in serialized
+    finally:
+        bridge.close()
+
+
+def test_past_bench_bridge_validates_artifact_set_ownership(tmp_path: Path) -> None:
+    source = ExtractionSourceEvidence(
+        source_id="source.set.v1",
+        source_projection_digest="a" * 64,
+        extraction_set_id="set.v1",
+        status=ExtractionSetStatus.NONEMPTY,
+        available_semantic_keys=("preference.summary.tsv",),
+        facts=(
+            ExtractedFactEvidence(
+                "fact.set.a.v1",
+                ("preference.summary.tsv",),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.set.a.v1",
+            ),
+            ExtractedFactEvidence(
+                "fact.set.b.v1",
+                ("preference.summary.tsv",),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.set.b.v1",
+            ),
+        ),
+    )
+    binding = ArtifactSetSemanticBinding.create(
+        semantic_unit_id="semantic.preference.tsv.v1",
+        semantic_key="preference.summary.tsv",
+        member_artifact_ids=("artifact.set.a.v1", "artifact.set.b.v1"),
+        member_fact_ids=("fact.set.a.v1", "fact.set.b.v1"),
+        complete=True,
+        source_digest=source.source_projection_digest,
+        provenance_id="provenance.set.v1",
+    )
+    bridge = HermesPastBenchBridge(
+        _hermes_home(tmp_path),
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-set",
+        trace_id="trace-set",
+        episode_id="episode-set",
+        session_id="session-set",
+        task_id="task-set",
+        experiment_variant="native+adapter+ledger",
+        artifact_set_binding_provider=lambda _: (binding,),
+    )
+    try:
+        bridge._record_artifact_set_bindings(source)
+        assert bridge.artifact_set_bindings == (binding,)
+        # Use a valid foreign binding to exercise source ownership.
+        foreign = ArtifactSetSemanticBinding.create(
+            semantic_unit_id="semantic.foreign.v1",
+            member_artifact_ids=("artifact.foreign.v1",),
+            member_fact_ids=("fact.foreign.v1",),
+            complete=True,
+            source_digest="b" * 64,
+            provenance_id="provenance.foreign.v1",
+        )
+        bridge._artifact_set_binding_provider = lambda _: (foreign,)
+        with pytest.raises(ValueError, match="source digest mismatch"):
+            bridge._record_artifact_set_bindings(source)
     finally:
         bridge.close()
 

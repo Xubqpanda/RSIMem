@@ -78,6 +78,7 @@ from .memory.extraction_feedback import (
     DeploymentObservation,
     ExposureMode,
     ExtractionFeedbackBuilder,
+    ExtractionSourceEvidence,
     FeedbackOperationJoin,
     FutureMemoryEvidence,
     ObservableToolEvent,
@@ -109,6 +110,10 @@ from .memory.extraction_projection import (
 from .memory.operation_graph import OperationContext
 from .memory.operation_graph import materialize_operation_graph
 from .memory.use_attribution import resolve_memory_use
+from .memory.artifact_set import (
+    ArtifactSetSemanticBinding,
+    JsonArtifactSetBindingLog,
+)
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
 
 
@@ -398,6 +403,10 @@ class HermesPastBenchBridge:
             [Mapping[str, Any]], Iterable[OpportunityEvidence]
         ] | None = None,
         memory_use_evidence_path: Path | None = None,
+        artifact_set_binding_path: Path | None = None,
+        artifact_set_binding_provider: Callable[
+            [object], Iterable[ArtifactSetSemanticBinding]
+        ] | None = None,
     ) -> None:
         if config.mode == HermesExecutionMode.NATIVE:
             raise ValueError("native mode must not construct an RSIMem bridge")
@@ -418,6 +427,11 @@ class HermesPastBenchBridge:
         self._memory_use_evidence_log = JsonMemoryUseEvidenceLog(
             memory_use_evidence_path
             or self.evidence_path.with_name("rsimem_memory_use_evidence.jsonl")
+        )
+        self._artifact_set_binding_provider = artifact_set_binding_provider
+        self._artifact_set_binding_log = JsonArtifactSetBindingLog(
+            artifact_set_binding_path
+            or self.evidence_path.with_name("rsimem_artifact_set_bindings.jsonl")
         )
         self._snapshot_collector = HermesStateSnapshotCollector()
         self.ledger = MemoryLedgerObserver(
@@ -738,6 +752,10 @@ class HermesPastBenchBridge:
         """Generic retrieval/injection/use/outcome joins observed by Hermes."""
 
         return self._memory_use_evidence_log.records()
+
+    @property
+    def artifact_set_bindings(self) -> tuple[ArtifactSetSemanticBinding, ...]:
+        return self._artifact_set_binding_log.records()
 
     def _record_runtime_opportunities(
         self,
@@ -1426,6 +1444,7 @@ class HermesPastBenchBridge:
             available_semantic_keys=available_keys,
         )
         self.extraction_source_store.append(record)
+        self._record_artifact_set_bindings(record.source)
         capture_log = self.extraction_optimizer_capture_log
         if capture_log is None:
             raise ValueError("optimizer capture log is unavailable")
@@ -1458,6 +1477,32 @@ class HermesPastBenchBridge:
             projection=projection,
             fact_contents=tuple(fact_contents),
         ))
+
+    def _record_artifact_set_bindings(self, source: object) -> None:
+        provider = self._artifact_set_binding_provider
+        if provider is None:
+            return
+        values = provider(source)
+        if isinstance(values, ArtifactSetSemanticBinding):
+            values = (values,)
+        if isinstance(values, (str, bytes, Mapping)):
+            raise TypeError("artifact-set provider must return an iterable")
+        if not isinstance(source, ExtractionSourceEvidence):
+            raise TypeError("artifact-set source has the wrong type")
+        source_artifacts = {
+            fact.artifact_id for fact in source.facts if fact.artifact_id is not None
+        }
+        source_facts = {fact.fact_id for fact in source.facts}
+        for binding in values:
+            if not isinstance(binding, ArtifactSetSemanticBinding):
+                raise TypeError("artifact-set provider returned a non-binding value")
+            if binding.source_digest != source.source_projection_digest:
+                raise ValueError("artifact-set binding source digest mismatch")
+            if not set(binding.member_artifact_ids).issubset(source_artifacts):
+                raise ValueError("artifact-set binding references foreign artifact")
+            if not set(binding.member_fact_ids).issubset(source_facts):
+                raise ValueError("artifact-set binding references foreign fact")
+            self._artifact_set_binding_log.append(binding)
 
     def _record_static_policy_evidence(
         self,

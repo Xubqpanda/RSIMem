@@ -157,6 +157,7 @@ from .artifact_set import (
     ArtifactSetResolution,
     ArtifactSetResolutionStatus,
     ArtifactSetSemanticBinding,
+    JsonArtifactSetBindingLog,
     resolve_artifact_set,
 )
 from .tool_exact_join import (
@@ -322,6 +323,7 @@ __all__ = [
     "ArtifactSetResolution",
     "ArtifactSetResolutionStatus",
     "ArtifactSetSemanticBinding",
+    "JsonArtifactSetBindingLog",
     "resolve_artifact_set",
     "TOOL_EXACT_JOIN_SCHEMA",
     "TOOL_EXACT_JOIN_SCHEMA_VERSION",
