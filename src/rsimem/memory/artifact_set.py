@@ -101,6 +101,8 @@ class ArtifactSetSemanticBinding:
             _id(self.matcher_version, "artifact-set matcher version")
         if self.equivalence_digest is not None:
             _sha(self.equivalence_digest, "artifact-set equivalence digest")
+        if self.matcher_version is not None and self.equivalence_digest is None:
+            raise ValueError("matcher evidence requires equivalence digest")
         digest = _digest(self._identity_payload())
         if self.binding_id != f"artifact-set-binding.{digest[:40]}":
             raise ValueError("artifact-set binding ID mismatch")
@@ -227,6 +229,7 @@ def resolve_artifact_set(
     *,
     retrieved_member_artifact_ids: tuple[str, ...],
     exposed_member_artifact_ids: tuple[str, ...],
+    observed_source_digest: str | None = None,
 ) -> ArtifactSetResolution:
     """Require complete, exact member retrieval and exposure for attribution."""
 
@@ -237,6 +240,17 @@ def resolve_artifact_set(
     _ids(retrieved, "retrieved member artifact IDs") if retrieved else None
     _ids(exposed, "exposed member artifact IDs") if exposed else None
     members = set(binding.member_artifact_ids)
+    if observed_source_digest is not None:
+        _sha(observed_source_digest, "observed source digest")
+        if observed_source_digest != binding.source_digest:
+            return ArtifactSetResolution(
+                binding.binding_id,
+                ArtifactSetResolutionStatus.AMBIGUOUS,
+                "member_source_mismatch",
+                False,
+                False,
+                False,
+            )
     if not binding.complete:
         return ArtifactSetResolution(binding.binding_id, ArtifactSetResolutionStatus.UNRESOLVED, "binding_incomplete", False, False, False)
     if not set(retrieved).issubset(members):

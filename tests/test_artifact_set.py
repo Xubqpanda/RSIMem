@@ -21,6 +21,7 @@ def _binding(*, complete: bool = True) -> ArtifactSetSemanticBinding:
         source_digest="a" * 64,
         provenance_id="provenance.extraction.v1",
         matcher_version="matcher.deterministic.v1",
+        equivalence_digest="f" * 64,
     )
 
 
@@ -56,6 +57,19 @@ def test_one_artifact_can_carry_multiple_fact_members() -> None:
     assert result.primary is True
 
 
+def test_matcher_requires_auditable_equivalence_digest() -> None:
+    with pytest.raises(ValueError, match="equivalence digest"):
+        ArtifactSetSemanticBinding.create(
+            semantic_unit_id="semantic.matcher.v1",
+            member_artifact_ids=("artifact.a.v1",),
+            member_fact_ids=("fact.a.v1",),
+            complete=True,
+            source_digest="d" * 64,
+            provenance_id="provenance.matcher.v1",
+            matcher_version="matcher.llm.v1",
+        )
+
+
 @pytest.mark.parametrize(
     ("retrieved", "exposed", "reason"),
     (
@@ -80,6 +94,17 @@ def test_partial_or_mismatched_members_never_resolve(
     }
     assert result.reason_code == reason
     assert result.primary is False
+
+
+def test_member_from_other_source_is_ambiguous() -> None:
+    result = resolve_artifact_set(
+        _binding(),
+        retrieved_member_artifact_ids=("artifact.fact.a.v1", "artifact.fact.b.v1"),
+        exposed_member_artifact_ids=("artifact.fact.a.v1", "artifact.fact.b.v1"),
+        observed_source_digest="e" * 64,
+    )
+    assert result.status == ArtifactSetResolutionStatus.AMBIGUOUS
+    assert result.reason_code == "member_source_mismatch"
 
 
 def test_incomplete_binding_and_duplicate_members_fail_closed() -> None:
