@@ -77,6 +77,9 @@ skipped`.
 Both formal extraction launchers now run `audit_process_events()` before
 persisting `process_corpus.json`; malformed terminal receipt joins or
 stage-specific failure semantics fail the attempt instead of entering analysis.
+The standard `rsimem.audit` report also emits `processEvidence` rows and marks
+the run failed when a process ledger cannot be structurally or semantically
+audited.
 
 ## Completed Work
 
