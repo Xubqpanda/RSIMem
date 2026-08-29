@@ -40,6 +40,15 @@ def test_signal_statuses_are_conservative_and_replayable() -> None:
     assert observable.status == ProcessSignalCaseStatus.OBSERVABLE_ONLY
     censored = _case(complete=False, physical="physical-observation.4")
     assert censored.status == ProcessSignalCaseStatus.CENSORED
+    invalid = ProcessSignalCase.create(
+        logical_case_id="logical-case.fixture.v1",
+        physical_observation_ids=("physical-observation.5",),
+        source_observed=True, extraction_observed=True, persistence_observed=True,
+        retrieval_observed=True, exposure_observed=True, outcome_observed=True,
+        extraction_attributable=True, abstract_hypothesis_digest="a" * 64,
+        observation_complete=True, invalid_reason_code="schema_mismatch",
+    )
+    assert invalid.status == ProcessSignalCaseStatus.INVALID
 
 
 def test_repeated_logical_case_counts_one_case_and_conflict_is_ambiguous() -> None:

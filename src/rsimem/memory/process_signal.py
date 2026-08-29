@@ -65,6 +65,7 @@ class ProcessSignalCase:
     extraction_attributable: bool
     abstract_hypothesis_digest: str | None
     observation_complete: bool
+    invalid_reason_code: str | None = None
     evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
     evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
     schema_version: int = PROCESS_SIGNAL_SCHEMA_VERSION
@@ -102,6 +103,10 @@ class ProcessSignalCase:
                 raise TypeError(f"{name} must be bool")
         if self.abstract_hypothesis_digest is not None:
             _sha(self.abstract_hypothesis_digest, "abstract hypothesis digest")
+        if self.invalid_reason_code is not None and not re.fullmatch(
+            r"[a-z][a-z0-9_]{0,63}", self.invalid_reason_code
+        ):
+            raise ValueError("invalid process signal reason is malformed")
         expected = f"process-signal-case.{_digest(self._identity_payload())[:40]}"
         if self.case_id != expected:
             raise ValueError("process signal case ID mismatch")
@@ -120,6 +125,7 @@ class ProcessSignalCase:
             "extraction_attributable": self.extraction_attributable,
             "abstract_hypothesis_digest": self.abstract_hypothesis_digest,
             "observation_complete": self.observation_complete,
+            "invalid_reason_code": self.invalid_reason_code,
             "evidence_plane": self.evidence_plane.value,
             "evidence_source": self.evidence_source.value,
         }
@@ -139,6 +145,7 @@ class ProcessSignalCase:
         extraction_attributable: bool,
         abstract_hypothesis_digest: str | None,
         observation_complete: bool,
+        invalid_reason_code: str | None = None,
     ) -> "ProcessSignalCase":
         values = {
             "logical_case_id": logical_case_id,
@@ -152,6 +159,7 @@ class ProcessSignalCase:
             "extraction_attributable": extraction_attributable,
             "abstract_hypothesis_digest": abstract_hypothesis_digest,
             "observation_complete": observation_complete,
+            "invalid_reason_code": invalid_reason_code,
             "evidence_plane": EvidencePlane.PURE_PROCESS,
             "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION,
             "schema_version": PROCESS_SIGNAL_SCHEMA_VERSION,
@@ -160,6 +168,8 @@ class ProcessSignalCase:
 
     @property
     def status(self) -> ProcessSignalCaseStatus:
+        if self.invalid_reason_code is not None:
+            return ProcessSignalCaseStatus.INVALID
         if not self.observation_complete:
             return ProcessSignalCaseStatus.CENSORED
         required_observation = (
@@ -193,7 +203,8 @@ class ProcessSignalCase:
             "physical_observation_ids", "source_observed", "extraction_observed",
             "persistence_observed", "retrieval_observed", "exposure_observed",
             "outcome_observed", "extraction_attributable", "abstract_hypothesis_digest",
-            "observation_complete", "evidence_plane", "evidence_source", "status",
+            "observation_complete", "invalid_reason_code", "evidence_plane",
+            "evidence_source", "status",
         }
         if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != PROCESS_SIGNAL_SCHEMA:
             raise ValueError("malformed process signal case")
@@ -209,6 +220,7 @@ class ProcessSignalCase:
                 extraction_attributable=value["extraction_attributable"],
                 abstract_hypothesis_digest=value["abstract_hypothesis_digest"],
                 observation_complete=value["observation_complete"],
+                invalid_reason_code=value["invalid_reason_code"],
                 evidence_plane=value["evidence_plane"], evidence_source=value["evidence_source"],
                 schema_version=value["schema_version"],
             )
