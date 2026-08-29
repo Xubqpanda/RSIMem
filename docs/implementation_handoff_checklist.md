@@ -825,9 +825,10 @@ fail closed。
 
 在六层 matched-intervention focused test 加入后，RSIMem 当前验证计数为
 `675 passed`；下文较早的 `656 passed` 是历史 process-audit 快照。
-完整 process-chain restart replay 测试后，当前计数更新为 `676 passed`。
+完整 process-chain restart replay 测试后，历史计数曾更新为 `676 passed`；当前
+RSIMem `.venv` 回归为 `689 passed`，PAST-Bench 为 `397 passed, 2 skipped`。
 
-第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。每个 intervention 现在由 `ProcessFeedback` 绑定 event、source revision、parent/candidate decision、receipt 和 before/after digest，并由独立 feasibility ledger 跨 restart 保存；ledger 支持 `verify_case()`，缺失或冲突 receipt fail closed；有 process signal 的 case 还生成绑定 past feedback 与目标层的 `PolicyHypothesis`，并持久化完整 hypothesis payload，显式覆盖 `N -> feedback -> N+1 -> intervention` identity。Hermes bridge 另外写入独立的 `rsimem_process_feedback.jsonl`，通过 host-neutral `ProcessEvent` 记录 trigger、source、extraction、admission、commit、retrieval、exposure、tool 和 task-outcome 的 content-free fingerprints；事件以文件锁和原子替换跨 restart 保持幂等，stage-specific failure reason 不再统一折叠为 extraction failure。PAST-Bench `StepResponse` 现在只携带 process event IDs/digest，不携带 grader 或 score 字段；evaluator-free fixture 验证了 trigger、formation、exposure、task-outcome 的完整事件闭环和 cross-ledger audit。真实 extraction feedback 只能通过 `feedback_chain_from_extraction_example()`、`LayerIntervention.from_extraction_feedback()`、`build_extraction_feedback_interventions()` 和 `build_optimizer_corpus_interventions()` 投影 primary useful/missed 链，其他状态继续保留为 unresolved/censored 诊断；census 同时报告 U/H/M、unresolved/censored 原始计数、ambiguity 计数和 zero-denominator unknown。当前新增的 `build_extraction_feedback_fixture()` 将 durable/temporary past context 与 future task 的 registered SM01 contract 串成可重放 useful/missed case，并由 `FeasibilityInterventionPath` ledger 记录 N+1 replay identity。该结果只是可行性状态，不代表任何层已完成在线优化；后续仍需补充完整 PAST process corpus、独立 matched validation 和失败/provider run 保留。当前验证：RSIMem `.venv` 测试 `656 passed`，PAST-Bench `397 passed, 2 skipped`。
+第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。每个 intervention 现在由 `ProcessFeedback` 绑定 event、source revision、parent/candidate decision、receipt 和 before/after digest，并由独立 feasibility ledger 跨 restart 保存；ledger 支持 `verify_case()`，缺失或冲突 receipt fail closed；有 process signal 的 case 还生成绑定 past feedback 与目标层的 `PolicyHypothesis`，并持久化完整 hypothesis payload，显式覆盖 `N -> feedback -> N+1 -> intervention` identity。Hermes bridge 另外写入独立的 `rsimem_process_feedback.jsonl`，通过 host-neutral `ProcessEvent` 记录 trigger、source、extraction、admission、commit、retrieval、exposure、tool 和 task-outcome 的 content-free fingerprints；事件以文件锁和原子替换跨 restart 保持幂等，stage-specific failure reason 不再统一折叠为 extraction failure。PAST-Bench `StepResponse` 现在只携带 process event IDs/digest，不携带 grader 或 score 字段；evaluator-free fixture 验证了 trigger、formation、exposure、task-outcome 的完整事件闭环和 cross-ledger audit。真实 extraction feedback 只能通过 `feedback_chain_from_extraction_example()`、`LayerIntervention.from_extraction_feedback()`、`build_extraction_feedback_interventions()` 和 `build_optimizer_corpus_interventions()` 投影 primary useful/missed 链，其他状态继续保留为 unresolved/censored 诊断；census 同时报告 U/H/M、unresolved/censored 原始计数、ambiguity 计数和 zero-denominator unknown。当前新增的 `build_extraction_feedback_fixture()` 将 durable/temporary past context 与 future task 的 registered SM01 contract 串成可重放 useful/missed case，并由 `FeasibilityInterventionPath` ledger 记录 N+1 replay identity。该结果只是可行性状态，不代表任何层已完成在线优化；后续仍需补充完整 PAST process corpus、独立 matched validation 和失败/provider run 保留。此前 `656 passed` 是历史快照；当前验证为 RSIMem `.venv` `689 passed`、PAST-Bench `397 passed, 2 skipped`。
 
 当前第三阶段的主要任务是 feasibility，不要求一次性完成六层 online optimization。每层分别完成以下验收：
 
@@ -1021,6 +1022,13 @@ actionable count为0，低于冻结门槛2；optimizer以0次模型调用返回`
 `incomplete_model_usage` fail-closed，完整 manifest/raw trace 仅作为 provider
 diagnostic 保留，详见
 [`extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md`](extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md)。
+同日 SM01 的后续 clean-worktree 尝试又发现两处真实运行边界问题：v5 将独立
+reflection episode 错误送入 semantic extraction，已由 `e22af5c` 修复并加入
+回归测试；v7 在 shared-cold 与 attempt 目录中看见同一份 process event，已由
+`569e295` 在两个 formal launcher 中先构造 canonical `ProcessCorpus`、再审计
+完全相同的 event ID。v6 及 post-v7 probe 仍因 provider HTTP 503 在首个 task
+前 fail-closed。完整记录见
+[`extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md`](extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md)。
 后续顺序仍严格按照：
 
 ```text
