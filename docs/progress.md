@@ -46,6 +46,9 @@ The accepted low-cost plain-parent smoke produced two source records, two exact-
 joined feedback records, 50 successful physical requests, and an issue-free
 audit. Detailed evidence and excluded attempts are recorded in
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md).
+SM02 boundary feedback now normalizes human-readable recipient names at the
+resolver boundary, while matching exact normalized IDs so near-collision names
+cannot be mislabeled as harmful.
 
 A single provider-connectivity smoke against the configured OpenAI-compatible
 endpoint also completed successfully; it records only raw usage in the ignored

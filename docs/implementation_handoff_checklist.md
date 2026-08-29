@@ -482,6 +482,7 @@ Adaptive final launcher要求 clean tree，但 static feedback launcher允许 di
 - √ Eager injection但无显式使用时不能生成 negative label。
 - √ Official score、grader、answer 和 expectation 在 label builder API 中不可达。
 - √ SM01、SM02、SM05等被选family各自具有正向、负向、ambiguous和censored contract fixture；不能把TSV parser复用于非TSV family。
+- √ SM02 resolver在 feedback boundary 统一规范化人名/recipient ID（大小写、空格和连字符），并按精确 normalized ID 判定 advisory boundary，避免相似字符串误判。
 
 ### 1F：重建 Prompt-Oriented Validation Contract
 
