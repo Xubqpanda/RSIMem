@@ -565,6 +565,7 @@ Adaptive final launcher要求 clean tree，但 static feedback launcher允许 di
 2A 实现记录：`src/rsimem/memory/policy_contracts.py` 提供统一 contract、SafetyBoundary、PolicyLineage、PolicyArtifactIdentity 和 audit validator；正反与 replay 测试见 `tests/test_policy_contracts.py`，对应 commit `ca174d4`。
 后续补充的执行状态反向测试还要求 `RUN` 不得伪装成 `SKIPPED/DEFERRED`，并拒绝非执行决策携带 runtime receipt；该约束保持 pending/failed/rejected recovery 状态可用。
 `JsonProcessFeedbackLedger` 的并发 writer 也已通过锁与原子替换反向测试，重复 event 只保留一个 canonical record。
+`JsonPolicyDecisionLedger` 同样通过独立实例并发 writer 测试，重复 policy evidence 不会扩增 ledger 或覆盖冲突 payload。
 
 ### 2B：Host Adapter 与 Lifecycle Trigger Policy
 
