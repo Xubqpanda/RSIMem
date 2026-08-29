@@ -81,7 +81,7 @@ from .memory.extraction_feedback import (
     FutureMemoryEvidence,
     ObservableToolEvent,
     detect_current_input_semantic_keys,
-    detect_source_semantic_keys,
+    detect_user_source_semantic_keys,
 )
 from .memory.extraction_optimizer_builder import ExtractionFactContent
 from .memory.extraction_optimizer_capture import (
@@ -1068,9 +1068,12 @@ class HermesPastBenchBridge:
         )
         if projection is None:
             raise ValueError("semantic compilation source projection is unavailable")
-        available_keys = detect_source_semantic_keys(
+        available_keys = detect_user_source_semantic_keys(
             self._family_id,
-            tuple(message.content for message in projection.messages),
+            tuple(
+                (message.role, message.content)
+                for message in projection.messages
+            ),
         )
         record = self.extraction_source_projector.project_record(
             boundary,

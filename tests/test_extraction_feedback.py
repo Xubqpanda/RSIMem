@@ -23,6 +23,7 @@ from rsimem.memory.extraction_feedback import (
     MissedExtractionEvidence,
     ObservableToolEvent,
     default_feedback_contract_registry,
+    detect_user_source_semantic_keys,
 )
 from rsimem.memory.extraction_projection import JsonExtractionFeedbackDatasetLog
 
@@ -489,6 +490,192 @@ def test_missed_derivation_requires_every_absence_attribution_node() -> None:
             operation_join=join,
         ) == ()
 
+
+def test_unclassified_nonempty_extraction_cannot_be_called_missed() -> None:
+    registry = default_feedback_contract_registry()
+    builder = ExtractionFeedbackBuilder(registry)
+    source = ExtractionSourceEvidence(
+        "source.unclassified-set",
+        _sha("unclassified set source"),
+        "extraction-set.unclassified-set",
+        ExtractionSetStatus.NONEMPTY,
+        ("constraint.share.exclude_ava_chen",),
+        (
+            ExtractedFactEvidence(
+                "fact.roster",
+                (),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.roster",
+            ),
+            ExtractedFactEvidence(
+                "fact.prohibition",
+                (),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.prohibition",
+            ),
+        ),
+    )
+    observation = _observation(
+        "SM02_constraint_retention",
+        ("constraint.share.exclude_ava_chen",),
+        final_response="The source note was not shared.",
+        completed=False,
+    )
+    future = _future((), exposure=ExposureMode.NOT_EXPOSED)
+    join = FeedbackOperationJoin(
+        future.opportunity_operation_id,
+        "operation.use.unclassified-set",
+        "operation.outcome.unclassified-set",
+    )
+
+    assert builder.derive_missed(
+        source,
+        observation,
+        future,
+        operation_join=join,
+    ) == ()
+
+    externally_supplied = MissedExtractionEvidence.create(
+        semantic_key="constraint.share.exclude_ava_chen",
+        source_span_digest=source.source_projection_digest,
+        future_opportunity_id=future.future_opportunity_id,
+        absence_outcome_operation_id=join.outcome_operation_id,
+    )
+    dataset = builder.build(
+        source,
+        observation,
+        future,
+        missed=(externally_supplied,),
+        operation_join=join,
+    )
+    assert _primary(dataset).label == ExtractionFeedbackLabel.UNRESOLVED
+
+
+def test_unclassified_split_rule_cannot_be_called_useful_from_partial_exposure() -> None:
+    source = ExtractionSourceEvidence(
+        "source.unclassified-partial-exposure",
+        _sha("unclassified partial exposure source"),
+        "extraction-set.unclassified-partial-exposure",
+        ExtractionSetStatus.NONEMPTY,
+        (BOUNDARY_KEY,),
+        (
+            ExtractedFactEvidence(
+                "fact.roster",
+                (),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.roster",
+            ),
+            ExtractedFactEvidence(
+                "fact.prohibition",
+                (),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.prohibition",
+            ),
+        ),
+    )
+    observation = _observation(
+        SM02,
+        (BOUNDARY_KEY,),
+        final_response="The note was shared only with an allowed employee.",
+    )
+    future = FutureMemoryEvidence(
+        "opportunity.partial-exposure",
+        ExposureMode.EAGER_SYSTEM_PROMPT,
+        (),
+        "operation.opportunity.partial-exposure",
+        "operation.injection.partial-exposure",
+    )
+
+    dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+        source,
+        observation,
+        future,
+    )
+
+    assert _primary(dataset).label == ExtractionFeedbackLabel.UNRESOLVED
+    assert _primary(dataset).reason_codes == ("use_not_bound_to_memory",)
+
+
+def test_unrelated_memory_cannot_claim_useful_credit_for_source_extraction() -> None:
+    source = ExtractionSourceEvidence(
+        "source.empty-with-existing-memory",
+        _sha("empty source with existing memory"),
+        "extraction-set.empty-with-existing-memory",
+        ExtractionSetStatus.EMPTY,
+        (TSV_KEY,),
+        (),
+    )
+    observation = _observation(SM01, (TSV_KEY,))
+    future = FutureMemoryEvidence(
+        "opportunity.existing-memory",
+        ExposureMode.EAGER_SYSTEM_PROMPT,
+        (ArtifactSemanticBinding("artifact.from-other-source", TSV_KEY),),
+        "operation.opportunity.existing-memory",
+        "operation.injection.existing-memory",
+    )
+
+    dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+        source,
+        observation,
+        future,
+    )
+
+    assert _primary(dataset).label == ExtractionFeedbackLabel.UNRESOLVED
+    assert _primary(dataset).reason_codes == ("use_not_bound_to_memory",)
+
+
+def test_future_binding_cannot_invent_semantics_for_source_artifact() -> None:
+    source = ExtractionSourceEvidence(
+        "source.unclassified-artifact",
+        _sha("unclassified source artifact"),
+        "extraction-set.unclassified-artifact",
+        ExtractionSetStatus.NONEMPTY,
+        (TSV_KEY,),
+        (
+            ExtractedFactEvidence(
+                "fact.unclassified-artifact",
+                (),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.unclassified",
+            ),
+        ),
+    )
+    future = FutureMemoryEvidence(
+        "opportunity.forged-binding",
+        ExposureMode.EAGER_SYSTEM_PROMPT,
+        (ArtifactSemanticBinding("artifact.unclassified", TSV_KEY),),
+        "operation.opportunity.forged-binding",
+        "operation.injection.forged-binding",
+    )
+
+    with pytest.raises(ValueError, match="source artifact semantics"):
+        ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+            source,
+            _observation(SM01, (TSV_KEY,)),
+            future,
+        )
+
+
+def test_source_keys_ignore_assistant_and_tool_generated_formats() -> None:
+    keys = detect_user_source_semantic_keys(
+        SM05,
+        (
+            (
+                "user",
+                "For future sessions, use TSV columns owner, priority, task, due_date.",
+            ),
+            (
+                "tool",
+                "Priorities are normalized to High/Medium/Low and dates use YYYY/MM/DD.",
+            ),
+            (
+                "assistant",
+                "I used normalized priorities and YYYY/MM/DD dates.",
+            ),
+        ),
+    )
+
+    assert keys == (TSV_KEY,)
 
 def test_incomplete_observation_is_censored_and_unknown_family_fails_closed() -> None:
     builder = ExtractionFeedbackBuilder(default_feedback_contract_registry())

@@ -1026,6 +1026,12 @@ class ExtractionFeedbackBuilder:
             for fact in source.facts
             for semantic_key in fact.semantic_keys
         }
+        # A non-empty unclassified fact may be a paraphrase or one part of a
+        # set-level expression of the target rule.  Without a deterministic
+        # equivalence proof, treating the absent key as an extraction miss
+        # would incorrectly move retrieval/exposure uncertainty upstream.
+        if any(not fact.semantic_keys for fact in source.facts):
+            return ()
         bound_keys = {
             semantic_key
             for binding in future.artifact_bindings
@@ -1078,6 +1084,30 @@ class ExtractionFeedbackBuilder:
         }
         if bound_keys - set(contract.opportunity.memory_scope_keys):
             raise ValueError("future memory evidence escapes contract scope")
+        source_keys_by_artifact: dict[str, set[str]] = {}
+        for fact in source.facts:
+            if fact.artifact_id is not None:
+                source_keys_by_artifact.setdefault(fact.artifact_id, set()).update(
+                    fact.semantic_keys
+                )
+        for binding in future.artifact_bindings:
+            source_keys = source_keys_by_artifact.get(binding.artifact_id)
+            if source_keys is not None and not set(binding.semantic_keys).issubset(
+                source_keys
+            ):
+                raise ValueError(
+                    "future memory binding disagrees with source artifact semantics"
+                )
+        source_used_artifact_ids = tuple(
+            artifact_id
+            for artifact_id in resolution.used_artifact_ids
+            if artifact_id in source_keys_by_artifact
+        )
+        if source_used_artifact_ids != resolution.used_artifact_ids:
+            resolution = replace(
+                resolution,
+                used_artifact_ids=source_used_artifact_ids,
+            )
         if operation_join is not None:
             if (
                 future.opportunity_operation_id
@@ -1237,9 +1267,13 @@ class ExtractionFeedbackBuilder:
             for fact in source.facts
             for semantic_key in fact.semantic_keys
         }
+        has_unclassified_facts = any(
+            not fact.semantic_keys for fact in source.facts
+        )
         valid_missed = tuple(
             value for value in missed
-            if value.semantic_key in source.available_semantic_keys
+            if not has_unclassified_facts
+            and value.semantic_key in source.available_semantic_keys
             and value.semantic_key not in extracted_keys
             and value.future_opportunity_id == future.future_opportunity_id
             and value.deterministically_attributed
@@ -1551,6 +1585,8 @@ def detect_current_input_semantic_keys(
         "don't share",
         "exclude",
         "never share",
+        "never be shared",
+        "must never be shared",
     )):
         keys.append("constraint.share.exclude_ava_chen")
     if family_id == "SM03_fact_correction" and (
@@ -1598,7 +1634,9 @@ def detect_extracted_fact_semantic_keys(
         "don't share",
         "exclude",
         "never share",
+        "never be shared",
         "must not share",
+        "must never be shared",
     )):
         keys.append("constraint.share.exclude_ava_chen")
     if family_id == "SM03_fact_correction" and (
@@ -1649,7 +1687,9 @@ def detect_source_semantic_keys(
         "don't share",
         "exclude",
         "never share",
+        "never be shared",
         "must not share",
+        "must never be shared",
     )):
         keys.append("constraint.share.exclude_ava_chen")
     if family_id == "SM03_fact_correction" and (
@@ -1666,3 +1706,20 @@ def detect_source_semantic_keys(
     ):
         keys.append("fact.phoenix.release_freeze_date")
     return tuple(dict.fromkeys(keys))
+
+
+def detect_user_source_semantic_keys(
+    family_id: str,
+    source_messages: tuple[tuple[str, str], ...],
+) -> tuple[str, ...]:
+    """Detect durable source keys without learning from agent/tool output."""
+
+    if any(
+        not isinstance(role, str) or not isinstance(content, str)
+        for role, content in source_messages
+    ):
+        raise TypeError("source message roles and contents must be strings")
+    return detect_source_semantic_keys(
+        family_id,
+        tuple(content for role, content in source_messages if role == "user"),
+    )
