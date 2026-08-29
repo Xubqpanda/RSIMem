@@ -975,17 +975,17 @@ bash -n scripts/*.sh
 
 ### 第二阶段完成
 
-- □ 六层 policy 的 core contract、Host adapter boundary、decision evidence、replay和安全不变量全部通过。
+- √ 六层 policy 的 core contract、Host adapter boundary、decision evidence、replay和安全不变量全部通过（deterministic/shadow scope；不等同于真实 adaptive effect）。
 - √ Trigger、Source、Extraction、Admission、Commit scheduling和Exposure均可以被fixed policy观测、回放和做 matched intervention；`tests/test_policy_feasibility.py::test_every_layer_case_has_matched_process_intervention_identity` 对六层逐一校验 event、revision、decision、before/after digest 和 action variation。该结论限定为 deterministic/shadow feasibility，不等同于真实 provider effect。
 - √ Extraction artifact、trigger/admission/exposure decision和formation lineage可以跨restart重建；完整六层 replay process chain 已通过 JSON ledger 重启读取、逐事件幂等重写和 audit 验证。
 - □ 第二阶段不要求任何 adaptive layer已经取得真实效果；真实效果属于第三阶段。
 
 ### 第三阶段完成
 
-- □ S0 baseline和六层 feasibility cases完成，并保留完整process/end-to-end feedback。
-- □ 每层都有明确的 `optimization-ready`、`diagnostic-only` 或 `validation-only` 结论。
-- □ 每个 `optimization-ready` 层都有至少一个可回放的 parent/candidate case、process signal、action variation和收益假设。
-- □ 六层的 Host adapter、decision、execution receipt、lineage和failure semantics可以独立审计。
+- √ S0 baseline和六层 feasibility cases完成，并保留完整process/end-to-end feedback（deterministic/shadow scope；真实 provider batch 另行记录）。
+- √ 每层都有明确的 `optimization-ready`、`diagnostic-only` 或 `validation-only` 结论。
+- √ 每个 `optimization-ready` 层都有至少一个可回放的 parent/candidate case、process signal、action variation和收益假设。
+- √ 六层的 Host adapter、decision、execution receipt、lineage和failure semantics可以独立审计。
 - □ 论文只声明六层 policy 的可优化性和具体 case；真实 uplift、单层 superiority、联合效果和跨 family 泛化列为后续效果实验结论。
 
 ## 11. 当前执行入口
