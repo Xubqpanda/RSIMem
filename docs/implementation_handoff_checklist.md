@@ -771,6 +771,11 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 - √ Rejection、重复activation、restart和rollback幂等。
 - √ Decision记录真实pair IDs、artifact digests、六层 decision fingerprints、U/H/M/unresolved/censored counts、各ratio分子分母、deployment-outcome delta、coverage、quality delta、constraint results和reason codes。
 
+Matched evidence assembler 现在还要求每个 completed validation slot 具有
+`process_corpus.json`，并校验其 split/family/template/manifest identity、process
+event audit 和 evaluator/score 字段隔离；缺失或篡改时在 activation assembly 前
+fail closed。
+
 ### 2I：Runtime Prompt Binding 与 Activation Fingerprint
 
 功能需求：

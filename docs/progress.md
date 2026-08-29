@@ -86,6 +86,10 @@ or missing the referenced decision. Standard audit also checks each event's
 comparison trace context.
 Raw lifecycle usage buckets now reject booleans and non-integer values while
 preserving provider-unknown buckets as `null`.
+Matched validation evidence assembly now requires a valid, content-free
+`process_corpus.json` for every completed slot and verifies its declared split,
+family, task-template, manifest digest, and process-event audit before building
+activation evidence.
 
 ## Completed Work
 
