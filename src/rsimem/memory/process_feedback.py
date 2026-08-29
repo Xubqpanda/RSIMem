@@ -94,6 +94,7 @@ PROCESS_REASON_CODES = frozenset({
     "non_use",
     "tool_failure",
     "retrieval_miss",
+    "retrieval_failure",
     "injection_failure",
     "task_failure",
     "task_completed",
@@ -104,6 +105,7 @@ PROCESS_REASON_CODES = frozenset({
     "recovery_failure",
     "unsupported_boundary",
     "observation_censored",
+    "adapter_failure",
 })
 
 
