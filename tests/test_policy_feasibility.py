@@ -40,6 +40,7 @@ from rsimem.memory.policy_feasibility import (
 from rsimem.memory.policy_replay import DeterministicPolicyReplay
 from rsimem.memory.policy_feasibility_fixture import (
     build_default_feasibility_cases,
+    build_extraction_feedback_fixture,
     run_default_feasibility_census,
 )
 from rsimem.memory.policy_audit import PolicyAuditReport
@@ -775,6 +776,39 @@ def test_real_extraction_feedback_examples_project_only_resolved_primary_chain()
     )
     assert unresolved.label is ExtractionFeedbackLabel.UNRESOLVED
     assert feedback_chain_from_extraction_example(unresolved).ids == ()
+
+
+def test_deterministic_past_future_fixture_replays_useful_and_missed_feedback() -> None:
+    parent, candidate = _replays()
+    projected = {}
+    for label in ("useful", "missed"):
+        fixture = build_extraction_feedback_fixture(outcome=label)
+        primary = next(example for example in fixture.dataset.examples if example.primary)
+        chain = feedback_chain_from_extraction_example(primary)
+        assert fixture.past_snapshot.snapshot_id == "snapshot.feasibility.default"
+        assert fixture.past_snapshot.segments[0].segment_id == "segment.durable"
+        assert fixture.past_snapshot.segments[1].segment_id == "segment.temporary"
+        assert primary.label.value == label
+        assert chain.complete_useful is (label == "useful")
+        assert chain.complete_missed is (label == "missed")
+        cases = build_extraction_feedback_interventions(
+            fixture.dataset.examples,
+            parent=parent,
+            candidate=candidate,
+            parent_artifact=_artifact(
+                "fixed.extraction.parent.v1", PolicyArtifactKind.FIXED
+            ),
+            candidate_artifact=_artifact(
+                "adaptive.extraction.candidate.v1",
+                PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE,
+            ),
+            case_id_prefix=f"case.fixture.{label}",
+        )
+        assert len(cases) == 1
+        projected[label] = cases[0]
+        assert "TSV output" not in str(cases[0].replay_payload)
+    assert projected["useful"].outcome is FeasibilityOutcome.USEFUL
+    assert projected["missed"].outcome is FeasibilityOutcome.MISSED
 
 
 def _layer_artifact(layer: PolicyLayer, version: str, kind: PolicyArtifactKind) -> PolicyArtifactIdentity:
