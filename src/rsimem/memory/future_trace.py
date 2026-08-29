@@ -205,6 +205,7 @@ class SemanticFutureEvidence:
     memory_artifact_ids: tuple[str, ...]
     memory_revisions: tuple[str, ...]
     injection_artifact_id: str | None
+    injected_artifact_ids: tuple[str, ...] = ()
     schema_version: int = SEMANTIC_FUTURE_TRACE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -212,6 +213,12 @@ class SemanticFutureEvidence:
             raise ValueError("unsupported semantic future evidence schema version")
         if len(self.memory_artifact_ids) != len(self.memory_revisions):
             raise ValueError("future semantic artifacts and revisions must align")
+        if len(self.injected_artifact_ids) != len(set(self.injected_artifact_ids)):
+            raise ValueError("future injected artifacts must be unique")
+        if not set(self.injected_artifact_ids).issubset(set(self.memory_artifact_ids)):
+            raise ValueError("injected artifacts must come from future retrieval")
+        if self.injected_artifact_ids and self.injection_artifact_id is None:
+            raise ValueError("injected artifacts require an injection operation")
 
 
 @dataclass(frozen=True, slots=True)
@@ -413,6 +420,7 @@ class SemanticFutureTraceRecorder:
             tuple(memory_ids),
             tuple(revisions),
             injection_artifact.artifact_id if injection_artifact is not None else None,
+            tuple(hit.artifact.artifact_id for hit in injected),
         )
 
     def record_use_and_outcome(

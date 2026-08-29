@@ -132,6 +132,7 @@ from .process_corpus import (
 )
 from .extraction_prompt_validation import JsonExtractionValidationObservationStore
 from .use_attribution import (
+    JsonMemoryUseEvidenceLog,
     MEMORY_USE_EVIDENCE_SCHEMA,
     MEMORY_USE_EVIDENCE_SCHEMA_VERSION,
     MemoryUseEvidence,
@@ -303,6 +304,7 @@ __all__ = [
     "MEMORY_USE_EVIDENCE_SCHEMA",
     "MEMORY_USE_EVIDENCE_SCHEMA_VERSION",
     "MemoryUseEvidence",
+    "JsonMemoryUseEvidenceLog",
     "MemoryUseResolution",
     "MemoryUseResolutionStatus",
     "OutcomeEvidenceKind",

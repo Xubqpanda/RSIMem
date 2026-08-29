@@ -7,6 +7,7 @@ import pytest
 
 from rsimem.lifecycle import RawResourceUsage
 from rsimem.memory.use_attribution import (
+    JsonMemoryUseEvidenceLog,
     MemoryUseEvidence,
     MemoryUseResolutionStatus,
     OutcomeEvidenceKind,
@@ -72,6 +73,15 @@ def test_exact_join_resolves_attributable_use_and_replays() -> None:
     assert resolution.status == MemoryUseResolutionStatus.ATTRIBUTABLE_USE
     assert resolution.attributable_use is True
     assert MemoryUseEvidence.from_payload(json.loads(json.dumps(evidence.payload()))) == evidence
+
+
+def test_memory_use_log_is_restart_safe(tmp_path) -> None:
+    path = tmp_path / "memory-use.jsonl"
+    evidence = _evidence()
+    log = JsonMemoryUseEvidenceLog(path)
+    assert log.append(evidence) is True
+    assert log.append(evidence) is False
+    assert JsonMemoryUseEvidenceLog(path).records() == (evidence,)
 
 
 def test_operation_graph_proves_retrieval_injection_use_outcome_chain() -> None:

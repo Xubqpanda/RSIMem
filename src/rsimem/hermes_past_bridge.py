@@ -95,6 +95,11 @@ from .memory.opportunity import (
     JsonOpportunityEvidenceLog,
     OpportunityEvidence,
 )
+from .memory.use_attribution import (
+    JsonMemoryUseEvidenceLog,
+    MemoryUseEvidence,
+    OutcomeEvidenceKind,
+)
 from .memory.extraction_projection import (
     JsonLiveExtractionFeedbackRecordLog,
     JsonExtractionSourceRecordStore,
@@ -102,6 +107,8 @@ from .memory.extraction_projection import (
     Mem0FlatExtractionSourceProjector,
 )
 from .memory.operation_graph import OperationContext
+from .memory.operation_graph import materialize_operation_graph
+from .memory.use_attribution import resolve_memory_use
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
 
 
@@ -390,6 +397,7 @@ class HermesPastBenchBridge:
         opportunity_evidence_provider: Callable[
             [Mapping[str, Any]], Sequence[OpportunityEvidence]
         ] | None = None,
+        memory_use_evidence_path: Path | None = None,
     ) -> None:
         if config.mode == HermesExecutionMode.NATIVE:
             raise ValueError("native mode must not construct an RSIMem bridge")
@@ -406,6 +414,10 @@ class HermesPastBenchBridge:
         self._opportunity_evidence_log = JsonOpportunityEvidenceLog(
             opportunity_evidence_path
             or self.evidence_path.with_name("rsimem_opportunities.jsonl")
+        )
+        self._memory_use_evidence_log = JsonMemoryUseEvidenceLog(
+            memory_use_evidence_path
+            or self.evidence_path.with_name("rsimem_memory_use_evidence.jsonl")
         )
         self._snapshot_collector = HermesStateSnapshotCollector()
         self.ledger = MemoryLedgerObserver(
@@ -720,6 +732,12 @@ class HermesPastBenchBridge:
         """
 
         return self._opportunity_evidence_log.records()
+
+    @property
+    def memory_use_evidence(self) -> tuple[MemoryUseEvidence, ...]:
+        """Generic retrieval/injection/use/outcome joins observed by Hermes."""
+
+        return self._memory_use_evidence_log.records()
 
     def _record_runtime_opportunities(
         self,
@@ -1072,6 +1090,7 @@ class HermesPastBenchBridge:
                     outcome_reason_code=resolution.outcome_reason_code,
                     step_id=step_id,
                 )
+                self._record_memory_use_evidence(future, outcome, result)
                 self._record_extraction_feedback(
                     future,
                     audit_observation,
@@ -1102,6 +1121,109 @@ class HermesPastBenchBridge:
             execution_receipt_ids=(f"receipt.task-outcome.{outcome_digest[:24]}",),
         )
         self._semantic_outcomes_recorded = True
+
+    def _record_memory_use_evidence(
+        self,
+        future: SemanticFutureEvidence,
+        outcome: SemanticOutcomeEvidence,
+        result: Mapping[str, Any],
+    ) -> None:
+        """Persist a generic operation-bound use/outcome join.
+
+        This evidence deliberately carries no benchmark family or parser
+        labels.  It is emitted even when no artifact was used (exposure-only
+        and non-use remain resolvable states), provided retrieval returned a
+        concrete artifact set.
+        """
+
+        if not future.memory_artifact_ids:
+            return
+        completed = result.get("completed") is True
+        observation_complete = not (
+            result.get("partial") is True or result.get("interrupted") is True
+        )
+        outcome_kind = self._outcome_kind(result)
+        evidence = MemoryUseEvidence.create(
+            artifact_ids=tuple(future.memory_artifact_ids),
+            retrieval_operation_id=future.retrieval_operation_id,
+            retrieved_artifact_ids=tuple(future.memory_artifact_ids),
+            injection_operation_id=(
+                future.injection_operation_id
+                if future.injected_artifact_ids
+                else None
+            ),
+            injected_artifact_ids=tuple(future.injected_artifact_ids),
+            downstream_operation_id=outcome.use_operation_id,
+            used_artifact_ids=tuple(outcome.used_artifact_ids),
+            outcome_operation_id=outcome.outcome_operation_id,
+            outcome_kind=outcome_kind,
+            outcome_success=(
+                None
+                if not observation_complete or outcome_kind is OutcomeEvidenceKind.TOOL_FAILURE
+                else completed
+            ),
+            observation_cutoff=self._observation_cutoff(result),
+            provenance_id=future.query_operation_id,
+            observation_complete=observation_complete,
+            behavioral_consistency=False,
+        )
+        if self.static_writeback is not None:
+            graph = materialize_operation_graph(
+                self.static_writeback.operation_log.events
+            )
+            joined = resolve_memory_use(evidence, operation_graph=graph)
+            if joined.reason_code == "operation_join_invalid":
+                raise ValueError("semantic memory-use operation join is invalid")
+        self._memory_use_evidence_log.append(evidence)
+
+    @staticmethod
+    def _outcome_kind(result: Mapping[str, Any]) -> OutcomeEvidenceKind:
+        raw_messages = result.get("messages")
+        if isinstance(raw_messages, (list, tuple)):
+            for message in raw_messages:
+                if not isinstance(message, Mapping) or message.get("role") != "tool":
+                    continue
+                content = message.get("content")
+                if not isinstance(content, str):
+                    continue
+                try:
+                    payload = json.loads(content)
+                except json.JSONDecodeError:
+                    return OutcomeEvidenceKind.TOOL_FAILURE
+                if not isinstance(payload, Mapping) or payload.get("success") is not True:
+                    return OutcomeEvidenceKind.TOOL_FAILURE
+        return OutcomeEvidenceKind.TASK_COMPLETION
+
+    @staticmethod
+    def _observation_cutoff(result: Mapping[str, Any]) -> str:
+        """Return a stable host timestamp, with an explicit deterministic fallback."""
+
+        for key in ("observation_cutoff", "observed_at", "completed_at"):
+            value = result.get(key)
+            if isinstance(value, str):
+                try:
+                    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if parsed.tzinfo is not None:
+                    return value.replace("+00:00", "Z")
+        raw_messages = result.get("messages")
+        timestamps = (
+            message.get("timestamp")
+            for message in raw_messages
+            if isinstance(message, Mapping)
+            and isinstance(message.get("timestamp"), (int, float))
+            and not isinstance(message.get("timestamp"), bool)
+        ) if isinstance(raw_messages, (list, tuple)) else ()
+        values = tuple(timestamps)
+        if values:
+            return datetime.fromtimestamp(max(values), tz=UTC).isoformat(
+                timespec="microseconds"
+            ).replace("+00:00", "Z")
+        # A missing host clock is an observation-quality limitation, not a
+        # reason to invent wall-clock identity.  Epoch is deterministic and
+        # callers can still inspect ``observation_complete``/join status.
+        return "1970-01-01T00:00:00Z"
 
     def _record_tool_call_results(self, result: Mapping[str, Any]) -> None:
         """Project every observed tool call/result into exact process events.

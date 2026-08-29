@@ -66,6 +66,8 @@ from rsimem.memory.operation_graph import (
     OperationStatus,
     materialize_operation_graph,
 )
+from rsimem.memory.future_trace import SemanticFutureEvidence, SemanticOutcomeEvidence
+from rsimem.memory.use_attribution import MemoryUseResolutionStatus, resolve_memory_use
 from rsimem.memory.adaptive_policy import AdaptiveParameterName
 from rsimem.memory.adaptive_mem0_binding import TrustedAdaptiveMem0Parameter
 from rsimem.memory_systems.mem0_flat import (
@@ -470,6 +472,49 @@ def test_past_bench_bridge_records_runtime_opportunity_without_family_leakage(
         assert restarted.opportunity_evidence == recorded
     finally:
         restarted.close()
+
+
+def test_past_bench_bridge_records_generic_memory_use_join(tmp_path: Path) -> None:
+    bridge = HermesPastBenchBridge(
+        _hermes_home(tmp_path),
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-memory-use",
+        trace_id="trace-memory-use",
+        episode_id="episode-memory-use",
+        session_id="session-memory-use",
+        task_id="task-memory-use",
+        experiment_variant="native+adapter+ledger",
+    )
+    future = SemanticFutureEvidence(
+        "op.query.memory-use",
+        "op.retrieval.memory-use",
+        "op.injection.memory-use",
+        ("artifact.memory-use.v1",),
+        ("revision.memory-use.v1",),
+        "artifact.injection.memory-use",
+        ("artifact.memory-use.v1",),
+    )
+    outcome = SemanticOutcomeEvidence(
+        "op.use.memory-use",
+        "op.outcome.memory-use",
+        ("artifact.memory-use.v1",),
+        OperationStatus.SUCCESS,
+    )
+    try:
+        bridge._record_memory_use_evidence(
+            future,
+            outcome,
+            {"completed": True, "observed_at": "2026-08-30T01:02:03Z"},
+        )
+        evidence = bridge.memory_use_evidence
+        assert len(evidence) == 1
+        assert resolve_memory_use(evidence[0]).status == MemoryUseResolutionStatus.ATTRIBUTABLE_USE
+        serialized = json.dumps(evidence[0].payload(), ensure_ascii=True)
+        assert "SM02" not in serialized
+        assert "stage" not in serialized
+    finally:
+        bridge.close()
 
 
 def test_past_bench_bridge_failure_policy_controls_native_bypass(
