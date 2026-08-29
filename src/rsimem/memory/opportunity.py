@@ -171,6 +171,15 @@ class OpportunityEvidence:
         object.__setattr__(self, "evidence_plane", plane)
         object.__setattr__(self, "evidence_source", source)
         object.__setattr__(self, "source_surface", OpportunitySurface(self.source_surface))
+        if self.source_surface is OpportunitySurface.APPLICATION_SCHEMA:
+            if source is not EvidenceSourceKind.APPLICATION_CONTRACT:
+                raise ValueError(
+                    "application-schema opportunity requires application contract source"
+                )
+        elif source is EvidenceSourceKind.APPLICATION_CONTRACT:
+            raise ValueError(
+                "application contract source requires application-schema surface"
+            )
         _id(self.operation_id, "opportunity operation ID")
         _id(self.provenance_id, "opportunity provenance ID")
         _require_requirement(self.semantic_requirement)
