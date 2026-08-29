@@ -126,6 +126,64 @@ def test_operation_graph_rejects_cross_task_chain() -> None:
     assert result.reason_code == "operation_join_invalid"
 
 
+@pytest.mark.parametrize(
+    ("operation_id", "status", "evidence_overrides"),
+    (
+        ("op.retrieve.v1", OperationStatus.FAILED, {}),
+        ("op.inject.v1", OperationStatus.FAILED, {}),
+        ("op.downstream.v1", OperationStatus.FAILED, {}),
+        ("op.outcome.v1", OperationStatus.FAILED, {"outcome_success": True}),
+        ("op.outcome.v1", OperationStatus.SUCCESS, {"outcome_success": False}),
+    ),
+)
+def test_operation_status_mismatch_cannot_claim_attributable_use(
+    operation_id: str,
+    status: OperationStatus,
+    evidence_overrides: dict[str, object],
+) -> None:
+    graph = _operation_graph()
+    broken = OperationGraph(
+        graph.artifacts,
+        tuple(
+            replace(
+                item,
+                status=status,
+                reason_code=("stage_failed" if status is OperationStatus.FAILED else None),
+            )
+            if item.operation_id == operation_id
+            else item
+            for item in graph.operations
+        ),
+        graph.mutations,
+    )
+    result = resolve_memory_use(
+        _evidence(**evidence_overrides),
+        operation_graph=broken,
+    )
+    assert result.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert result.reason_code == "operation_join_invalid"
+
+
+def test_operation_failure_flag_preserves_dedicated_retrieval_diagnostic() -> None:
+    graph = _operation_graph()
+    broken = OperationGraph(
+        graph.artifacts,
+        tuple(
+            replace(item, status=OperationStatus.FAILED, reason_code="retrieval_failed")
+            if item.operation_id == "op.retrieve.v1"
+            else item
+            for item in graph.operations
+        ),
+        graph.mutations,
+    )
+    result = resolve_memory_use(
+        _evidence(retrieval_failure=True),
+        operation_graph=broken,
+    )
+    assert result.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert result.reason_code == "retrieval_failure"
+
+
 def test_exposure_and_behavioral_consistency_do_not_become_use() -> None:
     exposed = _evidence(downstream_operation_id=None, used_artifact_ids=())
     result = resolve_memory_use(exposed)

@@ -655,7 +655,7 @@ def _operation_join_error(
     merely matching arbitrary strings.
     """
 
-    from .operation_graph import OperationKind
+    from .operation_graph import OperationKind, OperationStatus
 
     operations = {item.operation_id: item for item in operation_graph.operations}
 
@@ -679,6 +679,24 @@ def _operation_join_error(
     outcome = require(evidence.outcome_operation_id, OperationKind.DOWNSTREAM_OUTCOME)
     if evidence.outcome_operation_id is not None and outcome is None:
         return "operation_join_invalid"
+
+    # A content-free evidence record cannot override the owner-controlled
+    # operation status. Failed stages must remain unresolved through their
+    # dedicated failure flags; otherwise the chain is invalid rather than
+    # attributable use.
+    if retrieval is not None and retrieval.status is not OperationStatus.SUCCESS:
+        if not evidence.retrieval_failure:
+            return "operation_join_invalid"
+    if injection is not None and injection.status is not OperationStatus.SUCCESS:
+        if not evidence.injection_failure:
+            return "operation_join_invalid"
+    if downstream is not None and downstream.status is not OperationStatus.SUCCESS:
+        return "operation_join_invalid"
+    if outcome is not None:
+        if evidence.outcome_success is True and outcome.status is not OperationStatus.SUCCESS:
+            return "operation_join_invalid"
+        if evidence.outcome_success is False and outcome.status is OperationStatus.SUCCESS:
+            return "operation_join_invalid"
 
     # Operation IDs are opaque outside the owner-controlled graph.  Require
     # every present stage to belong to the same execution context so an
