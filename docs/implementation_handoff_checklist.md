@@ -1057,6 +1057,13 @@ deterministic replica compaction，保留全部 primary IDs 和 delayed identity
 复制 corpus-specific value 被 static safety gate 拒绝，未生成 candidate；
 结果见
 [`extraction_stage3_sm05_optimizer_20260829.md`](extraction_stage3_sm05_optimizer_20260829.md)。
+
+commit `3373a78` 新增显式 `ExtractionSplitPlan` contract，并让 matched
+preflight 在提供 split plan 时校验 validation family、template group 和
+task manifest digest。当前 SM01、SM02、SM05 的 pilot 全部已经占用 train
+role，因此没有未污染的 semantic held-out family；不得把这些 train manifest
+重命名为 validation。split 审计见
+[`extraction_stage3_split_audit_20260829.md`](extraction_stage3_split_audit_20260829.md)。
 后续顺序仍严格按照：
 
 ```text
