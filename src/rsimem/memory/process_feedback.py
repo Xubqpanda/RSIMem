@@ -525,6 +525,16 @@ def audit_process_events(
             # like a successful execution.
             if event.kind not in {ProcessEventKind.HOST_LIFECYCLE, ProcessEventKind.TASK_OUTCOME}:
                 errors.append(f"{event.event_id}: terminal process event lacks receipt")
+        if event.status in {
+            ProcessEventStatus.SKIPPED,
+            ProcessEventStatus.DEFERRED,
+        } and event.policy_decision_id is None and not {
+            "absence",
+            "unsupported_boundary",
+        }.intersection(event.reason_codes):
+            errors.append(
+                f"{event.event_id}: non-executing process event lacks decision or reason"
+            )
         if event.kind is ProcessEventKind.RETRIEVAL and "retrieval_miss" in event.reason_codes and event.status is not ProcessEventStatus.FAILED:
             errors.append(f"{event.event_id}: retrieval miss must be failed")
         if event.kind is ProcessEventKind.TOOL_RESULT and "tool_failure" in event.reason_codes and event.status is not ProcessEventStatus.FAILED:

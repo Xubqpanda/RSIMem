@@ -188,6 +188,26 @@ def test_process_audit_requires_receipt_for_rejected_terminal_event() -> None:
     assert any("terminal process event lacks receipt" in error for error in errors)
 
 
+def test_process_audit_requires_reason_for_unbound_skip() -> None:
+    event = ProcessEvent.create(
+        kind=ProcessEventKind.EXPOSURE,
+        status=ProcessEventStatus.SKIPPED,
+        run_id="run.unbound-skip",
+        variant="native+ledger",
+        trace_id="trace.unbound-skip",
+        episode_id="episode.unbound-skip",
+        session_id="session.unbound-skip",
+        task_id="task.unbound-skip",
+        host_event_id="event.unbound-skip",
+        source_revision="revision.unbound-skip",
+        input_payload={"artifacts": 0},
+        output_payload={"injected": False},
+        reason_codes=("decision_observed",),
+    )
+    errors = audit_process_events((event,))
+    assert any("non-executing process event lacks decision or reason" in error for error in errors)
+
+
 def test_process_audit_checks_policy_and_host_revision_joins() -> None:
     _, event, replay = _replay()
     process = replay.process_events[0]
