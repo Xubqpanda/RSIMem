@@ -19,6 +19,10 @@ from .prompt_components import content_digest, text_digest
 
 
 class OpenAICompatibleExtractionOptimizerClient:
+    # A real provider call is a formal proposal boundary and therefore must
+    # be paired with an owner-controlled revocation registry by the optimizer.
+    requires_revocation_registry = True
+
     def __init__(
         self,
         *,

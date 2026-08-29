@@ -301,6 +301,13 @@ class ExtractionPromptOptimizer:
                 None,
                 RawResourceUsage(),
             )
+        if (
+            getattr(self.client, "requires_revocation_registry", False)
+            and self.revocation_registry is None
+        ):
+            raise ValueError(
+                "optimizer provider proposal requires a revocation registry"
+            )
         request = build_extraction_optimizer_request(
             parent,
             corpus,
