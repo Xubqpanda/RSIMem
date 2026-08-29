@@ -256,6 +256,7 @@ def prepare_extraction_offline_validation_runtime(
     deterministic_suite: DeterministicExtractionSuiteReport,
     validation_id: str,
     output_root: Path,
+    revocation_registry: JsonRevocationRegistry | None = None,
 ) -> dict[str, object]:
     """Create a non-activating candidate bundle for offline observation runs."""
 
@@ -264,6 +265,15 @@ def prepare_extraction_offline_validation_runtime(
     _validate_offline_candidate_bundle(
         parent, candidate, static_safety, deterministic_suite
     )
+    if revocation_registry is not None:
+        for artifact in (parent, candidate):
+            revocation_registry.assert_active(
+                artifact_id=artifact.artifact_id,
+                artifact_schema_version=artifact.schema_version,
+                artifact_digest=artifact.artifact_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
     output = output_root.expanduser().resolve()
     config_path = output / EXTRACTION_OFFLINE_CONFIG_FILE
     candidate_path = output / EXTRACTION_OFFLINE_CANDIDATE_FILE
