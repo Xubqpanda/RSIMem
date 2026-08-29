@@ -123,6 +123,10 @@ The standard process audit also verifies that each policy-bound event's host
 event matches the `triggerEventId` recorded by the policy ledger.
 Unbound `SKIPPED`/`DEFERRED` process events now require an explicit `absence` or
 `unsupported_boundary` reason; otherwise the event is rejected as unexplained.
+Policy decision envelopes now reject a `RUN` action carrying a non-executing
+status, and content-free audit rejects execution receipts on `SKIPPED` or
+`DEFERRED` decisions.  Pending, failed, and rejected run states remain
+available for normal scheduling and recovery.
 
 ## Completed Work
 
