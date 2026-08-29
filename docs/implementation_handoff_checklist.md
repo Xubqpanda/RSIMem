@@ -509,6 +509,8 @@ Adaptive final launcher要求 clean tree，但 static feedback launcher允许 di
 - √ Raw validation observations have an independent crash-safe, split-bound
   store; replay reads the persisted observations rather than only a derived
   decision artifact.
+- √ Owner-controlled raw observation files are explicitly written with private
+  `0600` permissions and permission-checked in regression tests.
 - √ 将同一SM01 task template放入不同split时，split audit必须拒绝。
 
 ### 1G：修正 Experiment Manifest、Launcher 与 Analyzer
