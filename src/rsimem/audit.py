@@ -346,7 +346,20 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         if process_path.exists():
             try:
                 process_events = JsonProcessFeedbackLedger(process_path).events
-                process_errors = audit_process_events(process_events)
+                policy_ids = {
+                    str(item["decisionId"])
+                    for item in _read_jsonl(policy_path)
+                    if isinstance(item.get("decisionId"), str)
+                } if policy_path.exists() else set()
+                process_errors = audit_process_events(
+                    process_events,
+                    policy_decision_ids=policy_ids,
+                )
+                if any(
+                    event.policy_decision_id is not None
+                    for event in process_events
+                ) and not policy_path.exists():
+                    process_errors = (*process_errors, "policy-bound process event has no policy ledger")
                 process_row = {
                     "ok": not process_errors,
                     "traceId": trace_id,
