@@ -9,9 +9,11 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Mapping, Protocol, runtime_checkable
 
+from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 
-EXTRACTION_FEEDBACK_SCHEMA_VERSION = 2
-EXTRACTION_FEEDBACK_SCHEMA = "extraction-feedback-v2"
+
+EXTRACTION_FEEDBACK_SCHEMA_VERSION = 3
+EXTRACTION_FEEDBACK_SCHEMA = "extraction-feedback-v3"
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _SEMANTIC_KEY = re.compile(r"^[a-z][a-z0-9_.:-]{0,127}$")
@@ -865,12 +867,17 @@ class ExtractionFeedbackDataset:
     source_projection_digest: str
     contract_digest: str
     examples: tuple[ExtractionFeedbackExample, ...]
+    evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
     schema_version: int = EXTRACTION_FEEDBACK_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         _require_id(self.dataset_id, "extraction feedback dataset ID")
         _require_digest(self.source_projection_digest, "feedback source digest")
         _require_digest(self.contract_digest, "feedback contract digest")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         ids = tuple(value.example_id for value in self.examples)
         _require_unique(ids, "feedback example IDs")
         if sum(value.primary for value in self.examples) != 1:
@@ -879,6 +886,8 @@ class ExtractionFeedbackDataset:
             "source_projection_digest": self.source_projection_digest,
             "contract_digest": self.contract_digest,
             "examples": list(ids),
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
         })
         if self.dataset_id != expected:
             raise ValueError("extraction feedback dataset ID mismatch")
@@ -889,6 +898,8 @@ class ExtractionFeedbackDataset:
             "dataset_id": self.dataset_id,
             "source_projection_digest": self.source_projection_digest,
             "contract_digest": self.contract_digest,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
             "examples": [{
                 "example_id": example.example_id,
                 "primary_unit_id": example.primary_unit_id,
@@ -918,6 +929,8 @@ class ExtractionFeedbackDataset:
             "dataset_id",
             "source_projection_digest",
             "contract_digest",
+            "evidence_plane",
+            "evidence_source",
             "examples",
         }
         example_fields = {
@@ -990,6 +1003,8 @@ class ExtractionFeedbackDataset:
                 value["source_projection_digest"],
                 value["contract_digest"],
                 tuple(examples),
+                EvidencePlane(value["evidence_plane"]),
+                EvidenceSourceKind(value["evidence_source"]),
                 schema_version=value["schema_version"],
             )
         except (TypeError, ValueError) as exc:
@@ -1207,6 +1222,8 @@ class ExtractionFeedbackBuilder:
             "source_projection_digest": source.source_projection_digest,
             "contract_digest": contract.contract_digest,
             "examples": [value.example_id for value in examples],
+            "evidence_plane": EvidencePlane.BENCHMARK_AUDIT.value,
+            "evidence_source": EvidenceSourceKind.BENCHMARK_CONTRACT.value,
         })
         return ExtractionFeedbackDataset(
             dataset_id,
