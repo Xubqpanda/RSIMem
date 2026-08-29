@@ -826,7 +826,7 @@ fail closed。
 在六层 matched-intervention focused test 加入后，RSIMem 当前验证计数为
 `675 passed`；下文较早的 `656 passed` 是历史 process-audit 快照。
 完整 process-chain restart replay 测试后，历史计数曾更新为 `676 passed`；当前
-RSIMem `.venv` 回归为 `703 passed`，PAST-Bench 为 `397 passed, 2 skipped`；
+RSIMem `.venv` 回归为 `703 passed`，PAST-Bench 为 `398 passed, 2 skipped`；
 SM03 held-out split preflight 记录在
 [`extraction_stage3_sm03_heldout_preflight_20260829.md`](extraction_stage3_sm03_heldout_preflight_20260829.md)。
 
