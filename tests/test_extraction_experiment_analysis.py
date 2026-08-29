@@ -33,6 +33,7 @@ from rsimem.memory.extraction_projection import (
     JsonLiveExtractionFeedbackRecordLog,
     LiveExtractionFeedbackRecord,
 )
+from rsimem.memory.process_signal import JsonProcessSignalCaseStore, ProcessSignalCase
 from test_extraction_experiment_manifest import _inputs
 from extraction_fingerprint_support import extraction_activation_fixture
 
@@ -380,6 +381,36 @@ def test_analysis_reports_quality_raw_unknown_usage_and_complete_funnel(
     assert "lifecycleCostUnits" not in serialized
     assert "futureUtilityPerCost" not in serialized
     assert PRIVATE_TEXT not in serialized
+
+
+def test_analysis_reports_persisted_logical_process_signal_census(tmp_path: Path) -> None:
+    root = _batch(tmp_path, changed=False)
+    completed = next(
+        event
+        for event in json.loads(
+            (root / "batch_manifest.json").read_text(encoding="utf-8")
+        )["attemptHistory"]
+        if event["status"] == "completed"
+    )
+    run = root / completed["outputDirectory"]
+    case = ProcessSignalCase.create(
+        logical_case_id="logical-case.analysis.v1",
+        physical_observation_ids=("physical-observation.analysis.v1",),
+        source_observed=True,
+        extraction_observed=True,
+        persistence_observed=True,
+        retrieval_observed=True,
+        exposure_observed=False,
+        outcome_observed=False,
+        extraction_attributable=False,
+        abstract_hypothesis_digest=None,
+        observation_complete=True,
+    )
+    JsonProcessSignalCaseStore(run / "process_signal_cases.jsonl").append(case)
+    report = analyze_extraction_batch(root)
+    assert report["processSignalCases"]["caseCount"] == 1
+    assert report["processSignalCases"]["logicalCaseCount"] == 1
+    assert report["processSignalCases"]["physicalObservationCount"] == 1
 
 
 def test_analysis_rejects_adaptation_claim_without_changed_extraction(
