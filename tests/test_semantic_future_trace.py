@@ -154,6 +154,33 @@ def test_sm01_feedback_contract_uses_only_predeclared_deployment_signal() -> Non
     assert negative.reuse_signal_observed is False
 
 
+def test_family_match_without_visible_requirement_does_not_create_opportunity() -> None:
+    future = SemanticFutureEvidence(
+        "op.query.no-scope",
+        "op.retrieval.no-scope",
+        "op.injection.no-scope",
+        ("memory.one",),
+        ("revision.one",),
+        "artifact.injection",
+    )
+    resolver = SemanticFeedbackResolver(
+        SemanticFeedbackContract.SM01_TSV_V1,
+        family_id="SM01_preference_adoption",
+        stage="eval_near",
+    )
+    result = resolver.resolve(
+        future,
+        _observation(
+            response="owner\tpriority\ttask\tdue_date\na\tb\tc\td",
+            task_keys=(),
+        ),
+    )
+    assert result.eligible is True
+    assert result.used_artifact_ids == ()
+    assert result.reuse_signal_observed is False
+    assert result.outcome_reason_code == "opportunity_not_observed"
+
+
 def test_sm03_fact_correction_contract_resolves_corrected_value() -> None:
     future = SemanticFutureEvidence(
         "op.query",
