@@ -59,6 +59,8 @@ def test_replay_emits_process_events_bound_to_policy_and_host() -> None:
         assert process.input_digest == decision.input_digest
         assert process.output_digest == decision.output_digest
         assert process.event_id == ProcessEvent.from_payload(process.payload()).event_id
+    exposure = next(item for item in replay.process_events if item.policy_layer is PolicyLayer.EXPOSURE)
+    assert exposure.execution_receipt_ids == replay.lineage.injection_receipt_ids
 
 
 def test_process_ledger_is_restart_safe_and_conflict_checked(tmp_path) -> None:
