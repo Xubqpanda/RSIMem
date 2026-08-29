@@ -241,6 +241,32 @@ def test_matched_extraction_runtime_binds_candidate_and_is_restart_stable(
     assert all(len(client.calls) == 2 for client in clients)
 
 
+def test_offline_extraction_runtime_binds_candidate_without_trial_activation(tmp_path) -> None:
+    parent = Mem0FlatPromptAdapter().export_root_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID
+    )
+    candidate = _candidate(parent=parent)
+    runtime = StaticSemanticWritebackRuntime(
+        tmp_path / "offline" / "hermes-home",
+        _client(),
+        operation_evidence_path=tmp_path / "offline" / "operations.jsonl",
+        mutation_receipt_path=tmp_path / "offline" / "receipts.json",
+        extraction_policy_artifact=candidate,
+        expected_extraction_policy_artifact_id=candidate.artifact_id,
+        expected_extraction_policy_artifact_digest=candidate.artifact_digest,
+        extraction_runtime_scope=ExtractionPromptRuntimeScope.OFFLINE_VALIDATION,
+        extraction_trial_id="sm03-heldout-v1",
+    )
+    assert runtime.extraction_runtime_binding.deployment_scope == (
+        ExtractionPromptRuntimeScope.OFFLINE_VALIDATION
+    )
+    assert runtime.extraction_runtime_binding.trial_id == "sm03-heldout-v1"
+    assert runtime.extraction_runtime_binding.payload()["deployment_scope"] == (
+        "offline_validation"
+    )
+    runtime.close()
+
+
 @pytest.mark.parametrize(
     ("actual", "expected_id", "expected_digest", "scope", "trial_id", "message"),
     (
