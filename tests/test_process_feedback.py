@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import copy
 
 import pytest
 
@@ -161,9 +162,19 @@ def test_process_corpus_is_separate_from_evaluation_score_and_restart_safe(tmp_p
 
 def test_process_corpus_rejects_duplicate_or_cross_family_events() -> None:
     _, _, replay = _replay()
-    with pytest.raises(ValueError, match="event IDs"):
+    deduped = ProcessCorpus.create(
+        (*replay.process_events, replay.process_events[0]),
+        split_role="pilot",
+        family_id="SM01_preference_adoption",
+        task_template_group_id="sm01-process-pilot",
+        task_manifest_digest="a" * 64,
+    )
+    assert len(deduped.events) == len(replay.process_events)
+    conflicting = copy.copy(replay.process_events[0])
+    object.__setattr__(conflicting, "output_digest", "0" * 64)
+    with pytest.raises(ValueError, match="conflicting"):
         ProcessCorpus.create(
-            (*replay.process_events, replay.process_events[0]),
+            (*replay.process_events, conflicting),
             split_role="pilot",
             family_id="SM01_preference_adoption",
             task_template_group_id="sm01-process-pilot",
