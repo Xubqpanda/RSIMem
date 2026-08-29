@@ -843,9 +843,11 @@ RSIMem `.venv` 回归为 `708 passed`，PAST-Bench 为 `398 passed, 2 skipped`�
 最近的 `sm02-feedback-20260829-rerun-main` train batch 也已完成三次真实
 provider replicate；其 12 条 `missed` 与 12 条 `unresolved` 反馈进入了冻结
 optimizer。v2 contract 的一次 recovery request 产生了通过 static safety 和
-deterministic suite 的 N+1 proposal，但尚未完成 SM03 offline validation，
-因此仍不能运行 matched validation。详见
-[`extraction_stage3_sm02_feedback_rerun_20260829.md`](extraction_stage3_sm02_feedback_rerun_20260829.md)。
+deterministic suite 的 N+1 proposal。SM03 held-out offline validation 已完成，
+但因实际 strict observation 只有 2 个 matched pairs 且 resolved denominator
+为 0 而被 fail-closed reject，因此仍不能运行 matched validation。详见
+[`extraction_stage3_sm02_feedback_rerun_20260829.md`](extraction_stage3_sm02_feedback_rerun_20260829.md)
+和 [`extraction_stage3_sm03_offline_validation_20260829.md`](extraction_stage3_sm03_offline_validation_20260829.md)。
 
 当前第三阶段的主要任务是 feasibility，不要求一次性完成六层 online optimization。每层分别完成以下验收：
 
