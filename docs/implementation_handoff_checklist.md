@@ -668,6 +668,7 @@ frozen system/safety/schema wrapper
 - √ commit scheduler 执行前必须经过显式 mutation validator；validator 缺失或拒绝时持久化 `FAILED`，且不会调用 apply，避免绕过 mutation safety 或把失败伪装成成功。
 
 2D.2 当前实现记录：`CommitScheduler`/`JsonCommitScheduleStore` 提供 crash-safe pending/deferred schedule、CAS revision gate、cancel/failure/terminal idempotency；`execute()` 现在要求显式 `mutation_validator`，真实 backend validator 仍由现有 transactional executor 持有，scheduler 不宣称替代该 safety boundary。
+`JsonIdempotencyReceiptStore.reserve_if_absent()` 同样使用排他锁和原子替换；损坏 receipt 在 reservation 路径 fail-closed，不能被新 mutation 覆盖。
 
 ### 2D.3：Exposure 与 Context-Memory Interaction Policy
 
