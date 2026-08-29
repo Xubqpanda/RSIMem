@@ -214,7 +214,7 @@ import sys
 from pathlib import Path
 from rsimem.memory.extraction_projection import JsonExtractionSourceRecordStore
 from rsimem.memory.process_corpus import JsonProcessCorpusStore, ProcessCorpus
-from rsimem.memory.process_feedback import JsonProcessFeedbackLedger
+from rsimem.memory.process_feedback import JsonProcessFeedbackLedger, audit_process_events
 run_dir = Path(sys.argv[1])
 audit = json.loads((run_dir / "audit.json").read_text(encoding="utf-8"))
 if audit.get("ok") is not True or audit.get("issues") != []:
@@ -233,6 +233,9 @@ events = tuple(
 )
 if not events:
     raise ValueError("formal extraction run emitted no process feedback corpus")
+process_errors = audit_process_events(events)
+if process_errors:
+    raise ValueError("formal process feedback audit failed: " + "; ".join(process_errors))
 manifest = json.loads((run_dir.parent / "batch_manifest.json").read_text(encoding="utf-8"))
 split = manifest["split"]
 corpus = ProcessCorpus.create(

@@ -127,7 +127,7 @@ PY
 import json, sys
 from pathlib import Path
 from rsimem.memory.process_corpus import JsonProcessCorpusStore, ProcessCorpus
-from rsimem.memory.process_feedback import JsonProcessFeedbackLedger
+from rsimem.memory.process_feedback import JsonProcessFeedbackLedger, audit_process_events
 run_dir, manifest_path = map(Path, sys.argv[1:])
 events = tuple(
     event
@@ -136,6 +136,9 @@ events = tuple(
 )
 if not events:
     raise ValueError("formal matched run emitted no process feedback corpus")
+process_errors = audit_process_events(events)
+if process_errors:
+    raise ValueError("formal process feedback audit failed: " + "; ".join(process_errors))
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 split = manifest["split"]
 corpus = ProcessCorpus.create(
