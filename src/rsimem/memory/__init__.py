@@ -186,6 +186,7 @@ from .revocation import (
 from .process_signal import (
     PROCESS_SIGNAL_SCHEMA,
     PROCESS_SIGNAL_SCHEMA_VERSION,
+    JsonProcessSignalCaseStore,
     ProcessSignalCase,
     ProcessSignalCaseCensus,
     ProcessSignalCaseStatus,
@@ -344,6 +345,7 @@ __all__ = [
     "RevocationEntry",
     "PROCESS_SIGNAL_SCHEMA",
     "PROCESS_SIGNAL_SCHEMA_VERSION",
+    "JsonProcessSignalCaseStore",
     "ProcessSignalCase",
     "ProcessSignalCaseCensus",
     "ProcessSignalCaseStatus",
