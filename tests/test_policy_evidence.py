@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 
 import pytest
 
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.policy_contracts import TriggerDecision
 from rsimem.memory.policy_evidence import JsonPolicyDecisionLedger, PolicyDecisionEvidence
 
@@ -64,6 +66,30 @@ def test_evidence_payload_round_trips() -> None:
         mutation_receipt_ids=("receipt.mutation",),
     )
     assert PolicyDecisionEvidence.from_payload(evidence.payload()) == evidence
+
+
+def test_policy_evidence_plane_and_source_are_explicit(tmp_path) -> None:
+    pure = _record(JsonPolicyDecisionLedger(tmp_path / "policy-plane.jsonl"))
+    assert pure.evidence_plane is EvidencePlane.PURE_PROCESS
+    assert pure.evidence_source is EvidenceSourceKind.RUNTIME_OBSERVATION
+
+    audited = JsonPolicyDecisionLedger(
+        tmp_path / "policy-audit-plane.jsonl",
+        family_id="SM02_constraint_retention",
+        stage="eval_near",
+    ).record_decision(
+        _decision(),
+        run_id="run.audit-plane",
+        episode_id="episode.audit-plane",
+        session_id="session.audit-plane",
+        task_id="task.audit-plane",
+        snapshot_id="snapshot.audit-plane",
+    )
+    assert audited.evidence_plane is EvidencePlane.BENCHMARK_AUDIT
+    assert audited.evidence_source is EvidenceSourceKind.BENCHMARK_CONTRACT
+
+    with pytest.raises(ValueError, match="plane and source identity"):
+        replace(pure, evidence_plane=EvidencePlane.BENCHMARK_AUDIT)
 
 
 def test_policy_evidence_ledger_reserves_one_concurrent_writer(tmp_path) -> None:
