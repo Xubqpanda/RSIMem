@@ -94,6 +94,16 @@ def test_skip_and_defer_have_closed_execution_semantics() -> None:
         next_eligible_boundary="task_completed.next",
     )
     assert deferred.action is DecisionAction.DEFER
+    with pytest.raises(ValueError, match="non-executing status"):
+        TriggerDecision.create(
+            **{**_base_kwargs(), "action": DecisionAction.RUN, "execution_status": ExecutionStatus.SKIPPED}
+        )
+    receiptful_skip = TriggerDecision.create(
+        **{**_base_kwargs(), "action": DecisionAction.SKIP, "execution_status": ExecutionStatus.SKIPPED}
+    )
+    report = validate_policy_episode((receiptful_skip,), require_all_layers=False)
+    assert not report.ok
+    assert any("non-executing decision" in error for error in report.errors)
 
 
 def test_source_selection_cannot_bypass_active_current_or_tool_closure() -> None:
