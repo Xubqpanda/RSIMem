@@ -213,6 +213,8 @@ class SemanticFutureEvidence:
             raise ValueError("unsupported semantic future evidence schema version")
         if len(self.memory_artifact_ids) != len(self.memory_revisions):
             raise ValueError("future semantic artifacts and revisions must align")
+        if len(self.memory_artifact_ids) != len(set(self.memory_artifact_ids)):
+            raise ValueError("future semantic artifacts must be unique")
         if len(self.injected_artifact_ids) != len(set(self.injected_artifact_ids)):
             raise ValueError("future injected artifacts must be unique")
         if not set(self.injected_artifact_ids).issubset(set(self.memory_artifact_ids)):
