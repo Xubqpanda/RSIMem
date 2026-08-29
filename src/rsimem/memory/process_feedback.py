@@ -81,6 +81,7 @@ class ProcessEventStatus(StrEnum):
     FAILED = "failed"
     SKIPPED = "skipped"
     DEFERRED = "deferred"
+    REJECTED = "rejected"
     UNKNOWN = "unknown"
 
 
@@ -182,9 +183,6 @@ class ProcessEvent:
             ),
         )
         reasons = _strings(self.reason_codes, "process reason codes")
-        unknown = set(reasons).difference(PROCESS_REASON_CODES)
-        if unknown:
-            raise ValueError("unknown process reason code: " + ",".join(sorted(unknown)))
         object.__setattr__(self, "reason_codes", reasons)
         expected = f"process-event.{content_digest(self.identity_payload())[:40]}"
         if self.event_id != expected:
@@ -208,6 +206,8 @@ class ProcessEvent:
         source_revision: str,
         input_payload: object,
         output_payload: object,
+        input_digest: str | None = None,
+        output_digest: str | None = None,
         policy_decision_id: str | None = None,
         policy_layer: PolicyLayer | str | None = None,
         lineage_id: str | None = None,
@@ -216,8 +216,10 @@ class ProcessEvent:
         family_id: str | None = None,
         stage: str | None = None,
     ) -> "ProcessEvent":
-        input_digest = content_digest(input_payload)
-        output_digest = content_digest(output_payload)
+        input_digest = input_digest or content_digest(input_payload)
+        output_digest = output_digest or content_digest(output_payload)
+        _digest(input_digest, "process event input digest")
+        _digest(output_digest, "process event output digest")
         identity = {
             "kind": ProcessEventKind(kind).value,
             "status": ProcessEventStatus(status).value,
@@ -283,12 +285,10 @@ class ProcessEvent:
         receipts = tuple(execution_receipt_ids)
         if decision.execution_receipt_id and decision.execution_receipt_id not in receipts:
             receipts = (*receipts, decision.execution_receipt_id)
-        reason_codes = tuple(
-            value if value in PROCESS_REASON_CODES else "decision_observed"
-            for value in decision.reason_codes
-        )
-        # Keep at least one reason and de-duplicate while preserving order.
-        reason_codes = tuple(dict.fromkeys(reason_codes)) or ("decision_observed",)
+        # Keep the runtime reason codes (including layer-specific diagnostics)
+        # and de-duplicate while preserving order.  The public constructor
+        # validates their machine-readable shape.
+        reason_codes = tuple(dict.fromkeys(decision.reason_codes)) or ("decision_observed",)
         return cls.create(
             kind=_layer_kind(decision.layer),
             status=ProcessEventStatus(decision.execution_status.value),
@@ -300,8 +300,10 @@ class ProcessEvent:
             task_id=task_id,
             host_event_id=host_event_id,
             source_revision=decision.source_revision,
-            input_payload={"decision_id": decision.decision_id, "digest": decision.input_digest},
-            output_payload={"decision_id": decision.decision_id, "digest": decision.output_digest},
+            input_payload={},
+            output_payload={},
+            input_digest=decision.input_digest,
+            output_digest=decision.output_digest,
             policy_decision_id=decision.decision_id,
             policy_layer=decision.layer,
             lineage_id=decision.lineage_id,

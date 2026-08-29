@@ -51,6 +51,8 @@ def test_replay_emits_process_events_bound_to_policy_and_host() -> None:
         assert process.policy_layer is decision.layer
         assert process.source_revision == snapshot.context_revision
         assert process.lineage_id == decision.lineage_id
+        assert process.input_digest == decision.input_digest
+        assert process.output_digest == decision.output_digest
         assert process.event_id == ProcessEvent.from_payload(process.payload()).event_id
 
 
