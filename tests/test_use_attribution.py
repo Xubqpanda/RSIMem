@@ -11,6 +11,7 @@ from rsimem.memory.use_attribution import (
     OutcomeEvidenceKind,
     resolve_memory_use,
 )
+from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
 
 
 def _evidence(**overrides: object) -> MemoryUseEvidence:
@@ -129,11 +130,49 @@ def test_retrieval_injection_and_tool_failures_are_separate_diagnostics() -> Non
 
 
 def test_artifact_set_binding_is_supported_without_fact_multiplication() -> None:
+    binding = ArtifactSetSemanticBinding.create(
+        semantic_unit_id="semantic.preference.rule.v1",
+        member_artifact_ids=("artifact.a.v1", "artifact.b.v1"),
+        member_fact_ids=("fact.a.v1", "fact.b.v1"),
+        complete=True,
+        source_digest="a" * 64,
+        provenance_id="provenance.extraction.v1",
+    )
     evidence = _evidence(
         artifact_ids=(),
-        artifact_set_id="artifact-set.preference.v1",
-        retrieved_artifact_ids=("artifact.a.v1", "artifact.b.v1"),
-        injected_artifact_ids=("artifact.a.v1", "artifact.b.v1"),
-        used_artifact_ids=("artifact.a.v1", "artifact.b.v1"),
+        artifact_set_id=binding.binding_id,
+        retrieved_artifact_ids=binding.member_artifact_ids,
+        injected_artifact_ids=binding.member_artifact_ids,
+        used_artifact_ids=binding.member_artifact_ids,
     )
-    assert resolve_memory_use(evidence).status == MemoryUseResolutionStatus.ATTRIBUTABLE_USE
+    assert resolve_memory_use(
+        evidence, artifact_set_binding=binding
+    ).status == MemoryUseResolutionStatus.ATTRIBUTABLE_USE
+
+
+def test_opaque_or_mismatched_artifact_set_reference_fails_closed() -> None:
+    evidence = _evidence(
+        artifact_ids=(),
+        artifact_set_id="artifact-set.forged.v1",
+        retrieved_artifact_ids=("artifact.a.v1",),
+        injected_artifact_ids=("artifact.a.v1",),
+        used_artifact_ids=("artifact.a.v1",),
+    )
+    missing = resolve_memory_use(evidence)
+    assert missing.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert missing.reason_code == "artifact_set_binding_missing"
+
+    binding = ArtifactSetSemanticBinding.create(
+        semantic_unit_id="semantic.preference.other.v1",
+        member_artifact_ids=("artifact.a.v1",),
+        member_fact_ids=("fact.a.v1",),
+        complete=True,
+        source_digest="b" * 64,
+        provenance_id="provenance.other.v1",
+    )
+    mismatch = resolve_memory_use(
+        evidence,
+        artifact_set_binding=binding,
+    )
+    assert mismatch.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert mismatch.reason_code == "artifact_set_binding_mismatch"

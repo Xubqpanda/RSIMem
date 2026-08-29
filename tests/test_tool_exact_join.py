@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 
 import pytest
 
@@ -71,6 +72,34 @@ def test_projection_scope_is_attached_to_process_events_only() -> None:
     # The host-neutral join contract itself remains unchanged.
     assert "family_id" not in join.payload()
     assert "stage" not in join.payload()
+
+
+def test_exact_join_is_not_tied_to_notes_protocol() -> None:
+    tool_name = "calendar.create_event"
+    join = _join(
+        call_id="call.calendar.v1",
+        result_id="result.calendar.v1",
+        tool_name_digest=hashlib.sha256(tool_name.encode()).hexdigest(),
+        success=False,
+        retry_identity="retry.calendar.0",
+        call_receipt_id="receipt.calendar.call.v1",
+        result_receipt_id="receipt.calendar.result.v1",
+    )
+    events = join.process_events(
+        family_id="application.calendar",
+        stage="tool_boundary",
+    )
+    assert [event.kind.value for event in events] == ["tool_call", "tool_result"]
+    assert events[1].status.value == "failed"
+    assert events[1].reason_codes == ("tool_failure",)
+
+
+def test_missing_result_projects_only_call_and_resolves_non_exact() -> None:
+    join = _join(result_present=False, result_id=None)
+    events = join.process_events()
+    assert len(events) == 1
+    assert events[0].kind.value == "tool_call"
+    assert resolve_tool_call_result(join).status == ToolJoinResolutionStatus.MISSING
 
 
 @pytest.mark.parametrize(

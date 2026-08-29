@@ -16,9 +16,12 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Mapping
+from typing import TYPE_CHECKING, Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
+
+if TYPE_CHECKING:
+    from .artifact_set import ArtifactSetSemanticBinding
 
 
 MEMORY_USE_EVIDENCE_SCHEMA_VERSION = 1
@@ -329,8 +332,19 @@ class MemoryUseResolution:
         }
 
 
-def resolve_memory_use(evidence: MemoryUseEvidence) -> MemoryUseResolution:
-    """Resolve a use claim conservatively from exact operation joins."""
+def resolve_memory_use(
+    evidence: MemoryUseEvidence,
+    *,
+    artifact_set_binding: "ArtifactSetSemanticBinding | None" = None,
+) -> MemoryUseResolution:
+    """Resolve a use claim conservatively from exact operation joins.
+
+    An ``artifact_set_id`` is only an opaque reference.  Before it can
+    contribute to an attributable-use decision, callers must provide the
+    corresponding trusted :class:`ArtifactSetSemanticBinding`; otherwise the
+    resolver fails closed instead of treating arbitrary artifact IDs as a
+    complete semantic unit.
+    """
 
     if not isinstance(evidence, MemoryUseEvidence):
         raise TypeError("memory-use resolver requires MemoryUseEvidence")
@@ -357,6 +371,63 @@ def resolve_memory_use(evidence: MemoryUseEvidence) -> MemoryUseResolution:
             evidence.outcome_success,
             True,
         )
+    if evidence.artifact_set_id is not None:
+        # Import lazily to keep the two contract modules independent at
+        # runtime.  The binding itself carries the authoritative member set
+        # and completeness bit; the ID alone is not sufficient evidence.
+        from .artifact_set import ArtifactSetSemanticBinding
+
+        if artifact_set_binding is None:
+            return MemoryUseResolution(
+                evidence.evidence_id,
+                MemoryUseResolutionStatus.UNRESOLVED,
+                "artifact_set_binding_missing",
+                bool(evidence.injected_artifact_ids),
+                evidence.behavioral_consistency,
+                False,
+                evidence.outcome_success,
+                True,
+            )
+        if not isinstance(artifact_set_binding, ArtifactSetSemanticBinding):
+            raise TypeError("artifact-set binding has the wrong type")
+        if artifact_set_binding.binding_id != evidence.artifact_set_id:
+            return MemoryUseResolution(
+                evidence.evidence_id,
+                MemoryUseResolutionStatus.UNRESOLVED,
+                "artifact_set_binding_mismatch",
+                bool(evidence.injected_artifact_ids),
+                evidence.behavioral_consistency,
+                False,
+                evidence.outcome_success,
+                True,
+            )
+        if not artifact_set_binding.complete:
+            return MemoryUseResolution(
+                evidence.evidence_id,
+                MemoryUseResolutionStatus.UNRESOLVED,
+                "artifact_set_binding_incomplete",
+                bool(evidence.injected_artifact_ids),
+                evidence.behavioral_consistency,
+                False,
+                evidence.outcome_success,
+                True,
+            )
+        bound = set(artifact_set_binding.member_artifact_ids)
+        if evidence.artifact_ids and set(evidence.artifact_ids) != bound:
+            return MemoryUseResolution(
+                evidence.evidence_id,
+                MemoryUseResolutionStatus.UNRESOLVED,
+                "artifact_set_member_mismatch",
+                bool(evidence.injected_artifact_ids),
+                evidence.behavioral_consistency,
+                False,
+                evidence.outcome_success,
+                True,
+            )
+    else:
+        if artifact_set_binding is not None:
+            raise ValueError("artifact-set binding requires artifact_set_id")
+        bound = set(evidence.artifact_ids)
     if not evidence.retrieval_operation_id or not evidence.retrieved_artifact_ids:
         return MemoryUseResolution(
             evidence.evidence_id,
@@ -368,7 +439,6 @@ def resolve_memory_use(evidence: MemoryUseEvidence) -> MemoryUseResolution:
             evidence.outcome_success,
             True,
         )
-    bound = set(evidence.artifact_ids)
     if bound and set(evidence.retrieved_artifact_ids) != bound:
         return MemoryUseResolution(
             evidence.evidence_id,

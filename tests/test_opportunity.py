@@ -12,6 +12,7 @@ from rsimem.memory.opportunity import (
     OpportunitySurface,
     resolve_opportunity,
 )
+from rsimem.memory.evidence_planes import EvidenceSourceKind
 
 
 def _evidence() -> OpportunityEvidence:
@@ -52,6 +53,7 @@ def test_application_schema_is_frozen_and_versioned() -> None:
         application_schema=schema,
     )
     assert evidence.application_schema_digest == schema.schema_digest
+    assert evidence.evidence_source is EvidenceSourceKind.APPLICATION_CONTRACT
     with pytest.raises(ValueError, match="not in the frozen schema"):
         OpportunityEvidence.create(
             source_surface=OpportunitySurface.APPLICATION_SCHEMA,
@@ -62,6 +64,25 @@ def test_application_schema_is_frozen_and_versioned() -> None:
             source_payload={},
             application_schema=schema,
         )
+
+
+def test_application_schema_cannot_be_relabelled_as_runtime_observation() -> None:
+    schema = ApplicationOpportunitySchema.create(
+        schema_id="resource-policy",
+        version="v1",
+        requirement_ids=("resource.share.recipient_policy",),
+    )
+    evidence = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.APPLICATION_SCHEMA,
+        semantic_requirement="resource.share.recipient_policy",
+        observation_time="2026-08-30T01:02:03Z",
+        operation_id="op.application-schema.v3",
+        provenance_id="provenance.application.v3",
+        source_payload={"schema_event": "published"},
+        application_schema=schema,
+    )
+    with pytest.raises(ValueError, match="application-schema opportunity"):
+        replace(evidence, evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION)
 
 
 def test_opportunity_resolution_distinguishes_confounded_censored_and_absent() -> None:
