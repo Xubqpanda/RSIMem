@@ -164,6 +164,14 @@ from .revocation import (
     JsonRevocationRegistry,
     RevocationEntry,
 )
+from .process_signal import (
+    PROCESS_SIGNAL_SCHEMA,
+    PROCESS_SIGNAL_SCHEMA_VERSION,
+    ProcessSignalCase,
+    ProcessSignalCaseCensus,
+    ProcessSignalCaseStatus,
+    census_process_signal_cases,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -290,6 +298,12 @@ __all__ = [
     "REVOCATION_SCHEMA_VERSION",
     "JsonRevocationRegistry",
     "RevocationEntry",
+    "PROCESS_SIGNAL_SCHEMA",
+    "PROCESS_SIGNAL_SCHEMA_VERSION",
+    "ProcessSignalCase",
+    "ProcessSignalCaseCensus",
+    "ProcessSignalCaseStatus",
+    "census_process_signal_cases",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
