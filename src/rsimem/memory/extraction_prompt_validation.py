@@ -1261,19 +1261,28 @@ class JsonExtractionValidationObservationStore:
     def get(self, observation_id: str) -> ExtractionValidationObservation | None:
         path = self._path(self.root, observation_id)
         with self._lock(fcntl.LOCK_SH):
-            if not path.exists():
-                return None
-            try:
-                observation = ExtractionValidationObservation.from_payload(
-                    json.loads(path.read_text(encoding="utf-8"))
-                )
-            except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
-                raise ValueError("malformed extraction validation observation") from exc
-            if observation.observation_id != observation_id:
-                raise ValueError("validation observation filename mismatch")
-            if not self.split.permits(observation):
-                raise ValueError("stored validation observation is outside the frozen split")
-            return observation
+            return self._read_unlocked(path, observation_id)
+
+    def _read_unlocked(
+        self,
+        path: Path,
+        observation_id: str,
+    ) -> ExtractionValidationObservation | None:
+        if not path.exists():
+            return None
+        try:
+            observation = ExtractionValidationObservation.from_payload(
+                json.loads(path.read_text(encoding="utf-8"))
+            )
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise ValueError("malformed extraction validation observation") from exc
+        if observation.observation_id != observation_id:
+            raise ValueError("validation observation filename mismatch")
+        if not self.split.permits(observation):
+            raise ValueError(
+                "stored validation observation is outside the frozen split"
+            )
+        return observation
 
     def records(self) -> tuple[ExtractionValidationObservation, ...]:
         with self._lock(fcntl.LOCK_SH):
@@ -1281,12 +1290,12 @@ class JsonExtractionValidationObservationStore:
                 path for path in self.root.glob("extraction-observation.*.json")
                 if path.is_file()
             ))
-        values = tuple(
-            observation
-            for path in paths
-            for observation in (self.get(path.stem),)
-            if observation is not None
-        )
+            values = tuple(
+                observation
+                for path in paths
+                for observation in (self._read_unlocked(path, path.stem),)
+                if observation is not None
+            )
         return tuple(sorted(values, key=lambda value: value.observation_id))
 
 
