@@ -24,7 +24,7 @@ from rsimem.memory.extraction_optimizer_builder import (
     ExtractionFactContent,
     ExtractionOptimizerCorpusBuilder,
 )
-from rsimem.memory.evidence_planes import EvidencePlane
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.extraction_optimizer_audit import audit_optimizer_corpus_isolation
 from rsimem.memory.extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
@@ -198,6 +198,10 @@ def _fixture():
         outcome_operation_id=join.outcome_operation_id,
         dataset=feedback_dataset,
     )
+    assert source_record.evidence_plane is EvidencePlane.BENCHMARK_AUDIT
+    assert source_record.evidence_source is EvidenceSourceKind.BENCHMARK_CONTRACT
+    assert feedback.evidence_plane is EvidencePlane.BENCHMARK_AUDIT
+    assert feedback.evidence_source is EvidenceSourceKind.BENCHMARK_CONTRACT
     source_context = OperationContext(
         source_record.run_id,
         source_record.episode_id,
