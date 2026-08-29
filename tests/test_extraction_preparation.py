@@ -76,6 +76,7 @@ def test_stage_one_style_legacy_batch_is_audited_without_fabricating_signal(
     assert audit.primary_label_counts["unresolved"] == 1
     assert audit.reason_codes == (
         "source_schema_not_current",
+        "feedback_schema_not_current",
         "source_optimizer_capture_missing",
         "feedback_optimizer_capture_missing",
     )
