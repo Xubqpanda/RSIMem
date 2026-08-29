@@ -497,6 +497,7 @@ def audit_process_events(
             ProcessEventStatus.EXECUTED,
             ProcessEventStatus.SUCCESS,
             ProcessEventStatus.FAILED,
+            ProcessEventStatus.REJECTED,
         } and not event.execution_receipt_ids:
             # A failed observation may be a host event with no runtime receipt;
             # it must then explain the failure explicitly rather than looking
