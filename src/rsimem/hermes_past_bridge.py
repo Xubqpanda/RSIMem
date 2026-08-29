@@ -84,6 +84,7 @@ from .memory.extraction_feedback import (
     detect_current_input_semantic_keys,
     detect_user_source_semantic_keys,
 )
+from .memory.tool_exact_join import ToolCallResultJoin
 from .memory.extraction_optimizer_builder import ExtractionFactContent
 from .memory.extraction_optimizer_capture import (
     ExtractionOptimizerFeedbackCapture,
@@ -1000,6 +1001,7 @@ class HermesPastBenchBridge:
     def _record_semantic_outcomes(self, result: Mapping[str, Any]) -> None:
         if self._semantic_outcomes_recorded:
             return
+        self._record_tool_call_results(result)
         if self.semantic_future_recorder is not None and self.semantic_feedback_resolver is not None:
             for future, step_id in self._semantic_futures:
                 current_input = self._current_input(result)
@@ -1051,6 +1053,162 @@ class HermesPastBenchBridge:
             execution_receipt_ids=(f"receipt.task-outcome.{outcome_digest[:24]}",),
         )
         self._semantic_outcomes_recorded = True
+
+    def _record_tool_call_results(self, result: Mapping[str, Any]) -> None:
+        """Project every observed tool call/result into exact process events.
+
+        Arguments and return bodies stay in the host-owned trace.  The public
+        process corpus receives only stable call/result identity, tool-name
+        digest, retry identity, status, host boundary and receipt joins.
+        """
+
+        raw_messages = result.get("messages")
+        if not isinstance(raw_messages, (list, tuple)):
+            return
+        messages = tuple(value for value in raw_messages if isinstance(value, Mapping))
+        calls: dict[str, tuple[str, str, str, str]] = {}
+        call_counts: dict[str, int] = {}
+        emitted_result_ids: set[str] = set()
+        joins: list[ToolCallResultJoin] = []
+        host_event_id = self._last_host_event_id or "event.tool-observation"
+        source_revision = self._last_host_source_revision or self._exposure_context_revision()
+        for message in messages:
+            if message.get("role") != "assistant":
+                continue
+            raw_calls = message.get("tool_calls")
+            if not isinstance(raw_calls, (list, tuple)):
+                continue
+            for ordinal, call in enumerate(raw_calls, start=1):
+                if not isinstance(call, Mapping):
+                    continue
+                function = call.get("function")
+                if not isinstance(function, Mapping):
+                    continue
+                name = str(function.get("name") or "unknown_tool")
+                raw_call_id = str(call.get("id") or f"tool-call-{ordinal}")
+                count = call_counts.get(raw_call_id, 0)
+                call_counts[raw_call_id] = count + 1
+                retry_identity = (
+                    "retry."
+                    + hashlib.sha256(
+                        f"{raw_call_id}:{name}:{count}".encode("utf-8")
+                    ).hexdigest()[:24]
+                )
+                call_id = raw_call_id if re.fullmatch(
+                    r"[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}", raw_call_id
+                ) else (
+                    "tool-call."
+                    + hashlib.sha256(raw_call_id.encode("utf-8")).hexdigest()[:24]
+                )
+                calls.setdefault(
+                    raw_call_id,
+                    (
+                        call_id,
+                        name,
+                        retry_identity,
+                        "receipt.tool-call."
+                        + hashlib.sha256(
+                            f"{call_id}:{retry_identity}".encode("utf-8")
+                        ).hexdigest()[:24],
+                    ),
+                )
+        for message in messages:
+            if message.get("role") != "tool":
+                continue
+            raw_call_id = str(message.get("tool_call_id") or "")
+            call = calls.get(raw_call_id)
+            content = message.get("content")
+            parsed = None
+            if isinstance(content, str):
+                try:
+                    parsed = json.loads(content)
+                except json.JSONDecodeError:
+                    parsed = None
+            success = isinstance(parsed, Mapping) and parsed.get("success") is True
+            result_seed = json.dumps(
+                {"call_id": raw_call_id, "content_digest": hashlib.sha256(
+                    str(content or "").encode("utf-8")
+                ).hexdigest()},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            result_id = str(message.get("id") or (
+                "tool-result."
+                + hashlib.sha256(result_seed.encode("utf-8")).hexdigest()[:24]
+            ))
+            duplicate_result = result_id in emitted_result_ids
+            emitted_result_ids.add(result_id)
+            if call is None:
+                orphan_call_id = (
+                    "orphan-call."
+                    + hashlib.sha256(raw_call_id.encode("utf-8")).hexdigest()[:24]
+                )
+                joins.append(ToolCallResultJoin.create(
+                    call_id=orphan_call_id,
+                    result_id=result_id,
+                    tool_name_digest=hashlib.sha256(b"unknown_tool").hexdigest(),
+                    success=success,
+                    retry_identity="retry.orphan",
+                    run_id=self._run_id,
+                    variant=self.ledger.variant,
+                    trace_id=self._trace_id,
+                    episode_id=self._episode_id,
+                    session_id=self._session_id,
+                    task_id=self._task_id,
+                    source_revision=source_revision,
+                    host_event_id=host_event_id,
+                    result_receipt_id="receipt.tool-result."
+                    + hashlib.sha256(result_id.encode("utf-8")).hexdigest()[:24],
+                    call_present=False,
+                    result_present=True,
+                    orphan_result=True,
+                ))
+                continue
+            call_id, name, retry_identity, call_receipt = call
+            joins.append(ToolCallResultJoin.create(
+                call_id=call_id,
+                result_id=result_id,
+                tool_name_digest=hashlib.sha256(name.encode("utf-8")).hexdigest(),
+                success=success,
+                retry_identity=retry_identity,
+                run_id=self._run_id,
+                variant=self.ledger.variant,
+                trace_id=self._trace_id,
+                episode_id=self._episode_id,
+                session_id=self._session_id,
+                task_id=self._task_id,
+                source_revision=source_revision,
+                host_event_id=host_event_id,
+                call_receipt_id=call_receipt,
+                result_receipt_id="receipt.tool-result."
+                + hashlib.sha256(result_id.encode("utf-8")).hexdigest()[:24],
+                duplicate_result=duplicate_result,
+            ))
+        represented_calls = {join.call_id for join in joins if join.call_present}
+        for raw_call_id, (call_id, name, retry_identity, call_receipt) in calls.items():
+            if call_id in represented_calls:
+                continue
+            joins.append(ToolCallResultJoin.create(
+                call_id=call_id,
+                result_id=None,
+                tool_name_digest=hashlib.sha256(name.encode("utf-8")).hexdigest(),
+                success=None,
+                retry_identity=retry_identity,
+                run_id=self._run_id,
+                variant=self.ledger.variant,
+                trace_id=self._trace_id,
+                episode_id=self._episode_id,
+                session_id=self._session_id,
+                task_id=self._task_id,
+                source_revision=source_revision,
+                host_event_id=host_event_id,
+                call_receipt_id=call_receipt,
+                call_present=True,
+                result_present=False,
+            ))
+        for join in joins:
+            for event in join.process_events():
+                self._process_feedback.record(event)
 
     def _record_extraction_source(
         self,

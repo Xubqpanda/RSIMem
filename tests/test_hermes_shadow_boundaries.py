@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 from rsimem.hermes_past_bridge import HermesPastBenchBridge
@@ -87,3 +88,38 @@ def test_tool_boundary_preserves_open_closure_and_cannot_run_source_selection(tm
     assert bridge.trigger_observations[0].event.supported is True
     assert bridge.trigger_observations[0].decision.action.value == "SKIP"
     assert bridge.source_selection_decisions[0].selected_segment_ids == ()
+
+
+def test_task_result_projects_every_tool_call_and_result_without_content(tmp_path) -> None:
+    bridge = _bridge(tmp_path, [])
+    result = {
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-inspect-1",
+                    "function": {"name": "inspect", "arguments": "{\"path\": \"/private\"}"},
+                }],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-inspect-1",
+                "content": "{\"success\": true, \"content\": \"secret\"}",
+            },
+        ],
+        "completed": True,
+    }
+    try:
+        bridge._record_tool_call_results(result)
+        events = bridge.process_feedback
+    finally:
+        bridge.close()
+    calls = [event for event in events if event.kind.value == "tool_call"]
+    results = [event for event in events if event.kind.value == "tool_result"]
+    assert len(calls) == 1
+    assert len(results) == 1
+    assert calls[0].tool_call_id == "call-inspect-1"
+    assert results[0].tool_result_id is not None
+    serialized = json.dumps([event.payload() for event in events], ensure_ascii=True)
+    assert "private" not in serialized
+    assert "secret" not in serialized

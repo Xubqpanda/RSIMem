@@ -268,9 +268,10 @@ class ToolCallResultJoin:
     def process_events(self) -> tuple[ProcessEvent, ...]:
         """Project the call and result independently into process events."""
 
-        if not self.call_present or self.call_id is None:
-            return ()
-        call = ProcessEvent.create(
+        events: list[ProcessEvent] = []
+        call = None
+        if self.call_present and self.call_id is not None:
+            call = ProcessEvent.create(
             kind=ProcessEventKind.TOOL_CALL,
             status=ProcessEventStatus.EXECUTED,
             run_id=self.run_id,
@@ -291,12 +292,17 @@ class ToolCallResultJoin:
             lineage_id=self.policy_lineage_id,
             execution_receipt_ids=((self.call_receipt_id,) if self.call_receipt_id else ()),
             reason_codes=("decision_observed",),
-            tool_call_id=self.call_id,
-            tool_name_digest=self.tool_name_digest,
-            retry_identity=self.retry_identity,
-        )
+                tool_call_id=self.call_id,
+                tool_name_digest=self.tool_name_digest,
+                retry_identity=self.retry_identity,
+            )
+            events.append(call)
         if not self.result_present or self.result_id is None:
-            return (call,)
+            return tuple(events)
+        result_call_id = self.call_id or (
+            "orphan-call."
+            + hashlib.sha256(self.result_id.encode("utf-8")).hexdigest()[:24]
+        )
         result = ProcessEvent.create(
             kind=ProcessEventKind.TOOL_RESULT,
             status=(
@@ -330,13 +336,14 @@ class ToolCallResultJoin:
                 if self.success is False
                 else ("decision_observed",)
             ),
-            tool_call_id=self.call_id,
+            tool_call_id=result_call_id,
             tool_result_id=self.result_id,
             tool_name_digest=self.tool_name_digest,
             retry_identity=self.retry_identity,
             tool_success=self.success,
         )
-        return call, result
+        events.append(result)
+        return tuple(events)
 
 
 @dataclass(frozen=True, slots=True)
