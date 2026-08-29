@@ -608,6 +608,16 @@ response contract. The unchanged SM02 corpus then yielded one schema-valid
 not ACTIVE or matched-validation evidence. The retry report is in
 [`extraction_stage3_sm02_optimizer_retry_20260829.md`](extraction_stage3_sm02_optimizer_retry_20260829.md).
 
+An independent SM05 process pilot (`s1-sm05-feedback-20260829-v1`) then
+completed three clean nine-episode replicates. It produced 24 extraction-owned
+`missed` and 12 `unresolved` primary observations, with 89 canonical process
+events. The optimizer request initially exceeded the frozen input budget; the
+deterministic replica compaction in commit `f194bf8` reduced it to 158,538
+characters while retaining all primary IDs. The provider returned schema-valid
+proposals, but the candidate content-safety gate rejected corpus-specific
+value copying on both attempts, so no candidate was written. Details are in
+[`extraction_stage3_sm05_optimizer_20260829.md`](extraction_stage3_sm05_optimizer_20260829.md).
+
 ## Update Policy
 
 Update this file whenever a milestone is completed, its acceptance criteria change, or evidence reveals a new blocker. Mark an item complete only after its implementation, tests, and required experiment evidence are all available. Record detailed numerical results in a separate dated report and link that report here rather than embedding provisional paper results in the checklist.
