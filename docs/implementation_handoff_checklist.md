@@ -971,7 +971,7 @@ bash -n scripts/*.sh
 ### 第二阶段完成
 
 - □ 六层 policy 的 core contract、Host adapter boundary、decision evidence、replay和安全不变量全部通过。
-- □ Trigger、Source、Extraction、Admission、Commit scheduling和Exposure均可以被fixed policy观测、回放和做 matched intervention。
+- √ Trigger、Source、Extraction、Admission、Commit scheduling和Exposure均可以被fixed policy观测、回放和做 matched intervention；`tests/test_policy_feasibility.py::test_every_layer_case_has_matched_process_intervention_identity` 对六层逐一校验 event、revision、decision、before/after digest 和 action variation。该结论限定为 deterministic/shadow feasibility，不等同于真实 provider effect。
 - □ Extraction artifact、trigger/admission/exposure decision和formation lineage可以跨restart重建。
 - □ 第二阶段不要求任何 adaptive layer已经取得真实效果；真实效果属于第三阶段。
 
