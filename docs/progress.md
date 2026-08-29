@@ -79,6 +79,9 @@ formal training or validation batch.
 The reusable `rsimem.provider_probe` entry now performs a bounded completion
 check without exposing credentials or response content; it reports endpoint,
 content, and usage availability only and remains outside benchmark accounting.
+Its result contract rejects inconsistent manually constructed states, so a
+successful probe always has a 2xx status and a failed probe always has an
+explicit diagnostic code.
 
 The PAST-Bench Hermes adapter now transports only content-free process-corpus
 identity (`event_ids` and a stable digest) in `StepResponse`; it never exposes
