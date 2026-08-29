@@ -79,6 +79,12 @@ class ProviderProbeResult:
             raise ValueError("provider probe error code must be non-empty")
         if self.content_available and self.error_code is not None:
             raise ValueError("successful provider probe cannot carry an error")
+        if self.content_available and (
+            self.http_status is None or not 200 <= self.http_status < 300
+        ):
+            raise ValueError("successful provider probe requires a 2xx status")
+        if not self.content_available and self.error_code is None:
+            raise ValueError("failed provider probe requires an error code")
 
     @property
     def ok(self) -> bool:
