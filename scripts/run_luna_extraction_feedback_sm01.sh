@@ -87,6 +87,18 @@ PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.preflight \
   --agent hermes-luna \
   --require-provider
 
+# Fail before the first benchmark task when the configured endpoint cannot
+# return a non-empty completion.  The probe is provider diagnostics only; it
+# is kept outside benchmark accounting and never receives the batch corpus.
+provider_probe_path="${batch_root}/provider_probe.json"
+if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.provider_probe \
+  --base-url "${PAST_BASE_URL}" \
+  --model "${PAST_MODEL}" \
+  >"${provider_probe_path}"; then
+  echo "Provider completion probe failed; see ${provider_probe_path}." >&2
+  exit 1
+fi
+
 manifest_call() {
   local operation="$1"
   shift

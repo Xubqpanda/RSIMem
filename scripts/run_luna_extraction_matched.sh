@@ -46,6 +46,18 @@ PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.extraction_matched_pre
   --run-config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" \
   --experiment-config "${EXPERIMENT_CONFIG}" --trial-config "${TRIAL_CONFIG}"
 
+# Keep provider connectivity outside the matched task/accounting surface and
+# fail before any parent/candidate task starts when completion content is not
+# available.  Only the content-free probe result is persisted.
+provider_probe_path="${batch_root}/provider_probe.json"
+if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.provider_probe \
+  --base-url "${PAST_BASE_URL}" \
+  --model "${PAST_MODEL}" \
+  >"${provider_probe_path}"; then
+  echo "Provider completion probe failed; see ${provider_probe_path}." >&2
+  exit 1
+fi
+
 replicates="$(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -c 'from pathlib import Path; from rsimem.extraction_experiment_manifest import load_extraction_manifest; import sys; print(load_extraction_manifest(Path(sys.argv[1]))["replicates"])' "${manifest_path}")"
 feedback_contract="$(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${EXPERIMENT_CONFIG}" <<'PY'
 import sys
