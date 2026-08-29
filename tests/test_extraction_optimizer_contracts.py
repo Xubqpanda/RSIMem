@@ -24,6 +24,7 @@ from rsimem.memory.extraction_optimizer_contracts import (
     ExtractionOptimizerCompletion,
     ExtractionOptimizerConfig,
     build_extraction_optimizer_request,
+    logical_case_id_for_example,
 )
 from rsimem.memory.extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
@@ -213,6 +214,38 @@ def test_request_groups_one_primary_unit_with_source_set_fact_annotations() -> N
     assert "official_grader" not in request.input_json
     assert EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION not in request.input_json
     assert build_extraction_optimizer_request(_parent(), _corpus()) == request
+
+
+def test_logical_case_identity_ignores_request_boundary_and_run_ids() -> None:
+    base = _corpus().examples[1]
+    join = base.audit_join
+    variant_join = replace(
+        join,
+        feedback_record_id="live-extraction-feedback.future-v2",
+        feedback_trace_id="trace.future-v2",
+        feedback_episode_id="episode.future-v2",
+        feedback_session_id="session.future-v2",
+        feedback_run_id="run.future-v2",
+        feedback_example_id="feedback-example.future-v2",
+    )
+    variant = ExtractionOptimizerCorpusExample.create(
+        primary_unit_id="feedback-unit.variant-v2",
+        level=base.level,
+        primary=True,
+        feedback_fact_id=base.feedback_fact_id,
+        feedback_semantic_key=base.feedback_semantic_key,
+        feedback_artifact_ids=base.feedback_artifact_ids,
+        exposure_mode=base.exposure_mode,
+        label=base.label,
+        attribution_confidence=base.attribution_confidence,
+        reason_codes=base.reason_codes,
+        component_ownership=base.component_ownership,
+        audit_join=variant_join,
+        source_messages=base.source_messages,
+        extracted_facts=base.extracted_facts,
+        delayed_evidence=base.delayed_evidence,
+    )
+    assert logical_case_id_for_example(base) == logical_case_id_for_example(variant)
 
 
 def test_request_deduplicates_content_and_bounds_unresolved_context() -> None:
