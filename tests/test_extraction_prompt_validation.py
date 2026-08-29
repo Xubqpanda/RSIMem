@@ -31,6 +31,7 @@ from extraction_fingerprint_support import extraction_activation_fixture
 from rsimem.memory.extraction_prompt_validation import (
     ExtractionAcceptanceCriteria,
     ExtractionPromptMatchedValidator,
+    JsonExtractionValidationObservationStore,
     ExtractionPromptValidationSplit,
     ExtractionQualityMetrics,
     ExtractionValidationReplay,
@@ -106,6 +107,51 @@ def _observation(
         ),
         failure_counts=failure_counts,
     )
+
+
+def test_validation_observation_store_is_restart_safe_and_split_bound(tmp_path: Path) -> None:
+    split = _split()
+    observation = _observation(
+        ExtractionValidationVariant.PARENT,
+        1,
+        ExtractionFeedbackLabel.USEFUL,
+    )
+    store = JsonExtractionValidationObservationStore(tmp_path / "observations", split=split)
+    path, created = store.put(observation)
+    assert created is True
+    assert store.put(observation) == (path, False)
+    restarted = JsonExtractionValidationObservationStore(
+        tmp_path / "observations", split=split
+    )
+    assert restarted.get(observation.observation_id) == observation
+    assert restarted.records() == (observation,)
+
+    path.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed extraction validation observation"):
+        restarted.get(observation.observation_id)
+
+    outside = ExtractionValidationObservation.create(
+        variant=ExtractionValidationVariant.PARENT,
+        replicate=1,
+        family_id="other-family",
+        task_template_group_id="other-template",
+        task_id="other-task",
+        run_id="run.other",
+        episode_id="episode.other",
+        extraction_set_id="extraction-set.other",
+        task_manifest_digest=_sha("other manifest"),
+        model_profile_digest=_sha("model profile"),
+        budget_id="budget.other",
+        persistence_state_digest=_sha("state other"),
+        extraction_artifact_id=PARENT,
+        extraction_artifact_digest=_sha("parent body"),
+        extraction_output_digest=_sha("other output"),
+        label=ExtractionFeedbackLabel.UNRESOLVED,
+        extraction_status=ExtractionSetStatus.EMPTY,
+        missed_assessable=None,
+    )
+    with pytest.raises(ValueError, match="outside the frozen split"):
+        restarted.put(outside)
 
 
 def _criteria(**overrides) -> ExtractionAcceptanceCriteria:
