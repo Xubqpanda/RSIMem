@@ -641,7 +641,7 @@ frozen system/safety/schema wrapper
 - √ 定义 host-neutral `AdmissionPolicy` 接口；Mem0-flat 当前内部 operation prompt作为 fixed parent admission policy接入，不让其隐式承担 extraction 结果解释。
 - √ 保留 backend 的 duplicate、conflict、temporary、unsupported、empty和unresolved safety rules；policy只能在允许集合内选择 action。
 - √ 将“没有提取到事实”和“提取到了但 admission 选择 NONE”记录为不同状态，二者不得共用一个空 extraction label。
-- □ candidate不得通过全量ADD、重复ADD或全量NONE获得虚假的 coverage/useful-rate提升。
+- √ candidate不得通过全量ADD、重复ADD或全量NONE获得虚假的 coverage/useful-rate提升。
 
 测试与验收：
 
@@ -649,7 +649,7 @@ frozen system/safety/schema wrapper
 - √ admission decision可由 input fact digest、existing revision和policy artifact重放。
 - √ 不支持 UPDATE 的 backend不能接受 update decision；不支持 rollback 的 backend不能被声明为可安全执行的adaptive admission。
 
-2D.1 当前实现记录：`DeterministicAdmissionPolicy` 位于 `src/rsimem/memory/admission_policy.py`，Mem0-flat static writeback 的 extraction trace 会生成 admission evidence，并绑定 backend revision、operation IDs 与 receipt lineage。candidate coverage anti-collapse 仍需第三阶段指标 census。
+2D.1 当前实现记录：`DeterministicAdmissionPolicy` 位于 `src/rsimem/memory/admission_policy.py`，Mem0-flat static writeback 的 extraction trace 会生成 admission evidence，并绑定 backend revision、operation IDs 与 receipt lineage。`AdmissionCensus` 与 `validate_admission_candidate()` 现在按稳定 source ID 对齐 parent/candidate，拒绝 blanket ADD、blanket NONE、duplicate-marked ADD 和 coverage collapse；空 extraction 的 NONE 与 duplicate candidate 保持不同 reason。对应反向测试见 `tests/test_admission_policy.py`。第三阶段仍需在正式 family census 中报告该 gate 的实际分布。
 
 ### 2D.2：Commit Scheduling 与 Mutation Safety Boundary
 
@@ -813,7 +813,7 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 
 ### 3B：六层 Policy 可优化性验收
 
-第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。每个 intervention 现在由 `ProcessFeedback` 绑定 event、source revision、parent/candidate decision、receipt 和 before/after digest，并由独立 feasibility ledger 跨 restart 保存；ledger 支持 `verify_case()`，缺失或冲突 receipt fail closed；有 process signal 的 case 还生成绑定 past feedback 与目标层的 `PolicyHypothesis`，并持久化完整 hypothesis payload，显式覆盖 `N -> feedback -> N+1 -> intervention` identity。真实 extraction feedback 只能通过 `feedback_chain_from_extraction_example()`、`LayerIntervention.from_extraction_feedback()`、`build_extraction_feedback_interventions()` 和 `build_optimizer_corpus_interventions()` 投影 primary useful/missed 链，其他状态继续保留为 unresolved/censored 诊断；census 同时报告 U/H/M、unresolved/censored 原始计数、ambiguity 计数和 zero-denominator unknown。当前新增的 `build_extraction_feedback_fixture()` 将 durable/temporary past context 与 future task 的 registered SM01 contract 串成可重放 useful/missed case，并由 `FeasibilityInterventionPath` ledger 记录 N+1 replay identity。该结果只是可行性状态，不代表任何层已完成在线优化；后续仍需补充 process corpus、独立 matched validation 和失败/provider run 保留。当前验证：RSIMem `.venv` 测试 `645 passed`，PAST-Bench `397 passed, 2 skipped`。
+第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。每个 intervention 现在由 `ProcessFeedback` 绑定 event、source revision、parent/candidate decision、receipt 和 before/after digest，并由独立 feasibility ledger 跨 restart 保存；ledger 支持 `verify_case()`，缺失或冲突 receipt fail closed；有 process signal 的 case 还生成绑定 past feedback 与目标层的 `PolicyHypothesis`，并持久化完整 hypothesis payload，显式覆盖 `N -> feedback -> N+1 -> intervention` identity。Hermes bridge 另外写入独立的 `rsimem_process_feedback.jsonl`，通过 host-neutral `ProcessEvent` 记录 trigger、source、extraction、admission、commit、retrieval、exposure、tool 和 task-outcome 的 content-free fingerprints；事件以文件锁和原子替换跨 restart 保持幂等，stage-specific failure reason 不再统一折叠为 extraction failure。真实 extraction feedback 只能通过 `feedback_chain_from_extraction_example()`、`LayerIntervention.from_extraction_feedback()`、`build_extraction_feedback_interventions()` 和 `build_optimizer_corpus_interventions()` 投影 primary useful/missed 链，其他状态继续保留为 unresolved/censored 诊断；census 同时报告 U/H/M、unresolved/censored 原始计数、ambiguity 计数和 zero-denominator unknown。当前新增的 `build_extraction_feedback_fixture()` 将 durable/temporary past context 与 future task 的 registered SM01 contract 串成可重放 useful/missed case，并由 `FeasibilityInterventionPath` ledger 记录 N+1 replay identity。该结果只是可行性状态，不代表任何层已完成在线优化；后续仍需补充完整 PAST process corpus、独立 matched validation 和失败/provider run 保留。当前验证：RSIMem `.venv` 测试 `649 passed`，PAST-Bench `397 passed, 2 skipped`。
 
 当前第三阶段的主要任务是 feasibility，不要求一次性完成六层 online optimization。每层分别完成以下验收：
 
