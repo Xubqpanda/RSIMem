@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import copy
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 
 import pytest
 
@@ -65,6 +66,50 @@ def test_replay_emits_process_events_bound_to_policy_and_host() -> None:
         assert process.event_id == ProcessEvent.from_payload(process.payload()).event_id
     exposure = next(item for item in replay.process_events if item.policy_layer is PolicyLayer.EXPOSURE)
     assert exposure.execution_receipt_ids == replay.lineage.injection_receipt_ids
+
+
+def test_process_event_plane_and_source_follow_benchmark_metadata() -> None:
+    _, _, replay = _replay()
+    pure = ProcessEvent.create(
+        kind=ProcessEventKind.TASK_OUTCOME,
+        status=ProcessEventStatus.SUCCESS,
+        run_id="run.pure-plane-v1",
+        variant="native",
+        trace_id="trace.pure-plane-v1",
+        episode_id="episode.pure-plane-v1",
+        session_id="session.pure-plane-v1",
+        task_id="task.pure-plane-v1",
+        host_event_id="event.pure-plane-v1",
+        source_revision="revision.pure-plane-v1",
+        input_payload={},
+        output_payload={"completed": True},
+        execution_receipt_ids=("receipt.pure-plane-v1",),
+    )
+    assert pure.evidence_plane is EvidencePlane.PURE_PROCESS
+    assert pure.evidence_source is EvidenceSourceKind.RUNTIME_OBSERVATION
+
+    audited = ProcessEvent.create(
+        kind=ProcessEventKind.TASK_OUTCOME,
+        status=ProcessEventStatus.SUCCESS,
+        run_id="run.audit-plane-v1",
+        variant="native+ledger",
+        trace_id="trace.audit-plane-v1",
+        episode_id="episode.audit-plane-v1",
+        session_id="session.audit-plane-v1",
+        task_id="task.audit-plane-v1",
+        host_event_id="event.audit-plane-v1",
+        source_revision="revision.audit-plane-v1",
+        input_payload={},
+        output_payload={"completed": True},
+        execution_receipt_ids=("receipt.audit-plane-v1",),
+        family_id="SM02_constraint_retention",
+        stage="eval_near",
+    )
+    assert audited.evidence_plane is EvidencePlane.BENCHMARK_AUDIT
+    assert audited.evidence_source is EvidenceSourceKind.BENCHMARK_CONTRACT
+
+    with pytest.raises(ValueError, match="plane and source identity"):
+        replace(pure, evidence_plane=EvidencePlane.BENCHMARK_AUDIT)
 
 
 def test_process_ledger_is_restart_safe_and_conflict_checked(tmp_path) -> None:

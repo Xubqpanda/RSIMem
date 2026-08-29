@@ -876,6 +876,10 @@ class ExtractionFeedbackDataset:
         _require_digest(self.source_projection_digest, "feedback source digest")
         _require_digest(self.contract_digest, "feedback contract digest")
         plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        if plane is not EvidencePlane.BENCHMARK_AUDIT or source is not EvidenceSourceKind.BENCHMARK_CONTRACT:
+            raise ValueError(
+                "family-bound extraction feedback must be benchmark_audit evidence"
+            )
         object.__setattr__(self, "evidence_plane", plane)
         object.__setattr__(self, "evidence_source", source)
         ids = tuple(value.example_id for value in self.examples)
