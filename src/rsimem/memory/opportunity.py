@@ -64,6 +64,20 @@ def _canonical(value: object) -> str:
     return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
 
+def _has_observable_payload(value: object) -> bool:
+    """Return whether a source carries a concrete visible observation."""
+
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, Mapping):
+        return bool(value)
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return bool(value)
+    return True
+
+
 class OpportunitySurface(StrEnum):
     CURRENT_INPUT = "current_input"
     ENVIRONMENT_STATE = "environment_state"
@@ -235,6 +249,8 @@ class OpportunityEvidence:
                 raise ValueError("application opportunity is not in the frozen schema")
         elif application_schema is not None:
             raise ValueError("application schema identity requires application surface")
+        if not _has_observable_payload(source_payload):
+            raise ValueError("opportunity source payload must contain an observation")
         source_digest = hashlib.sha256(_canonical(source_payload).encode("utf-8")).hexdigest()
         values = {
             "source_surface": surface,

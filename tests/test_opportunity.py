@@ -121,6 +121,19 @@ def test_hidden_evaluation_payload_cannot_create_opportunity() -> None:
         )
 
 
+@pytest.mark.parametrize("payload", (None, "", {}, [], ()))
+def test_empty_source_cannot_create_visible_opportunity(payload) -> None:
+    with pytest.raises(ValueError, match="source payload"):
+        OpportunityEvidence.create(
+            source_surface=OpportunitySurface.TOOL_SCHEMA,
+            semantic_requirement="resource.share.recipient_policy",
+            observation_time="2026-08-30T01:02:03Z",
+            operation_id="op.empty.v1",
+            provenance_id="provenance.empty.v1",
+            source_payload=payload,
+        )
+
+
 def test_opportunity_identity_does_not_depend_on_family_or_stage() -> None:
     first = _evidence()
     second = OpportunityEvidence.create(
