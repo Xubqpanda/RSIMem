@@ -11,11 +11,14 @@ neither is silently promoted to attributable use.
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from pathlib import Path
 from typing import TYPE_CHECKING, Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
@@ -291,6 +294,77 @@ class MemoryUseEvidence:
             )
         except (TypeError, ValueError, KeyError) as exc:
             raise ValueError("malformed memory-use evidence") from exc
+
+
+class JsonMemoryUseEvidenceLog:
+    """Crash-safe append-only log for generic runtime use evidence."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+        self._records: dict[str, str] = {}
+        self._load()
+
+    @staticmethod
+    def _canonical(value: Mapping[str, object]) -> str:
+        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                evidence = MemoryUseEvidence.from_payload(json.loads(line))
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"malformed memory-use evidence at line {line_number}"
+                ) from exc
+            canonical = self._canonical(evidence.payload())
+            previous = self._records.get(evidence.evidence_id)
+            if previous is not None and previous != canonical:
+                raise ValueError("conflicting memory-use evidence")
+            self._records[evidence.evidence_id] = canonical
+
+    def records(self) -> tuple[MemoryUseEvidence, ...]:
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
+            try:
+                self._records.clear()
+                self._load()
+                return tuple(
+                    MemoryUseEvidence.from_payload(json.loads(value))
+                    for value in self._records.values()
+                )
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def append(self, evidence: MemoryUseEvidence) -> bool:
+        if not isinstance(evidence, MemoryUseEvidence):
+            raise TypeError("memory-use log accepts MemoryUseEvidence only")
+        serialized = self._canonical(evidence.payload())
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                self._records.clear()
+                self._load()
+                previous = self._records.get(evidence.evidence_id)
+                if previous is not None:
+                    if previous != serialized:
+                        raise ValueError("conflicting memory-use evidence")
+                    return False
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    handle.write(serialized + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                self._records[evidence.evidence_id] = serialized
+                return True
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 @dataclass(frozen=True, slots=True)
@@ -635,6 +709,7 @@ __all__ = [
     "MEMORY_USE_EVIDENCE_SCHEMA",
     "MEMORY_USE_EVIDENCE_SCHEMA_VERSION",
     "MemoryUseEvidence",
+    "JsonMemoryUseEvidenceLog",
     "MemoryUseResolution",
     "MemoryUseResolutionStatus",
     "OutcomeEvidenceKind",
