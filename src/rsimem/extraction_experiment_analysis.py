@@ -33,6 +33,11 @@ from .memory.operation_graph import (
     materialize_operation_graph,
 )
 from .memory.process_corpus import JsonProcessCorpusStore, census_process_events
+from .memory.process_signal import (
+    JsonProcessSignalCaseStore,
+    ProcessSignalCase,
+    census_process_signal_cases,
+)
 from .memory.pure_process import (
     JsonPureProcessCorpusStore,
     PureProcessEvent,
@@ -195,6 +200,22 @@ def _pure_process_events(run_dir: Path) -> tuple[PureProcessEvent, ...]:
                 )
             by_id[event.event_id] = event
     return tuple(by_id[event_id] for event_id in sorted(by_id))
+
+
+def _process_signal_cases(run_dir: Path) -> tuple[ProcessSignalCase, ...]:
+    """Read optional logical-case projections without using quality labels."""
+
+    paths = tuple(sorted(run_dir.rglob("process_signal_cases.jsonl")))
+    by_id: dict[str, ProcessSignalCase] = {}
+    for path in paths:
+        for case in JsonProcessSignalCaseStore(path).records():
+            previous = by_id.get(case.case_id)
+            if previous is not None and previous != case:
+                raise ValueError(
+                    f"conflicting process-signal case identity: {case.case_id}"
+                )
+            by_id[case.case_id] = case
+    return tuple(by_id[case_id] for case_id in sorted(by_id))
 
 
 def _terminal_attempts(manifest: dict[str, Any]) -> tuple[dict[str, Any], ...]:
@@ -558,6 +579,7 @@ def _run_evidence(
     feedback = _feedback_records(run_dir)
     process_events = _process_events(run_dir)
     pure_process_events = _pure_process_events(run_dir)
+    process_signal_cases = _process_signal_cases(run_dir)
     if process_events:
         process_errors = audit_process_events(process_events)
         if process_errors:
@@ -629,6 +651,7 @@ def _run_evidence(
         "feedback": feedback,
         "processEvents": process_events,
         "pureProcessEvents": pure_process_events,
+        "processSignalCases": process_signal_cases,
         "quality": _quality(sources, feedback, safety),
         "rawUsage": _raw_usage(comparison, audit, ledger, run_dir),
     }
@@ -756,6 +779,25 @@ def _process_corpus_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
         "byReason": dict(sorted(by_reason.items())),
         "census": census.payload() if census is not None else None,
         "evaluationScoreAccessible": False,
+    }
+
+
+def _process_signal_case_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+    cases: list[ProcessSignalCase] = []
+    for row in rows:
+        cases.extend(row.get("processSignalCases", ()))
+    if not cases:
+        return {
+            "caseCount": 0,
+            "physicalObservationCount": 0,
+            "logicalCaseCount": 0,
+            "conflictCaseCount": 0,
+            "statusCounts": {},
+        }
+    census = census_process_signal_cases(cases)
+    return {
+        "caseCount": len(cases),
+        **census.payload(),
     }
 
 
@@ -948,10 +990,14 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
             "pureProcessFeedback": [
                 event.payload() for event in row.get("pureProcessEvents", ())
             ],
+            "processSignalCases": [
+                case.payload() for case in row.get("processSignalCases", ())
+            ],
         } for row in rows],
         "summaryByMethod": quality_summaries,
         "activationFunnel": funnel,
         "processCorpus": _process_corpus_summary(rows),
+        "processSignalCases": _process_signal_case_summary(rows),
         "pureProcessCorpus": _pure_process_corpus_summary(rows),
         "evidencePlanes": _evidence_plane_summary(rows, by_method),
         "pairedRawUsageDelta": _paired_usage_delta(rows),
