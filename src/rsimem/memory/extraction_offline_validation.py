@@ -13,6 +13,7 @@ from .extraction_policy_artifact import (
     ExtractionPromptPolicyArtifact,
     apply_extraction_rule_edits,
 )
+from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 from .extraction_prompt_validation import (
     ExtractionAcceptanceCriteria,
     ExtractionPromptMatchedValidator,
@@ -26,10 +27,10 @@ from .extraction_prompt_validation import (
 from .prompt_components import PromptSlotDescriptor, content_digest, text_digest
 
 
-EXTRACTION_OFFLINE_SCHEMA_VERSION = 1
-EXTRACTION_STATIC_SAFETY_SCHEMA = "extraction-candidate-static-safety-v1"
-EXTRACTION_DETERMINISTIC_SUITE_SCHEMA = "extraction-deterministic-suite-v1"
-EXTRACTION_OFFLINE_DECISION_SCHEMA = "extraction-offline-validation-decision-v1"
+EXTRACTION_OFFLINE_SCHEMA_VERSION = 2
+EXTRACTION_STATIC_SAFETY_SCHEMA = "extraction-candidate-static-safety-v2"
+EXTRACTION_DETERMINISTIC_SUITE_SCHEMA = "extraction-deterministic-suite-v2"
+EXTRACTION_OFFLINE_DECISION_SCHEMA = "extraction-offline-validation-decision-v2"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _FORBIDDEN_POLICY = re.compile(
     r"(?:\bSM\d{2}\b|\bTSV\b|due_date|owner\s*[|,/ ]+\s*priority|"
@@ -633,6 +634,8 @@ class ExtractionOfflineValidationDecision:
     reason_codes: tuple[str, ...]
     decision_schema: str = EXTRACTION_OFFLINE_DECISION_SCHEMA
     schema_version: int = EXTRACTION_OFFLINE_SCHEMA_VERSION
+    evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
 
     def __post_init__(self) -> None:
         if (
@@ -640,6 +643,19 @@ class ExtractionOfflineValidationDecision:
             or self.decision_schema != EXTRACTION_OFFLINE_DECISION_SCHEMA
         ):
             raise ValueError("unsupported extraction offline decision")
+        plane, source = validate_plane_source(
+            self.evidence_plane,
+            self.evidence_source,
+        )
+        if (
+            plane is not EvidencePlane.BENCHMARK_AUDIT
+            or source is not EvidenceSourceKind.BENCHMARK_CONTRACT
+        ):
+            raise ValueError(
+                "offline validation decision must use benchmark_audit evidence"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         object.__setattr__(self, "status", ExtractionOfflineDecisionStatus(self.status))
         for value in (
             self.decision_id,
@@ -715,6 +731,8 @@ class ExtractionOfflineValidationDecision:
             "parent_ratios": [value.payload() for value in self.parent_ratios],
             "candidate_ratios": [value.payload() for value in self.candidate_ratios],
             "reason_codes": list(self.reason_codes),
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
         }
 
     def payload(self) -> dict[str, object]:
@@ -744,6 +762,8 @@ class ExtractionOfflineValidationDecision:
             "parent_ratios",
             "candidate_ratios",
             "reason_codes",
+            "evidence_plane",
+            "evidence_source",
         }
         if not isinstance(value, Mapping) or set(value) != fields or not all(
             isinstance(value[field], list)
@@ -781,6 +801,8 @@ class ExtractionOfflineValidationDecision:
                 reason_codes=tuple(value["reason_codes"]),
                 decision_schema=value["decision_schema"],
                 schema_version=value["schema_version"],
+                evidence_plane=EvidencePlane(value["evidence_plane"]),
+                evidence_source=EvidenceSourceKind(value["evidence_source"]),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("malformed extraction offline decision") from exc
@@ -871,6 +893,8 @@ class ExtractionPromptOfflineValidator:
             "reason_codes": reason_codes,
             "decision_schema": EXTRACTION_OFFLINE_DECISION_SCHEMA,
             "schema_version": EXTRACTION_OFFLINE_SCHEMA_VERSION,
+            "evidence_plane": EvidencePlane.BENCHMARK_AUDIT,
+            "evidence_source": EvidenceSourceKind.BENCHMARK_CONTRACT,
         }
         identity = {
             "schema_version": values["schema_version"],
@@ -890,6 +914,8 @@ class ExtractionPromptOfflineValidator:
                 value.payload() for value in values["candidate_ratios"]
             ],
             "reason_codes": list(reason_codes),
+            "evidence_plane": values["evidence_plane"].value,
+            "evidence_source": values["evidence_source"].value,
         }
         return ExtractionOfflineValidationDecision(
             decision_id=f"offline-validation.{content_digest(identity)[:40]}",

@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Mapping
 
 from ..lifecycle import RawResourceUsage
+from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 from .prompt_components import (
     PromptComponentArtifact,
     PromptSlotDescriptor,
@@ -19,7 +20,7 @@ from .prompt_components import (
 EXTRACTION_POLICY_SCHEMA_VERSION = 1
 EXTRACTION_POLICY_SPEC_SCHEMA = "extraction-policy-spec-v1"
 EXTRACTION_RULE_EDIT_SCHEMA = "extraction-policy-rule-edit-v1"
-EXTRACTION_GENERATION_PROVENANCE_SCHEMA = "extraction-generation-provenance-v1"
+EXTRACTION_GENERATION_PROVENANCE_SCHEMA = "extraction-generation-provenance-v2"
 EXTRACTION_PROMPT_ARTIFACT_SCHEMA = "extraction-prompt-policy-artifact-v1"
 EXTRACTION_POLICY_COMPILER_ID = "extraction-policy-compiler-v1"
 EXTRACTION_POLICY_COMPILER_DIGEST = content_digest({
@@ -308,6 +309,8 @@ class ExtractionGenerationProvenance:
     proposal_request_digest: str
     completion_digest: str
     usage: RawResourceUsage
+    evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
     provenance_schema: str = EXTRACTION_GENERATION_PROVENANCE_SCHEMA
     schema_version: int = EXTRACTION_POLICY_SCHEMA_VERSION
 
@@ -317,6 +320,19 @@ class ExtractionGenerationProvenance:
             or self.provenance_schema != EXTRACTION_GENERATION_PROVENANCE_SCHEMA
         ):
             raise ValueError("unsupported extraction generation provenance schema")
+        plane, source = validate_plane_source(
+            self.evidence_plane,
+            self.evidence_source,
+        )
+        if (
+            plane is not EvidencePlane.PURE_PROCESS
+            or source is not EvidenceSourceKind.RUNTIME_OBSERVATION
+        ):
+            raise ValueError(
+                "extraction generation provenance must be pure_process runtime evidence"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         for value, name in (
             (self.optimizer_model, "optimizer model"),
             (self.training_corpus_id, "training corpus ID"),
@@ -343,6 +359,8 @@ class ExtractionGenerationProvenance:
             "proposal_request_digest": self.proposal_request_digest,
             "completion_digest": self.completion_digest,
             "usage": self.usage.to_dict(),
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
         }
 
     @classmethod
@@ -359,6 +377,8 @@ class ExtractionGenerationProvenance:
                 "proposal_request_digest",
                 "completion_digest",
                 "usage",
+                "evidence_plane",
+                "evidence_source",
             },
             "extraction generation provenance",
         )
@@ -387,6 +407,8 @@ class ExtractionGenerationProvenance:
                 proposal_request_digest=payload["proposal_request_digest"],
                 completion_digest=payload["completion_digest"],
                 usage=RawResourceUsage(**usage),
+                evidence_plane=EvidencePlane(payload["evidence_plane"]),
+                evidence_source=EvidenceSourceKind(payload["evidence_source"]),
                 provenance_schema=payload["provenance_schema"],
                 schema_version=payload["schema_version"],
             )

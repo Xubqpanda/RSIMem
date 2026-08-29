@@ -30,6 +30,7 @@ from rsimem.memory.extraction_policy_artifact import (
     ExtractionRuleEdit,
     ExtractionRuleEditAction,
 )
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.extraction_prompt_validation import (
     ExtractionAcceptanceCriteria,
     ExtractionPromptMatchedValidator,
@@ -482,6 +483,11 @@ def test_offline_strict_improvement_is_only_accepted_for_matched_trial() -> None
     )
     assert decision.eligible_next_stage == "matched_trial"
     assert decision.reason_codes == ("offline_validation_passed",)
+    assert decision.evidence_plane is EvidencePlane.BENCHMARK_AUDIT
+    assert decision.evidence_source is EvidenceSourceKind.BENCHMARK_CONTRACT
+    assert type(decision).from_payload(
+        json.loads(json.dumps(decision.payload()))
+    ) == decision
     assert not hasattr(decision, "active")
     ratios = {value.metric: value for value in decision.candidate_ratios}
     assert ratios[OfflineMetricName.RESOLVED_USEFUL_RATE].payload() == {
@@ -845,3 +851,29 @@ def test_offline_decision_rejects_detached_quality_and_ratio_evidence() -> None:
     )
     with pytest.raises(ValueError, match="quality decision join mismatch"):
         replace(decision, quality_decision=other_quality)
+
+
+def test_offline_decision_rejects_process_plane_relabel() -> None:
+    parent = _parent()
+    candidate = _candidate(parent=parent)
+    safety, suite = _safety_and_suite(parent, candidate)
+    decision = ExtractionPromptOfflineValidator().evaluate(
+        parent=parent,
+        candidate=candidate,
+        split=_split(),
+        observations=_pairs(
+            parent,
+            candidate,
+            (ExtractionFeedbackLabel.HARMFUL,) * 3,
+            (ExtractionFeedbackLabel.USEFUL,) * 3,
+        ),
+        criteria=_criteria(),
+        static_safety=safety,
+        deterministic_suite=suite,
+    )
+    with pytest.raises(ValueError, match="benchmark_audit evidence"):
+        replace(
+            decision,
+            evidence_plane=EvidencePlane.PURE_PROCESS,
+            evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        )
