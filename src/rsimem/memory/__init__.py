@@ -190,6 +190,7 @@ from .process_signal import (
     ProcessSignalCase,
     ProcessSignalCaseCensus,
     ProcessSignalCaseStatus,
+    build_process_signal_cases,
     census_process_signal_cases,
 )
 from .final_evaluation import (
@@ -349,6 +350,7 @@ __all__ = [
     "ProcessSignalCase",
     "ProcessSignalCaseCensus",
     "ProcessSignalCaseStatus",
+    "build_process_signal_cases",
     "census_process_signal_cases",
     "FINAL_EVALUATION_SCHEMA",
     "FINAL_EVALUATION_SCHEMA_VERSION",

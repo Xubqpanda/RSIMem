@@ -20,6 +20,7 @@ from typing import Iterable, Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 from .process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
+from .logical_case import LogicalCaseIdentity
 
 
 PROCESS_SIGNAL_SCHEMA_VERSION = 1
@@ -433,6 +434,59 @@ def census_process_signal_cases(cases: Iterable[ProcessSignalCase]) -> ProcessSi
     )
 
 
+def build_process_signal_cases(
+    events: Iterable[ProcessEvent],
+    *,
+    frozen_policy_digest: str,
+    source_task_template_id: str,
+    future_task_template_id: str,
+    observation_window: str,
+    replicate_id: str,
+) -> tuple[ProcessSignalCase, ...]:
+    """Project one physical run into replay-stable task-level signal cases.
+
+    The projection uses only process-event identity and stage status. It does
+    not infer extraction attribution or a policy hypothesis; those remain
+    ``False``/``None`` until a trusted attribution pass supplies them.
+    Replicate identity affects only the physical observation ID.
+    """
+
+    values = tuple(events)
+    if any(not isinstance(event, ProcessEvent) for event in values):
+        raise TypeError("process signal projection requires ProcessEvent values")
+    if not values:
+        return ()
+    grouped: dict[str, list[ProcessEvent]] = {}
+    for event in values:
+        grouped.setdefault(event.task_id, []).append(event)
+    cases: list[ProcessSignalCase] = []
+    for task_id, task_events in sorted(grouped.items()):
+        source_set = "extraction-set." + _digest({
+            "task_id": task_id,
+            "source_task_template_id": source_task_template_id,
+        })[:32]
+        identity = LogicalCaseIdentity.create(
+            frozen_policy_digest=frozen_policy_digest,
+            source_task_template_id=source_task_template_id,
+            source_extraction_set_id=source_set,
+            future_task_template_id=future_task_template_id,
+            observation_window=observation_window,
+        )
+        event_ids = tuple(sorted(event.event_id for event in task_events))
+        physical_identity = {
+            "logical_case_id": identity.logical_case_id,
+            "replicate_id": replicate_id,
+            "event_ids": list(event_ids),
+        }
+        physical_id = "physical-observation." + _digest(physical_identity)[:40]
+        cases.append(ProcessSignalCase.from_process_events(
+            logical_case_id=identity.logical_case_id,
+            physical_observation_ids=(physical_id,),
+            events=task_events,
+        ))
+    return tuple(cases)
+
+
 __all__ = [
     "PROCESS_SIGNAL_SCHEMA",
     "PROCESS_SIGNAL_SCHEMA_VERSION",
@@ -441,4 +495,5 @@ __all__ = [
     "JsonProcessSignalCaseStore",
     "ProcessSignalCaseStatus",
     "census_process_signal_cases",
+    "build_process_signal_cases",
 ]
