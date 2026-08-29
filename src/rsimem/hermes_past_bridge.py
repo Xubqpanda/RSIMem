@@ -1355,6 +1355,57 @@ class HermesPastBenchBridge:
                 dataset=dataset,
             )
             self.extraction_feedback_log.append(feedback_record)
+            # Preserve stage diagnosis as process feedback.  A strict label is
+            # not itself a process event: these observations only say whether
+            # an exposure/use/outcome stage was seen, and therefore remain safe
+            # for deployments without an output evaluator.
+            for example in dataset.examples:
+                if not example.primary:
+                    continue
+                if example.label.value == "useful":
+                    process_kind = ProcessEventKind.TASK_OUTCOME
+                    process_status = ProcessEventStatus.SUCCESS
+                    process_reason = ("decision_observed",)
+                elif example.label.value == "harmful":
+                    process_kind = ProcessEventKind.TASK_OUTCOME
+                    process_status = ProcessEventStatus.FAILED
+                    process_reason = ("task_failure",)
+                elif "injected_not_used" in example.reason_codes:
+                    process_kind = ProcessEventKind.EXPOSURE
+                    process_status = ProcessEventStatus.SUCCESS
+                    process_reason = ("non_use",)
+                elif "use_not_bound_to_memory" in example.reason_codes or "not_exposed" in example.reason_codes:
+                    process_kind = ProcessEventKind.EXPOSURE
+                    process_status = ProcessEventStatus.SKIPPED
+                    process_reason = ("absence",)
+                elif "observation_censored" in example.reason_codes:
+                    process_kind = ProcessEventKind.TASK_OUTCOME
+                    process_status = ProcessEventStatus.UNKNOWN
+                    process_reason = ("observation_censored",)
+                else:
+                    process_kind = ProcessEventKind.TASK_OUTCOME
+                    process_status = ProcessEventStatus.UNKNOWN
+                    process_reason = ("decision_observed",)
+                self._record_process_observation(
+                    kind=process_kind,
+                    status=process_status,
+                    host_event_id=self._last_host_event_id or f"event.feedback.{record.record_id}",
+                    source_revision=self._last_host_source_revision or self._exposure_context_revision(),
+                    input_payload={
+                        "feedback_record_id": feedback_record.record_id,
+                        "example_id": example.example_id,
+                        "future_opportunity_id": example.future_opportunity_id,
+                    },
+                    output_payload={
+                        "label": example.label.value,
+                        "exposure_mode": example.exposure_mode.value,
+                    },
+                    reason_codes=process_reason,
+                    execution_receipt_ids=(
+                        f"receipt.feedback.{hashlib.sha256(example.example_id.encode('utf-8')).hexdigest()[:24]}",
+                    ),
+                    lineage_id=(future.query_operation_id or None),
+                )
             capture_log = self.extraction_optimizer_capture_log
             if capture_log is None:
                 raise ValueError("optimizer capture log is unavailable")
