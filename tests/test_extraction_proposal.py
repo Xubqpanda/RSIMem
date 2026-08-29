@@ -153,6 +153,45 @@ def test_rejected_candidate_is_persisted_without_deployable_artifact(
     assert hypothesis["candidate_artifact_id"] is None
 
 
+def test_malformed_completion_is_persisted_without_deployable_artifact(
+    tmp_path: Path,
+) -> None:
+    corpus = _multi_corpus(("missed", "missed"))
+    store, owner = _store(tmp_path, corpus)
+
+    def malformed(request) -> str:
+        return json.dumps({
+            "decision": "PROPOSE",
+            "reason_codes": ["actionable_extraction_signal"],
+            "edits": [{
+                "edit_id": "edit.malformed",
+                "action": "REPLACE_RULE",
+                "target_rule_id": "future-useful-scope",
+                "rule_id": "future-useful-scope",
+                "rule_text": None,
+                "after_rule_id": None,
+                "evidence_example_ids": [request.primary_example_ids[0]],
+                "reason_codes": ["malformed_rule"],
+            }],
+        })
+
+    client = CapturedExtractionOptimizerClient(malformed)
+    result = prepare_extraction_proposal(
+        corpus_store=store,
+        output_root=owner / "proposal-malformed",
+        client=client,
+    )
+
+    assert result.decision == ExtractionOptimizerDecision.NO_PROPOSAL
+    assert result.reason_codes == ("completion_contract_invalid",)
+    assert result.completion_id is not None
+    output = owner / "proposal-malformed"
+    persisted = json.loads((output / "optimizer-result.json").read_text())
+    assert persisted["reasonCodes"] == ["completion_contract_invalid"]
+    assert persisted["completionId"] == result.completion_id
+    assert not (output / "candidate-artifact.json").exists()
+
+
 def test_no_signal_cli_does_not_read_credentials_or_validate_provider(
     tmp_path: Path,
 ) -> None:
