@@ -310,7 +310,8 @@ The first six-layer deterministic feasibility baseline is recorded in
 [`policy_feasibility_baseline_20260829.md`](policy_feasibility_baseline_20260829.md).
 It includes replay-stable parent/candidate identities, process feedback,
 strict extraction-feedback projection, constrained N+1 hypothesis identity,
-and a crash-safe content-free evidence ledger. The fixture classifies
+restart-safe future N+1 loading/intervention-path identity, and a crash-safe
+content-free evidence ledger. The fixture classifies
 Extraction as `optimization-ready` and the other five layers as
 `validation-only`; fixture labels are not deployment labels and do not support
 an uplift claim. It can be regenerated with
