@@ -36,12 +36,14 @@ class SemanticFeedbackContract(StrEnum):
     DISABLED = "disabled"
     SM01_TSV_V1 = "sm01_tsv_v1"
     SM02_BOUNDARY_V1 = "sm02_boundary_v1"
+    SM03_FACT_CORRECTION_V1 = "sm03_fact_correction_v1"
     SM05_NORMALIZED_TSV_V1 = "sm05_normalized_tsv_v1"
 
 
 _SEMANTIC_FEEDBACK_FAMILIES = {
     SemanticFeedbackContract.SM01_TSV_V1: "SM01_preference_adoption",
     SemanticFeedbackContract.SM02_BOUNDARY_V1: "SM02_constraint_retention",
+    SemanticFeedbackContract.SM03_FACT_CORRECTION_V1: "SM03_fact_correction",
     SemanticFeedbackContract.SM05_NORMALIZED_TSV_V1: (
         "SM05_weak_trigger_preference_adoption"
     ),
