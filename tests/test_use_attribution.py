@@ -215,6 +215,60 @@ def test_artifact_set_binding_is_supported_without_fact_multiplication() -> None
     ).status == MemoryUseResolutionStatus.ATTRIBUTABLE_USE
 
 
+def test_three_fact_set_requires_complete_retrieval_and_exposure() -> None:
+    binding = ArtifactSetSemanticBinding.create(
+        semantic_unit_id="semantic.constraint.compound.v1",
+        member_artifact_ids=(
+            "artifact.constraint.a.v1",
+            "artifact.constraint.b.v1",
+            "artifact.constraint.c.v1",
+        ),
+        member_fact_ids=("fact.constraint.a.v1", "fact.constraint.b.v1", "fact.constraint.c.v1"),
+        complete=True,
+        source_digest="c" * 64,
+        provenance_id="provenance.constraint.compound.v1",
+        semantic_key="constraint.share.recipient_policy",
+    )
+    complete = _evidence(
+        artifact_ids=(),
+        artifact_set_id=binding.binding_id,
+        retrieved_artifact_ids=binding.member_artifact_ids,
+        injected_artifact_ids=binding.member_artifact_ids,
+        used_artifact_ids=binding.member_artifact_ids,
+    )
+    assert resolve_memory_use(
+        complete,
+        artifact_set_binding=binding,
+    ).status == MemoryUseResolutionStatus.ATTRIBUTABLE_USE
+
+    # The identity is intentionally rebuilt through create: a partial member
+    # set is a distinct evidence record, not a mutation of the complete one.
+    partial = MemoryUseEvidence.create(
+        artifact_ids=(),
+        artifact_set_id=binding.binding_id,
+        retrieval_operation_id=complete.retrieval_operation_id,
+        retrieved_artifact_ids=binding.member_artifact_ids[:2],
+        injection_operation_id=complete.injection_operation_id,
+        injected_artifact_ids=binding.member_artifact_ids[:2],
+        downstream_operation_id=complete.downstream_operation_id,
+        used_artifact_ids=binding.member_artifact_ids[:2],
+        outcome_operation_id=complete.outcome_operation_id,
+        outcome_kind=complete.outcome_kind,
+        outcome_success=True,
+        observation_cutoff=complete.observation_cutoff,
+        provenance_id=complete.provenance_id,
+    )
+    assert resolve_memory_use(
+        partial,
+        artifact_set_binding=binding,
+    ).status == MemoryUseResolutionStatus.UNRESOLVED
+
+    assert resolve_memory_use(
+        complete,
+        artifact_set_binding=binding,
+    ).attributable_use is True
+
+
 def test_opaque_or_mismatched_artifact_set_reference_fails_closed() -> None:
     evidence = _evidence(
         artifact_ids=(),
