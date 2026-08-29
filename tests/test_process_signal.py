@@ -10,6 +10,7 @@ from rsimem.memory.process_signal import (
     ProcessSignalCaseStatus,
     census_process_signal_cases,
 )
+from rsimem.memory.process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 
 
 def _case(*, logical: str = "logical-case.fixture.v1", complete: bool = True, attribution: bool = True, hypothesis: str | None = "a" * 64, physical: str = "physical-observation.1") -> ProcessSignalCase:
@@ -93,3 +94,36 @@ def test_census_counts_all_physical_observations_inside_one_case() -> None:
         observation_complete=True,
     )
     assert census_process_signal_cases((case,)).physical_observation_count == 2
+
+
+def test_projection_from_process_events_never_infers_extraction_attribution() -> None:
+    common = dict(
+        run_id="run.signal.v1", variant="native", trace_id="trace.signal.v1",
+        episode_id="episode.signal.v1", session_id="session.signal.v1",
+        task_id="task.signal.v1", host_event_id="event.signal.v1",
+        source_revision="revision.signal.v1", execution_receipt_ids=("receipt.signal.v1",),
+    )
+    events = tuple(
+        ProcessEvent.create(
+            kind=kind,
+            status=ProcessEventStatus.SUCCESS,
+            input_payload={"kind": kind.value},
+            output_payload={"ok": True},
+            **common,
+        )
+        for kind in (
+            ProcessEventKind.SOURCE_SELECTION,
+            ProcessEventKind.EXTRACTION,
+            ProcessEventKind.COMMIT,
+            ProcessEventKind.RETRIEVAL,
+            ProcessEventKind.EXPOSURE,
+            ProcessEventKind.TASK_OUTCOME,
+        )
+    )
+    case = ProcessSignalCase.from_process_events(
+        logical_case_id="logical-case.events.v1",
+        physical_observation_ids=("physical-observation.events.v1",),
+        events=events,
+    )
+    assert case.status == ProcessSignalCaseStatus.OBSERVABLE_ONLY
+    assert case.extraction_attributable is False
