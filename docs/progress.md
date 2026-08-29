@@ -572,6 +572,14 @@ It is not a blocker for the deterministic feasibility baseline, but real N+1
 provider validation remains deferred until a family supplies sufficient
 actionable signal.
 
+The corrected plain-parent SM01 batch `s1-sm01-feedback-20260829-v9a` then
+completed three clean real-provider replicates.  All audits and process
+corpora passed; 24 primary feedback examples remained unresolved, so corpus
+preparation returned `optimizerSignalReady=false` and the optimizer made zero
+provider calls with `NO_PROPOSAL`.  This is a valid no-signal feedback pilot,
+not an effect result.  Raw usage and disposition are recorded in
+[`extraction_stage3_sm01_feedback_v9a_20260829.md`](extraction_stage3_sm01_feedback_v9a_20260829.md).
+
 On 2026-08-29, a transient successful provider probe allowed a clean SM01
 feedback attempt (`v5`) to start.  It exposed a runtime boundary bug: the
 separate PAST-Bench reflection episode was incorrectly sent through semantic

@@ -1029,6 +1029,11 @@ reflection episode 错误送入 semantic extraction，已由 `e22af5c` 修复并
 完全相同的 event ID。v6 及 post-v7 probe 仍因 provider HTTP 503 在首个 task
 前 fail-closed。完整记录见
 [`extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md`](extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md)。
+修复后 `s1-sm01-feedback-20260829-v9a` 已完成 3 个 clean parent replicate，
+231 条 canonical process event 和全部 raw usage 均可重建；24 条 primary
+feedback 全部为 `unresolved`，strict corpus 返回 `NO_PROPOSAL`，因此仍未
+产生可进入 matched validation 的 N+1 candidate。结果见
+[`extraction_stage3_sm01_feedback_v9a_20260829.md`](extraction_stage3_sm01_feedback_v9a_20260829.md)。
 后续顺序仍严格按照：
 
 ```text
