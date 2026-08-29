@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -1003,7 +1004,16 @@ class HermesPastBenchBridge:
             for future, step_id in self._semantic_futures:
                 current_input = self._current_input(result)
                 observation = self._semantic_deployment_observation(result)
-                resolution = self.semantic_feedback_resolver.resolve(future, observation)
+                # Runtime observations must not be seeded with benchmark
+                # contract scope.  The feedback resolver may use a
+                # contract-scoped projection for audit attribution, but that
+                # projection remains local to this benchmark-audit path and
+                # is never emitted as pure-process evidence.
+                audit_observation = self._semantic_audit_observation(observation)
+                resolution = self.semantic_feedback_resolver.resolve(
+                    future,
+                    audit_observation,
+                )
                 outcome = self.semantic_future_recorder.record_use_and_outcome(
                     future,
                     used_artifact_ids=resolution.used_artifact_ids,
@@ -1013,7 +1023,7 @@ class HermesPastBenchBridge:
                 )
                 self._record_extraction_feedback(
                     future,
-                    observation,
+                    audit_observation,
                     outcome,
                     current_input,
                 )
@@ -1491,7 +1501,6 @@ class HermesPastBenchBridge:
         resolver = self.semantic_feedback_resolver
         if resolver is None or self._family_id is None or self._stage is None:
             raise ValueError("semantic feedback resolver identity is unavailable")
-        contract = resolver.registry.resolver(self._family_id).contract
         messages = ()
         raw_messages = result.get("messages")
         if isinstance(raw_messages, (list, tuple)):
@@ -1502,11 +1511,6 @@ class HermesPastBenchBridge:
         current_keys = detect_current_input_semantic_keys(
             self._family_id,
             current_input,
-        )
-        task_keys = (
-            contract.opportunity.memory_scope_keys
-            if self._stage in contract.opportunity.eligible_stages
-            else ()
         )
         observation_complete = not (
             result.get("partial") is True or result.get("interrupted") is True
@@ -1531,12 +1535,40 @@ class HermesPastBenchBridge:
                 current_input.encode("utf-8")
             ).hexdigest(),
             current_input_semantic_keys=current_keys,
-            task_semantic_keys=task_keys,
+            # Task semantic requirements are application-owned runtime
+            # evidence.  A benchmark family contract is not allowed to
+            # manufacture them at the bridge boundary.
+            task_semantic_keys=(),
             final_response=str(result.get("final_response") or ""),
             tool_events=self._observable_tool_events(messages),
             completed=result.get("completed") is True,
             observation_complete=observation_complete,
             censor_reason=(None if observation_complete else "execution_incomplete"),
+        )
+
+    def _semantic_audit_observation(
+        self,
+        observation: DeploymentObservation,
+    ) -> DeploymentObservation:
+        """Attach frozen benchmark scope only for audit attribution.
+
+        ``DeploymentObservation`` is also used as the source for process
+        captures.  Keeping the runtime observation scope-free prevents a
+        benchmark contract from leaking into optimizer-visible evidence.  The
+        semantic feedback resolver still needs its registered contract to
+        decide whether an opportunity was observed, so it receives this
+        short-lived audit projection instead.
+        """
+
+        resolver = self.semantic_feedback_resolver
+        if resolver is None:
+            raise ValueError("semantic feedback resolver is unavailable")
+        contract = resolver.registry.resolver(observation.family_id).contract
+        if observation.stage not in contract.opportunity.eligible_stages:
+            return observation
+        return replace(
+            observation,
+            task_semantic_keys=contract.opportunity.memory_scope_keys,
         )
 
     @staticmethod
