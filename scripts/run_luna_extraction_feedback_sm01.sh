@@ -10,6 +10,7 @@ PYTHON_BIN="${RSIMEM_ROOT}/.venv/bin/python"
 TASK_FAMILY="${RSIMEM_EXTRACTION_TASK_FAMILY:-memory_ability/SM01_preference_adoption}"
 FAMILY_ROOT="${PAST_BENCH_ROOT}/self-evolve-tasks-v2/${TASK_FAMILY}"
 EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-${RSIMEM_ROOT}/configs/extraction_feedback_sm01.json}"
+SPLIT_PLAN="${RSIMEM_EXTRACTION_SPLIT_PLAN:-${RSIMEM_ROOT}/configs/extraction_split_plan_sm02_sm03_sm04.json}"
 AGENT_REGISTRY="${RSIMEM_AGENT_REGISTRY:-${RSIMEM_ROOT}/configs/agents.yaml}"
 PAST_AGENT_REGISTRY="${RSIMEM_PAST_AGENT_REGISTRY:-${PAST_BENCH_ROOT}/configs/agents.yaml}"
 PAST_AGENT="${RSIMEM_PAST_AGENT:-hermes}"
@@ -48,6 +49,10 @@ if [[ ! -f "${FAMILY_ROOT}/family.yaml" ]]; then
   echo "The requested vendored family is incomplete: ${TASK_FAMILY}" >&2
   exit 2
 fi
+if [[ ! -f "${SPLIT_PLAN}" ]]; then
+  echo "RSIMEM_EXTRACTION_SPLIT_PLAN does not exist." >&2
+  exit 2
+fi
 
 if [[ -z "${FEEDBACK_CONTRACT}" ]]; then
   FEEDBACK_CONTRACT="$(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${TASK_FAMILY}" <<'PY'
@@ -78,7 +83,8 @@ PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" \
   --family-root "${FAMILY_ROOT}" \
   --agent-registry "${AGENT_REGISTRY}" \
   --run-config "${RUN_CONFIG}" \
-  --experiment-config "${EXPERIMENT_CONFIG}"
+  --experiment-config "${EXPERIMENT_CONFIG}" \
+  --split-plan "${SPLIT_PLAN}"
 
 PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.preflight \
   --state-dir "${batch_root}/provider_preflight" \
