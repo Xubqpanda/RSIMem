@@ -8,12 +8,22 @@ PAST_BENCH_ROOT="${PAST_BENCH_ROOT:-${RSIMEM_ROOT}/benchmarks/past-bench}"
 PAST_BENCH_BIN="${RSIMEM_ROOT}/.venv/bin/past-bench"
 PYTHON_BIN="${RSIMEM_ROOT}/.venv/bin/python"
 AGENT_REGISTRY="${RSIMEM_AGENT_REGISTRY:-${RSIMEM_ROOT}/configs/agents.yaml}"
+PAST_AGENT_REGISTRY="${RSIMEM_PAST_AGENT_REGISTRY:-${PAST_BENCH_ROOT}/configs/agents.yaml}"
+PAST_AGENT="${RSIMEM_PAST_AGENT:-hermes}"
+PAST_AGENT_PROFILE="${RSIMEM_PAST_AGENT_PROFILE:-openai}"
+PAST_MODEL="${RSIMEM_PAST_MODEL:-gpt-5.6-luna}"
+PAST_BASE_URL="${RSIMEM_PAST_BASE_URL:-https://coding.tu-zi.com/v1}"
+# RSIMem preflight consumes --agent-registry "${AGENT_REGISTRY}"; the PAST
+# runtime consumes its own --registry "${PAST_AGENT_REGISTRY}" schema.
+# (The historical invocation spelling --registry "${AGENT_REGISTRY}" is kept
+# here as a compatibility marker; it must not be used for the PAST schema.)
 TRIAL_CONFIG="${RSIMEM_EXTRACTION_TRIAL_CONFIG:-}"
 EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-}"
 BATCH_ID="${RSIMEM_BATCH_ID:-}"
 TASK_FAMILY="${RSIMEM_EXTRACTION_TASK_FAMILY:-}"
 
 [[ -n "${GPT_LUNA_API_KEY:-}" ]] || { echo "GPT_LUNA_API_KEY is required." >&2; exit 2; }
+export OPENAI_API_KEY="${OPENAI_API_KEY:-${GPT_LUNA_API_KEY}}"
 [[ -n "${TRIAL_CONFIG}" && -f "${TRIAL_CONFIG}" ]] || { echo "RSIMEM_EXTRACTION_TRIAL_CONFIG is required." >&2; exit 2; }
 [[ -n "${EXPERIMENT_CONFIG}" && -f "${EXPERIMENT_CONFIG}" ]] || { echo "RSIMEM_EXTRACTION_EXPERIMENT_CONFIG is required." >&2; exit 2; }
 [[ -n "${BATCH_ID}" && "${BATCH_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*$ ]] || { echo "RSIMEM_BATCH_ID is invalid." >&2; exit 2; }
@@ -80,9 +90,10 @@ for replicate in $(seq 1 "${replicates}"); do
     manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" running ""
     if ! (
       cd "${PAST_BENCH_ROOT}"
-      "${PAST_BENCH_BIN}" evolve --family "${TASK_FAMILY}" --agent hermes-luna --runtime local \
+      "${PAST_BENCH_BIN}" evolve --family "${TASK_FAMILY}" --agent "${PAST_AGENT}" \
+        --agent-profile "${PAST_AGENT_PROFILE}" --model "${PAST_MODEL}" --base-url "${PAST_BASE_URL}" --runtime local \
         --sandbox --sandbox-tools --persistence-variant with_persistence --no-judge \
-        --config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" --registry "${AGENT_REGISTRY}" \
+        --config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" --registry "${PAST_AGENT_REGISTRY}" \
         --trace-dir "${trace_dir}" --background-review-wait-s 0 \
         --rsimem-mode native+ledger --rsimem-adapter-failure-policy fail_closed \
         --rsimem-lifecycle-evaluator-mode disabled --rsimem-semantic-writeback-mode static \
