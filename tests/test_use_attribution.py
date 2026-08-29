@@ -104,6 +104,21 @@ def test_incomplete_observation_is_censored_and_flags_are_strict() -> None:
         _evidence(outcome_success="true")
 
 
+def test_retrieval_injection_and_tool_failures_are_separate_diagnostics() -> None:
+    retrieval = resolve_memory_use(_evidence(retrieval_failure=True))
+    assert retrieval.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert retrieval.reason_code == "retrieval_failure"
+    injection = resolve_memory_use(_evidence(injection_failure=True))
+    assert injection.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert injection.reason_code == "injection_failure"
+    tool = resolve_memory_use(_evidence(
+        outcome_kind=OutcomeEvidenceKind.TOOL_FAILURE,
+        outcome_success=False,
+    ))
+    assert tool.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert tool.reason_code == "tool_failure_not_attributable"
+
+
 def test_artifact_set_binding_is_supported_without_fact_multiplication() -> None:
     evidence = _evidence(
         artifact_ids=(),
