@@ -18,6 +18,7 @@ from past_bench.runtime.protocol import (
     StepRequest,
 )
 from past_bench.runtime.registry import AgentSpec
+from rsimem.memory.process_feedback import audit_process_events
 
 
 PRIVATE_MEMORY = "Use TSV with owner, priority, task, and due_date."
@@ -539,3 +540,22 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
     assert PRIVATE_MEMORY not in (
         artifacts / "rsimem_semantic_operations.jsonl"
     ).read_text(encoding="utf-8")
+    # A deployment without an output evaluator still closes the process
+    # feedback loop: formation and exposure receipts are observable without
+    # importing any benchmark grader or score.
+    process_path = artifacts / "rsimem_process_feedback.jsonl"
+    process_events = [
+        json.loads(line) for line in process_path.read_text(encoding="utf-8").splitlines()
+    ]
+    assert {event["kind"] for event in process_events} >= {
+        "trigger",
+        "source_selection",
+        "extraction",
+        "admission",
+        "commit",
+        "exposure",
+        "task_outcome",
+    }
+    assert all("score" not in event and "grader" not in event for event in process_events)
+    assert response.process_feedback_event_ids == [event["event_id"] for event in process_events]
+    assert audit_process_events(process_path) == ()
