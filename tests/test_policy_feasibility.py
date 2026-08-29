@@ -601,6 +601,23 @@ def test_executable_feasibility_census_replays_and_persists(tmp_path) -> None:
     assert first.payload()["caseCount"] == 7
 
 
+def test_every_layer_case_has_matched_process_intervention_identity() -> None:
+    cases = build_default_feasibility_cases()
+    assert {case.target_layer for case in cases} == set(PolicyLayer)
+    for case in cases:
+        validate_feasibility_case(case)
+        feedback = case.process_feedback
+        assert feedback is not None
+        assert feedback.event_id == case.parent.event.event_id == case.candidate.event.event_id
+        assert feedback.source_revision == case.parent.event.source_revision == case.candidate.event.source_revision
+        assert feedback.parent_decision_id == case.parent_decision.decision_id
+        assert feedback.candidate_decision_id == case.candidate_decision.decision_id
+        assert feedback.observed_before_digest == case.parent_decision.output_digest
+        assert feedback.observed_after_digest == case.candidate_decision.output_digest
+        assert feedback.observed_before_digest != feedback.observed_after_digest
+        assert case.action_changed is True
+
+
 def test_optimizer_corpus_primary_examples_feed_extraction_census() -> None:
     from test_extraction_optimizer_contracts import _multi_corpus
     from rsimem.memory.extraction_feedback import ExtractionFeedbackLabel
