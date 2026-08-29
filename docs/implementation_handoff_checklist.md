@@ -1046,6 +1046,16 @@ candidate。candidate 仍未 ACTIVE、未进入 matched validation，也不构�
 [`extraction_stage3_sm02_feedback_v5_20260829.md`](extraction_stage3_sm02_feedback_v5_20260829.md)
 和
 [`extraction_stage3_sm02_optimizer_retry_20260829.md`](extraction_stage3_sm02_optimizer_retry_20260829.md)。
+
+随后独立的 SM05 process pilot `s1-sm05-feedback-20260829-v1` 完成了三个
+clean parent replicate，得到 24 条 extraction-owned `missed`、12 条
+`unresolved` 和 89 条 canonical process event。该 family 的 request 在
+replicate 展开后超过 160k 字符；commit `f194bf8` 增加仅在预算溢出时触发的
+deterministic replica compaction，保留全部 primary IDs 和 delayed identity，
+将 request 控制在 158,538 字符。两次 schema-valid optimizer completion 都因
+复制 corpus-specific value 被 static safety gate 拒绝，未生成 candidate；
+结果见
+[`extraction_stage3_sm05_optimizer_20260829.md`](extraction_stage3_sm05_optimizer_20260829.md)。
 后续顺序仍严格按照：
 
 ```text
