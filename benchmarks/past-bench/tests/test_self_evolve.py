@@ -10,6 +10,7 @@ from past_bench.models.message import Message
 from past_bench.models.self_evolve import (
     HermesPersistenceConfig,
     RSIMemAdaptiveWritebackConfig,
+    RSIMemExtractionOfflineValidationProfile,
     RSIMemExtractionTrialProfile,
     SelfEvolveEpisode,
     SelfEvolveSequenceDefinition,
@@ -75,6 +76,29 @@ def _extraction_trial_profile(**overrides) -> dict:
         "configDigest": "c" * 64,
         "policyStoreDigest": "d" * 64,
         "offlineDecisionDigest": "e" * 64,
+    }
+    value.update(overrides)
+    return value
+
+
+def _extraction_offline_profile(**overrides) -> dict:
+    value = {
+        "schemaVersion": 1,
+        "preparation": "extraction_offline_validation_store",
+        "deploymentScope": "offline_validation_only",
+        "officialEvaluation": False,
+        "validationOnly": True,
+        "productionActivationAllowed": False,
+        "validationId": "sm03-heldout.fixture",
+        "slotId": "mem0-flat.semantic.extraction",
+        "parentArtifactId": "extraction-prompt.parent",
+        "parentArtifactDigest": "a" * 64,
+        "candidateArtifactId": "extraction-prompt.candidate",
+        "candidateArtifactDigest": "b" * 64,
+        "staticSafetyReportId": "candidate-safety.fixture",
+        "deterministicSuiteReportId": "deterministic-suite.fixture",
+        "configDigest": "c" * 64,
+        "candidateArtifactFileDigest": "d" * 64,
     }
     value.update(overrides)
     return value
@@ -479,6 +503,61 @@ def test_extraction_trial_transport_rejects_profile_or_mode_drift(
         RSIMemExtractionTrialProfile.model_validate(
             _extraction_trial_profile(candidateArtifactDigest="bad")
         )
+
+
+def test_extraction_offline_transport_is_attempt_local_and_scope_bound(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import rsimem.extraction_validation_runtime as runtime_module
+
+    source = tmp_path / "prepared"
+    source.mkdir()
+    config_path = source / "extraction-offline-validation.json"
+    candidate_path = source / "candidate-artifact.json"
+    config_path.write_text('{"fixture":"config"}\n', encoding="utf-8")
+    candidate_path.write_text('{"fixture":"candidate"}\n', encoding="utf-8")
+    profile_payload = _extraction_offline_profile()
+    profile = RSIMemExtractionOfflineValidationProfile.model_validate(profile_payload)
+    resolved = SimpleNamespace(
+        config_path=config_path,
+        candidate_artifact_path=candidate_path,
+        profile=lambda: profile_payload,
+    )
+    monkeypatch.setattr(
+        runtime_module, "load_extraction_offline_validation_profile", lambda path: resolved
+    )
+    common = {
+        "home_dir": tmp_path / "home",
+        "artifacts_dir": tmp_path / "artifacts",
+        "memory_enabled": True,
+        "user_profile_enabled": True,
+        "skills_enabled": True,
+        "session_search_enabled": True,
+        "memory_nudge_interval": 1,
+        "memory_flush_min_turns": 1,
+        "skill_creation_nudge_interval": 1,
+        "background_review_wait_s": 0.0,
+        "rsimem_mode": "native+ledger",
+        "rsimem_semantic_writeback_mode": "static",
+        "rsimem_extraction_offline_profile": profile,
+        "rsimem_extraction_offline_source_path": str(config_path),
+    }
+    payload = build_hermes_extra_body(persistence_enabled=True, **common)["hermes"]
+    writeback = payload["rsimem"]["semantic_writeback"]
+    assert writeback["extraction_runtime_scope"] == "offline_validation"
+    target = tmp_path / "artifacts" / "rsimem_extraction_offline"
+    assert Path(writeback["extraction_runtime_config_path"]) == (
+        target / config_path.name
+    )
+    assert (target / candidate_path.name).read_bytes() == candidate_path.read_bytes()
+    manifest_value = HermesPersistenceConfig(**{
+        "rsimem_mode": "native+ledger",
+        "rsimem_semantic_writeback_mode": "static",
+        "rsimem_extraction_offline_profile": profile,
+        "rsimem_extraction_offline_source_path": str(config_path),
+    }).model_dump(mode="json")
+    assert "rsimem_extraction_offline_profile" in manifest_value
+    assert "rsimem_extraction_offline_source_path" not in manifest_value
 
 
 @pytest.mark.parametrize(
