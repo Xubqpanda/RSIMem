@@ -105,6 +105,9 @@ corpus instead of silently overwriting one another.
 Hermes process feedback identity now has an explicit restart replay fixture:
 the event set, canonical ID ordering, and digest remain unchanged after a
 second bridge instance observes the same completed boundary.
+The complete six-layer deterministic replay chain is also persisted and
+reloaded through the process ledger; every event remains auditable and
+idempotent after restart.
 Native-bypass handling now records a second failed process event when the
 fallback native call also fails, preserving both `adapter_failure` and the
 stage-specific `retrieval_failure`/`tool_failure`/`injection_failure` reason.
