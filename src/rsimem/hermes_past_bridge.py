@@ -712,49 +712,56 @@ class HermesPastBenchBridge:
         """Receive the explicit post-conversation task boundary from PAST."""
 
         self._record_semantic_outcomes(result)
-        if result.get("completed") is not True:
+        completed = result.get("completed") is True
+        if not completed:
             return
-        if self.lifecycle is not None:
-            self._process_lifecycle_boundary(
-                EvaluationTrigger.TASK_COMPLETED,
-                TaskLifecycleState.COMPLETED,
-            )
-        if self.static_writeback is None:
-            return
-        try:
-            snapshot = self._collect_completed_snapshot()
-            trigger_event = self._trigger_adapter.from_snapshot(
-                snapshot,
-                EvaluationTrigger.TASK_COMPLETED.value,
-                turn_index=sum(
-                    1 for segment in snapshot.segments if segment.role == "user"
-                ),
-            )
-            source_decision = self._observe_policy_boundary(snapshot, trigger_event)
-            results = self.static_writeback.process_completed_snapshot(
-                snapshot,
-                selected_segment_ids=(
-                    source_decision.selected_segment_ids
-                    if source_decision is not None
-                    and source_decision.action == DecisionAction.RUN
-                    else None
-                ),
-            )
-            for compiled in results:
-                if not any(
-                    item.compilation_id == compiled.compilation_id
-                    for item in self._static_results
-                ):
-                    self._static_results.append(compiled)
-                self._record_extraction_source(compiled)
-                self._record_static_policy_evidence(compiled, snapshot, trigger_event)
-        except Exception as exc:
-            self._static_failures.append((
-                EvaluationTrigger.TASK_COMPLETED.value,
-                type(exc).__name__,
-            ))
-            if self.extraction_source_store is not None:
-                raise
+        # PAST-Bench reflection is a separate review episode.  It has no
+        # completed-task source projection or extraction invocation of its own;
+        # running semantic writeback here would either duplicate the parent
+        # compilation or make extraction evidence unverifiable.  Keep process
+        # observation, but reserve semantic compilation for the primary
+        # task-completed boundary.
+        if self._stage != "reflection":
+            if self.lifecycle is not None:
+                self._process_lifecycle_boundary(
+                    EvaluationTrigger.TASK_COMPLETED,
+                    TaskLifecycleState.COMPLETED,
+                )
+            if self.static_writeback is not None:
+                try:
+                    snapshot = self._collect_completed_snapshot()
+                    trigger_event = self._trigger_adapter.from_snapshot(
+                        snapshot,
+                        EvaluationTrigger.TASK_COMPLETED.value,
+                        turn_index=sum(
+                            1 for segment in snapshot.segments if segment.role == "user"
+                        ),
+                    )
+                    source_decision = self._observe_policy_boundary(snapshot, trigger_event)
+                    results = self.static_writeback.process_completed_snapshot(
+                        snapshot,
+                        selected_segment_ids=(
+                            source_decision.selected_segment_ids
+                            if source_decision is not None
+                            and source_decision.action == DecisionAction.RUN
+                            else None
+                        ),
+                    )
+                    for compiled in results:
+                        if not any(
+                            item.compilation_id == compiled.compilation_id
+                            for item in self._static_results
+                        ):
+                            self._static_results.append(compiled)
+                        self._record_extraction_source(compiled)
+                        self._record_static_policy_evidence(compiled, snapshot, trigger_event)
+                except Exception as exc:
+                    self._static_failures.append((
+                        EvaluationTrigger.TASK_COMPLETED.value,
+                        type(exc).__name__,
+                    ))
+                    if self.extraction_source_store is not None:
+                        raise
 
     def on_session_end(self, *, task_state: TaskLifecycleState = TaskLifecycleState.COMPLETED) -> None:
         """Observe a real session-end boundary without opening writeback."""

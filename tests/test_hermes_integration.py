@@ -1094,6 +1094,60 @@ def test_live_bridge_static_writeback_runs_only_at_task_completion(tmp_path: Pat
     db.close()
 
 
+def test_live_bridge_does_not_compile_reflection_episode(tmp_path: Path) -> None:
+    """Reflection is a review episode, not a second extraction boundary."""
+
+    from hermes_state import SessionDB
+
+    home = _hermes_home(tmp_path / "home")
+    db = SessionDB(home / "state.db")
+    session_id = "session-reflection"
+    db.create_session(session_id, "past_bench", model="fixture-model")
+    db.append_message(session_id, "user", "Reflect on the completed task.")
+    db.append_message(session_id, "assistant", "Nothing to save.")
+    client = FakeCompletionClient({
+        POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id: json.dumps({
+            "facts": ["This must never be extracted from reflection."],
+        }),
+        POLICY_INTERNAL_OPERATION_PROMPT.artifact.prompt_id: json.dumps({
+            "operations": [],
+        }),
+    })
+    artifacts = tmp_path / "reflection-artifacts"
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=artifacts / "memory.jsonl",
+        run_id="run-reflection",
+        trace_id="trace-reflection",
+        episode_id="episode-reflection",
+        session_id=session_id,
+        task_id="SM01_LEARN_B_001_REFLECT",
+        experiment_variant="static-extraction-rsimem",
+        family_id="SM01_preference_adoption",
+        stage="reflection",
+        static_writeback_config=StaticSemanticWritebackConfig(
+            mode="static",
+            feedback_contract="sm01_tsv_v1",
+        ),
+        static_completion_client=client,
+    )
+    bridge.attach(SimpleNamespace(
+        _memory_store=None,
+        _session_db=db,
+        session_id=session_id,
+    ))
+
+    bridge.on_task_completed({"completed": True})
+
+    assert bridge.static_results == ()
+    assert bridge.static_failures == ()
+    assert client.calls == ()
+    assert not (home / ".rsimem" / "extraction_sources.jsonl").exists()
+    bridge.close()
+    db.close()
+
+
 def test_live_bridge_compiles_completed_task_without_lifecycle_evaluator(
     tmp_path: Path,
 ) -> None:
