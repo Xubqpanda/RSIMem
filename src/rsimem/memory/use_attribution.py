@@ -1,0 +1,445 @@
+"""Host-neutral memory-use and outcome attribution evidence.
+
+This module deliberately does not know about benchmark families, stages or
+grader outputs.  A use claim is only attributable when the same bound artifact
+(or artifact set) can be joined through retrieval, injection, downstream
+behaviour and an application-observable outcome inside a closed observation
+window.  Exposure and behavioural consistency are retained as weaker signals;
+neither is silently promoted to attributable use.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+from dataclasses import dataclass
+from datetime import datetime
+from enum import StrEnum
+from typing import Mapping
+
+from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
+
+
+MEMORY_USE_EVIDENCE_SCHEMA_VERSION = 1
+MEMORY_USE_EVIDENCE_SCHEMA = "rsimem-memory-use-evidence-v1"
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+_REASON = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+def _canonical(value: object) -> str:
+    return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+
+def _digest(value: object) -> str:
+    return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def _require_id(value: object, name: str) -> None:
+    if not isinstance(value, str) or _IDENTIFIER.fullmatch(value) is None:
+        raise ValueError(f"{name} must be a stable identifier")
+
+
+def _require_digest(value: object, name: str) -> None:
+    if not isinstance(value, str) or _DIGEST.fullmatch(value) is None:
+        raise ValueError(f"{name} must be sha256")
+
+
+def _require_timestamp(value: object, name: str) -> None:
+    if not isinstance(value, str) or _ISO_UTC.fullmatch(value) is None:
+        raise ValueError(f"{name} must be an ISO UTC timestamp")
+    try:
+        datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an ISO UTC timestamp") from exc
+
+
+def _require_ids(values: tuple[str, ...], name: str) -> None:
+    if not isinstance(values, tuple):
+        raise TypeError(f"{name} must be a tuple")
+    if len(values) != len(set(values)):
+        raise ValueError(f"{name} must be unique")
+    for value in values:
+        _require_id(value, name)
+
+
+class OutcomeEvidenceKind(StrEnum):
+    """Application-observable outcome surfaces.
+
+    ``WEAK_STRING_MATCH`` is intentionally non-attributable.  It can explain
+    why a caller suspects reuse, but a final response string alone cannot prove
+    that a particular memory artifact caused the behaviour.
+    """
+
+    TOOL_SUCCESS = "tool_success"
+    TOOL_FAILURE = "tool_failure"
+    STATE_TRANSITION = "state_transition"
+    USER_CONFIRMATION = "user_confirmation"
+    TASK_COMPLETION = "task_completion"
+    WEAK_STRING_MATCH = "weak_string_match"
+
+
+class MemoryUseResolutionStatus(StrEnum):
+    UNRESOLVED = "unresolved"
+    CENSORED = "censored"
+    EXPOSURE_ONLY = "exposure_only"
+    BEHAVIORAL_CONSISTENCY = "behavioral_consistency"
+    ATTRIBUTABLE_USE = "attributable_use"
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryUseEvidence:
+    """Content-free joins for one observation of a memory artifact or set."""
+
+    evidence_id: str
+    artifact_ids: tuple[str, ...]
+    artifact_set_id: str | None
+    retrieval_operation_id: str | None
+    retrieved_artifact_ids: tuple[str, ...]
+    injection_operation_id: str | None
+    injected_artifact_ids: tuple[str, ...]
+    downstream_operation_id: str | None
+    used_artifact_ids: tuple[str, ...]
+    outcome_operation_id: str | None
+    outcome_kind: OutcomeEvidenceKind | None
+    outcome_success: bool | None
+    observation_cutoff: str
+    provenance_id: str
+    observation_complete: bool = True
+    behavioral_consistency: bool = False
+    schema_version: int = MEMORY_USE_EVIDENCE_SCHEMA_VERSION
+    evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != MEMORY_USE_EVIDENCE_SCHEMA_VERSION:
+            raise ValueError("unsupported memory-use evidence schema")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        if plane != EvidencePlane.PURE_PROCESS or source != EvidenceSourceKind.RUNTIME_OBSERVATION:
+            raise ValueError("memory-use evidence must be pure_process runtime evidence")
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
+        _require_id(self.evidence_id, "memory-use evidence ID")
+        _require_ids(self.artifact_ids, "memory artifact IDs")
+        _require_ids(self.retrieved_artifact_ids, "retrieved artifact IDs")
+        _require_ids(self.injected_artifact_ids, "injected artifact IDs")
+        _require_ids(self.used_artifact_ids, "used artifact IDs")
+        if not self.artifact_ids and self.artifact_set_id is None:
+            raise ValueError("memory-use evidence requires an artifact or artifact set")
+        if self.artifact_set_id is not None:
+            _require_id(self.artifact_set_id, "memory artifact set ID")
+        for value, name in (
+            (self.retrieval_operation_id, "retrieval operation ID"),
+            (self.injection_operation_id, "injection operation ID"),
+            (self.downstream_operation_id, "downstream operation ID"),
+            (self.outcome_operation_id, "outcome operation ID"),
+            (self.provenance_id, "memory-use provenance ID"),
+        ):
+            if value is not None:
+                _require_id(value, name)
+        if self.retrieved_artifact_ids and self.retrieval_operation_id is None:
+            raise ValueError("retrieved artifacts require a retrieval operation")
+        if self.injected_artifact_ids and self.injection_operation_id is None:
+            raise ValueError("injected artifacts require an injection operation")
+        if self.used_artifact_ids and self.downstream_operation_id is None:
+            raise ValueError("used artifacts require a downstream operation")
+        if self.artifact_ids:
+            bound = set(self.artifact_ids)
+            for values, name in (
+                (self.retrieved_artifact_ids, "retrieved artifacts"),
+                (self.injected_artifact_ids, "injected artifacts"),
+                (self.used_artifact_ids, "used artifacts"),
+            ):
+                if not set(values).issubset(bound):
+                    raise ValueError(f"{name} escape the bound artifact set")
+        if type(self.observation_complete) is not bool:
+            raise TypeError("observation completeness must be bool")
+        if type(self.behavioral_consistency) is not bool:
+            raise TypeError("behavioral consistency must be bool")
+        if self.outcome_success is not None and type(self.outcome_success) is not bool:
+            raise TypeError("outcome success must be bool or None")
+        if self.outcome_kind is not None:
+            object.__setattr__(self, "outcome_kind", OutcomeEvidenceKind(self.outcome_kind))
+        _require_timestamp(self.observation_cutoff, "observation cutoff")
+        digest = _digest(self._identity_payload())
+        if self.evidence_id != f"memory-use-evidence.{digest[:40]}":
+            raise ValueError("memory-use evidence ID mismatch")
+
+    def _identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "artifact_ids": list(self.artifact_ids),
+            "artifact_set_id": self.artifact_set_id,
+            "retrieval_operation_id": self.retrieval_operation_id,
+            "retrieved_artifact_ids": list(self.retrieved_artifact_ids),
+            "injection_operation_id": self.injection_operation_id,
+            "injected_artifact_ids": list(self.injected_artifact_ids),
+            "downstream_operation_id": self.downstream_operation_id,
+            "used_artifact_ids": list(self.used_artifact_ids),
+            "outcome_operation_id": self.outcome_operation_id,
+            "outcome_kind": self.outcome_kind.value if self.outcome_kind is not None else None,
+            "outcome_success": self.outcome_success,
+            "observation_cutoff": self.observation_cutoff,
+            "provenance_id": self.provenance_id,
+            "observation_complete": self.observation_complete,
+            "behavioral_consistency": self.behavioral_consistency,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
+        }
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        artifact_ids: tuple[str, ...] = (),
+        artifact_set_id: str | None = None,
+        retrieval_operation_id: str | None = None,
+        retrieved_artifact_ids: tuple[str, ...] = (),
+        injection_operation_id: str | None = None,
+        injected_artifact_ids: tuple[str, ...] = (),
+        downstream_operation_id: str | None = None,
+        used_artifact_ids: tuple[str, ...] = (),
+        outcome_operation_id: str | None = None,
+        outcome_kind: OutcomeEvidenceKind | str | None = None,
+        outcome_success: bool | None = None,
+        observation_cutoff: str,
+        provenance_id: str,
+        observation_complete: bool = True,
+        behavioral_consistency: bool = False,
+    ) -> "MemoryUseEvidence":
+        values: dict[str, object] = {
+            "artifact_ids": tuple(artifact_ids),
+            "artifact_set_id": artifact_set_id,
+            "retrieval_operation_id": retrieval_operation_id,
+            "retrieved_artifact_ids": tuple(retrieved_artifact_ids),
+            "injection_operation_id": injection_operation_id,
+            "injected_artifact_ids": tuple(injected_artifact_ids),
+            "downstream_operation_id": downstream_operation_id,
+            "used_artifact_ids": tuple(used_artifact_ids),
+            "outcome_operation_id": outcome_operation_id,
+            "outcome_kind": OutcomeEvidenceKind(outcome_kind) if outcome_kind is not None else None,
+            "outcome_success": outcome_success,
+            "observation_cutoff": observation_cutoff,
+            "provenance_id": provenance_id,
+            "observation_complete": observation_complete,
+            "behavioral_consistency": behavioral_consistency,
+            "schema_version": MEMORY_USE_EVIDENCE_SCHEMA_VERSION,
+            "evidence_plane": EvidencePlane.PURE_PROCESS,
+            "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION,
+        }
+        digest = _digest(values)
+        return cls(evidence_id=f"memory-use-evidence.{digest[:40]}", **values)
+
+    def payload(self) -> dict[str, object]:
+        return {"schema": MEMORY_USE_EVIDENCE_SCHEMA, "evidence_id": self.evidence_id, **self._identity_payload()}
+
+    @classmethod
+    def from_payload(cls, value: object) -> "MemoryUseEvidence":
+        fields = {
+            "schema", "evidence_id", "schema_version", "artifact_ids", "artifact_set_id",
+            "retrieval_operation_id", "retrieved_artifact_ids", "injection_operation_id",
+            "injected_artifact_ids", "downstream_operation_id", "used_artifact_ids",
+            "outcome_operation_id", "outcome_kind", "outcome_success", "observation_cutoff",
+            "provenance_id", "observation_complete", "behavioral_consistency",
+            "evidence_plane", "evidence_source",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != MEMORY_USE_EVIDENCE_SCHEMA:
+            raise ValueError("malformed memory-use evidence")
+        list_fields = ("artifact_ids", "retrieved_artifact_ids", "injected_artifact_ids", "used_artifact_ids")
+        if any(not isinstance(value[name], list) for name in list_fields):
+            raise ValueError("malformed memory-use evidence collections")
+        try:
+            return cls(
+                evidence_id=value["evidence_id"],
+                artifact_ids=tuple(value["artifact_ids"]),
+                artifact_set_id=value["artifact_set_id"],
+                retrieval_operation_id=value["retrieval_operation_id"],
+                retrieved_artifact_ids=tuple(value["retrieved_artifact_ids"]),
+                injection_operation_id=value["injection_operation_id"],
+                injected_artifact_ids=tuple(value["injected_artifact_ids"]),
+                downstream_operation_id=value["downstream_operation_id"],
+                used_artifact_ids=tuple(value["used_artifact_ids"]),
+                outcome_operation_id=value["outcome_operation_id"],
+                outcome_kind=value["outcome_kind"],
+                outcome_success=value["outcome_success"],
+                observation_cutoff=value["observation_cutoff"],
+                provenance_id=value["provenance_id"],
+                observation_complete=value["observation_complete"],
+                behavioral_consistency=value["behavioral_consistency"],
+                schema_version=value["schema_version"],
+                evidence_plane=value["evidence_plane"],
+                evidence_source=value["evidence_source"],
+            )
+        except (TypeError, ValueError, KeyError) as exc:
+            raise ValueError("malformed memory-use evidence") from exc
+
+
+@dataclass(frozen=True, slots=True)
+class MemoryUseResolution:
+    evidence_id: str
+    status: MemoryUseResolutionStatus
+    reason_code: str
+    exposure_observed: bool
+    behavioral_consistency: bool
+    attributable_use: bool
+    outcome_success: bool | None
+    observation_complete: bool
+
+    def __post_init__(self) -> None:
+        _require_id(self.evidence_id, "memory-use evidence ID")
+        object.__setattr__(self, "status", MemoryUseResolutionStatus(self.status))
+        if not _REASON.fullmatch(self.reason_code):
+            raise ValueError("memory-use resolution reason is invalid")
+        for value, name in (
+            (self.exposure_observed, "exposure"),
+            (self.behavioral_consistency, "behavioral consistency"),
+            (self.attributable_use, "attributable use"),
+            (self.observation_complete, "observation completeness"),
+        ):
+            if type(value) is not bool:
+                raise TypeError(f"{name} flag must be bool")
+        if self.outcome_success is not None and type(self.outcome_success) is not bool:
+            raise TypeError("outcome success must be bool or None")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "evidence_id": self.evidence_id,
+            "status": self.status.value,
+            "reason_code": self.reason_code,
+            "exposure_observed": self.exposure_observed,
+            "behavioral_consistency": self.behavioral_consistency,
+            "attributable_use": self.attributable_use,
+            "outcome_success": self.outcome_success,
+            "observation_complete": self.observation_complete,
+        }
+
+
+def resolve_memory_use(evidence: MemoryUseEvidence) -> MemoryUseResolution:
+    """Resolve a use claim conservatively from exact operation joins."""
+
+    if not isinstance(evidence, MemoryUseEvidence):
+        raise TypeError("memory-use resolver requires MemoryUseEvidence")
+    exposure = bool(evidence.injected_artifact_ids)
+    if not evidence.observation_complete:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.CENSORED,
+            "observation_censored",
+            exposure,
+            evidence.behavioral_consistency,
+            False,
+            evidence.outcome_success,
+            False,
+        )
+    if not evidence.retrieval_operation_id or not evidence.retrieved_artifact_ids:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.UNRESOLVED,
+            "retrieval_exact_join_missing",
+            exposure,
+            evidence.behavioral_consistency,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    bound = set(evidence.artifact_ids)
+    if bound and set(evidence.retrieved_artifact_ids) != bound:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.UNRESOLVED,
+            "retrieval_artifact_set_incomplete",
+            exposure,
+            evidence.behavioral_consistency,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    if not evidence.injection_operation_id or not evidence.injected_artifact_ids:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.EXPOSURE_ONLY if evidence.retrieved_artifact_ids else MemoryUseResolutionStatus.UNRESOLVED,
+            "injection_exact_join_missing" if evidence.retrieved_artifact_ids else "retrieval_miss",
+            exposure,
+            evidence.behavioral_consistency,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    if bound and set(evidence.injected_artifact_ids) != bound:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.UNRESOLVED,
+            "injection_artifact_set_incomplete",
+            True,
+            evidence.behavioral_consistency,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    if not evidence.downstream_operation_id or not evidence.used_artifact_ids:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.BEHAVIORAL_CONSISTENCY if evidence.behavioral_consistency else MemoryUseResolutionStatus.EXPOSURE_ONLY,
+            "downstream_use_not_observed",
+            True,
+            evidence.behavioral_consistency,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    if bound and set(evidence.used_artifact_ids) != bound:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.UNRESOLVED,
+            "use_artifact_set_incomplete",
+            True,
+            evidence.behavioral_consistency,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    if not evidence.outcome_operation_id or evidence.outcome_kind is None or evidence.outcome_success is None:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.BEHAVIORAL_CONSISTENCY,
+            "outcome_exact_join_missing",
+            True,
+            True,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    if evidence.outcome_kind == OutcomeEvidenceKind.WEAK_STRING_MATCH:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.BEHAVIORAL_CONSISTENCY,
+            "weak_string_match_only",
+            True,
+            True,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    return MemoryUseResolution(
+        evidence.evidence_id,
+        MemoryUseResolutionStatus.ATTRIBUTABLE_USE,
+        "attributable_use" if evidence.outcome_success else "attributable_use_failed_outcome",
+        True,
+        True,
+        True,
+        evidence.outcome_success,
+        True,
+    )
+
+
+__all__ = [
+    "MEMORY_USE_EVIDENCE_SCHEMA",
+    "MEMORY_USE_EVIDENCE_SCHEMA_VERSION",
+    "MemoryUseEvidence",
+    "MemoryUseResolution",
+    "MemoryUseResolutionStatus",
+    "OutcomeEvidenceKind",
+    "resolve_memory_use",
+]

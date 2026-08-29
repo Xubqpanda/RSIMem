@@ -124,6 +124,15 @@ from .process_corpus import (
     ensure_process_corpus_has_no_evaluation_fields,
 )
 from .extraction_prompt_validation import JsonExtractionValidationObservationStore
+from .use_attribution import (
+    MEMORY_USE_EVIDENCE_SCHEMA,
+    MEMORY_USE_EVIDENCE_SCHEMA_VERSION,
+    MemoryUseEvidence,
+    MemoryUseResolution,
+    MemoryUseResolutionStatus,
+    OutcomeEvidenceKind,
+    resolve_memory_use,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -220,6 +229,13 @@ __all__ = [
     "ProcessEventStatus",
     "audit_process_events",
     "JsonExtractionValidationObservationStore",
+    "MEMORY_USE_EVIDENCE_SCHEMA",
+    "MEMORY_USE_EVIDENCE_SCHEMA_VERSION",
+    "MemoryUseEvidence",
+    "MemoryUseResolution",
+    "MemoryUseResolutionStatus",
+    "OutcomeEvidenceKind",
+    "resolve_memory_use",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
