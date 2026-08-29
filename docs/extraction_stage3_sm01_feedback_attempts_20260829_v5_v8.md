@@ -1,9 +1,9 @@
 # SM01 feedback attempts — 2026-08-29 (v5–v8)
 
-This report records four post-probe attempts to run the plain static SM01
-feedback batch.  They are retained as infrastructure diagnostics only.  No
-attempt below is eligible for optimizer input, matched validation, activation,
-or an effect claim.
+This report records three post-probe attempts to run the plain static SM01
+feedback batch plus one follow-up provider-only probe.  They are retained as
+infrastructure diagnostics only.  No batch below is eligible for optimizer
+input, matched validation, activation, or an effect claim.
 
 ## Attempt outcomes
 
@@ -12,7 +12,7 @@ or an effect claim.
 | `v5` | passed (HTTP 200, content/usage available) | first replicate reached `learn_b` reflection | reflection episode incorrectly entered semantic extraction and lacked an invocation fingerprint | incomplete runtime attempt |
 | `v6` | failed (HTTP 503) | no task | provider capacity failure before first task | no-trace diagnostic |
 | `v7` | passed (HTTP 200, content/usage available) | first replicate completed the task sequence through control tasks | launcher audited an exact shared-cold duplicate process event before canonical corpus construction | incomplete evidence attempt |
-| `v8` | failed (HTTP 503) | no task | provider capacity failure before first task | no-trace diagnostic |
+| `v8` probe | failed (HTTP 503) | no batch started | provider capacity failure at the follow-up completion probe | provider-only diagnostic |
 
 All attempts used a clean detached worktree, the fixed model
 `gpt-5.6-luna`, plain `static-extraction-rsimem`, `native+ledger`, disabled
@@ -26,7 +26,7 @@ outputs/extraction_feedback/hermes_luna/s1-sm01-feedback-20260829-v7/
 ```
 
 The v8 probe was run after v7; it failed before a batch directory was created
-and therefore has no local output copy beyond the provider-only result.
+and therefore has no local output copy beyond the command result.
 
 ## Runtime fixes
 
