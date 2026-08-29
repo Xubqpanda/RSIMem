@@ -74,12 +74,12 @@ class ExtractionOptimizerDecision(StrEnum):
     PROPOSE = "PROPOSE"
 
 
-class CandidateValidationError(ValueError):
-    """A parsed provider proposal rejected by the content-safety boundary.
+class OptimizerCompletionValidationError(ValueError):
+    """A provider completion rejected after transport succeeded.
 
     The exception keeps the completion metadata available to the outer
     preparation layer.  That layer can persist a rejected result and usage
-    without retaining the untrusted candidate body or weakening the direct
+    without retaining untrusted completion content or weakening the direct
     optimizer API's fail-closed exception semantics.
     """
 
@@ -97,6 +97,10 @@ class CandidateValidationError(ValueError):
         self.request = request
         self.completion_id = completion_id
         self.usage = usage
+
+
+class CandidateValidationError(OptimizerCompletionValidationError):
+    """A parsed proposal rejected by the candidate-content safety boundary."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,10 +268,19 @@ class ExtractionPromptOptimizer:
         completion = self.client.complete(request, self.config)
         if completion.request_id != request.request_id:
             raise ValueError("optimizer completion belongs to another request")
-        decision, reasons, edits = self._parse_completion(
-            completion.output_text,
-            corpus,
-        )
+        try:
+            decision, reasons, edits = self._parse_completion(
+                completion.output_text,
+                corpus,
+            )
+        except ValueError as exc:
+            raise OptimizerCompletionValidationError(
+                str(exc),
+                reason_code="completion_contract_invalid",
+                request=request,
+                completion_id=completion.completion_id,
+                usage=completion.usage,
+            ) from exc
         if decision == ExtractionOptimizerDecision.NO_PROPOSAL:
             return self._result(
                 decision,

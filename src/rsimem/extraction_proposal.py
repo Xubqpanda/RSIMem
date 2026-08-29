@@ -16,10 +16,10 @@ from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStor
 from .memory.extraction_policy_artifact import ExtractionPromptPolicyArtifact
 from .memory.extraction_policy_store import JsonExtractionPolicyStore
 from .memory.extraction_prompt_optimizer import (
-    CandidateValidationError,
     ExtractionOptimizerDecision,
     ExtractionOptimizerResult,
     ExtractionPromptOptimizer,
+    OptimizerCompletionValidationError,
 )
 from .memory.policy_feasibility import project_optimizer_result
 from .memory.prompt_components import canonical_json, content_digest
@@ -123,7 +123,7 @@ def prepare_extraction_proposal(
             client,
             config=FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
         ).propose(parent, corpus)
-    except CandidateValidationError as exc:
+    except OptimizerCompletionValidationError as exc:
         # Persist the rejected completion metadata and usage before building
         # the content-free hypothesis.  Candidate text remains unreachable
         # from the durable result and can never be deployed.
