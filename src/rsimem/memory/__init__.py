@@ -81,6 +81,7 @@ from .commit_scheduler import (
     CommitScheduler,
     InMemoryCommitScheduleStore,
     JsonCommitScheduleStore,
+    ValidateCommit,
 )
 from .exposure_policy import (
     DeterministicExposurePolicy,
@@ -171,6 +172,7 @@ __all__ = [
     "CommitScheduler",
     "InMemoryCommitScheduleStore",
     "JsonCommitScheduleStore",
+    "ValidateCommit",
     "DeterministicExposurePolicy",
     "ExposurePolicyConfig",
     "InjectionReceipt",
