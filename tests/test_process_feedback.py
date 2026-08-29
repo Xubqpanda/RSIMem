@@ -130,6 +130,26 @@ def test_process_reason_codes_keep_failure_stages_distinct() -> None:
     assert any("retrieval miss" in error for error in errors)
 
 
+def test_process_audit_requires_receipt_for_rejected_terminal_event() -> None:
+    event = ProcessEvent.create(
+        kind=ProcessEventKind.COMMIT,
+        status=ProcessEventStatus.REJECTED,
+        run_id="run.rejected",
+        variant="native+ledger",
+        trace_id="trace.rejected",
+        episode_id="episode.rejected",
+        session_id="session.rejected",
+        task_id="task.rejected",
+        host_event_id="event.rejected",
+        source_revision="revision.rejected",
+        input_payload={"mutation": "digest-only"},
+        output_payload={"status": "rejected"},
+        reason_codes=("mutation_rejected",),
+    )
+    errors = audit_process_events((event,))
+    assert any("terminal process event lacks receipt" in error for error in errors)
+
+
 def test_process_audit_checks_policy_and_host_revision_joins() -> None:
     _, event, replay = _replay()
     process = replay.process_events[0]
