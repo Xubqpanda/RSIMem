@@ -580,6 +580,8 @@ extraction and failed closed for a missing invocation fingerprint.  Commit
 primary task-completed boundary, with a regression test.  A post-fix clean
 attempt (`v6`) was gated before its first task by another provider HTTP 503;
 neither attempt is eligible feedback or effect evidence.
+The complete v5–v8 diagnostics and the v7 canonical process-corpus replay are
+documented in [`extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md`](extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md).
 
 ## Update Policy
 
