@@ -764,7 +764,19 @@ class HermesPastBenchBridge:
         provider = self._opportunity_evidence_provider
         if provider is None:
             return ()
-        values = provider(result)
+        return self.record_opportunity_evidence(provider(result))
+
+    def record_opportunity_evidence(
+        self,
+        values: OpportunityEvidence | Iterable[OpportunityEvidence],
+    ) -> tuple[OpportunityEvidence, ...]:
+        """Record deployment-visible opportunity evidence from a host adapter.
+
+        This is the public bridge boundary for application-owned opportunity
+        adapters.  It never accepts family/stage labels as a substitute for a
+        visible evidence payload.
+        """
+
         if isinstance(values, OpportunityEvidence):
             values = (values,)
         if isinstance(values, (str, bytes, Mapping)):
