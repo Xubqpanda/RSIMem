@@ -283,6 +283,34 @@ def test_offline_runtime_revocation_gate_runs_before_bundle_write(tmp_path) -> N
     assert not output.exists()
 
 
+def test_matched_runtime_loader_rechecks_revocation_before_use(tmp_path) -> None:
+    parent, candidate, static, suite = _offline_bundle_inputs()
+    decision = _offline_decision(parent, candidate)
+    output = tmp_path / "trial"
+    prepare_extraction_matched_trial_runtime(
+        parent=parent,
+        candidate=candidate,
+        offline_decision=decision,
+        output_root=output,
+    )
+    registry = JsonRevocationRegistry(tmp_path / "loader-revocations.jsonl")
+    registry.initialize()
+    registry.append(RevocationEntry.create(
+        artifact_id=candidate.artifact_id,
+        artifact_schema_version=candidate.schema_version,
+        artifact_digest=candidate.artifact_digest,
+        evidence_plane=EvidencePlane.PURE_PROCESS,
+        evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        revoked_at="2026-08-30T01:02:03Z",
+        reason_code="stale_schema",
+    ))
+    with pytest.raises(ValueError, match="artifact is revoked"):
+        load_extraction_matched_trial_profile(
+            output / EXTRACTION_TRIAL_CONFIG_FILE,
+            revocation_registry=registry,
+        )
+
+
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     (

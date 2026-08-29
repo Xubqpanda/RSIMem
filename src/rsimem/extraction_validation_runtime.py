@@ -459,6 +459,7 @@ def load_extraction_runtime_profile(
     config_path: Path,
     *,
     required_scope: str,
+    revocation_registry: JsonRevocationRegistry | None = None,
 ) -> ResolvedExtractionMatchedTrialRuntime:
     """Load a trial config only for its declared scope."""
 
@@ -547,6 +548,15 @@ def load_extraction_runtime_profile(
     if config["offlineDecisionId"] != offline.decision_id:
         raise ValueError("extraction matched trial offline decision mismatch")
     _validate_offline_join(parent, candidate, offline)
+    if revocation_registry is not None:
+        for artifact in (parent, candidate):
+            revocation_registry.assert_active(
+                artifact_id=artifact.artifact_id,
+                artifact_schema_version=artifact.schema_version,
+                artifact_digest=artifact.artifact_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
     return ResolvedExtractionMatchedTrialRuntime(
         path,
         store_path,
@@ -560,10 +570,13 @@ def load_extraction_runtime_profile(
 
 def load_extraction_matched_trial_profile(
     config_path: Path,
+    *,
+    revocation_registry: JsonRevocationRegistry | None = None,
 ) -> ResolvedExtractionMatchedTrialRuntime:
     return load_extraction_runtime_profile(
         config_path,
         required_scope=EXTRACTION_MATCHED_TRIAL_SCOPE,
+        revocation_registry=revocation_registry,
     )
 
 
