@@ -1061,9 +1061,16 @@ deterministic replica compaction，保留全部 primary IDs 和 delayed identity
 commit `3373a78` 新增显式 `ExtractionSplitPlan` contract，并让 matched
 preflight 在提供 split plan 时校验 validation family、template group 和
 task manifest digest。当前 SM01、SM02、SM05 的 pilot 全部已经占用 train
-role，因此没有未污染的 semantic held-out family；不得把这些 train manifest
-重命名为 validation。split 审计见
+role，因此不得把这些 train manifest 重命名为 validation。当前已冻结一个
+候选 held-out 计划：SM02 作为 train、SM03_fact_correction 作为 validation、
+SM04_rule_migration 作为 final_test，计划文件为
+`configs/extraction_split_plan_sm02_sm03_sm04.json`；SM03 的
+`sm03_fact_correction_v1` contract 仅用于冻结 update prompt 下的 extraction
+validation。split 审计见
 [`extraction_stage3_split_audit_20260829.md`](extraction_stage3_split_audit_20260829.md)。
+该计划只解除 split identity 阻塞，不代表 validation 已执行；后续仍需
+candidate trial profile、clean trees、provider probe、完整 process corpus
+和 matched parent/proposal run。
 后续顺序仍严格按照：
 
 ```text

@@ -1,0 +1,25 @@
+{
+  "assignments": [
+    {
+      "family_id": "SM04_rule_migration",
+      "role": "final_test",
+      "task_manifest_digest": "0022269fd7e8e033c0b9c50fd65930ebacc1bb3483734c4e2251a685a44470e0",
+      "task_template_group_id": "sm04-migration-heldout-final-v1"
+    },
+    {
+      "family_id": "SM02_constraint_retention",
+      "role": "train",
+      "task_manifest_digest": "698882eefe9817b1827517ea921c686f08cfd76c4a90ab70a29cabe9dda4884d",
+      "task_template_group_id": "sm02-process-pilot-train-v1"
+    },
+    {
+      "family_id": "SM03_fact_correction",
+      "role": "validation",
+      "task_manifest_digest": "cece4019357f08d7bde746e012683542a699e61756ede76c91d4f6641dced54c",
+      "task_template_group_id": "sm03-correction-heldout-validation-v1"
+    }
+  ],
+  "plan_id": "split-plan.c2a6dac70a64b295d617ff8e2640a1eb764b2170",
+  "schema": "extraction-split-plan-v1",
+  "schema_version": 1
+}

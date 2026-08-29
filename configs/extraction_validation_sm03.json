@@ -1,0 +1,28 @@
+{
+  "acceptanceCriteria": {
+    "maximumCandidateSelections": 1,
+    "maximumEmptyRate": 0.5,
+    "maximumHarmfulRateDelta": 0.0,
+    "maximumMissedRateDelta": 0.0,
+    "maximumProposalGenerations": 1,
+    "minimumCoverageRatio": 0.8,
+    "minimumMatchedPairs": 3,
+    "minimumResolvedExamples": 2,
+    "minimumUsefulRateDelta": 0.05,
+    "proposalBudgetId": "extraction-proposal.sm02-to-sm03-heldout-v1",
+    "requiredMetrics": [
+      "harmful_rate",
+      "missed_rate"
+    ]
+  },
+  "familyId": "SM03_fact_correction",
+  "persistenceProfileId": "per-attempt-empty-home-v1",
+  "replicates": 3,
+  "requestBudgetId": "past-sm03-heldout-default-budget-v1",
+  "schemaVersion": 1,
+  "semanticWriteback": {
+    "maxOutputTokens": 4096,
+    "timeoutSeconds": 30.0
+  },
+  "taskTemplateGroupId": "sm03-correction-heldout-validation-v1"
+}
