@@ -264,6 +264,15 @@ def test_process_audit_checks_policy_trigger_join() -> None:
     assert any("host event does not match policy trigger" in error for error in errors)
 
 
+def test_previous_process_feedback_schema_is_not_silently_migrated() -> None:
+    _, _, replay = _replay()
+    payload = replay.process_events[0].payload()
+    payload["schema_version"] = 1
+    payload["schema"] = "rsimem-process-feedback-v1"
+    with pytest.raises(ValueError, match="malformed process feedback event|unsupported"):
+        ProcessEvent.from_payload(payload)
+
+
 def test_process_corpus_is_separate_from_evaluation_score_and_restart_safe(tmp_path) -> None:
     _, _, replay = _replay()
     corpus = ProcessCorpus.create(
@@ -286,6 +295,22 @@ def test_process_corpus_is_separate_from_evaluation_score_and_restart_safe(tmp_p
     for field in ("taskScore", "officialScore", "answerKey", "hidden-expectation"):
         with pytest.raises(ValueError, match="evaluation-only"):
             ensure_process_corpus_has_no_evaluation_fields({"nested": {field: 1}})
+
+
+def test_previous_process_corpus_schema_is_not_silently_migrated() -> None:
+    _, _, replay = _replay()
+    corpus = ProcessCorpus.create(
+        replay.process_events,
+        split_role="pilot",
+        family_id="SM01_preference_adoption",
+        task_template_group_id="sm01-process-pilot",
+        task_manifest_digest="a" * 64,
+    )
+    payload = corpus.payload()
+    payload["schema_version"] = 1
+    payload["schema"] = "rsimem-process-corpus-v1"
+    with pytest.raises(ValueError, match="malformed process corpus|unsupported"):
+        ProcessCorpus.from_payload(payload)
 
 
 def test_process_corpus_store_reserves_one_concurrent_writer(tmp_path) -> None:

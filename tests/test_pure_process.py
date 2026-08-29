@@ -63,6 +63,15 @@ def test_pure_process_payload_rejects_evaluation_fields() -> None:
         validate_pure_process_payload({"nested": {"officialScore": 0.5}})
 
 
+def test_previous_pure_process_schema_is_not_silently_migrated() -> None:
+    corpus = PureProcessCorpus.create((_event(),))
+    payload = corpus.payload()
+    payload["schema_version"] = 1
+    payload["schema"] = "rsimem-pure-process-corpus-v1"
+    with pytest.raises(ValueError, match="malformed pure-process corpus|unsupported"):
+        PureProcessCorpus.from_payload(payload)
+
+
 def test_evidence_plane_source_identity_is_least_privilege() -> None:
     assert validate_plane_source(
         EvidencePlane.PURE_PROCESS,

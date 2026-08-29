@@ -384,7 +384,7 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
             for line in process_path.read_text(encoding="utf-8").splitlines()
         ]
         assert process_events
-        assert all(event["schema"] == "rsimem-process-feedback-v1" for event in process_events)
+        assert all(event["schema"] == "rsimem-process-feedback-v2" for event in process_events)
         assert all(event["source_revision"] for event in process_events)
         assert {event["policy_layer"] for event in process_events if event["policy_layer"]} == {
             "exposure",
