@@ -664,9 +664,9 @@ frozen system/safety/schema wrapper
 
 - √ deferred commit不会提前修改backend，重启后可恢复或明确标记失败。
 - √ stale revision、CAS失败、重复提交、进程崩溃和rollback均不产生半提交 memory。
-- □ commit scheduler不能绕过 mutation validator或把失败伪装成成功。
+- √ commit scheduler 执行前必须经过显式 mutation validator；validator 缺失或拒绝时持久化 `FAILED`，且不会调用 apply，避免绕过 mutation safety 或把失败伪装成成功。
 
-2D.2 当前实现记录：`CommitScheduler`/`JsonCommitScheduleStore` 提供 crash-safe pending/deferred schedule、CAS revision gate、cancel/failure/terminal idempotency；真实 backend validator 仍由现有 transactional executor 持有，scheduler 不宣称替代该 safety boundary。
+2D.2 当前实现记录：`CommitScheduler`/`JsonCommitScheduleStore` 提供 crash-safe pending/deferred schedule、CAS revision gate、cancel/failure/terminal idempotency；`execute()` 现在要求显式 `mutation_validator`，真实 backend validator 仍由现有 transactional executor 持有，scheduler 不宣称替代该 safety boundary。
 
 ### 2D.3：Exposure 与 Context-Memory Interaction Policy
 
