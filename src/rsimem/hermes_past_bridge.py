@@ -1611,7 +1611,47 @@ class HermesPastBenchBridge:
                         "failure_type": failure_type,
                     },
                 ))
+                process_kind = (
+                    ProcessEventKind.RETRIEVAL
+                    if operation == "session_search"
+                    else ProcessEventKind.TOOL_RESULT
+                    if operation.startswith("skill")
+                    else ProcessEventKind.EXPOSURE
+                )
+                self._record_process_observation(
+                    kind=process_kind,
+                    status=ProcessEventStatus.SUCCESS,
+                    host_event_id=self._last_host_event_id or f"event.adapter.{operation}",
+                    source_revision=self._last_host_source_revision or self._exposure_context_revision(),
+                    input_payload={"operation": operation},
+                    output_payload={"route": "native_bypass", "failure_type": failure_type},
+                    reason_codes=("adapter_failure",),
+                    execution_receipt_ids=(
+                        "receipt.adapter-failure."
+                        + hashlib.sha256(operation.encode("utf-8")).hexdigest()[:24],
+                    ),
+                )
                 return native_call()
+            process_kind = (
+                ProcessEventKind.RETRIEVAL
+                if operation == "session_search"
+                else ProcessEventKind.TOOL_RESULT
+                if operation.startswith("skill")
+                else ProcessEventKind.EXPOSURE
+            )
+            self._record_process_observation(
+                kind=process_kind,
+                status=ProcessEventStatus.FAILED,
+                host_event_id=self._last_host_event_id or f"event.adapter.{operation}",
+                source_revision=self._last_host_source_revision or self._exposure_context_revision(),
+                input_payload={"operation": operation},
+                output_payload={"failure_type": failure_type},
+                reason_codes=("adapter_failure",),
+                execution_receipt_ids=(
+                    "receipt.adapter-failure."
+                    + hashlib.sha256(operation.encode("utf-8")).hexdigest()[:24],
+                ),
+            )
             raise HermesAdapterExecutionError(
                 f"Hermes adapter operation failed closed: {operation} ({failure_type})"
             ) from exc
@@ -1692,7 +1732,18 @@ class HermesPastBenchBridge:
                     ).hexdigest()[:24],
                 ),
             )
-        except Exception:
+        except Exception as exc:
+            query_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            self._record_process_observation(
+                kind=ProcessEventKind.RETRIEVAL,
+                status=ProcessEventStatus.FAILED,
+                host_event_id=f"event.query-failure.{query_digest[:40]}",
+                source_revision=self._exposure_context_revision(),
+                input_payload={"query_digest": query_digest, "namespace": namespace, "limit": limit},
+                output_payload={"failure_type": type(exc).__name__},
+                reason_codes=("retrieval_failure",),
+                execution_receipt_ids=(f"receipt.query-failure.{query_digest[:24]}",),
+            )
             return
 
     def record_native_search(
