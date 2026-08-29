@@ -341,7 +341,7 @@ This is process-signal infrastructure, not a live adaptive-effect result.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `649 passed`.
+- [x] Pass all RSIMem tests: `654 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `397 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
