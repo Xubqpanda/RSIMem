@@ -16,6 +16,7 @@
 
 - `□`：尚未完成或尚未通过验收。
 - `进行中`：已开始，但不能作为后续任务的稳定依赖。
+- `延后`：不属于当前 3B/3D feasibility scope，待后续独立效果实验再执行。
 - `√`：功能、测试、真实证据和文档均已通过。
 - `保留`：已有实现可复用，但不代表当前论文核心任务完成。
 - `延后`：不属于本轮串行路径。
@@ -763,11 +764,11 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 - √ 对于需要正式激活的candidate，offline quality不严格高于parent时保持REJECTED；exploratory hypothesis只能进入matched trial，不能直接激活。
 - √ Offline accepted只允许进入matched trial，不可直接写production ACTIVE。
 
-### 2H：Matched Trial、Activation 与 Rollback
+### 2H：Matched Trial、Activation 与 Rollback（延后）
 
 功能需求：
 
-- □ 在独立PAST-Bench validation batch中轮换运行parent N与proposal N+1。
+- 延后：在独立PAST-Bench validation batch中轮换运行parent N与proposal N+1；本轮只完成 deterministic/shadow feasibility 和候选准备。
 - √ Pair使用相同family、episode manifest、model、budget、home seed state和feedback contract。
 - √ Activation只看预注册的deployment-observable task outcome、strict attribution diagnostics、anti-collapse constraints和安全审计，不看optimizer不可达的official task score。
 - √ Exploratory candidate可以在strict resolved sample不足时进入 matched trial，但不能直接激活；正式激活必须有 matched outcome improvement，并通过适用的harmful、coverage、empty、missed和安全 gate。若某项 strict metric 为unknown，只能在该项被预先声明为非必需时继续。
@@ -835,7 +836,7 @@ RSIMem `.venv` 回归为 `708 passed`，PAST-Bench 为 `398 passed, 2 skipped`�
 SM03 held-out split preflight 记录在
 [`extraction_stage3_sm03_heldout_preflight_20260829.md`](extraction_stage3_sm03_heldout_preflight_20260829.md)。
 
-第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。每个 intervention 现在由 `ProcessFeedback` 绑定 event、source revision、parent/candidate decision、receipt 和 before/after digest，并由独立 feasibility ledger 跨 restart 保存；ledger 支持 `verify_case()`，缺失或冲突 receipt fail closed；有 process signal 的 case 还生成绑定 past feedback 与目标层的 `PolicyHypothesis`，并持久化完整 hypothesis payload，显式覆盖 `N -> feedback -> N+1 -> intervention` identity。Hermes bridge 另外写入独立的 `rsimem_process_feedback.jsonl`，通过 host-neutral `ProcessEvent` 记录 trigger、source、extraction、admission、commit、retrieval、exposure、tool 和 task-outcome 的 content-free fingerprints；事件以文件锁和原子替换跨 restart 保持幂等，stage-specific failure reason 不再统一折叠为 extraction failure。PAST-Bench `StepResponse` 现在只携带 process event IDs/digest，不携带 grader 或 score 字段；evaluator-free fixture 验证了 trigger、formation、exposure、task-outcome 的完整事件闭环和 cross-ledger audit。真实 extraction feedback 只能通过 `feedback_chain_from_extraction_example()`、`LayerIntervention.from_extraction_feedback()`、`build_extraction_feedback_interventions()` 和 `build_optimizer_corpus_interventions()` 投影 primary useful/missed 链，其他状态继续保留为 unresolved/censored 诊断；census 同时报告 U/H/M、unresolved/censored 原始计数、ambiguity 计数和 zero-denominator unknown。当前新增的 `build_extraction_feedback_fixture()` 将 durable/temporary past context 与 future task 的 registered SM01 contract 串成可重放 useful/missed case，并由 `FeasibilityInterventionPath` ledger 记录 N+1 replay identity。该结果只是可行性状态，不代表任何层已完成在线优化；后续仍需补充完整 PAST process corpus、独立 matched validation 和失败/provider run 保留。此前 `656 passed` 是历史快照；当前验证为 RSIMem `.venv` `689 passed`、PAST-Bench `397 passed, 2 skipped`。
+第一轮六层 deterministic census 已建立：每层至少有一个 parent/candidate replay case，Extraction 因同时具备 useful/missed resolved outcome 暂列 `optimization-ready`；Trigger、Source selection、Admission、Commit、Exposure 因 outcome variation 不足暂列 `validation-only`。每个 intervention 现在由 `ProcessFeedback` 绑定 event、source revision、parent/candidate decision、receipt 和 before/after digest，并由独立 feasibility ledger 跨 restart 保存；ledger 支持 `verify_case()`，缺失或冲突 receipt fail closed；有 process signal 的 case 还生成绑定 past feedback 与目标层的 `PolicyHypothesis`，并持久化完整 hypothesis payload，显式覆盖 `N -> feedback -> N+1 -> intervention` identity。Hermes bridge 另外写入独立的 `rsimem_process_feedback.jsonl`，通过 host-neutral `ProcessEvent` 记录 trigger、source、extraction、admission、commit、retrieval、exposure、tool 和 task-outcome 的 content-free fingerprints；事件以文件锁和原子替换跨 restart 保持幂等，stage-specific failure reason 不再统一折叠为 extraction failure。PAST-Bench `StepResponse` 现在只携带 process event IDs/digest，不携带 grader 或 score 字段；evaluator-free fixture 验证了 trigger、formation、exposure、task-outcome 的完整事件闭环和 cross-ledger audit。真实 extraction feedback 只能通过 `feedback_chain_from_extraction_example()`、`LayerIntervention.from_extraction_feedback()`、`build_extraction_feedback_interventions()` 和 `build_optimizer_corpus_interventions()` 投影 primary useful/missed 链，其他状态继续保留为 unresolved/censored 诊断；census 同时报告 U/H/M、unresolved/censored 原始计数、ambiguity 计数和 zero-denominator unknown。当前新增的 `build_extraction_feedback_fixture()` 将 durable/temporary past context 与 future task 的 registered SM01 contract 串成可重放 useful/missed case，并由 `FeasibilityInterventionPath` ledger 记录 N+1 replay identity。该结果只是可行性状态，不代表任何层已完成在线优化；后续仍需补充完整 PAST process corpus、独立 matched validation 和失败/provider run 保留。该段中的 `656 passed`、`689 passed` 和 `703 passed` 均为历史快照；当前验证见下方。
 
 上段中的 `656 passed`、`689 passed` 和 `703 passed` 均为历史快照；当前
 RSIMem `.venv` 回归为 `708 passed`，PAST-Bench 为 `398 passed, 2 skipped`。
@@ -854,7 +855,7 @@ deterministic suite 的 N+1 proposal，但尚未完成 SM03 offline validation�
 4. √ 记录该层的 signal coverage、action variation、outcome variation、ambiguous/unresolved比例和主要缺口。
 5. √ 只有 signal 和 action 足够支持下一步实验时，才把该层列为 `optimization-ready`；否则列为 `diagnostic-only` 或 `validation-only`，不强行训练。
 
-推荐先完成六层的 deterministic/shadow feasibility，再选择最有信号的层做真实 adaptive effect experiment。正式效果实验仍需冻结 split、model、budget、replicate、source projection、feedback contract、optimizer config和anti-collapse criteria。
+3B 的最低验收是每层具备 decision contract、process signal、action variation、可回放 case 和收益解释；不要求当前产生真实 aggregate uplift 或在线 candidate。推荐先完成六层的 deterministic/shadow feasibility，再根据 process-signal census 选择最有信号的层做真实 adaptive effect experiment。正式效果实验仍需冻结 split、model、budget、replicate、source projection、feedback contract、optimizer config和anti-collapse criteria。
 
 Family规则：
 
@@ -865,16 +866,17 @@ Family规则：
 
 最终效果验收：
 
-- □ 所有variant使用matched task manifest、model、budget、order、sandbox和persistence isolation。
+- 延后：所有variant使用matched task manifest、model、budget、order、sandbox和persistence isolation（属于后续 held-out effect experiment）。
 - √ deterministic feasibility cases 与首个真实 provider feedback pilot 均完成预设 replay/trace/audit；provider pilot 的完整 attempt、raw usage 和 no-signal 结果单独保存在 [`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md)，没有把 unresolved 当成 negative。
 - √ 每个 deterministic candidate 至少一次改变目标层的 decision或输入/输出 fingerprint；不要求真实任务分数提升。
 - √ `LayerFeasibilityCensus` 报告每层 process-signal coverage、action variation、outcome variation、unresolved/censored 比例、ambiguity 和具体失败原因。
 - √ census 报告 U/H/M/unresolved/censored 原始计数以及 resolved useful rate 的分子分母；extraction-specific coverage、empty、missed 和 unknown 分母由 `ExtractionOfflineValidationDecision` 的 ratio evidence 单独报告，不把 unknown silently drop。
 - √ raw calls/tokens/retry/latency/storage 由 lifecycle `RawResourceUsage` 记录，injection/recovery 由对应 receipt/ledger event 记录并独立 join；当前不生成未经定义的混合 cost 结论。
-- □ 只有后续效果实验才能声明observed uplift、layer superiority或联合版本优势。
-- □ 不要求N+2，不声明recursive self-improvement。
+- √ PAST-Bench family process-signal census 已完成，报告每个 family 的 process coverage、stage action variation、outcome reason 和当前层级结论；见 [`extraction_stage3_process_signal_census_20260829.md`](extraction_stage3_process_signal_census_20260829.md)。
+- 延后：只有后续效果实验才能声明observed uplift、layer superiority或联合版本优势。
+- 延后：不要求N+2，不声明recursive self-improvement。
 
-### 3C：逐层解锁矩阵、联合 Policy 与论文边界
+### 3C：逐层解锁矩阵、联合 Policy 与论文边界（延后）
 
 随后新增 raw-usage contract 反向测试后，RSIMem 当前回归计数更新为
 `665 passed`；下方 `656 passed` 记录保留为此前 process-audit 基线。
@@ -903,24 +905,24 @@ unbound skip reason 反向测试后，当前计数更新为 `674 passed`。
 
 当前建议的第一条真实路线是 `S0 -> S1 -> S2 -> S4 -> S5 -> S6`；Source selection先保持固定，只有当 source projection成为明确瓶颈时再加入 `S3`。这不是跳过 Source 层，而是避免第一版同时引入新的上下文裁剪变量。若某一层未通过 feasibility，后续实验可以停在该层并将其列为 future work。
 
-每个 S 阶段必须包含：
+每个 S 阶段必须包含（延后至真实效果实验）：
 
-- □ 固定 parent policy、唯一新增的开放 layer、candidate artifact和decision budget。
-- □ 同一 task manifest 上的 matched parent/candidate，独立 replicate、相同模型、budget、sandbox、persistence和Host adapter。
-- □ layer-specific intervention fingerprint，证明 candidate确实改变了该层，而非隐式改变其他层。
-- □ task-level end-to-end outcome、strict attribution diagnosis、coverage/empty/non-use和安全结果的完整报告。
-- □ 与 static parent、上一阶段版本和最佳单层版本的比较；只报告实际完成的层级 claim。
+- 延后：固定 parent policy、唯一新增的开放 layer、candidate artifact和decision budget。
+- 延后：同一 task manifest 上的 matched parent/candidate，独立 replicate、相同模型、budget、sandbox、persistence和Host adapter。
+- 延后：layer-specific intervention fingerprint，证明 candidate确实改变了该层，而非隐式改变其他层。
+- 延后：task-level end-to-end outcome、strict attribution diagnosis、coverage/empty/non-use和安全结果的完整报告。
+- 延后：与 static parent、上一阶段版本和最佳单层版本的比较；只报告实际完成的层级 claim。
 
-第一版只运行与extraction claim直接相关的ablation：
+第一版只运行与extraction claim直接相关的ablation（延后至 matched effect experiment）：
 
-- □ Static parent prompt vs adaptive extraction prompt。
-- □ Delayed-feedback optimizer vs 不使用delayed feedback的generic prompt rewrite。
-- □ Operation/source attribution vs 无差别episode feedback。
-- □ 包含missed-extraction evidence vs 只观察已提取fact的future evidence。
-- □ Constrained structured rule edits vs unconstrained free-form prompt rewrite。
-- □ Fixed `task_completed` trigger vs adaptive trigger。
-- □ Fixed exposure vs adaptive exposure。
-- □ Best single-layer variant vs joint formation/exposure policy。
+- 延后：Static parent prompt vs adaptive extraction prompt。
+- 延后：Delayed-feedback optimizer vs 不使用delayed feedback的generic prompt rewrite。
+- 延后：Operation/source attribution vs 无差别episode feedback。
+- 延后：包含missed-extraction evidence vs 只观察已提取fact的future evidence。
+- 延后：Constrained structured rule edits vs unconstrained free-form prompt rewrite。
+- 延后：Fixed `task_completed` trigger vs adaptive trigger。
+- 延后：Fixed exposure vs adaptive exposure。
+- 延后：Best single-layer variant vs joint formation/exposure policy。
 
 以下ablation标记为deferred/not applicable：
 
@@ -1007,7 +1009,7 @@ PAST-Bench task 前退出且不产生 task trace。
 - √ 六层 policy 的 core contract、Host adapter boundary、decision evidence、replay和安全不变量全部通过（deterministic/shadow scope；不等同于真实 adaptive effect）。
 - √ Trigger、Source、Extraction、Admission、Commit scheduling和Exposure均可以被fixed policy观测、回放和做 matched intervention；`tests/test_policy_feasibility.py::test_every_layer_case_has_matched_process_intervention_identity` 对六层逐一校验 event、revision、decision、before/after digest 和 action variation。该结论限定为 deterministic/shadow feasibility，不等同于真实 provider effect。
 - √ Extraction artifact、trigger/admission/exposure decision和formation lineage可以跨restart重建；完整六层 replay process chain 已通过 JSON ledger 重启读取、逐事件幂等重写和 audit 验证。
-- □ 第二阶段不要求任何 adaptive layer已经取得真实效果；真实效果属于第三阶段。
+- 延后：第二阶段不要求任何 adaptive layer已经取得真实效果；真实效果属于后续效果实验。
 
 ### 第三阶段完成
 
@@ -1015,7 +1017,7 @@ PAST-Bench task 前退出且不产生 task trace。
 - √ 每层都有明确的 `optimization-ready`、`diagnostic-only` 或 `validation-only` 结论。
 - √ 每个 `optimization-ready` 层都有至少一个可回放的 parent/candidate case、process signal、action variation和收益假设。
 - √ 六层的 Host adapter、decision、execution receipt、lineage和failure semantics可以独立审计。
-- □ 论文只声明六层 policy 的可优化性和具体 case；真实 uplift、单层 superiority、联合效果和跨 family 泛化列为后续效果实验结论。
+- 延后：论文只声明六层 policy 的可优化性和具体 case；真实 uplift、单层 superiority、联合效果和跨 family 泛化列为后续效果实验结论。
 
 ## 11. 当前执行入口
 

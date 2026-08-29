@@ -73,6 +73,13 @@ optimizer gate correctly returned `NO_PROPOSAL` without a candidate. Full raw
 usage, trace, ledger, and audit evidence is recorded in
 [`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md).
 
+The current Stage 3B/3D process-signal census joins the clean SM01, SM02 and
+SM05 parent pilots without using evaluation scores. It confirms stable
+observability for all six stages, RUN/SKIP variation at the exposure boundary,
+and sparse outcome variation for the other fixed layers. Extraction remains
+the first layer to open; the family-level counts and replay interpretation are
+recorded in [`extraction_stage3_process_signal_census_20260829.md`](extraction_stage3_process_signal_census_20260829.md).
+
 The follow-up SM02 process-signal pilot exercised the generalized family
 launcher and both configured endpoints. Two primary-provider replicates passed
 audit, while one primary and one backup attempt failed with HTTP 503/capacity
