@@ -42,6 +42,18 @@ a usable OpenAI-compatible completion route in this environment and should
 not be retried as an experimental provider until its operator supplies a
 working API route and credential.
 
+## Process-signal diagnostic
+
+The failed attempts were still inspected as content-free process evidence
+after exact event-ID deduplication.  The primary retry retained 74 unique
+events (policy-bound coverage 43/74, receipt-bound coverage 52/74), including
+trigger, source selection, extraction, admission, commit, exposure, retrieval,
+and task-outcome events.  The backup retry retained 37 unique events (14
+exposure, 14 retrieval, and 9 task-outcome events); its empty responses caused
+no formation policy chain to be emitted.  These counts are infrastructure
+diagnostics only and do not enter the optimizer, strict attribution denominator,
+or matched validation.
+
 The complete attempt manifests and raw traces are retained under:
 
 - `outputs/extraction_feedback/hermes_luna/s1-sm02-process-20260829-v3/`
