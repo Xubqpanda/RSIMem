@@ -198,6 +198,18 @@ def test_process_audit_checks_policy_and_host_revision_joins() -> None:
     assert any("source revision" in error for error in errors)
 
 
+def test_process_audit_checks_policy_trigger_join() -> None:
+    _, event, replay = _replay()
+    process = replay.process_events[0]
+    assert process.policy_decision_id is not None
+    errors = audit_process_events(
+        (process,),
+        policy_decision_ids=(process.policy_decision_id,),
+        policy_trigger_event_ids={process.policy_decision_id: "event.other"},
+    )
+    assert any("host event does not match policy trigger" in error for error in errors)
+
+
 def test_process_corpus_is_separate_from_evaluation_score_and_restart_safe(tmp_path) -> None:
     _, _, replay = _replay()
     corpus = ProcessCorpus.create(
