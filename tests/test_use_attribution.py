@@ -46,6 +46,15 @@ def test_exposure_and_behavioral_consistency_do_not_become_use() -> None:
     assert result.status == MemoryUseResolutionStatus.EXPOSURE_ONLY
     assert result.attributable_use is False
 
+    completion_only = _evidence(
+        downstream_operation_id=None,
+        used_artifact_ids=(),
+        outcome_kind=OutcomeEvidenceKind.TASK_COMPLETION,
+    )
+    result = resolve_memory_use(completion_only)
+    assert result.status == MemoryUseResolutionStatus.EXPOSURE_ONLY
+    assert result.attributable_use is False
+
     weak = _evidence(
         outcome_kind=OutcomeEvidenceKind.WEAK_STRING_MATCH,
         behavioral_consistency=True,
