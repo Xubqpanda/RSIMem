@@ -265,8 +265,18 @@ class ToolCallResultJoin:
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("malformed tool exact join") from exc
 
-    def process_events(self) -> tuple[ProcessEvent, ...]:
-        """Project the call and result independently into process events."""
+    def process_events(
+        self,
+        *,
+        family_id: str | None = None,
+        stage: str | None = None,
+    ) -> tuple[ProcessEvent, ...]:
+        """Project the call and result independently into process events.
+
+        The join remains host-neutral and does not carry benchmark scope.
+        Callers supply scope at projection time so process events can still
+        participate in the cross-ledger identity audit.
+        """
 
         events: list[ProcessEvent] = []
         call = None
@@ -295,6 +305,8 @@ class ToolCallResultJoin:
                 tool_call_id=self.call_id,
                 tool_name_digest=self.tool_name_digest,
                 retry_identity=self.retry_identity,
+                family_id=family_id,
+                stage=stage,
             )
             events.append(call)
         if not self.result_present or self.result_id is None:
@@ -341,6 +353,8 @@ class ToolCallResultJoin:
             tool_name_digest=self.tool_name_digest,
             retry_identity=self.retry_identity,
             tool_success=self.success,
+            family_id=family_id,
+            stage=stage,
         )
         events.append(result)
         return tuple(events)

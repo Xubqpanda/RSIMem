@@ -58,6 +58,21 @@ def test_exact_call_result_join_replays_and_projects_two_events() -> None:
     assert ToolCallResultJoin.from_payload(json.loads(json.dumps(join.payload()))) == join
 
 
+def test_projection_scope_is_attached_to_process_events_only() -> None:
+    join = _join()
+    events = join.process_events(
+        family_id="SM02_constraint_retention",
+        stage="learn_a",
+    )
+
+    assert len(events) == 2
+    assert {event.family_id for event in events} == {"SM02_constraint_retention"}
+    assert {event.stage for event in events} == {"learn_a"}
+    # The host-neutral join contract itself remains unchanged.
+    assert "family_id" not in join.payload()
+    assert "stage" not in join.payload()
+
+
 @pytest.mark.parametrize(
     ("field", "status"),
     (
