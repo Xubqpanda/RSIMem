@@ -65,3 +65,10 @@ def test_non_pure_plane_and_duplicate_physical_ids_fail_closed() -> None:
             extraction_attributable=True, abstract_hypothesis_digest="a" * 64,
             observation_complete=True,
         )
+
+
+def test_census_rejects_same_physical_observation_in_two_cases() -> None:
+    first = _case(physical="physical-observation.1")
+    second = _case(logical="logical-case.other.v1", physical="physical-observation.1")
+    with pytest.raises(ValueError, match="duplicate physical observation identity"):
+        census_process_signal_cases((first, second))
