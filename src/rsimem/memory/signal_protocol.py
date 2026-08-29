@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
+import os
 import re
+import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Mapping
 
 
@@ -131,8 +135,81 @@ class ProcessSignalAnalysisProtocol:
             raise ValueError("malformed process signal protocol") from exc
 
 
+class JsonProcessSignalAnalysisProtocolStore:
+    """Freeze one result-independent process-signal analysis protocol.
+
+    The protocol is written before any census output is consumed.  A later
+    write is allowed only when its canonical payload is identical, so a
+    changed family/split/provider/window configuration cannot silently alter
+    the analysis contract after results exist.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+
+    @staticmethod
+    def _canonical(value: Mapping[str, object]) -> str:
+        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+    def _read_unlocked(self) -> ProcessSignalAnalysisProtocol | None:
+        if self.path.is_symlink():
+            raise ValueError("process signal protocol file cannot be a symlink")
+        if not self.path.exists():
+            return None
+        try:
+            value = json.loads(self.path.read_text(encoding="utf-8"))
+            return ProcessSignalAnalysisProtocol.from_payload(value)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise ValueError("malformed process signal protocol store") from exc
+
+    def get(self) -> ProcessSignalAnalysisProtocol | None:
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
+            try:
+                return self._read_unlocked()
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def freeze(self, protocol: ProcessSignalAnalysisProtocol) -> bool:
+        """Persist a protocol once; return ``False`` for an exact replay."""
+
+        if not isinstance(protocol, ProcessSignalAnalysisProtocol):
+            raise TypeError("protocol store accepts ProcessSignalAnalysisProtocol only")
+        serialized = self._canonical(protocol.payload()) + "\n"
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                existing = self._read_unlocked()
+                if existing is not None:
+                    if self._canonical(existing.payload()) + "\n" != serialized:
+                        raise ValueError("process signal protocol is already frozen")
+                    return False
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                descriptor, temporary_name = tempfile.mkstemp(
+                    prefix=self.path.name + ".",
+                    suffix=".tmp",
+                    dir=self.path.parent,
+                )
+                try:
+                    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                        handle.write(serialized)
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                    os.replace(temporary_name, self.path)
+                finally:
+                    if os.path.exists(temporary_name):
+                        os.unlink(temporary_name)
+                return True
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
 __all__ = [
     "SIGNAL_PROTOCOL_SCHEMA",
     "SIGNAL_PROTOCOL_SCHEMA_VERSION",
     "ProcessSignalAnalysisProtocol",
+    "JsonProcessSignalAnalysisProtocolStore",
 ]
