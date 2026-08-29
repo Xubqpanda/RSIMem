@@ -1317,6 +1317,8 @@ class ExtractionValidationReplay:
         if not isinstance(store, JsonExtractionValidationObservationStore):
             raise TypeError("validation replay requires an observation store")
         observations = store.records()
+        if decision.split_id != store.split.split_id:
+            raise ValueError("stored validation split does not match decision")
         expected_ids = set(decision.observation_ids)
         actual_ids = {value.observation_id for value in observations}
         if actual_ids != expected_ids:
