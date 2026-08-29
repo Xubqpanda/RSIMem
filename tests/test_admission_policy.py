@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 
 from rsimem.memory.contracts import MemoryAccessMode, MemoryBackendDescriptor, MemoryKind, MemoryKindCapability
-from rsimem.memory.admission_policy import DeterministicAdmissionPolicy
+from rsimem.memory.admission_policy import (
+    DeterministicAdmissionPolicy,
+    census_admission_decisions,
+    validate_admission_candidate,
+)
 from rsimem.memory.policy_contracts import ExtractionDecision, MutationKind
 
 
@@ -86,3 +90,63 @@ def test_add_target_and_missing_revision_fail_closed() -> None:
         )
     with pytest.raises(ValueError, match="current backend revision"):
         policy.decide(_extraction(("fact.1",)), backend=_backend(), backend_revision="")
+
+
+def test_admission_census_distinguishes_empty_none_from_duplicate_and_add() -> None:
+    policy = DeterministicAdmissionPolicy()
+    empty = policy.decide(_extraction(()), backend=_backend(), backend_revision="backend.rev.1")
+    duplicate = policy.decide(
+        _extraction(("fact.1",)), backend=_backend(), backend_revision="backend.rev.1",
+        existing_artifact_ids=("fact.1",),
+    )
+    add = policy.decide(_extraction(("fact.2",)), backend=_backend(), backend_revision="backend.rev.1")
+    census = census_admission_decisions((empty, duplicate, add))
+    assert census.none_count == 2
+    assert census.add_count == 1
+    assert census.duplicate_add_count == 0
+    assert census.nonempty_extraction_count == 2
+
+
+def test_admission_candidate_rejects_blanket_none_and_blanket_add() -> None:
+    policy = DeterministicAdmissionPolicy()
+    parent = {
+        "source.1": policy.decide(_extraction(("fact.1",)), backend=_backend(), backend_revision="backend.rev.1"),
+        "source.2": policy.decide(_extraction(("fact.2",)), backend=_backend(), backend_revision="backend.rev.1"),
+    }
+    none_candidate = {
+        key: policy.decide(_extraction(()), backend=_backend(), backend_revision="backend.rev.1")
+        for key in parent
+    }
+    with pytest.raises(ValueError, match="candidate_all_none"):
+        validate_admission_candidate(parent, none_candidate)
+
+    add_candidate = {
+        key: policy.decide(_extraction((f"fact.{index}",)), backend=_backend(), backend_revision="backend.rev.1")
+        for index, key in enumerate(parent, start=3)
+    }
+    # The parent has the same non-empty coverage, so blanket ADD is not an
+    # automatic rejection when it cannot inflate coverage.
+    validate_admission_candidate(parent, add_candidate)
+
+    sparse_parent = {
+        "source.1": policy.decide(_extraction(("fact.1",)), backend=_backend(), backend_revision="backend.rev.1"),
+        "source.2": policy.decide(_extraction(()), backend=_backend(), backend_revision="backend.rev.1"),
+    }
+    inflated_candidate = {
+        key: policy.decide(_extraction((f"fact.inflated.{index}",)), backend=_backend(), backend_revision="backend.rev.1")
+        for index, key in enumerate(sparse_parent, start=1)
+    }
+    with pytest.raises(ValueError, match="candidate_all_add"):
+        validate_admission_candidate(sparse_parent, inflated_candidate)
+
+
+def test_admission_candidate_rejects_duplicate_marked_add() -> None:
+    policy = DeterministicAdmissionPolicy()
+    parent = {"source.1": policy.decide(_extraction(("fact.1",)), backend=_backend(), backend_revision="backend.rev.1")}
+    candidate = {
+        "source.1": policy.decide(_extraction(("fact.1",)), backend=_backend(), backend_revision="backend.rev.1")
+    }
+    from dataclasses import replace
+    malformed = replace(candidate["source.1"], reason_codes=("duplicate_add",))
+    with pytest.raises(ValueError, match="duplicate_add"):
+        validate_admission_candidate(parent, {"source.1": malformed})

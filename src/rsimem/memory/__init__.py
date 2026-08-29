@@ -89,6 +89,11 @@ from .exposure_policy import (
     InjectionReceipt,
     InjectionReceiptStatus,
 )
+from .admission_policy import (
+    AdmissionCensus,
+    census_admission_decisions,
+    validate_admission_candidate,
+)
 from .policy_evidence import (
     POLICY_EVIDENCE_SCHEMA_VERSION,
     JsonPolicyDecisionLedger,
@@ -187,6 +192,9 @@ __all__ = [
     "ExposurePolicyConfig",
     "InjectionReceipt",
     "InjectionReceiptStatus",
+    "AdmissionCensus",
+    "census_admission_decisions",
+    "validate_admission_candidate",
     "POLICY_EVIDENCE_SCHEMA_VERSION",
     "JsonPolicyDecisionLedger",
     "PolicyDecisionEvidence",
