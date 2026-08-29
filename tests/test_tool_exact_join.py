@@ -9,6 +9,7 @@ from rsimem.memory.tool_exact_join import (
     ToolJoinResolutionStatus,
     resolve_tool_call_result,
 )
+from rsimem.memory.pure_process import PureProcessCorpus
 
 
 def _join(**overrides: object) -> ToolCallResultJoin:
@@ -47,6 +48,11 @@ def test_exact_call_result_join_replays_and_projects_two_events() -> None:
     assert events[0].retry_identity == join.retry_identity
     assert events[1].tool_result_id == join.result_id
     assert events[1].tool_success is True
+    pure = PureProcessCorpus.create(events)
+    projected_call = next(item for item in pure.events if item.kind.value == "tool_call")
+    projected_result = next(item for item in pure.events if item.kind.value == "tool_result")
+    assert projected_call.tool_call_id == join.call_id
+    assert projected_result.tool_result_id == join.result_id
     serialized = json.dumps(events[0].payload(), ensure_ascii=True)
     assert "arguments" not in serialized
     assert ToolCallResultJoin.from_payload(json.loads(json.dumps(join.payload()))) == join
