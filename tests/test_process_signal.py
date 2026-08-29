@@ -81,3 +81,15 @@ def test_census_rejects_same_physical_observation_in_two_cases() -> None:
     second = _case(logical="logical-case.other.v1", physical="physical-observation.1")
     with pytest.raises(ValueError, match="duplicate physical observation identity"):
         census_process_signal_cases((first, second))
+
+
+def test_census_counts_all_physical_observations_inside_one_case() -> None:
+    case = ProcessSignalCase.create(
+        logical_case_id="logical-case.multi.v1",
+        physical_observation_ids=("physical-observation.1", "physical-observation.2"),
+        source_observed=True, extraction_observed=True, persistence_observed=True,
+        retrieval_observed=True, exposure_observed=True, outcome_observed=True,
+        extraction_attributable=True, abstract_hypothesis_digest="a" * 64,
+        observation_complete=True,
+    )
+    assert census_process_signal_cases((case,)).physical_observation_count == 2
