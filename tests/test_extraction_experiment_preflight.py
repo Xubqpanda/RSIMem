@@ -241,3 +241,55 @@ def test_preflight_rejects_wrong_family_before_manifest_creation(
             split_plan_path=tmp_path / "unused-split.json",
         )
     assert not manifest.exists()
+
+
+def test_feedback_preflight_rejects_validation_family_as_train(tmp_path: Path) -> None:
+    family = tmp_path / "SM03_fact_correction"
+    episode = family / "update"
+    episode.mkdir(parents=True)
+    (family / "family.yaml").write_text(
+        "episode_order: [update]\n",
+        encoding="utf-8",
+    )
+    (episode / "task.yaml").write_text(
+        "task_id: sm03-update\nenvironment:\n  max_turns: 20\n  timeout_seconds: 300\n",
+        encoding="utf-8",
+    )
+    task_digest = resolved_task_template_profile(family)["taskManifestDigest"]
+    split_plan = ExtractionSplitPlan.create((
+        ExtractionSplitAssignment(
+            ExtractionSplitRole.TRAIN,
+            "SM02_constraint_retention",
+            "sm02-process-pilot-train-v1",
+            "1" * 64,
+        ),
+        ExtractionSplitAssignment(
+            ExtractionSplitRole.VALIDATION,
+            "SM03_fact_correction",
+            "sm03-correction-heldout-validation-v1",
+            task_digest,
+        ),
+        ExtractionSplitAssignment(
+            ExtractionSplitRole.FINAL_TEST,
+            "fixture-final",
+            "fixture-final-v1",
+            "2" * 64,
+        ),
+    ))
+    split_path = tmp_path / "split-plan.json"
+    write_extraction_split_plan(split_path, split_plan)
+    registry, run = _agent_files(tmp_path)
+    with pytest.raises(ValueError, match="does not match split plan"):
+        preflight.initialize_formal_feedback_batch(
+            manifest_path=tmp_path / "manifest.json",
+            batch_registry_path=tmp_path / "registry.json",
+            batch_id="feedback-sm03-misuse-v1",
+            rsimem_root=tmp_path,
+            past_bench_root=tmp_path,
+            family_root=family,
+            agent_registry_path=registry,
+            run_config_path=run,
+            experiment_config_path=ROOT / "configs/extraction_validation_sm03.json",
+            split_plan_path=split_path,
+        )
+    assert not (tmp_path / "manifest.json").exists()
