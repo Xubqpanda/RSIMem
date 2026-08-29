@@ -296,7 +296,13 @@ class ToolCallResultJoin:
             return (call,)
         result = ProcessEvent.create(
             kind=ProcessEventKind.TOOL_RESULT,
-            status=ProcessEventStatus.SUCCESS if self.success is True else ProcessEventStatus.FAILED,
+            status=(
+                ProcessEventStatus.SUCCESS
+                if self.success is True
+                else ProcessEventStatus.FAILED
+                if self.success is False
+                else ProcessEventStatus.UNKNOWN
+            ),
             run_id=self.run_id,
             variant=self.variant,
             trace_id=self.trace_id,
@@ -314,7 +320,13 @@ class ToolCallResultJoin:
             output_payload={"success": self.success, "receipt_id": self.result_receipt_id},
             lineage_id=self.policy_lineage_id,
             execution_receipt_ids=((self.result_receipt_id,) if self.result_receipt_id else ()),
-            reason_codes=("decision_observed",) if self.success is True else ("tool_failure",),
+            reason_codes=(
+                ("decision_observed",)
+                if self.success is True
+                else ("tool_failure",)
+                if self.success is False
+                else ("decision_observed",)
+            ),
         )
         return call, result
 
