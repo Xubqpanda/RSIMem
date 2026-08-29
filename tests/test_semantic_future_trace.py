@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from rsimem.lifecycle import RawResourceUsage
@@ -223,6 +225,73 @@ def test_sm03_fact_correction_keys_are_deterministic_and_confounded() -> None:
         "SM03_fact_correction",
         "Include the current Phoenix freeze date in the summary.",
     ) == ()
+
+
+def test_sm03_fact_correction_contract_preserves_unresolved_and_censored() -> None:
+    future = SemanticFutureEvidence(
+        "op.query",
+        "op.retrieval",
+        "op.injection",
+        ("memory.one",),
+        ("revision.one",),
+        "artifact.injection",
+    )
+    resolver = SemanticFeedbackResolver(
+        SemanticFeedbackContract.SM03_FACT_CORRECTION_V1,
+        family_id="SM03_fact_correction",
+        stage="eval_far",
+    )
+    no_share_observation = _observation(
+        family_id="SM03_fact_correction",
+        stage="eval_far",
+        response="The current Phoenix freeze date is 2026-06-16.",
+        task_keys=("fact.phoenix.release_freeze_date",),
+        recipients=(),
+    )
+    no_share_observation = replace(
+        no_share_observation,
+        tool_events=(ObservableToolEvent("tool.no-share", "notes_share", False),),
+    )
+    no_share = resolver.resolve(future, no_share_observation)
+    assert no_share.outcome_status == OperationStatus.NONE
+    assert no_share.outcome_reason_code == "outcome_not_attributable"
+
+    confounded = resolver.resolve(future, _observation(
+        family_id="SM03_fact_correction",
+        stage="eval_far",
+        response=(
+            "The current Phoenix freeze date is 2026-06-16. "
+            "The note was shared with the rollout owners."
+        ),
+        current_keys=("fact.phoenix.release_freeze_date",),
+        task_keys=("fact.phoenix.release_freeze_date",),
+    ))
+    assert confounded.outcome_status == OperationStatus.NONE
+    assert confounded.outcome_reason_code == "current_input_confounded"
+
+    # The helper's completed flag is separate from observation completeness;
+    # use an interrupted observation to exercise the censoring contract.
+    censored = resolver.resolve(future, DeploymentObservation(
+        "observation.sm03-censored",
+        "SM03_fact_correction",
+        "eval_far",
+        "task.fixture",
+        "a" * 64,
+        (),
+        ("fact.phoenix.release_freeze_date",),
+        "The current Phoenix freeze date is 2026-06-16.",
+        (ObservableToolEvent(
+            "tool.share.censored",
+            "notes_share",
+            True,
+            recipient_ids=("owner",),
+        ),),
+        False,
+        observation_complete=False,
+        censor_reason="execution_incomplete",
+    ))
+    assert censored.outcome_status == OperationStatus.NONE
+    assert censored.outcome_reason_code == "execution_incomplete"
 
 
 def test_sm01_feedback_contract_censors_ineligible_or_ambiguous_evidence() -> None:
