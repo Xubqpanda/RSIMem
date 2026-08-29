@@ -11,13 +11,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping
 
-from .evidence_planes import EvidencePlane, validate_pure_process_payload
+from .evidence_planes import (
+    EvidencePlane,
+    EvidenceSourceKind,
+    validate_plane_source,
+    validate_pure_process_payload,
+)
 from .policy_contracts import PolicyLayer, content_digest
 from .process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 
 
-PURE_PROCESS_SCHEMA_VERSION = 2
-PURE_PROCESS_SCHEMA = "rsimem-pure-process-corpus-v2"
+PURE_PROCESS_SCHEMA_VERSION = 3
+PURE_PROCESS_SCHEMA = "rsimem-pure-process-corpus-v3"
 
 
 def _id(value: object, name: str) -> str:
@@ -63,6 +68,7 @@ class PureProcessEvent:
     tool_success: bool | None = None
     schema_version: int = PURE_PROCESS_SCHEMA_VERSION
     evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
 
     @classmethod
     def from_process_event(cls, event: ProcessEvent) -> "PureProcessEvent":
@@ -93,6 +99,7 @@ class PureProcessEvent:
             "tool_success": event.tool_success,
             "schema_version": PURE_PROCESS_SCHEMA_VERSION,
             "evidence_plane": EvidencePlane.PURE_PROCESS,
+            "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION,
         }
         identity = cls._identity(values)
         return cls(
@@ -105,6 +112,11 @@ class PureProcessEvent:
             raise ValueError("unsupported pure-process event schema")
         if self.evidence_plane != EvidencePlane.PURE_PROCESS:
             raise ValueError("pure-process event has the wrong evidence plane")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        if plane is not EvidencePlane.PURE_PROCESS or source is not EvidenceSourceKind.RUNTIME_OBSERVATION:
+            raise ValueError("pure-process event has the wrong source identity")
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         for value, name in (
             (self.event_id, "pure-process event ID"),
             (self.run_id, "run ID"),
@@ -160,6 +172,7 @@ class PureProcessEvent:
             "retry_identity": self.retry_identity,
             "tool_success": self.tool_success,
             "evidence_plane": self.evidence_plane,
+            "evidence_source": self.evidence_source,
         })
 
     @staticmethod
@@ -191,6 +204,7 @@ class PureProcessEvent:
             "retry_identity": values["retry_identity"],
             "tool_success": values["tool_success"],
             "evidence_plane": EvidencePlane(values["evidence_plane"]).value,
+            "evidence_source": EvidenceSourceKind(values["evidence_source"]).value,
         }
 
     def payload(self) -> dict[str, object]:
@@ -210,7 +224,7 @@ class PureProcessEvent:
             "policy_decision_id", "policy_layer", "lineage_id",
             "execution_receipt_ids", "reason_codes", "evidence_plane",
             "tool_call_id", "tool_result_id", "tool_name_digest", "retry_identity",
-            "tool_success",
+            "tool_success", "evidence_source",
         }
         if not isinstance(value, Mapping) or set(value) != fields:
             raise ValueError("malformed pure-process event")
@@ -235,6 +249,7 @@ class PureProcessEvent:
                 value["retry_identity"], value["tool_success"],
                 value["schema_version"],
                 EvidencePlane(value["evidence_plane"]),
+                EvidenceSourceKind(value["evidence_source"]),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("malformed pure-process event") from exc
@@ -264,12 +279,14 @@ class PureProcessCorpus:
     events: tuple[PureProcessEvent, ...]
     schema_version: int = PURE_PROCESS_SCHEMA_VERSION
     evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
 
     @classmethod
     def create(cls, events: Iterable[ProcessEvent | PureProcessEvent]) -> "PureProcessCorpus":
         ordered = project_pure_process_events(events)
         identity = {"schema_version": PURE_PROCESS_SCHEMA_VERSION,
                     "evidence_plane": EvidencePlane.PURE_PROCESS.value,
+                    "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION.value,
                     "event_ids": [event.event_id for event in ordered]}
         return cls(
             f"pure-process-corpus.{content_digest(identity)[:40]}", ordered
@@ -280,6 +297,11 @@ class PureProcessCorpus:
             raise ValueError("unsupported pure-process corpus schema")
         if self.evidence_plane != EvidencePlane.PURE_PROCESS:
             raise ValueError("pure-process corpus has the wrong evidence plane")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        if plane is not EvidencePlane.PURE_PROCESS or source is not EvidenceSourceKind.RUNTIME_OBSERVATION:
+            raise ValueError("pure-process corpus has the wrong source identity")
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         if not self.events or len({event.event_id for event in self.events}) != len(self.events):
             raise ValueError("pure-process corpus events must be nonempty and unique")
         expected = f"pure-process-corpus.{content_digest(self.identity_payload())[:40]}"
@@ -290,6 +312,7 @@ class PureProcessCorpus:
         return {
             "schema_version": self.schema_version,
             "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
             "event_ids": [event.event_id for event in self.events],
         }
 
@@ -305,13 +328,20 @@ class PureProcessCorpus:
 
     @classmethod
     def from_payload(cls, value: object) -> "PureProcessCorpus":
-        fields = {"schema", "corpus_id", "schema_version", "evidence_plane", "event_ids", "events"}
+        fields = {
+            "schema", "corpus_id", "schema_version", "evidence_plane",
+            "evidence_source", "event_ids", "events",
+        }
         if not isinstance(value, Mapping) or set(value) != fields or value["schema"] != PURE_PROCESS_SCHEMA:
             raise ValueError("malformed pure-process corpus")
         if not isinstance(value["event_ids"], list) or not isinstance(value["events"], list):
             raise ValueError("malformed pure-process corpus events")
         events = tuple(PureProcessEvent.from_payload(item) for item in value["events"])
-        result = cls(value["corpus_id"], events, value["schema_version"], EvidencePlane(value["evidence_plane"]))
+        result = cls(
+            value["corpus_id"], events, value["schema_version"],
+            EvidencePlane(value["evidence_plane"]),
+            EvidenceSourceKind(value["evidence_source"]),
+        )
         if list(event.event_id for event in result.events) != value["event_ids"] or result.payload() != dict(value):
             raise ValueError("non-canonical pure-process corpus")
         return result

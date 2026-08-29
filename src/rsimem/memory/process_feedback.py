@@ -20,11 +20,12 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 from .policy_contracts import PolicyDecision, PolicyLayer, content_digest
 
 
-PROCESS_FEEDBACK_SCHEMA_VERSION = 2
-PROCESS_FEEDBACK_SCHEMA = "rsimem-process-feedback-v2"
+PROCESS_FEEDBACK_SCHEMA_VERSION = 3
+PROCESS_FEEDBACK_SCHEMA = "rsimem-process-feedback-v3"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _REASON = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
@@ -163,6 +164,8 @@ class ProcessEvent:
     tool_success: bool | None = None
     family_id: str | None = None
     stage: str | None = None
+    evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
     schema_version: int = PROCESS_FEEDBACK_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -205,6 +208,23 @@ class ProcessEvent:
             _id(self.family_id, "family ID")
         if self.stage is not None:
             _id(self.stage, "stage")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        expected_plane = (
+            EvidencePlane.BENCHMARK_AUDIT
+            if self.family_id is not None or self.stage is not None
+            else EvidencePlane.PURE_PROCESS
+        )
+        expected_source = (
+            EvidenceSourceKind.BENCHMARK_CONTRACT
+            if expected_plane is EvidencePlane.BENCHMARK_AUDIT
+            else EvidenceSourceKind.RUNTIME_OBSERVATION
+        )
+        if plane is not expected_plane or source is not expected_source:
+            raise ValueError(
+                "process event plane/source does not match benchmark metadata"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         object.__setattr__(
             self,
             "execution_receipt_ids",
@@ -314,6 +334,16 @@ class ProcessEvent:
             "tool_success": tool_success,
             "family_id": family_id,
             "stage": stage,
+            "evidence_plane": (
+                EvidencePlane.BENCHMARK_AUDIT.value
+                if family_id is not None or stage is not None
+                else EvidencePlane.PURE_PROCESS.value
+            ),
+            "evidence_source": (
+                EvidenceSourceKind.BENCHMARK_CONTRACT.value
+                if family_id is not None or stage is not None
+                else EvidenceSourceKind.RUNTIME_OBSERVATION.value
+            ),
         }
         return cls(
             event_id=f"process-event.{content_digest(identity)[:40]}",
@@ -341,6 +371,16 @@ class ProcessEvent:
             tool_success=tool_success,
             family_id=family_id,
             stage=stage,
+            evidence_plane=(
+                EvidencePlane.BENCHMARK_AUDIT
+                if family_id is not None or stage is not None
+                else EvidencePlane.PURE_PROCESS
+            ),
+            evidence_source=(
+                EvidenceSourceKind.BENCHMARK_CONTRACT
+                if family_id is not None or stage is not None
+                else EvidenceSourceKind.RUNTIME_OBSERVATION
+            ),
         )
 
     @classmethod
@@ -424,6 +464,8 @@ class ProcessEvent:
             "tool_success": self.tool_success,
             "family_id": self.family_id,
             "stage": self.stage,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
         }
 
     def payload(self) -> dict[str, object]:
@@ -443,6 +485,7 @@ class ProcessEvent:
             "policy_decision_id", "policy_layer", "lineage_id", "execution_receipt_ids",
             "reason_codes", "tool_call_id", "tool_result_id", "tool_name_digest",
             "retry_identity", "tool_success", "family_id", "stage",
+            "evidence_plane", "evidence_source",
         }
         if not isinstance(value, Mapping) or set(value) != fields:
             raise ValueError("malformed process feedback event")
@@ -464,7 +507,9 @@ class ProcessEvent:
                 tool_call_id=value["tool_call_id"], tool_result_id=value["tool_result_id"],
                 tool_name_digest=value["tool_name_digest"], retry_identity=value["retry_identity"],
                 tool_success=value["tool_success"], family_id=value["family_id"],
-                stage=value["stage"], schema_version=value["schema_version"],
+                stage=value["stage"], evidence_plane=value["evidence_plane"],
+                evidence_source=value["evidence_source"],
+                schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("malformed process feedback event") from exc

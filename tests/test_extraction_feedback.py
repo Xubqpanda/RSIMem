@@ -26,6 +26,7 @@ from rsimem.memory.extraction_feedback import (
     detect_user_source_semantic_keys,
 )
 from rsimem.memory.extraction_projection import JsonExtractionFeedbackDatasetLog
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 
 
 SM01 = "SM01_preference_adoption"
@@ -182,6 +183,24 @@ def test_current_input_confounding_and_not_exposed_cannot_claim_memory_use() -> 
     )
     assert _primary(not_exposed).label == ExtractionFeedbackLabel.UNRESOLVED
     assert _primary(not_exposed).reason_codes == ("use_not_bound_to_memory",)
+
+
+def test_family_bound_feedback_cannot_be_relabelled_as_pure_process() -> None:
+    dataset = ExtractionFeedbackBuilder(
+        default_feedback_contract_registry()
+    ).build(
+        _source((TSV_KEY,)),
+        _observation(SM01, (TSV_KEY,)),
+        _future((TSV_KEY,)),
+    )
+    assert dataset.evidence_plane is EvidencePlane.BENCHMARK_AUDIT
+    assert dataset.evidence_source is EvidenceSourceKind.BENCHMARK_CONTRACT
+    with pytest.raises(ValueError, match="family-bound extraction feedback"):
+        replace(
+            dataset,
+            evidence_plane=EvidencePlane.PURE_PROCESS,
+            evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        )
 
 
 def test_eager_injection_without_explicit_use_is_unresolved_not_harmful() -> None:

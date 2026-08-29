@@ -52,10 +52,22 @@ def test_pure_process_projection_strips_benchmark_identity_and_replays(tmp_path)
     ):
         assert forbidden not in serialized
     assert payload["evidence_plane"] == EvidencePlane.PURE_PROCESS.value
+    assert payload["evidence_source"] == EvidenceSourceKind.RUNTIME_OBSERVATION.value
+    assert payload["events"][0]["evidence_source"] == EvidenceSourceKind.RUNTIME_OBSERVATION.value
     store = JsonPureProcessCorpusStore(tmp_path / "pure-process.json")
     assert store.put(corpus)[1] is True
     assert store.put(corpus)[1] is False
     assert JsonPureProcessCorpusStore(tmp_path / "pure-process.json").get() == corpus
+
+
+def test_pure_process_rejects_non_runtime_source_identity() -> None:
+    corpus = PureProcessCorpus.create((_event(),))
+    with pytest.raises(ValueError, match="source identity"):
+        PureProcessCorpus(
+            corpus.corpus_id,
+            corpus.events,
+            evidence_source=EvidenceSourceKind.BENCHMARK_CONTRACT,
+        )
 
 
 def test_pure_process_payload_rejects_evaluation_fields() -> None:
