@@ -99,6 +99,9 @@ and receipt-free by contract.
 Policy `SKIP`/`DEFER` reasons are projected through a bounded mapping so
 `absence` and `unsupported_boundary` remain distinguishable from generic
 `decision_observed` process evidence.
+`JsonProcessCorpusStore` now uses the same lock-protected atomic persistence
+semantics as the process-event ledger; concurrent writers reserve one canonical
+corpus instead of silently overwriting one another.
 Hermes process feedback identity now has an explicit restart replay fixture:
 the event set, canonical ID ordering, and digest remain unchanged after a
 second bridge instance observes the same completed boundary.
