@@ -10,11 +10,13 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 from typing import Mapping
+import re
 
 
 SPLIT_PLAN_SCHEMA_VERSION = 1
 SPLIT_PLAN_SCHEMA = "extraction-split-plan-v1"
 _DIGEST_LENGTH = 64
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
 
 
 def _canonical(value: object) -> str:
@@ -26,9 +28,7 @@ def _digest(value: object) -> str:
 
 
 def _id(value: object, name: str) -> str:
-    if not isinstance(value, str) or not value.strip() or any(
-        char.isspace() for char in value
-    ):
+    if not isinstance(value, str) or _IDENTIFIER.fullmatch(value) is None:
         raise ValueError(f"{name} must be a stable identifier")
     return value
 
@@ -193,6 +193,11 @@ def write_extraction_split_plan(path: Path, plan: ExtractionSplitPlan) -> bool:
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(temporary, target)
+        directory = os.open(target.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
         return True
     finally:
         if os.path.exists(temporary):

@@ -63,3 +63,13 @@ def test_split_plan_rejects_cross_role_manifest_and_missing_roles() -> None:
             _assignment(ExtractionSplitRole.TRAIN, 2),
             _assignment(ExtractionSplitRole.FINAL_TEST, 3),
         ))
+
+
+def test_split_plan_rejects_unstable_identifiers() -> None:
+    with pytest.raises(ValueError, match="stable identifier"):
+        ExtractionSplitAssignment(
+            ExtractionSplitRole.TRAIN,
+            "family/with-slash",
+            "group-1",
+            "a" * 64,
+        )
