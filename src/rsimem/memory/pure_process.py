@@ -56,6 +56,11 @@ class PureProcessEvent:
     lineage_id: str | None
     execution_receipt_ids: tuple[str, ...]
     reason_codes: tuple[str, ...]
+    tool_call_id: str | None = None
+    tool_result_id: str | None = None
+    tool_name_digest: str | None = None
+    retry_identity: str | None = None
+    tool_success: bool | None = None
     schema_version: int = PURE_PROCESS_SCHEMA_VERSION
     evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
 
@@ -81,6 +86,11 @@ class PureProcessEvent:
             "lineage_id": event.lineage_id,
             "execution_receipt_ids": event.execution_receipt_ids,
             "reason_codes": event.reason_codes,
+            "tool_call_id": event.tool_call_id,
+            "tool_result_id": event.tool_result_id,
+            "tool_name_digest": event.tool_name_digest,
+            "retry_identity": event.retry_identity,
+            "tool_success": event.tool_success,
             "schema_version": PURE_PROCESS_SCHEMA_VERSION,
             "evidence_plane": EvidencePlane.PURE_PROCESS,
         }
@@ -144,6 +154,11 @@ class PureProcessEvent:
             "lineage_id": self.lineage_id,
             "execution_receipt_ids": list(self.execution_receipt_ids),
             "reason_codes": list(self.reason_codes),
+            "tool_call_id": self.tool_call_id,
+            "tool_result_id": self.tool_result_id,
+            "tool_name_digest": self.tool_name_digest,
+            "retry_identity": self.retry_identity,
+            "tool_success": self.tool_success,
             "evidence_plane": self.evidence_plane,
         })
 
@@ -170,6 +185,11 @@ class PureProcessEvent:
             "lineage_id": values["lineage_id"],
             "execution_receipt_ids": list(values["execution_receipt_ids"]),
             "reason_codes": list(values["reason_codes"]),
+            "tool_call_id": values["tool_call_id"],
+            "tool_result_id": values["tool_result_id"],
+            "tool_name_digest": values["tool_name_digest"],
+            "retry_identity": values["retry_identity"],
+            "tool_success": values["tool_success"],
             "evidence_plane": EvidencePlane(values["evidence_plane"]).value,
         }
 
@@ -189,6 +209,8 @@ class PureProcessEvent:
             "host_event_id", "source_revision", "input_digest", "output_digest",
             "policy_decision_id", "policy_layer", "lineage_id",
             "execution_receipt_ids", "reason_codes", "evidence_plane",
+            "tool_call_id", "tool_result_id", "tool_name_digest", "retry_identity",
+            "tool_success",
         }
         if not isinstance(value, Mapping) or set(value) != fields:
             raise ValueError("malformed pure-process event")
@@ -208,7 +230,10 @@ class PureProcessEvent:
                 value["policy_decision_id"],
                 PolicyLayer(value["policy_layer"]) if value["policy_layer"] else None,
                 value["lineage_id"], tuple(value["execution_receipt_ids"]),
-                tuple(value["reason_codes"]), value["schema_version"],
+                tuple(value["reason_codes"]),
+                value["tool_call_id"], value["tool_result_id"], value["tool_name_digest"],
+                value["retry_identity"], value["tool_success"],
+                value["schema_version"],
                 EvidencePlane(value["evidence_plane"]),
             )
         except (KeyError, TypeError, ValueError) as exc:
