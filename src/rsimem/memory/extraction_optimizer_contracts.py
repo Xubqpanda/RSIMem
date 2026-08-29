@@ -311,6 +311,97 @@ class ExtractionOptimizerClient(Protocol):
     ) -> ExtractionOptimizerCompletion: ...
 
 
+def _compact_replicated_units(
+    units: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Merge exact content-equivalent replicated evidence units.
+
+    The optimizer still receives every primary example ID through the request
+    identity.  Compaction only removes repeated transport metadata after the
+    uncompressed request exceeds its frozen character budget; it never drops a
+    source, changes a label, or treats a replica as an additional reward unit.
+    """
+
+    groups: dict[str, list[dict[str, object]]] = {}
+    for unit in units:
+        # IDs and timestamps identify individual observations, while these
+        # fields describe the content/decision shape that is safe to share.
+        levels = unit.get("feedback_levels")
+        level_shape = []
+        if isinstance(levels, list):
+            for level in levels:
+                if isinstance(level, dict):
+                    level_shape.append({
+                        key: value
+                        for key, value in level.items()
+                        if key not in {"example_id", "fact_id"}
+                    })
+        key_payload = {
+            "label": unit.get("label"),
+            "attribution_confidence": unit.get("attribution_confidence"),
+            "reason_codes": unit.get("reason_codes"),
+            "component_ownership": unit.get("component_ownership"),
+            "source_projection_ref": unit.get("source_projection_ref"),
+            "extracted_fact_set_ref": unit.get("extracted_fact_set_ref"),
+            "delayed_evidence_ref": unit.get("delayed_evidence_ref"),
+            "feedback_levels": level_shape,
+        }
+        key = content_digest(key_payload)
+        groups.setdefault(key, []).append(unit)
+
+    compacted: list[dict[str, object]] = []
+    for key in sorted(groups):
+        values = sorted(
+            groups[key],
+            key=lambda value: (
+                str(value.get("primary_unit_id", "")),
+                str(value.get("primary_example_id", "")),
+            ),
+        )
+        representative = dict(values[0])
+        representative["replica_count"] = len(values)
+        representative["replica_primary_example_ids"] = [
+            value["primary_example_id"]
+            for value in values
+        ]
+        representative["replica_primary_unit_ids"] = [
+            value["primary_unit_id"]
+            for value in values
+        ]
+        representative["replica_delayed_evidence_identities"] = [
+            value["delayed_evidence_identity"]
+            for value in values
+            if value.get("delayed_evidence_identity") is not None
+        ]
+        if len(values) == 1:
+            # Avoid adding replica bookkeeping to an already unique unit;
+            # retain its original identity fields verbatim instead.
+            representative["delayed_evidence_identity"] = values[0][
+                "delayed_evidence_identity"
+            ]
+            representative.pop("replica_count", None)
+            representative.pop("replica_primary_example_ids", None)
+            representative.pop("replica_primary_unit_ids", None)
+            representative.pop("replica_delayed_evidence_identities", None)
+        # The detailed level rows repeat replica-specific IDs. Preserve their
+        # semantic coverage as counts while retaining every primary and
+        # delayed identity above; this transport compaction is activated only
+        # after the uncompressed request exceeds the frozen budget.
+        level_counts: dict[str, int] = {}
+        for value in values:
+            for level in value.get("feedback_levels", []):
+                if isinstance(level, dict) and isinstance(level.get("level"), str):
+                    level_counts[level["level"]] = level_counts.get(
+                        level["level"], 0
+                    ) + 1
+        representative["feedback_level_counts"] = dict(sorted(level_counts.items()))
+        representative.pop("feedback_levels", None)
+        if len(values) > 1:
+            representative.pop("delayed_evidence_identity", None)
+        compacted.append(representative)
+    return compacted
+
+
 def build_extraction_optimizer_request(
     parent: ExtractionPromptPolicyArtifact,
     corpus: ExtractionOptimizerCorpus,
@@ -416,10 +507,12 @@ def build_extraction_optimizer_request(
         })
     if len(units) > config.maximum_primary_examples:
         raise ValueError("optimizer corpus exceeds the primary sample budget")
-    groups = {
-        label.value: [unit for unit in units if unit["label"] == label.value]
-        for label in ExtractionFeedbackLabel
-    }
+    def grouped(values):
+        return {
+            label.value: [unit for unit in values if unit["label"] == label.value]
+            for label in ExtractionFeedbackLabel
+        }
+
     input_payload = {
         "schema_version": EXTRACTION_OPTIMIZER_SCHEMA_VERSION,
         "parent_policy": {
@@ -447,7 +540,7 @@ def build_extraction_optimizer_request(
             "maximum_candidates": 1,
             "maximum_rule_edits": config.maximum_rule_edits,
         },
-        "evidence_groups": groups,
+        "evidence_groups": grouped(units),
         "content_catalog": {
             "source_projections": dict(sorted(source_catalog.items())),
             "extracted_fact_sets": dict(sorted(fact_catalog.items())),
@@ -456,7 +549,16 @@ def build_extraction_optimizer_request(
     }
     input_json = canonical_json(input_payload)
     if len(input_json) > config.maximum_input_chars:
-        raise ValueError("optimizer request exceeds the input character budget")
+        # Replicated runs can carry byte-for-byte identical source/fact/
+        # delayed evidence units.  Compact only those exact content groups as
+        # a deterministic second pass; never truncate or select examples based
+        # on their labels.  All primary IDs remain in the request identity and
+        # the merged unit carries the complete replica identity list.
+        compacted = _compact_replicated_units(units)
+        input_payload["evidence_groups"] = grouped(compacted)
+        input_json = canonical_json(input_payload)
+        if len(input_json) > config.maximum_input_chars:
+            raise ValueError("optimizer request exceeds the input character budget")
     values = {
         "parent_artifact_id": parent.artifact_id,
         "parent_artifact_digest": parent.artifact_digest,
