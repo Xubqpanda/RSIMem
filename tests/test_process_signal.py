@@ -9,6 +9,7 @@ from rsimem.memory.process_signal import (
     JsonProcessSignalCaseStore,
     ProcessSignalCase,
     ProcessSignalCaseStatus,
+    build_process_signal_cases,
     census_process_signal_cases,
 )
 from rsimem.memory.process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
@@ -116,6 +117,54 @@ def test_process_signal_case_store_replays_logical_census(tmp_path) -> None:
     assert census.physical_observation_count == 2
     assert census.logical_case_count == 1
     assert census.conflict_case_count == 1
+
+
+def test_build_process_signal_cases_separates_logical_and_physical_identity() -> None:
+    common = dict(
+        run_id="run.builder.v1",
+        variant="native+ledger",
+        trace_id="trace.builder.v1",
+        episode_id="episode.builder.v1",
+        session_id="session.builder.v1",
+        task_id="task.builder.v1",
+        host_event_id="event.builder.v1",
+        source_revision="revision.builder.v1",
+    )
+    events = tuple(
+        ProcessEvent.create(
+            kind=kind,
+            status=ProcessEventStatus.SUCCESS,
+            input_payload={"kind": kind.value},
+            output_payload={"ok": True},
+            **common,
+        )
+        for kind in (
+            ProcessEventKind.SOURCE_SELECTION,
+            ProcessEventKind.EXTRACTION,
+            ProcessEventKind.COMMIT,
+            ProcessEventKind.RETRIEVAL,
+            ProcessEventKind.EXPOSURE,
+            ProcessEventKind.TASK_OUTCOME,
+        )
+    )
+    first = build_process_signal_cases(
+        events,
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.v1",
+        future_task_template_id="future-template.v1",
+        observation_window="window.v1",
+        replicate_id="replicate.1",
+    )
+    second = build_process_signal_cases(
+        events,
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.v1",
+        future_task_template_id="future-template.v1",
+        observation_window="window.v1",
+        replicate_id="replicate.2",
+    )
+    assert first[0].logical_case_id == second[0].logical_case_id
+    assert first[0].physical_observation_ids != second[0].physical_observation_ids
 
 
 def test_projection_from_process_events_never_infers_extraction_attribution() -> None:
