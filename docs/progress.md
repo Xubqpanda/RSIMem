@@ -591,6 +591,15 @@ neither attempt is eligible feedback or effect evidence.
 The complete v5–v8 diagnostics and the v7 canonical process-corpus replay are
 documented in [`extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md`](extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md).
 
+The SM02 process-signal family subsequently completed three clean parent
+replicates in `s1-sm02-feedback-20260829-v5`.  It yielded 8 contract-resolved
+`missed` observations and 16 `unresolved` observations, with no
+useful/harmful variation.  The content-bearing corpus was reconstructed and
+the bounded optimizer request was built, but the provider returned malformed
+optimizer JSON twice; strict parsing rejected both and produced no candidate.
+This is recorded as provider/model-output diagnostics, not a task negative,
+in [`extraction_stage3_sm02_feedback_v5_20260829.md`](extraction_stage3_sm02_feedback_v5_20260829.md).
+
 ## Update Policy
 
 Update this file whenever a milestone is completed, its acceptance criteria change, or evidence reveals a new blocker. Mark an item complete only after its implementation, tests, and required experiment evidence are all available. Record detailed numerical results in a separate dated report and link that report here rather than embedding provisional paper results in the checklist.

@@ -1034,6 +1034,13 @@ reflection episode 错误送入 semantic extraction，已由 `e22af5c` 修复并
 feedback 全部为 `unresolved`，strict corpus 返回 `NO_PROPOSAL`，因此仍未
 产生可进入 matched validation 的 N+1 candidate。结果见
 [`extraction_stage3_sm01_feedback_v9a_20260829.md`](extraction_stage3_sm01_feedback_v9a_20260829.md)。
+随后 SM02 process-signal family 的 `s1-sm02-feedback-20260829-v5` 已完成 3 个
+clean parent replicate，产生 8 条 contract-resolved `missed` 和 16 条
+`unresolved`；没有 useful/harmful variation，不能直接生成可激活 candidate。
+其 content-bearing corpus 已通过重复上下文压缩保持在冻结 optimizer 输入预算
+内，但 provider 两次返回 malformed optimizer JSON，严格 schema 拒绝且未写入
+candidate。详细记录见
+[`extraction_stage3_sm02_feedback_v5_20260829.md`](extraction_stage3_sm02_feedback_v5_20260829.md)。
 后续顺序仍严格按照：
 
 ```text
