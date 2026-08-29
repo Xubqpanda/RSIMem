@@ -370,6 +370,11 @@ def _compact_replicated_units(
             value["primary_unit_id"]
             for value in values
         ]
+        representative["replica_logical_case_ids"] = [
+            value["logical_case_id"]
+            for value in values
+            if value.get("logical_case_id") is not None
+        ]
         representative["replica_delayed_evidence_identities"] = [
             value["delayed_evidence_identity"]
             for value in values
@@ -384,6 +389,7 @@ def _compact_replicated_units(
             representative.pop("replica_count", None)
             representative.pop("replica_primary_example_ids", None)
             representative.pop("replica_primary_unit_ids", None)
+            representative.pop("replica_logical_case_ids", None)
             representative.pop("replica_delayed_evidence_identities", None)
         # The detailed level rows repeat replica-specific IDs. Preserve their
         # semantic coverage as counts while retaining every primary and
@@ -402,6 +408,61 @@ def _compact_replicated_units(
             representative.pop("delayed_evidence_identity", None)
         compacted.append(representative)
     return compacted
+
+
+def logical_case_id_for_example(
+    example: ExtractionOptimizerCorpusExample,
+) -> str:
+    """Derive a replicate-independent semantic case identity.
+
+    Request-level opportunity IDs and run/session IDs are deliberately absent:
+    repeated retrieval boundaries and provider replicates must contribute
+    physical evidence to one case, not extra optimizer reward.  The source
+    projection digest stands in for the frozen extraction set, while the
+    policy body digest and task/stage identities prevent cross-policy or
+    cross-window merges.
+    """
+
+    if not isinstance(example, ExtractionOptimizerCorpusExample):
+        raise TypeError("logical case identity requires an optimizer example")
+    join = example.audit_join
+    identity = {
+        "schema_version": 1,
+        "frozen_policy_digest": join.extraction_artifact_digest,
+        "source_task_template_id": join.source_task_id,
+        "source_extraction_set_digest": join.source_projection_digest,
+        "future_task_template_id": join.feedback_task_id,
+        "observation_window": join.feedback_stage,
+    }
+    return f"logical-case.{content_digest(identity)[:40]}"
+
+
+def logical_primary_examples(
+    corpus: ExtractionOptimizerCorpus,
+) -> tuple[ExtractionOptimizerCorpusExample, ...]:
+    """Return one deterministic primary representative per logical case.
+
+    Replicate labels must agree.  A conflict is never resolved by majority
+    vote because doing so would hide provider/runtime disagreement from the
+    optimizer gate.
+    """
+
+    if not isinstance(corpus, ExtractionOptimizerCorpus):
+        raise TypeError("logical case grouping requires an optimizer corpus")
+    groups: dict[str, list[ExtractionOptimizerCorpusExample]] = {}
+    for example in corpus.examples:
+        if example.primary:
+            groups.setdefault(logical_case_id_for_example(example), []).append(example)
+    representatives: list[ExtractionOptimizerCorpusExample] = []
+    for logical_id in sorted(groups):
+        values = groups[logical_id]
+        labels = {value.label for value in values}
+        if len(labels) != 1:
+            raise ValueError(
+                f"logical case has conflicting labels: {logical_id}"
+            )
+        representatives.append(min(values, key=lambda value: value.example_id))
+    return tuple(representatives)
 
 
 def build_extraction_optimizer_request(
@@ -424,7 +485,7 @@ def build_extraction_optimizer_request(
         raise ValueError("optimizer corpus was not produced by the parent policy body")
     by_unit: dict[str, list[ExtractionOptimizerCorpusExample]] = {}
     for example in corpus.examples:
-        by_unit.setdefault(example.primary_unit_id, []).append(example)
+        by_unit.setdefault(logical_case_id_for_example(example), []).append(example)
     units = []
     # Replicated runs commonly carry the same bounded source projection and
     # delayed evidence text.  Keep those content-bearing values once in a
@@ -435,12 +496,17 @@ def build_extraction_optimizer_request(
     fact_catalog: dict[str, object] = {}
     delayed_catalog: dict[str, object] = {}
     primary_ids = []
-    for primary_unit_id in sorted(by_unit):
-        values = by_unit[primary_unit_id]
+    for logical_id in sorted(by_unit):
+        values = by_unit[logical_id]
         primaries = [value for value in values if value.primary]
-        if len(primaries) != 1:
+        if not primaries:
             raise ValueError("optimizer evidence unit requires one primary example")
-        primary = primaries[0]
+        labels = {value.label for value in primaries}
+        if len(labels) != 1:
+            raise ValueError(
+                f"logical case has conflicting labels: {logical_id}"
+            )
+        primary = min(primaries, key=lambda value: value.example_id)
         primary_ids.append(primary.example_id)
         actionable = primary.label in {
             ExtractionFeedbackLabel.USEFUL,
@@ -488,7 +554,10 @@ def build_extraction_optimizer_request(
                 "outcome_operation_id": delayed_payload["outcome_operation_id"],
             }
         units.append({
-            "primary_unit_id": primary_unit_id,
+            # Keep the original primary unit ID as an audit reference while
+            # using the logical ID for weighting and replica bookkeeping.
+            "logical_case_id": logical_id,
+            "primary_unit_id": primary.primary_unit_id,
             "primary_example_id": primary.example_id,
             "label": primary.label.value,
             "attribution_confidence": primary.attribution_confidence.value,
@@ -510,6 +579,13 @@ def build_extraction_optimizer_request(
                 "reason_codes": list(value.reason_codes),
                 "component_ownership": value.component_ownership.value,
             } for value in levels],
+            "replica_count": len(primaries),
+            "replica_primary_example_ids": [
+                value.example_id for value in sorted(primaries, key=lambda item: item.example_id)
+            ],
+            "replica_primary_unit_ids": [
+                value.primary_unit_id for value in sorted(primaries, key=lambda item: item.example_id)
+            ],
         })
     if len(units) > config.maximum_primary_examples:
         raise ValueError("optimizer corpus exceeds the primary sample budget")
@@ -619,7 +695,7 @@ def build_extraction_optimizer_gate_request(
     if not reason_codes or len(reason_codes) != len(set(reason_codes)):
         raise ValueError("optimizer gate requires unique reason codes")
     primary = tuple(sorted(
-        (value for value in corpus.examples if value.primary),
+        logical_primary_examples(corpus),
         key=lambda value: value.example_id,
     ))
     label_counts = {

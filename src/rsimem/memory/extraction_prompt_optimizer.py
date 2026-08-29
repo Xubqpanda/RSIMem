@@ -19,6 +19,7 @@ from .extraction_optimizer_contracts import (
     FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
     build_extraction_optimizer_gate_request,
     build_extraction_optimizer_request,
+    logical_primary_examples,
 )
 from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
@@ -227,7 +228,25 @@ class ExtractionPromptOptimizer:
                 evidence_plane=EvidencePlane.PURE_PROCESS,
                 evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
             )
-        primary = tuple(value for value in corpus.examples if value.primary)
+        try:
+            primary = logical_primary_examples(corpus)
+        except ValueError as exc:
+            reason = "conflicting_logical_case_signal"
+            request = build_extraction_optimizer_gate_request(
+                parent,
+                corpus,
+                reason_codes=(reason,),
+                config=self.config,
+            )
+            return self._result(
+                ExtractionOptimizerDecision.NO_PROPOSAL,
+                (reason,),
+                request,
+                None,
+                (),
+                None,
+                RawResourceUsage(),
+            )
         actionable = tuple(value for value in primary if _is_actionable(value))
         if len(actionable) < self.config.minimum_actionable_primary_examples:
             reason = (
