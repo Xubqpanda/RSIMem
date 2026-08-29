@@ -163,6 +163,38 @@ class ApplicationOpportunitySchema:
             "schema_digest": self.schema_digest,
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "ApplicationOpportunitySchema":
+        """Rebuild a frozen application contract without trusting its digest.
+
+        The constructor recomputes the canonical digest and therefore rejects
+        tampered requirement lists or schema identities during replay.
+        """
+
+        fields = {
+            "schema_version",
+            "schema_id",
+            "version",
+            "requirement_ids",
+            "schema_digest",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed application opportunity schema")
+        try:
+            requirement_ids = tuple(value["requirement_ids"])
+        except (KeyError, TypeError) as exc:
+            raise ValueError("malformed application opportunity schema") from exc
+        try:
+            return cls(
+                schema_id=value["schema_id"],
+                version=value["version"],
+                requirement_ids=requirement_ids,
+                schema_digest=value["schema_digest"],
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed application opportunity schema") from exc
+
 
 @dataclass(frozen=True, slots=True)
 class OpportunityEvidence:
@@ -372,7 +404,7 @@ class JsonOpportunityEvidenceLog:
                 self._load()
                 return tuple(
                     OpportunityEvidence.from_payload(json.loads(value))
-                    for value in self._records.values()
+                    for _, value in sorted(self._records.items())
                 )
             finally:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
