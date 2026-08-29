@@ -506,6 +506,9 @@ Adaptive final launcher要求 clean tree，但 static feedback launcher允许 di
 - √ Useful率提高但harmful、empty或high-confidence missed任一越界时保持REJECTED。
 - √ Positive delayed quality且所有安全条件通过时可以激活，即使 resource cost更高。
 - √ Validation decision可从 raw observation重建，且不读取 official task score。
+- √ Raw validation observations have an independent crash-safe, split-bound
+  store; replay reads the persisted observations rather than only a derived
+  decision artifact.
 - √ 将同一SM01 task template放入不同split时，split audit必须拒绝。
 
 ### 1G：修正 Experiment Manifest、Launcher 与 Analyzer
