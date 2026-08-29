@@ -967,6 +967,9 @@ bash -n scripts/*.sh
 正式 provider batch 前可运行 [`provider_probe.md`](provider_probe.md) 中的
 completion probe；probe 只判断 endpoint 是否返回非空 completion，不替代
 formal usage/process-corpus audit，且失败结果不得进入训练或质量统计。
+`run_luna_extraction_feedback_sm01.sh` 与 `run_luna_extraction_matched.sh` 已在
+manifest/preflight 注册后、首个 benchmark task 前自动执行该 gate，并将
+content-free 结果保存为 batch 内的 `provider_probe.json`。
 
 ## 10. 三阶段完成定义
 
