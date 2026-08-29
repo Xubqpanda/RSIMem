@@ -203,6 +203,7 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
 
     episodes_by_variant: dict[str, list[dict[str, Any]]] = {}
     trace_paths: dict[str, Path] = {}
+    trace_contexts: dict[str, dict[str, Any]] = {}
     memory_entries: list[str] = []
     for variant in ("with_persistence", "without_persistence"):
         episodes = [
@@ -217,6 +218,12 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
                     trace_id,
                     resolve_comparison_evidence_path(episode.get("trace"), run_dir),
                 )
+                trace_contexts.setdefault(trace_id, {
+                    "variant": variant,
+                    "task_id": episode.get("task_id"),
+                    "family_id": episode.get("family_id"),
+                    "stage": episode.get("stage"),
+                })
             artifacts = episode.get("artifacts", {})
             for field in ("memory_entries", "user_entries"):
                 memory_entries.extend(
@@ -343,6 +350,7 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         artifact_dir = trace_path.parent / "artifacts"
         policy_path = artifact_dir / "rsimem_policy_decisions.jsonl"
         process_path = artifact_dir / "rsimem_process_feedback.jsonl"
+        context = trace_contexts.get(trace_id, {})
         if process_path.exists():
             try:
                 process_events = JsonProcessFeedbackLedger(process_path).events
@@ -353,6 +361,14 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
                 } if policy_path.exists() else set()
                 process_errors = audit_process_events(
                     process_events,
+                    required_identity={
+                        "run_id": run_dir.name,
+                        "variant": context.get("variant"),
+                        "trace_id": trace_id,
+                        "task_id": context.get("task_id"),
+                        "family_id": context.get("family_id"),
+                        "stage": context.get("stage"),
+                    },
                     policy_decision_ids=policy_ids,
                 )
                 if any(
@@ -388,6 +404,12 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         try:
             policy_report = audit_policy_evidence(
                 policy_path,
+                run_id=run_dir.name,
+                variant=context.get("variant"),
+                trace_id=trace_id,
+                task_id=context.get("task_id"),
+                family_id=context.get("family_id"),
+                stage=context.get("stage"),
                 lifecycle_events=lifecycle_path if lifecycle_path.exists() else None,
             )
             row = policy_report.payload()
