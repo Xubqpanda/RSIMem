@@ -805,7 +805,7 @@ Audit dataset继续content-free；optimizer corpus只存在于owner-controlled i
 - √ End-to-end feedback fixture 保留 source、future opportunity/use/outcome operation join、exposure、extraction-set 和 fact-level 轨迹；strict resolver 同时保留 `UNRESOLVED/CENSORED` 诊断，resolved primary 才能投影 extraction hypothesis。
 - √ Delayed feedback构建optimizer corpus并生成受限的、只针对当前开放层的N+1 hypothesis；`extraction_proposal` 现在持久化经 parent/corpus/ownership gate 校验的 `feasibility-hypothesis.json`，没有真实 uplift 也不判定 feasibility 失败。
 - √ N+1 proposal 已通过 optimizer projection、parent/corpus/ownership gate、candidate static safety、deterministic extraction suite、offline quality gate 和 extraction slot boundary validation；candidate 只注册为 proposal，是否激活属于后续效果实验，不属于本阶段最低验收。
-- □ Future fixture可以加载N+1并记录 intervention path；是否改善deployment-observable outcome作为后续效果实验结果，不作为六层基建的前置假设。
+- √ Future fixture 可以从 restart 后的 extraction policy store 加载 N+1 proposal，并通过 `FeasibilityInterventionPath`/JSONL ledger 记录 projection、parent/candidate、target layer 和 replay fingerprint；是否改善 deployment-observable outcome仍属于后续效果实验。
 - √ fixture 到 feasibility projection 的链路不读取 grader/answer，不使用 cost 信号，也不修改 update/retrieval policy；content-bearing source 只停留在 owner-controlled fixture/corpus 边界。
 - □ Restart、rejection、no-proposal和rollback反向路径全部通过。
 

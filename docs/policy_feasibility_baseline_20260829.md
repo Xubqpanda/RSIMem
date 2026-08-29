@@ -103,4 +103,7 @@ IDs 和 reason codes；`NO_PROPOSAL` 明确没有 candidate。proposal 写入前
 quality gate 和 `JsonExtractionPolicyStore` 的 restart reload。验证结果是
 `ACCEPTED_FOR_MATCHED_TRIAL`，candidate 仍保持 `PROPOSAL` 状态，未被本阶段
 提前切换为 ACTIVE；真实 future-task intervention 与 matched effect 仍待后续
-阶段完成。
+阶段完成。该测试还用 `FeasibilityInterventionPath` 将 projection 与
+target-layer replay fingerprint 写入独立 JSONL ledger，重启读取和重复写入
+均保持幂等；ledger 只保存 identity、状态和 reason，不保存 source 或 memory
+正文。
