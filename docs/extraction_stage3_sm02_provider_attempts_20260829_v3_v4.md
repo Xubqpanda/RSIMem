@@ -24,6 +24,10 @@ A later provider-only completion probe against the primary endpoint returned
 HTTP 503 with no completion or usage payload.  No benchmark batch was started
 from that probe, and it is not included in any experiment accounting.
 
+The reusable probe was run again after the completion-probe gate was added; it
+timed out with `transport_error` after 20 seconds (no HTTP status, content, or
+usage).  This provider-only result likewise did not start a benchmark batch.
+
 ## Batch outcomes
 
 | batch | endpoint | completed traces | requests | retries | input tokens | output tokens | audit | disposition |
