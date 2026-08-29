@@ -512,11 +512,7 @@ class ExtractionOptimizerCorpusExample:
             "component_ownership",
             OptimizerComponentOwnership(self.component_ownership),
         )
-        object.__setattr__(
-            self,
-            "evidence_plane",
-            require_optimizer_plane(self.evidence_plane),
-        )
+        object.__setattr__(self, "evidence_plane", EvidencePlane(self.evidence_plane))
         if type(self.primary) is not bool or self.primary != (
             self.level == ExtractionFeedbackLevel.EXTRACTION_SET
         ):
@@ -589,6 +585,16 @@ class ExtractionOptimizerCorpusExample:
             raise ValueError("negative optimizer example lacks attribution evidence")
         digest = content_digest(self.identity_payload())
         if self.example_digest != digest:
+            # A caller mutating a pure-process example into a benchmark/final
+            # plane without rebuilding its canonical digest is attempting to
+            # smuggle diagnostic evidence through an optimizer contract.  Keep
+            # this failure explicit; valid diagnostic examples are accepted as
+            # corpus artifacts and are rejected later at request construction.
+            if self.evidence_plane != EvidencePlane.PURE_PROCESS:
+                raise ValueError(
+                    "optimizer requires pure_process evidence; benchmark/final "
+                    "evidence is diagnostic-only"
+                )
             raise ValueError("optimizer corpus example digest mismatch")
         if self.example_id != f"optimizer-example.{digest[:40]}":
             raise ValueError("optimizer corpus example ID mismatch")
@@ -630,7 +636,10 @@ class ExtractionOptimizerCorpusExample:
             "source_messages": source_messages,
             "extracted_facts": extracted_facts,
             "delayed_evidence": delayed_evidence,
-            "evidence_plane": require_optimizer_plane(evidence_plane),
+            # Corpus builders may materialize benchmark-audit examples for
+            # diagnostics.  The optimizer request boundary performs the
+            # pure-process gate; retaining the plane here preserves provenance.
+            "evidence_plane": EvidencePlane(evidence_plane),
             "schema_version": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
         }
         identity = cls._identity(values)

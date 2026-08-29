@@ -25,6 +25,7 @@ from .extraction_feedback import (
     default_feedback_contract_registry,
     detect_extracted_fact_semantic_keys,
 )
+from .evidence_planes import validate_plane_source
 from .ingestion import InternalMemoryAction, MemoryIngestStatus
 from .live_writeback import ExtractionRuntimeBinding, StaticSemanticBoundaryResult
 from .prompt_components import SemanticPolicyManifest
@@ -49,6 +50,8 @@ def _validate_feedback_dataset_payload(value: object) -> dict[str, object]:
         "dataset_id",
         "source_projection_digest",
         "contract_digest",
+        "evidence_plane",
+        "evidence_source",
         "examples",
     }
     example_fields = {
@@ -75,6 +78,8 @@ def _validate_feedback_dataset_payload(value: object) -> dict[str, object]:
         not isinstance(value, dict)
         or set(value) != fields
         or value["schema_version"] != EXTRACTION_FEEDBACK_SCHEMA_VERSION
+        or not isinstance(value["evidence_plane"], str)
+        or not isinstance(value["evidence_source"], str)
         or not all(isinstance(value[field], str) for field in (
             "dataset_id",
             "source_projection_digest",
@@ -84,6 +89,10 @@ def _validate_feedback_dataset_payload(value: object) -> dict[str, object]:
         or not value["examples"]
     ):
         raise ValueError("malformed extraction feedback dataset log")
+    try:
+        validate_plane_source(value["evidence_plane"], value["evidence_source"])
+    except (TypeError, ValueError) as exc:
+        raise ValueError("malformed extraction feedback dataset log") from exc
     for example in value["examples"]:
         if (
             not isinstance(example, dict)
