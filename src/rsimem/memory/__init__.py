@@ -149,6 +149,15 @@ from .tool_exact_join import (
     ToolJoinResolutionStatus,
     resolve_tool_call_result,
 )
+from .logical_case import (
+    LOGICAL_CASE_SCHEMA,
+    LOGICAL_CASE_SCHEMA_VERSION,
+    LogicalCaseIdentity,
+    LogicalCaseResolution,
+    LogicalCaseResolutionStatus,
+    PhysicalObservation,
+    resolve_logical_case,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -264,6 +273,13 @@ __all__ = [
     "ToolJoinResolution",
     "ToolJoinResolutionStatus",
     "resolve_tool_call_result",
+    "LOGICAL_CASE_SCHEMA",
+    "LOGICAL_CASE_SCHEMA_VERSION",
+    "LogicalCaseIdentity",
+    "LogicalCaseResolution",
+    "LogicalCaseResolutionStatus",
+    "PhysicalObservation",
+    "resolve_logical_case",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
