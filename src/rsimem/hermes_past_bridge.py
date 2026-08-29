@@ -1311,7 +1311,7 @@ class HermesPastBenchBridge:
         if not isinstance(raw_messages, (list, tuple)):
             return
         messages = tuple(value for value in raw_messages if isinstance(value, Mapping))
-        calls: dict[str, tuple[str, str, str, str]] = {}
+        calls: dict[str, list[tuple[str, str, str, str]]] = {}
         call_counts: dict[str, int] = {}
         duplicate_call_ids: set[str] = set()
         emitted_result_ids: set[str] = set()
@@ -1348,8 +1348,7 @@ class HermesPastBenchBridge:
                     "tool-call."
                     + hashlib.sha256(raw_call_id.encode("utf-8")).hexdigest()[:24]
                 )
-                calls.setdefault(
-                    raw_call_id,
+                calls.setdefault(raw_call_id, []).append(
                     (
                         call_id,
                         name,
@@ -1358,13 +1357,13 @@ class HermesPastBenchBridge:
                         + hashlib.sha256(
                             f"{call_id}:{retry_identity}".encode("utf-8")
                         ).hexdigest()[:24],
-                    ),
+                    )
                 )
         for message in messages:
             if message.get("role") != "tool":
                 continue
             raw_call_id = str(message.get("tool_call_id") or "")
-            call = calls.get(raw_call_id)
+            call_occurrences = calls.get(raw_call_id, ())
             content = message.get("content")
             parsed = None
             if isinstance(content, str):
@@ -1386,7 +1385,7 @@ class HermesPastBenchBridge:
             ))
             duplicate_result = result_id in emitted_result_ids
             emitted_result_ids.add(result_id)
-            if call is None:
+            if not call_occurrences:
                 orphan_call_id = (
                     "orphan-call."
                     + hashlib.sha256(raw_call_id.encode("utf-8")).hexdigest()[:24]
@@ -1413,7 +1412,12 @@ class HermesPastBenchBridge:
                     orphan_result=True,
                 ))
                 continue
-            call_id, name, retry_identity, call_receipt = call
+            # A result referring to a duplicated call ID cannot identify
+            # which retry occurrence produced it.  Bind it to the first
+            # occurrence for deterministic projection and retain the
+            # duplicate flag; the remaining occurrences are emitted as
+            # duplicate/missing call-only joins below.
+            call_id, name, retry_identity, call_receipt = call_occurrences[0]
             joins.append(ToolCallResultJoin.create(
                 call_id=call_id,
                 result_id=result_id,
@@ -1435,30 +1439,35 @@ class HermesPastBenchBridge:
                 duplicate_call=raw_call_id in duplicate_call_ids,
                 duplicate_result=duplicate_result,
             ))
-        represented_calls = {join.call_id for join in joins if join.call_present}
-        for raw_call_id, (call_id, name, retry_identity, call_receipt) in calls.items():
-            if call_id in represented_calls:
-                continue
-            joins.append(ToolCallResultJoin.create(
-                call_id=call_id,
-                result_id=None,
-                tool_name_digest=hashlib.sha256(name.encode("utf-8")).hexdigest(),
-                success=None,
-                retry_identity=retry_identity,
-                run_id=self._run_id,
-                variant=self.ledger.variant,
-                trace_id=self._trace_id,
-                episode_id=self._episode_id,
-                session_id=self._session_id,
-                task_id=self._task_id,
-                source_revision=source_revision,
-                host_event_id=host_event_id,
-                memory_use_operation_id=memory_use_operation_id,
-                call_receipt_id=call_receipt,
-                call_present=True,
-                result_present=False,
-                duplicate_call=raw_call_id in duplicate_call_ids,
-            ))
+        represented_calls = {
+            (join.call_id, join.retry_identity)
+            for join in joins
+            if join.call_present
+        }
+        for raw_call_id, occurrences in calls.items():
+            for call_id, name, retry_identity, call_receipt in occurrences:
+                if (call_id, retry_identity) in represented_calls:
+                    continue
+                joins.append(ToolCallResultJoin.create(
+                    call_id=call_id,
+                    result_id=None,
+                    tool_name_digest=hashlib.sha256(name.encode("utf-8")).hexdigest(),
+                    success=None,
+                    retry_identity=retry_identity,
+                    run_id=self._run_id,
+                    variant=self.ledger.variant,
+                    trace_id=self._trace_id,
+                    episode_id=self._episode_id,
+                    session_id=self._session_id,
+                    task_id=self._task_id,
+                    source_revision=source_revision,
+                    host_event_id=host_event_id,
+                    memory_use_operation_id=memory_use_operation_id,
+                    call_receipt_id=call_receipt,
+                    call_present=True,
+                    result_present=False,
+                    duplicate_call=raw_call_id in duplicate_call_ids,
+                ))
         for join in joins:
             previous = self._tool_call_result_joins.get(join.join_id)
             if previous is not None and previous != join:
