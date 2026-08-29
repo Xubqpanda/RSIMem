@@ -133,6 +133,14 @@ from .use_attribution import (
     OutcomeEvidenceKind,
     resolve_memory_use,
 )
+from .artifact_set import (
+    ARTIFACT_SET_SCHEMA,
+    ARTIFACT_SET_SCHEMA_VERSION,
+    ArtifactSetResolution,
+    ArtifactSetResolutionStatus,
+    ArtifactSetSemanticBinding,
+    resolve_artifact_set,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -236,6 +244,12 @@ __all__ = [
     "MemoryUseResolutionStatus",
     "OutcomeEvidenceKind",
     "resolve_memory_use",
+    "ARTIFACT_SET_SCHEMA",
+    "ARTIFACT_SET_SCHEMA_VERSION",
+    "ArtifactSetResolution",
+    "ArtifactSetResolutionStatus",
+    "ArtifactSetSemanticBinding",
+    "resolve_artifact_set",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
