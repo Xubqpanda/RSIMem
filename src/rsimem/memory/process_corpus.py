@@ -357,7 +357,9 @@ def ensure_process_corpus_has_no_evaluation_fields(value: object) -> None:
     # rejected unless the field itself is an evaluation field.
     forbidden = {
         "score", "taskscore", "officialscore", "officialevaluation", "grader",
-        "answer", "answerkey", "hiddenexpectation", "judge", "expectation",
+        "graderfeedback", "answer", "answerkey", "hiddenexpectation", "judge",
+        "judgefeedback", "expectation", "evaluation", "referenceanswer",
+        "goldanswer", "groundtruth",
     }
 
     def normalized_key(key: object) -> str:
