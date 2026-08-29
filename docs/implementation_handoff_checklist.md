@@ -857,6 +857,7 @@ rejected-terminal receipt 反向测试后，当前计数更新为 `667 passed`�
 policy reason-code 保真反向测试后，当前计数更新为 `671 passed`。
 policy-to-host trigger join 反向测试后，当前计数更新为 `672 passed`。
 process corpus 并发 writer 反向测试后，当前计数更新为 `673 passed`。
+unbound skip reason 反向测试后，当前计数更新为 `674 passed`。
 
 本轮在新增 process-feedback、process-corpus 与 admission anti-collapse
 回归后，RSIMem 当前验证计数为 `665 passed`；PAST-Bench 仍为 `397 passed,
