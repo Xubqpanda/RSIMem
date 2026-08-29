@@ -37,7 +37,7 @@ interventions, strict feedback projection, process feedback, N+1 hypothesis
 identity, and restart-safe content-free evidence. Extraction is currently
 `optimization-ready` in that fixture; the other layers remain
 `validation-only` until outcome variation is observed. The latest regression
-counts are RSIMem `706 passed` and vendored PAST-Bench `398 passed, 2 skipped`.
+counts are RSIMem `707 passed` and vendored PAST-Bench `398 passed, 2 skipped`.
 
 Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
@@ -458,7 +458,7 @@ This is process-signal infrastructure, not a live adaptive-effect result.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `706 passed`.
+- [x] Pass all RSIMem tests: `707 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `398 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.

@@ -42,6 +42,6 @@ Verification at the original preflight revision:
 - split-plan digest replay against all three vendored family roots: passed
 
 The repository has since added durable-observation replay and split-identity
-guards. The current full regression is RSIMem `706 passed` and vendored
+guards. The current full regression is RSIMem `707 passed` and vendored
 PAST-Bench `398 passed, 2 skipped`; the counts above remain the historical
 preflight snapshot and are not a claim that matched validation has run.
