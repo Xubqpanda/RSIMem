@@ -291,6 +291,9 @@ class ToolCallResultJoin:
             lineage_id=self.policy_lineage_id,
             execution_receipt_ids=((self.call_receipt_id,) if self.call_receipt_id else ()),
             reason_codes=("decision_observed",),
+            tool_call_id=self.call_id,
+            tool_name_digest=self.tool_name_digest,
+            retry_identity=self.retry_identity,
         )
         if not self.result_present or self.result_id is None:
             return (call,)
@@ -327,6 +330,11 @@ class ToolCallResultJoin:
                 if self.success is False
                 else ("decision_observed",)
             ),
+            tool_call_id=self.call_id,
+            tool_result_id=self.result_id,
+            tool_name_digest=self.tool_name_digest,
+            retry_identity=self.retry_identity,
+            tool_success=self.success,
         )
         return call, result
 
