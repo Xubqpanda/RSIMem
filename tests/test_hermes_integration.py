@@ -447,9 +447,9 @@ def test_past_bench_bridge_records_runtime_opportunity_without_family_leakage(
         opportunity_evidence_provider=provider,
     )
     try:
-        recorded = bridge._record_runtime_opportunities({
+        recorded = bridge.record_opportunity_evidence(provider({
             "messages": [{"role": "user", "content": "visible request"}],
-        })
+        }))
         assert len(recorded) == 1
         assert bridge.opportunity_evidence == recorded
         payload = json.dumps(recorded[0].payload(), ensure_ascii=True)
