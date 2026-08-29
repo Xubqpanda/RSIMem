@@ -474,6 +474,35 @@ def test_past_bench_bridge_failure_policy_controls_native_bypass(
     assert "RuntimeError" in serialized
     assert "private failure" not in serialized
 
+    native_failure = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(
+            HermesExecutionMode.ADAPTER_LEDGER,
+            adapter_failure_policy=HermesAdapterFailurePolicy.BYPASS_NATIVE,
+        ),
+        evidence_path=tmp_path / "bypass_native_failure" / "events.jsonl",
+        run_id="run-bypass-native-failure",
+        trace_id="trace-bypass-native-failure",
+        episode_id="episode",
+        session_id="session",
+        task_id="task",
+        experiment_variant="with_persistence",
+    )
+    try:
+        with pytest.raises(RuntimeError, match="native failure"):
+            native_failure.adapter_call(
+                "session_search",
+                lambda: (_ for _ in ()).throw(RuntimeError("adapter failure")),
+                lambda: (_ for _ in ()).throw(RuntimeError("native failure")),
+            )
+    finally:
+        native_failure.close()
+    native_failure_events = (
+        tmp_path / "bypass_native_failure" / "rsimem_process_feedback.jsonl"
+    ).read_text(encoding="utf-8")
+    assert "retrieval_failure" in native_failure_events
+    assert '"status": "failed"' in native_failure_events
+
 
 def test_past_bench_bridge_fails_closed_on_projection_mismatch(tmp_path: Path) -> None:
     from types import SimpleNamespace
