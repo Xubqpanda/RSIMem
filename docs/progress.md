@@ -25,7 +25,8 @@ third-stage feasibility fixture now records six-layer parent/candidate
 interventions, strict feedback projection, process feedback, N+1 hypothesis
 identity, and restart-safe content-free evidence. Extraction is currently
 `optimization-ready` in that fixture; the other layers remain
-`validation-only` until outcome variation is observed.
+`validation-only` until outcome variation is observed. The latest regression
+counts are RSIMem `703 passed` and vendored PAST-Bench `398 passed, 2 skipped`.
 
 Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
