@@ -186,6 +186,9 @@ class ProcessEvent:
             ),
         )
         reasons = _strings(self.reason_codes, "process reason codes")
+        unknown = set(reasons).difference(PROCESS_REASON_CODES)
+        if unknown:
+            raise ValueError("unknown process reason code: " + ",".join(sorted(unknown)))
         object.__setattr__(self, "reason_codes", reasons)
         expected = f"process-event.{content_digest(self.identity_payload())[:40]}"
         if self.event_id != expected:
@@ -288,10 +291,14 @@ class ProcessEvent:
         receipts = tuple(execution_receipt_ids)
         if decision.execution_receipt_id and decision.execution_receipt_id not in receipts:
             receipts = (*receipts, decision.execution_receipt_id)
-        # Keep the runtime reason codes (including layer-specific diagnostics)
-        # and de-duplicate while preserving order.  The public constructor
-        # validates their machine-readable shape.
-        reason_codes = tuple(dict.fromkeys(decision.reason_codes)) or ("decision_observed",)
+        # Policy decisions have layer-specific reason codes.  Keep the process
+        # corpus vocabulary intentionally small and stable, while the richer
+        # policy reason remains available in the policy ledger.
+        mapped = tuple(
+            value if value in PROCESS_REASON_CODES else "decision_observed"
+            for value in decision.reason_codes
+        )
+        reason_codes = tuple(dict.fromkeys(mapped)) or ("decision_observed",)
         return cls.create(
             kind=_layer_kind(decision.layer),
             status=ProcessEventStatus(decision.execution_status.value),
