@@ -14,6 +14,9 @@ from rsimem.memory.future_trace import (
 from rsimem.memory.extraction_feedback import (
     DeploymentObservation,
     ObservableToolEvent,
+    detect_current_input_semantic_keys,
+    detect_extracted_fact_semantic_keys,
+    detect_source_semantic_keys,
 )
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
@@ -147,6 +150,69 @@ def test_sm01_feedback_contract_uses_only_predeclared_deployment_signal() -> Non
     assert negative.outcome_status == OperationStatus.NONE
     assert negative.outcome_reason_code == "injected_not_used"
     assert negative.reuse_signal_observed is False
+
+
+def test_sm03_fact_correction_contract_resolves_corrected_value() -> None:
+    future = SemanticFutureEvidence(
+        "op.query",
+        "op.retrieval",
+        "op.injection",
+        ("memory.one",),
+        ("revision.one",),
+        "artifact.injection",
+    )
+    resolver = SemanticFeedbackResolver(
+        SemanticFeedbackContract.SM03_FACT_CORRECTION_V1,
+        family_id="SM03_fact_correction",
+        stage="eval_near",
+    )
+    positive = resolver.resolve(future, _observation(
+        family_id="SM03_fact_correction",
+        response=(
+            "The current Phoenix freeze date is 2026-06-16. "
+            "The note was shared with the rollout owners."
+        ),
+        task_keys=("fact.phoenix.release_freeze_date",),
+    ))
+    assert positive.used_artifact_ids == ("memory.one",)
+    assert positive.outcome_status == OperationStatus.SUCCESS
+    assert positive.reuse_signal_observed is True
+
+    harmful = resolver.resolve(future, _observation(
+        family_id="SM03_fact_correction",
+        response=(
+            "The current Phoenix freeze date is 2026-06-14. "
+            "The note was shared with the rollout owners."
+        ),
+        task_keys=("fact.phoenix.release_freeze_date",),
+    ))
+    assert harmful.outcome_status == OperationStatus.FAILED
+    assert harmful.outcome_reason_code == "memory_use_harmfully_attributed"
+
+
+def test_sm03_fact_correction_keys_are_deterministic_and_confounded() -> None:
+    key = "fact.phoenix.release_freeze_date"
+    source = (
+        "Authoritative update: the Phoenix release freeze date is 2026-06-16 "
+        "going forward; the old date is obsolete.",
+    )
+    assert detect_source_semantic_keys("SM03_fact_correction", source) == (key,)
+    assert detect_extracted_fact_semantic_keys(
+        "SM03_fact_correction",
+        "Phoenix release freeze date: 2026-06-16",
+    ) == (key,)
+    assert detect_extracted_fact_semantic_keys(
+        "SM03_fact_correction",
+        "Phoenix release freeze date: 2026-06-14",
+    ) == ()
+    assert detect_current_input_semantic_keys(
+        "SM03_fact_correction",
+        "For this task only, the Phoenix freeze date is 2026-06-16.",
+    ) == (key,)
+    assert detect_current_input_semantic_keys(
+        "SM03_fact_correction",
+        "Include the current Phoenix freeze date in the summary.",
+    ) == ()
 
 
 def test_sm01_feedback_contract_censors_ineligible_or_ambiguous_evidence() -> None:
