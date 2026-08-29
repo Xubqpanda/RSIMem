@@ -83,3 +83,21 @@ The process events and failure reasons remain useful for infrastructure
 diagnosis, but they are not task-level negative labels.  A new clean,
 single-provider SM02 batch is required after sustained provider completion
 health is established.
+
+## Follow-up SM01 attempts — v5/v6
+
+After a transient successful completion probe, a clean detached worktree
+started `s1-sm01-feedback-20260829-v5`.  The first replicate reached the
+`learn_b` reflection episode, then failed closed because the bridge attempted
+to project a reflection as a new semantic extraction without an invocation
+fingerprint.  This was an RSIMem runtime defect, not a provider label or task
+outcome; the partial attempt is retained under
+`/tmp/rsimem-formal-sm01-v5/outputs/` and is excluded from feedback and
+accounting aggregates.
+
+The defect was fixed in commit `e22af5c` by reserving semantic compilation for
+the primary task-completed boundary.  A new clean attempt
+`s1-sm01-feedback-20260829-v6` was registered against that commit, but its
+pre-task completion probe immediately returned HTTP 503.  It therefore created
+no task trace.  Both attempts remain diagnostics only; a fresh clean batch is
+required after a sustained successful probe.
