@@ -63,3 +63,6 @@ valid step is to collect independent SM03 parent/candidate validation
 observations under a separately recorded pre-validation scope, then run the
 offline quality and safety gate exactly once before preparing the validation
 trial profile.
+
+The repository regression after the proposal-audit changes is RSIMem `708
+passed`; vendored PAST-Bench remains `398 passed, 2 skipped`.
