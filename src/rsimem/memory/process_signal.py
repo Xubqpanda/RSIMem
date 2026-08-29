@@ -452,6 +452,7 @@ def build_process_signal_cases(
     """
 
     values = tuple(events)
+    _id(replicate_id, "replicate ID")
     if any(not isinstance(event, ProcessEvent) for event in values):
         raise TypeError("process signal projection requires ProcessEvent values")
     if not values:
