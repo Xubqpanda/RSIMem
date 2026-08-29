@@ -35,6 +35,13 @@ requests were transport-successful, no provider usage was reported, so the
 audit correctly rejects the batch rather than interpreting missing usage as
 zero.
 
+An additional endpoint probe explains the backup result: its configured root
+URL serves the Sub2API web UI, while `/v1/chat/completions` returns an upstream
+authentication error.  The backup key/base-URL pair therefore does not provide
+a usable OpenAI-compatible completion route in this environment and should
+not be retried as an experimental provider until its operator supplies a
+working API route and credential.
+
 The complete attempt manifests and raw traces are retained under:
 
 - `outputs/extraction_feedback/hermes_luna/s1-sm02-process-20260829-v3/`
