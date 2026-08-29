@@ -385,12 +385,19 @@ class HermesAdapter(RuntimeAdapter):
         )
 
         assistant = Message(role="assistant", content=[TextBlock(text=final_text or "(no response)")])
+        process_event_ids: list[str] = []
+        process_digest: str | None = None
+        if self._rsimem_bridge is not None:
+            process_event_ids = list(self._rsimem_bridge.process_feedback_event_ids)
+            process_digest = self._rsimem_bridge.process_feedback_digest
         return StepResponse(
             status="finished",
             assistant_message=assistant,
             usage=usage,
             model_calls=model_calls,
             final_output=final_text,
+            process_feedback_event_ids=process_event_ids,
+            process_feedback_digest=process_digest,
         )
 
     @staticmethod

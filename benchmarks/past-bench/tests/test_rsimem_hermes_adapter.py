@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 import types
@@ -52,8 +53,11 @@ def _home(path: Path) -> Path:
 
 
 def _request(home: Path, artifacts: Path, mode: str) -> StartSessionRequest:
+    # ``+`` is reserved for the experiment-variant label; host/session IDs
+    # use the stricter policy-contract identifier grammar.
+    session_id = f"session-{mode.replace('+', '-')}"
     return StartSessionRequest(
-        session_id=f"session-{mode}",
+        session_id=session_id,
         agent_name="hermes",
         task_id="SM01_fixture",
         task_name="Matched RSIMem fixture",
@@ -163,20 +167,23 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
 
     results = {}
     evidence = {}
+    responses = {}
     for mode in ("native", "native+ledger", "native+adapter+ledger"):
         artifacts = tmp_path / mode.replace("+", "_")
+        request = _request(home, artifacts, mode)
         adapter = HermesAdapter(
             AgentSpec(name="hermes", adapter="hermes"),
-            _request(home, artifacts, mode),
+            request,
         )
         try:
             response = adapter.step(StepRequest(
-                session_id=f"session-{mode}",
+                session_id=request.session_id,
                 step_id=0,
             ))
         finally:
             adapter.close("fixture complete")
         assert response.status == "finished", response.error
+        responses[mode] = response
         results[mode] = response.final_output
         evidence_path = artifacts / "rsimem_memory_events.jsonl"
         evidence[mode] = (
@@ -198,6 +205,25 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
         assert PRIVATE_MEMORY not in serialized
         assert "task table is ready" not in serialized.lower()
     assert '"kind": "projection_check"' in evidence["native+adapter+ledger"]
+    # The runtime transports only content-free process-corpus identity.  It
+    # must be an exact projection of the persisted event IDs and must not
+    # expose benchmark scores or grader fields to the learner-facing response.
+    for mode, response in responses.items():
+        process_path = tmp_path / mode.replace("+", "_") / "rsimem_process_feedback.jsonl"
+        process_ids = [
+            json.loads(line)["event_id"]
+            for line in process_path.read_text(encoding="utf-8").splitlines()
+        ] if process_path.exists() else []
+        assert response.process_feedback_event_ids == process_ids
+        if not process_path.exists():
+            assert response.process_feedback_digest is None
+            continue
+        expected_digest = hashlib.sha256(
+            json.dumps(process_ids, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        assert response.process_feedback_digest == expected_digest
+        assert "score" not in response.model_dump()
+        assert "grader" not in response.model_dump()
     assert not any(
         (tmp_path / mode.replace("+", "_") / "rsimem_lifecycle_events.jsonl").exists()
         for mode in ("native+ledger", "native+adapter+ledger")
