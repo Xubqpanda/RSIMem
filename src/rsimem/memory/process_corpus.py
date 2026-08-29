@@ -26,8 +26,8 @@ from .process_feedback import (
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 
 
-PROCESS_CORPUS_SCHEMA_VERSION = 1
-PROCESS_CORPUS_SCHEMA = "rsimem-process-corpus-v1"
+PROCESS_CORPUS_SCHEMA_VERSION = 2
+PROCESS_CORPUS_SCHEMA = "rsimem-process-corpus-v2"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _SPLITS = {"train", "validation", "final", "pilot"}

@@ -23,8 +23,8 @@ from typing import Iterable, Mapping, Sequence
 from .policy_contracts import PolicyDecision, PolicyLayer, content_digest
 
 
-PROCESS_FEEDBACK_SCHEMA_VERSION = 1
-PROCESS_FEEDBACK_SCHEMA = "rsimem-process-feedback-v1"
+PROCESS_FEEDBACK_SCHEMA_VERSION = 2
+PROCESS_FEEDBACK_SCHEMA = "rsimem-process-feedback-v2"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _REASON = re.compile(r"^[a-z][a-z0-9_]{0,63}$")

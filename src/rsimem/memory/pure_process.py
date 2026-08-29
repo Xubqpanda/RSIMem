@@ -16,8 +16,8 @@ from .policy_contracts import PolicyLayer, content_digest
 from .process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 
 
-PURE_PROCESS_SCHEMA_VERSION = 1
-PURE_PROCESS_SCHEMA = "rsimem-pure-process-corpus-v1"
+PURE_PROCESS_SCHEMA_VERSION = 2
+PURE_PROCESS_SCHEMA = "rsimem-pure-process-corpus-v2"
 
 
 def _id(value: object, name: str) -> str:
