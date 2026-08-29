@@ -52,6 +52,12 @@ endpoint also completed successfully; it records only raw usage in the ignored
 `outputs/provider_connectivity_smoke_20260829.json` and is not a benchmark or
 effect replicate.
 
+The first real-provider parent-only SM01 feedback pilot completed three clean
+replicates. It produced 24 primary examples, all `unresolved`, so the strict
+optimizer gate correctly returned `NO_PROPOSAL` without a candidate. Full raw
+usage, trace, ledger, and audit evidence is recorded in
+[`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md).
+
 ## Completed Work
 
 ### Repository And Benchmark Foundation
