@@ -452,6 +452,7 @@ class HermesPastBenchBridge:
             observers=(self.ledger,),
         )
         self._tool_handlers: dict[str, Callable[..., str]] = {}
+        self._tool_call_result_joins: dict[str, ToolCallResultJoin] = {}
         self._agent: object | None = None
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
@@ -735,6 +736,12 @@ class HermesPastBenchBridge:
         """Content-free process observations captured for this bridge run."""
 
         return self._process_feedback.events
+
+    @property
+    def tool_call_result_joins(self) -> tuple[ToolCallResultJoin, ...]:
+        """Exact tool call/result closures observed by this bridge."""
+
+        return tuple(self._tool_call_result_joins.values())
 
     @property
     def opportunity_evidence(self) -> tuple[OpportunityEvidence, ...]:
@@ -1098,7 +1105,7 @@ class HermesPastBenchBridge:
     def _record_semantic_outcomes(self, result: Mapping[str, Any]) -> None:
         if self._semantic_outcomes_recorded:
             return
-        self._record_tool_call_results(result)
+        memory_use_operation_ids: list[str] = []
         if self.semantic_future_recorder is not None and self.semantic_feedback_resolver is not None:
             for future, step_id in self._semantic_futures:
                 current_input = self._current_input(result)
@@ -1120,6 +1127,7 @@ class HermesPastBenchBridge:
                     outcome_reason_code=resolution.outcome_reason_code,
                     step_id=step_id,
                 )
+                memory_use_operation_ids.append(outcome.use_operation_id)
                 self._record_memory_use_evidence(future, outcome, result)
                 self._record_extraction_feedback(
                     future,
@@ -1127,6 +1135,14 @@ class HermesPastBenchBridge:
                     outcome,
                     current_input,
                 )
+        self._record_tool_call_results(
+            result,
+            memory_use_operation_id=(
+                memory_use_operation_ids[0]
+                if len(memory_use_operation_ids) == 1
+                else None
+            ),
+        )
         completed = result.get("completed") is True
         outcome_digest = hashlib.sha256(
             json.dumps(
@@ -1275,7 +1291,12 @@ class HermesPastBenchBridge:
         # callers can still inspect ``observation_complete``/join status.
         return "1970-01-01T00:00:00Z"
 
-    def _record_tool_call_results(self, result: Mapping[str, Any]) -> None:
+    def _record_tool_call_results(
+        self,
+        result: Mapping[str, Any],
+        *,
+        memory_use_operation_id: str | None = None,
+    ) -> None:
         """Project every observed tool call/result into exact process events.
 
         Arguments and return bodies stay in the host-owned trace.  The public
@@ -1378,6 +1399,7 @@ class HermesPastBenchBridge:
                     task_id=self._task_id,
                     source_revision=source_revision,
                     host_event_id=host_event_id,
+                    memory_use_operation_id=memory_use_operation_id,
                     result_receipt_id="receipt.tool-result."
                     + hashlib.sha256(result_id.encode("utf-8")).hexdigest()[:24],
                     call_present=False,
@@ -1400,6 +1422,7 @@ class HermesPastBenchBridge:
                 task_id=self._task_id,
                 source_revision=source_revision,
                 host_event_id=host_event_id,
+                memory_use_operation_id=memory_use_operation_id,
                 call_receipt_id=call_receipt,
                 result_receipt_id="receipt.tool-result."
                 + hashlib.sha256(result_id.encode("utf-8")).hexdigest()[:24],
@@ -1423,11 +1446,16 @@ class HermesPastBenchBridge:
                 task_id=self._task_id,
                 source_revision=source_revision,
                 host_event_id=host_event_id,
+                memory_use_operation_id=memory_use_operation_id,
                 call_receipt_id=call_receipt,
                 call_present=True,
                 result_present=False,
             ))
         for join in joins:
+            previous = self._tool_call_result_joins.get(join.join_id)
+            if previous is not None and previous != join:
+                raise ValueError("conflicting tool call/result join")
+            self._tool_call_result_joins[join.join_id] = join
             for event in join.process_events(
                 family_id=self._family_id,
                 stage=self._stage,

@@ -110,7 +110,10 @@ def test_task_result_projects_every_tool_call_and_result_without_content(tmp_pat
         "completed": True,
     }
     try:
-        bridge._record_tool_call_results(result)
+        bridge._record_tool_call_results(
+            result,
+            memory_use_operation_id="op.use.fixture.v1",
+        )
         events = bridge.process_feedback
     finally:
         bridge.close()
@@ -120,6 +123,9 @@ def test_task_result_projects_every_tool_call_and_result_without_content(tmp_pat
     assert len(results) == 1
     assert calls[0].tool_call_id == "call-inspect-1"
     assert results[0].tool_result_id is not None
+    assert bridge.tool_call_result_joins[0].memory_use_operation_id == (
+        "op.use.fixture.v1"
+    )
     serialized = json.dumps([event.payload() for event in events], ensure_ascii=True)
     assert "private" not in serialized
     assert "secret" not in serialized
