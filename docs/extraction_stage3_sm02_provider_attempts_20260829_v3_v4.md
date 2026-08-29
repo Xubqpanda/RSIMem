@@ -32,6 +32,13 @@ The latest probe still returns `http_error` with status 503 and no completion or
 usage payload.  The formal launchers therefore remain correctly gated and no
 new SM02 attempt is created from this check.
 
+Follow-up provider-only probes on 2026-08-29 used the formal model
+`gpt-5.6-luna` and the exact configured completion route.  The primary endpoint
+again returned `http_error`/HTTP 503; the backup endpoint returned
+`transport_error` without an HTTP status.  Neither probe exposed completion
+content or usage, and neither started a benchmark task.  These results are
+kept as connectivity diagnostics only and do not alter the batch accounting.
+
 ## Batch outcomes
 
 | batch | endpoint | completed traces | requests | retries | input tokens | output tokens | audit | disposition |
