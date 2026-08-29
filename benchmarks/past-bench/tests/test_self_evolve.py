@@ -486,6 +486,7 @@ def test_extraction_trial_transport_rejects_profile_or_mode_drift(
     (
         "sm01_tsv_v1",
         "sm02_boundary_v1",
+        "sm03_fact_correction_v1",
         "sm05_normalized_tsv_v1",
     ),
 )

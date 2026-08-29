@@ -613,6 +613,7 @@ class HermesPersistenceConfig(BaseModel):
         "disabled",
         "sm01_tsv_v1",
         "sm02_boundary_v1",
+        "sm03_fact_correction_v1",
         "sm05_normalized_tsv_v1",
     ] = "disabled"
     rsimem_adaptive_config: RSIMemAdaptiveWritebackConfig | None = None
