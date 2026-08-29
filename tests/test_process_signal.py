@@ -13,7 +13,7 @@ from rsimem.memory.process_signal import (
 from rsimem.memory.process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 
 
-def _case(*, logical: str = "logical-case.fixture.v1", complete: bool = True, attribution: bool = True, hypothesis: str | None = "a" * 64, physical: str = "physical-observation.1") -> ProcessSignalCase:
+def _case(*, logical: str = "logical-case.fixture.v1", complete: bool = True, attribution: bool = True, hypothesis: str | None = "a" * 64, physical: str = "physical-observation.1", stage_diagnosis_observed: bool = True) -> ProcessSignalCase:
     return ProcessSignalCase.create(
         logical_case_id=logical,
         physical_observation_ids=(physical,),
@@ -26,6 +26,7 @@ def _case(*, logical: str = "logical-case.fixture.v1", complete: bool = True, at
         extraction_attributable=attribution,
         abstract_hypothesis_digest=hypothesis,
         observation_complete=complete,
+        stage_diagnosis_observed=stage_diagnosis_observed,
     )
 
 
@@ -37,7 +38,11 @@ def test_signal_statuses_are_conservative_and_replayable() -> None:
 
     diagnostic = _case(hypothesis=None, physical="physical-observation.2")
     assert diagnostic.status == ProcessSignalCaseStatus.DIAGNOSTIC_ONLY
-    observable = _case(attribution=False, physical="physical-observation.3")
+    observable = _case(
+        attribution=False,
+        physical="physical-observation.3",
+        stage_diagnosis_observed=False,
+    )
     assert observable.status == ProcessSignalCaseStatus.OBSERVABLE_ONLY
     censored = _case(complete=False, physical="physical-observation.4")
     assert censored.status == ProcessSignalCaseStatus.CENSORED
