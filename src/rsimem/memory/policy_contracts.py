@@ -334,6 +334,11 @@ class PolicyDecision:
         }.get(self.action)
         if expected_status is not None and self.execution_status != expected_status:
             raise ValueError(f"{self.action.value} decision must have {expected_status.value} status")
+        if self.action == DecisionAction.RUN and self.execution_status in {
+            ExecutionStatus.SKIPPED,
+            ExecutionStatus.DEFERRED,
+        }:
+            raise ValueError("RUN decision cannot have non-executing status")
 
     @property
     def identity_payload(self) -> dict[str, object]:
@@ -860,6 +865,8 @@ def validate_policy_episode(
             errors.append(f"{item.decision_id}: missing policy identity")
         if item.action == DecisionAction.RUN and item.execution_status == ExecutionStatus.EXECUTED and not item.execution_receipt_id:
             errors.append(f"{item.decision_id}: missing execution receipt")
+        if item.action in {DecisionAction.SKIP, DecisionAction.DEFER} and item.execution_receipt_id:
+            errors.append(f"{item.decision_id}: non-executing decision has execution receipt")
     for values, name in ((mutation_receipt_ids, "mutation receipt IDs"), (injection_receipt_ids, "injection receipt IDs"), (future_feedback_ids, "future feedback IDs")):
         try:
             _tuple_strings(values, name)
