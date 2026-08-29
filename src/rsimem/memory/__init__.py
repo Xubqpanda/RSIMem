@@ -172,6 +172,11 @@ from .process_signal import (
     ProcessSignalCaseStatus,
     census_process_signal_cases,
 )
+from .final_evaluation import (
+    FINAL_EVALUATION_SCHEMA,
+    FINAL_EVALUATION_SCHEMA_VERSION,
+    FinalEvaluationRecord,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -304,6 +309,9 @@ __all__ = [
     "ProcessSignalCaseCensus",
     "ProcessSignalCaseStatus",
     "census_process_signal_cases",
+    "FINAL_EVALUATION_SCHEMA",
+    "FINAL_EVALUATION_SCHEMA_VERSION",
+    "FinalEvaluationRecord",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
