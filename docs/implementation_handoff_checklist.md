@@ -964,6 +964,9 @@ bash -n scripts/*.sh
 ```
 
 每个阶段还必须运行对应focused tests、tracked-secret scan和一次isolated temporary-home restart fixture。真实provider命令只在代码、fixture和preflight全部通过后执行。
+正式 provider batch 前可运行 [`provider_probe.md`](provider_probe.md) 中的
+completion probe；probe 只判断 endpoint 是否返回非空 completion，不替代
+formal usage/process-corpus audit，且失败结果不得进入训练或质量统计。
 
 ## 10. 三阶段完成定义
 
