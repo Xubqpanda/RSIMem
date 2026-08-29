@@ -572,6 +572,15 @@ It is not a blocker for the deterministic feasibility baseline, but real N+1
 provider validation remains deferred until a family supplies sufficient
 actionable signal.
 
+On 2026-08-29, a transient successful provider probe allowed a clean SM01
+feedback attempt (`v5`) to start.  It exposed a runtime boundary bug: the
+separate PAST-Bench reflection episode was incorrectly sent through semantic
+extraction and failed closed for a missing invocation fingerprint.  Commit
+`e22af5c` now keeps reflection process-only and reserves extraction for the
+primary task-completed boundary, with a regression test.  A post-fix clean
+attempt (`v6`) was gated before its first task by another provider HTTP 503;
+neither attempt is eligible feedback or effect evidence.
+
 ## Update Policy
 
 Update this file whenever a milestone is completed, its acceptance criteria change, or evidence reveals a new blocker. Mark an item complete only after its implementation, tests, and required experiment evidence are all available. Record detailed numerical results in a separate dated report and link that report here rather than embedding provisional paper results in the checklist.
