@@ -32,6 +32,7 @@ from .memory.operation_graph import (
     OperationKind,
     materialize_operation_graph,
 )
+from .memory.process_corpus import JsonProcessCorpusStore
 from .memory.process_feedback import JsonProcessFeedbackLedger, ProcessEvent
 
 
@@ -144,6 +145,12 @@ def _feedback_records(run_dir: Path) -> tuple[LiveExtractionFeedbackRecord, ...]
 def _process_events(run_dir: Path) -> tuple[ProcessEvent, ...]:
     """Read the bridge process corpus without touching evaluation results."""
 
+    corpus_path = run_dir / "process_corpus.json"
+    if corpus_path.exists():
+        corpus = JsonProcessCorpusStore(corpus_path).get()
+        if corpus is None:
+            raise ValueError("process corpus disappeared during analysis")
+        return corpus.events
     records: list[ProcessEvent] = []
     seen: dict[str, str] = {}
     for path in sorted(run_dir.rglob("rsimem_process_feedback.jsonl")):

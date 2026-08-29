@@ -112,6 +112,34 @@ PY
       manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" failed audit
       exit 1
     fi
+    if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${trace_dir}" "${manifest_path}" <<'PY'
+import json, sys
+from pathlib import Path
+from rsimem.memory.process_corpus import JsonProcessCorpusStore, ProcessCorpus
+from rsimem.memory.process_feedback import JsonProcessFeedbackLedger
+run_dir, manifest_path = map(Path, sys.argv[1:])
+events = tuple(
+    event
+    for path in sorted(run_dir.rglob("rsimem_process_feedback.jsonl"))
+    for event in JsonProcessFeedbackLedger(path).events
+)
+if not events:
+    raise ValueError("formal matched run emitted no process feedback corpus")
+manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+split = manifest["split"]
+corpus = ProcessCorpus.create(
+    events,
+    split_role="validation",
+    family_id=split["familyId"],
+    task_template_group_id=split["taskTemplateGroupId"],
+    task_manifest_digest=split["taskManifestDigest"],
+)
+JsonProcessCorpusStore(run_dir / "process_corpus.json").put(corpus)
+PY
+    then
+      manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" failed process_corpus
+      exit 1
+    fi
     manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" completed ""
   done
 done

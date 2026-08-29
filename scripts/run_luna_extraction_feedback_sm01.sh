@@ -183,6 +183,8 @@ import json
 import sys
 from pathlib import Path
 from rsimem.memory.extraction_projection import JsonExtractionSourceRecordStore
+from rsimem.memory.process_corpus import JsonProcessCorpusStore, ProcessCorpus
+from rsimem.memory.process_feedback import JsonProcessFeedbackLedger
 run_dir = Path(sys.argv[1])
 audit = json.loads((run_dir / "audit.json").read_text(encoding="utf-8"))
 if audit.get("ok") is not True or audit.get("issues") != []:
@@ -193,8 +195,26 @@ if utility.get("events") != 0:
 paths = tuple(run_dir.rglob("extraction_sources.jsonl"))
 if not paths or not any(JsonExtractionSourceRecordStore(path).records() for path in paths):
     raise ValueError("formal extraction run emitted no source evidence")
+process_paths = tuple(run_dir.rglob("rsimem_process_feedback.jsonl"))
+events = tuple(
+    event
+    for path in process_paths
+    for event in JsonProcessFeedbackLedger(path).events
+)
+if not events:
+    raise ValueError("formal extraction run emitted no process feedback corpus")
+manifest = json.loads((run_dir.parent / "batch_manifest.json").read_text(encoding="utf-8"))
+split = manifest["split"]
+corpus = ProcessCorpus.create(
+    events,
+    split_role=split["role"],
+    family_id=split["familyId"],
+    task_template_group_id=split["taskTemplateGroupId"],
+    task_manifest_digest=split["taskManifestDigest"],
+)
+JsonProcessCorpusStore(run_dir / "process_corpus.json").put(corpus)
 ' "${trace_dir}"; then
-    manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" failed extraction_audit
+    manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" failed process_corpus
     exit 1
   fi
   manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" completed ""
