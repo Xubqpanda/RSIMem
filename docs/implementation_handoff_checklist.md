@@ -840,9 +840,10 @@ SM03 held-out split preflight 记录在
 上段中的 `656 passed`、`689 passed` 和 `703 passed` 均为历史快照；当前
 RSIMem `.venv` 回归为 `707 passed`，PAST-Bench 为 `398 passed, 2 skipped`。
 最近的 `sm02-feedback-20260829-rerun-main` train batch 也已完成三次真实
-provider replicate；其 12 条 `missed` 与 12 条 `unresolved` 反馈使 optimizer
-进入一次受控 proposal，但候选因 corpus-specific value copying 被安全拒绝，
-因此仍没有可用于 matched validation 的 N+1 artifact。详见
+provider replicate；其 12 条 `missed` 与 12 条 `unresolved` 反馈进入了冻结
+optimizer。v2 contract 的一次 recovery request 产生了通过 static safety 和
+deterministic suite 的 N+1 proposal，但尚未完成 SM03 offline validation，
+因此仍不能运行 matched validation。详见
 [`extraction_stage3_sm02_feedback_rerun_20260829.md`](extraction_stage3_sm02_feedback_rerun_20260829.md)。
 
 当前第三阶段的主要任务是 feasibility，不要求一次性完成六层 online optimization。每层分别完成以下验收：

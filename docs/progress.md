@@ -94,10 +94,11 @@ formal training or validation batch.
 The subsequent clean primary-endpoint train rerun
 `sm02-feedback-20260829-rerun-main` completed three audited replicates and
 reconstructed 24 primary feedback records (12 `missed`, 12 `unresolved`). A
-single bounded optimizer request returned a schema-valid proposal, but the
-candidate content gate rejected corpus-specific value copying; the preparation
-path now persists that rejection and raw usage without a deployable artifact.
-No N+1 candidate or matched validation was produced. Details are in
+the first v2 optimizer completion was malformed and the strict parser rejected
+it; a single recovery request under the new v2 contract produced an abstract
+schema-valid candidate after the persistence fix. Static safety and the
+deterministic extraction suite pass, but the candidate remains a proposal and
+has not entered independent SM03 validation. Details are in
 [`extraction_stage3_sm02_feedback_rerun_20260829.md`](extraction_stage3_sm02_feedback_rerun_20260829.md).
 The reusable `rsimem.provider_probe` entry now performs a bounded completion
 check without exposing credentials or response content; it reports endpoint,
