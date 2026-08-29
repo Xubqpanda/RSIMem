@@ -238,7 +238,7 @@ class JsonArtifactSetBindingLog:
                 self._load()
                 return tuple(
                     ArtifactSetSemanticBinding.from_payload(json.loads(value))
-                    for value in self._records.values()
+                    for _, value in sorted(self._records.items())
                 )
             finally:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)

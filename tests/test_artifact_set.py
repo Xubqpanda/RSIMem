@@ -12,9 +12,9 @@ from rsimem.memory.artifact_set import (
 )
 
 
-def _binding(*, complete: bool = True) -> ArtifactSetSemanticBinding:
+def _binding(*, complete: bool = True, suffix: str = "") -> ArtifactSetSemanticBinding:
     return ArtifactSetSemanticBinding.create(
-        semantic_unit_id="semantic.preference.rule.v1",
+        semantic_unit_id=f"semantic.preference.rule.v1{suffix}",
         semantic_key="preference.status.concise",
         member_artifact_ids=("artifact.fact.a.v1", "artifact.fact.b.v1"),
         member_fact_ids=("fact.a.v1", "fact.b.v1"),
@@ -48,6 +48,17 @@ def test_artifact_set_log_is_restart_safe(tmp_path) -> None:
     assert log.append(binding) is True
     assert log.append(binding) is False
     assert JsonArtifactSetBindingLog(path).records() == (binding,)
+
+
+def test_artifact_set_log_replay_order_is_stable_across_write_order(tmp_path) -> None:
+    path = tmp_path / "bindings.jsonl"
+    first = _binding(suffix=".first")
+    second = _binding(suffix=".second")
+    log = JsonArtifactSetBindingLog(path)
+    assert log.append(second) is True
+    assert log.append(first) is True
+    expected = tuple(sorted((first, second), key=lambda item: item.binding_id))
+    assert JsonArtifactSetBindingLog(path).records() == expected
 
 
 def test_one_artifact_can_carry_multiple_fact_members() -> None:
