@@ -26,6 +26,7 @@ from rsimem.lifecycle import (
 from rsimem.memory import MemoryEvent, MemoryEventKind, MemoryKind
 from rsimem.memory.policy_contracts import TriggerDecision
 from rsimem.memory.policy_evidence import JsonPolicyDecisionLedger
+from rsimem.memory.process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 from rsimem.memory.ingestion import (
     InternalMemoryAction,
     MemoryIngestOutcome,
@@ -478,6 +479,57 @@ def test_audit_run_reports_policy_evidence_and_identity(tmp_path: Path) -> None:
     assert report["policyEvidence"]["files"] == 1
     assert report["policyEvidence"]["events"] == 1
     assert report["policyEvidence"]["reports"][0]["ok"] is True
+
+
+def test_audit_run_reports_and_validates_process_evidence(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    process_path = _runtime_evidence_path(comparison).with_name(
+        "rsimem_process_feedback.jsonl"
+    )
+    event = ProcessEvent.create(
+        kind=ProcessEventKind.RETRIEVAL,
+        status=ProcessEventStatus.SUCCESS,
+        run_id="run-1",
+        variant="with_persistence",
+        trace_id="trace-1",
+        episode_id="episode-1",
+        session_id="session-1",
+        task_id="task-1",
+        host_event_id="event-retrieval-1",
+        source_revision="revision-1",
+        input_payload={"query": "digest-only"},
+        output_payload={"count": 1},
+        execution_receipt_ids=("receipt-retrieval-1",),
+    )
+    process_path.write_text(json.dumps(event.payload()) + "\n", encoding="utf-8")
+    write_ledger(comparison, comparison.parent / "ledger.jsonl", judge_enabled=False)
+
+    report = audit_run(comparison.parent)
+    assert report["ok"] is True
+    assert report["processEvidence"]["files"] == 1
+    assert report["processEvidence"]["events"] == 1
+    assert report["processEvidence"]["reports"][0]["ok"] is True
+
+    invalid = ProcessEvent.create(
+        kind=ProcessEventKind.RETRIEVAL,
+        status=ProcessEventStatus.SUCCESS,
+        run_id="run-1",
+        variant="with_persistence",
+        trace_id="trace-1",
+        episode_id="episode-1",
+        session_id="session-1",
+        task_id="task-1",
+        host_event_id="event-retrieval-2",
+        source_revision="revision-1",
+        input_payload={"query": "digest-only"},
+        output_payload={"count": 0},
+        reason_codes=("retrieval_miss",),
+        execution_receipt_ids=("receipt-retrieval-2",),
+    )
+    process_path.write_text(json.dumps(invalid.payload()) + "\n", encoding="utf-8")
+    report = audit_run(comparison.parent)
+    assert report["ok"] is False
+    assert any(issue["kind"] == "process_feedback_audit_failed" for issue in report["issues"])
 
 
 def test_static_utility_evidence_rejects_content_and_policy_drift(

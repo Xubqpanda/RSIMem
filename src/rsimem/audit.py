@@ -11,6 +11,7 @@ from typing import Any
 
 from .ledger import resolve_comparison_evidence_path
 from .memory.policy_audit import audit_policy_evidence
+from .memory.process_feedback import JsonProcessFeedbackLedger, audit_process_events
 
 
 _SECRET_PATTERNS = {
@@ -337,9 +338,37 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
         issues.append({"kind": "adapter_native_bypass", "count": adapter_bypasses})
 
     policy_audit_rows: list[dict[str, Any]] = []
+    process_audit_rows: list[dict[str, Any]] = []
     for trace_id, trace_path in trace_paths.items():
         artifact_dir = trace_path.parent / "artifacts"
         policy_path = artifact_dir / "rsimem_policy_decisions.jsonl"
+        process_path = artifact_dir / "rsimem_process_feedback.jsonl"
+        if process_path.exists():
+            try:
+                process_events = JsonProcessFeedbackLedger(process_path).events
+                process_errors = audit_process_events(process_events)
+                process_row = {
+                    "ok": not process_errors,
+                    "traceId": trace_id,
+                    "path": str(process_path.relative_to(run_dir)),
+                    "eventCount": len(process_events),
+                    "errors": list(process_errors),
+                }
+            except (OSError, ValueError) as exc:
+                process_row = {
+                    "ok": False,
+                    "traceId": trace_id,
+                    "path": str(process_path.relative_to(run_dir)),
+                    "eventCount": 0,
+                    "errors": [type(exc).__name__ + ": " + str(exc)],
+                }
+            process_audit_rows.append(process_row)
+            if process_row["ok"] is not True:
+                issues.append({
+                    "kind": "process_feedback_audit_failed",
+                    "traceId": trace_id,
+                    "errors": process_row["errors"],
+                })
         if not policy_path.exists():
             continue
         lifecycle_path = artifact_dir / "rsimem_lifecycle_events.jsonl"
@@ -428,6 +457,11 @@ def audit_run(run_dir: Path) -> dict[str, Any]:
             "files": len(policy_audit_rows),
             "events": sum(int(row.get("eventCount") or 0) for row in policy_audit_rows),
             "reports": policy_audit_rows,
+        },
+        "processEvidence": {
+            "files": len(process_audit_rows),
+            "events": sum(int(row.get("eventCount") or 0) for row in process_audit_rows),
+            "reports": process_audit_rows,
         },
         "unresolvedMemoryInjections": unresolved_injections,
         "privacy": {
