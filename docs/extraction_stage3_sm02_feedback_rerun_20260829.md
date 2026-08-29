@@ -53,7 +53,8 @@ The first v2 completion was malformed and was rejected with
 `completion_contract_invalid`. A single recovery request under the same frozen
 v2 budget produced an abstract, schema-valid candidate
 `extraction-prompt.a45dca366abeb0cd24bf6dacbe8859014caaaf0b`. Static safety and
-the deterministic extraction suite both pass. The candidate is still only a
+the deterministic extraction suite both pass (`candidate-safety.05a51ca68d8f4f4ec571193864bf141c2945d1be`,
+`deterministic-suite.9f74b50fa95110df5c0d2253e5b193e5fa78d68c`). The candidate is still only a
 proposal: it has not been evaluated on the independent SM03 validation split,
 activated, or used in a matched effect run.
 
