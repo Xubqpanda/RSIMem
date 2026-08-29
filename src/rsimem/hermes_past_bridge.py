@@ -9,7 +9,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from .hermes_integration import (
     HermesAdapterExecutionError,
@@ -395,7 +395,7 @@ class HermesPastBenchBridge:
         static_mutation_receipt_path: Path | None = None,
         opportunity_evidence_path: Path | None = None,
         opportunity_evidence_provider: Callable[
-            [Mapping[str, Any]], Sequence[OpportunityEvidence]
+            [Mapping[str, Any]], Iterable[OpportunityEvidence]
         ] | None = None,
         memory_use_evidence_path: Path | None = None,
     ) -> None:
@@ -749,8 +749,8 @@ class HermesPastBenchBridge:
         values = provider(result)
         if isinstance(values, OpportunityEvidence):
             values = (values,)
-        if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
-            raise TypeError("opportunity provider must return a sequence")
+        if isinstance(values, (str, bytes, Mapping)):
+            raise TypeError("opportunity provider must return an iterable")
         recorded: list[OpportunityEvidence] = []
         for evidence in values:
             if not isinstance(evidence, OpportunityEvidence):
