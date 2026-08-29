@@ -47,6 +47,8 @@ from rsimem.memory.extraction_optimizer_provider import (
 )
 from rsimem.memory.optimizer_content_boundary import OptimizerSecretBoundary
 from rsimem.memory.prompt_components import text_digest
+from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory_systems.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT_ID,
     Mem0FlatPromptAdapter,
@@ -468,6 +470,28 @@ def test_low_sample_no_signal_and_conflict_do_not_call_optimizer_client() -> Non
     )
     conflicted = ExtractionPromptOptimizer(client).propose(_parent(), conflict)
     assert conflicted.reason_codes == ("conflicting_extraction_signal",)
+    assert client.requests == []
+
+
+def test_optimizer_revocation_gate_runs_before_provider_call(tmp_path) -> None:
+    parent = _parent()
+    registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    registry.initialize()
+    registry.append(RevocationEntry.create(
+        artifact_id=parent.artifact_id,
+        artifact_schema_version=parent.schema_version,
+        artifact_digest=parent.artifact_digest,
+        evidence_plane=EvidencePlane.PURE_PROCESS,
+        evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        revoked_at="2026-08-30T01:02:03Z",
+        reason_code="stale_schema",
+    ))
+    client = CapturedExtractionOptimizerClient(_proposal_output)
+    with pytest.raises(ValueError, match="artifact is revoked"):
+        ExtractionPromptOptimizer(
+            client,
+            revocation_registry=registry,
+        ).propose(parent, _multi_corpus((ExtractionFeedbackLabel.USEFUL,) * 3))
     assert client.requests == []
 
 

@@ -35,6 +35,8 @@ from .extraction_prompt_validation import (
     ExtractionValidationVariant,
 )
 from .prompt_components import canonical_json, content_digest
+from .evidence_planes import EvidencePlane, EvidenceSourceKind
+from .revocation import JsonRevocationRegistry
 
 
 EXTRACTION_MATCHED_ACTIVATION_SCHEMA_VERSION = 1
@@ -812,10 +814,12 @@ class ExtractionMatchedActivationCoordinator:
         policy_store: JsonExtractionPolicyStore,
         decision_store: JsonExtractionMatchedTrialDecisionStore,
         rollback_store: JsonExtractionRollbackEvidenceStore,
+        revocation_registry: JsonRevocationRegistry | None = None,
     ) -> None:
         self.policy_store = policy_store
         self.decision_store = decision_store
         self.rollback_store = rollback_store
+        self.revocation_registry = revocation_registry
 
     @staticmethod
     def _transition_id(action: str, identity: str) -> str:
@@ -837,6 +841,15 @@ class ExtractionMatchedActivationCoordinator:
         parent_runtime_artifact_id: str | None = None,
         candidate_runtime_artifact_id: str | None = None,
     ) -> ExtractionPolicyState:
+        if self.revocation_registry is not None:
+            for artifact in (parent, candidate):
+                self.revocation_registry.assert_active(
+                    artifact_id=artifact.artifact_id,
+                    artifact_schema_version=artifact.schema_version,
+                    artifact_digest=artifact.artifact_digest,
+                    evidence_plane=EvidencePlane.PURE_PROCESS,
+                    evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+                )
         if parent != self.policy_store.trusted_root:
             raise ValueError("first extraction activation requires trusted root parent")
         replay = ExtractionMatchedTrialEvaluator().evaluate(
