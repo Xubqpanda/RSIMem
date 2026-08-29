@@ -60,7 +60,10 @@ from .memory.live_writeback import (
     StaticSemanticWritebackConfig,
     StaticSemanticWritebackRuntime,
 )
-from .extraction_validation_runtime import load_extraction_matched_trial_profile
+from .extraction_validation_runtime import (
+    load_extraction_matched_trial_profile,
+    load_extraction_offline_validation_profile,
+)
 from .memory.adaptive_policy_store import JsonAdaptivePolicyStore
 from .memory.future_trace import (
     SemanticFeedbackContract,
@@ -504,7 +507,10 @@ class HermesPastBenchBridge:
                         static_writeback_config.adaptive_trusted_roots
                     ),
                 )
-            if static_writeback_config.matched_extraction_enabled:
+            if static_writeback_config.matched_extraction_enabled or (
+                static_writeback_config.extraction_runtime_scope
+                == ExtractionPromptRuntimeScope.OFFLINE_VALIDATION
+            ):
                 extraction_config_path = Path(
                     static_writeback_config.extraction_runtime_config_path or ""
                 ).expanduser().resolve()
@@ -513,9 +519,14 @@ class HermesPastBenchBridge:
                     raise ValueError(
                         "extraction runtime config must stay inside capture artifacts"
                     )
-                extraction_profile = load_extraction_matched_trial_profile(
-                    extraction_config_path
-                )
+                if static_writeback_config.matched_extraction_enabled:
+                    extraction_profile = load_extraction_matched_trial_profile(
+                        extraction_config_path
+                    )
+                else:
+                    extraction_profile = load_extraction_offline_validation_profile(
+                        extraction_config_path
+                    )
             self.static_writeback = StaticSemanticWritebackRuntime(
                 hermes_home,
                 static_completion_client,
@@ -555,12 +566,16 @@ class HermesPastBenchBridge:
                     else None
                 ),
                 extraction_runtime_scope=(
-                    ExtractionPromptRuntimeScope.MATCHED_VALIDATION
+                    static_writeback_config.extraction_runtime_scope
                     if extraction_profile is not None
                     else ExtractionPromptRuntimeScope.ROOT_STATIC
                 ),
                 extraction_trial_id=(
-                    extraction_profile.trial_id
+                    (
+                        extraction_profile.trial_id
+                        if hasattr(extraction_profile, "trial_id")
+                        else extraction_profile.validation_id
+                    )
                     if extraction_profile is not None
                     else None
                 ),

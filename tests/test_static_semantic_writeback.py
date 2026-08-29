@@ -126,6 +126,15 @@ def test_static_config_is_default_disabled_and_strict() -> None:
     assert matched.matched_extraction_enabled is True
     assert matched.plain_extraction_parent is False
     assert matched.method_identity == MATCHED_EXTRACTION_CANDIDATE_ID
+    offline = StaticSemanticWritebackConfig.from_mapping({
+        "mode": "static",
+        "extraction_runtime_scope": "offline_validation",
+        "extraction_runtime_config_path": "/attempt/extraction-offline-validation.json",
+    })
+    assert offline.offline_extraction_enabled is True
+    assert offline.validated_extraction_enabled is True
+    assert offline.plain_extraction_parent is False
+    assert offline.method_identity == MATCHED_EXTRACTION_CANDIDATE_ID
     utility = StaticSemanticWritebackConfig.from_mapping({
         "mode": "static_utility",
     })

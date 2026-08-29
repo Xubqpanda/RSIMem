@@ -1982,6 +1982,11 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         "rsimem_extraction_trial_config",
         None,
     )
+    extraction_offline_path = getattr(
+        args,
+        "rsimem_extraction_offline_config",
+        None,
+    )
     if all(value is None for value in (
         mode,
         failure_policy,
@@ -1996,6 +2001,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         semantic_feedback,
         adaptive_config_path,
         extraction_trial_path,
+        extraction_offline_path,
     )) and not verify_projection:
         return
     if not str(args.agent).startswith("hermes"):
@@ -2061,6 +2067,20 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
             raise SystemExit(
                 f"invalid RSIMem extraction trial config: {exc}"
             ) from exc
+    if extraction_offline_path is not None:
+        from .models.self_evolve import RSIMemExtractionOfflineValidationProfile
+        from rsimem.extraction_validation_runtime import (
+            load_extraction_offline_validation_profile,
+        )
+        path = Path(extraction_offline_path).expanduser().resolve()
+        try:
+            resolved = load_extraction_offline_validation_profile(path)
+            sequence.hermes.rsimem_extraction_offline_profile = (
+                RSIMemExtractionOfflineValidationProfile.model_validate(resolved.profile())
+            )
+            sequence.hermes.rsimem_extraction_offline_source_path = str(path)
+        except (OSError, ValueError) as exc:
+            raise SystemExit(f"invalid RSIMem extraction offline config: {exc}") from exc
     adaptive_selected = (
         sequence.hermes.rsimem_semantic_writeback_mode == "adaptive_utility"
     )
@@ -2071,6 +2091,9 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
     extraction_selected = (
         sequence.hermes.rsimem_extraction_trial_profile is not None
     )
+    offline_selected = sequence.hermes.rsimem_extraction_offline_profile is not None
+    if extraction_selected and offline_selected:
+        raise SystemExit("extraction trial and offline profile are mutually exclusive")
     if extraction_selected and (
         sequence.hermes.rsimem_semantic_writeback_mode != "static"
     ):
@@ -2355,6 +2378,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     ),
                     rsimem_extraction_trial_source_path=(
                         sequence.hermes.rsimem_extraction_trial_source_path
+                    ),
+                    rsimem_extraction_offline_profile=(
+                        sequence.hermes.rsimem_extraction_offline_profile
+                    ),
+                    rsimem_extraction_offline_source_path=(
+                        sequence.hermes.rsimem_extraction_offline_source_path
                     ),
                 )
 
@@ -3600,6 +3629,14 @@ def main(argv: list[str] | None = None) -> None:
         default=None,
         help=(
             "Validation-only extraction trial bundle prepared by RSIMem; "
+            "requires static semantic writeback"
+        ),
+    )
+    p_evolve.add_argument(
+        "--rsimem-extraction-offline-config",
+        default=None,
+        help=(
+            "Offline-only extraction candidate bundle for held-out observations; "
             "requires static semantic writeback"
         ),
     )
