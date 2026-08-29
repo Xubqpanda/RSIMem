@@ -186,7 +186,13 @@ class DeterministicPolicyReplay:
         )
         return PolicyReplayResult(
             event, tuple(decisions), lineage, report,
-            _process_events(snapshot, event, decisions),
+            _process_events(
+                snapshot,
+                event,
+                decisions,
+                mutation_receipt_ids=lineage.mutation_receipt_ids,
+                injection_receipt_ids=lineage.injection_receipt_ids,
+            ),
         )
 
 
@@ -211,11 +217,17 @@ def _process_events(
     snapshot: ContextSnapshot,
     event: TriggerEvent,
     decisions: Sequence[PolicyDecision],
+    *,
+    mutation_receipt_ids: Sequence[str] = (),
+    injection_receipt_ids: Sequence[str] = (),
 ) -> tuple[ProcessEvent, ...]:
     """Project every replayed decision into content-free process evidence."""
 
     result: list[ProcessEvent] = []
     for decision in decisions:
+        receipts = tuple(mutation_receipt_ids) if decision.layer.value == "commit" else (
+            tuple(injection_receipt_ids) if decision.layer.value == "exposure" else ()
+        )
         result.append(ProcessEvent.from_policy_decision(
             decision,
             run_id=snapshot.run_id,
@@ -227,6 +239,7 @@ def _process_events(
             host_event_id=event.event_id,
             family_id=None,
             stage=None,
+            execution_receipt_ids=receipts,
         ))
     return tuple(result)
 
