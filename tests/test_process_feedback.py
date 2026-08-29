@@ -5,7 +5,7 @@ import copy
 
 import pytest
 
-from rsimem.memory.policy_contracts import PolicyLayer
+from rsimem.memory.policy_contracts import DecisionAction, PolicyLayer
 from rsimem.memory.policy_feasibility_fixture import (
     build_fixture_backend,
     build_fixture_snapshot,
@@ -24,7 +24,7 @@ from rsimem.memory.process_corpus import (
     census_process_events,
     ensure_process_corpus_has_no_evaluation_fields,
 )
-from rsimem.memory.trigger_policy import HostTriggerAdapter
+from rsimem.memory.trigger_policy import DeterministicTriggerPolicy, HostTriggerAdapter
 
 
 def _replay():
@@ -128,6 +128,43 @@ def test_process_reason_codes_keep_failure_stages_distinct() -> None:
     )
     errors = audit_process_events((bad,))
     assert any("retrieval miss" in error for error in errors)
+
+
+@pytest.mark.parametrize(
+    ("policy_reason", "process_reason"),
+    (
+        ("trigger_not_run", "absence"),
+        ("no_eligible_source", "absence"),
+        ("unsupported_trigger", "unsupported_boundary"),
+        ("shadow_only", "unsupported_boundary"),
+    ),
+)
+def test_policy_skip_reasons_are_preserved_in_process_feedback(
+    policy_reason: str,
+    process_reason: str,
+) -> None:
+    decision = DeterministicTriggerPolicy()._decision(
+        HostTriggerAdapter().event(
+            "task_completed",
+            source_revision="revision.reason-map",
+            payload={"case": policy_reason},
+            session_id="session.reason-map",
+            task_id="task.reason-map",
+        ),
+        DecisionAction.SKIP,
+        policy_reason,
+    )
+    event = ProcessEvent.from_policy_decision(
+        decision,
+        run_id="run.reason-map",
+        variant="native+ledger",
+        trace_id="trace.reason-map",
+        episode_id="episode.reason-map",
+        session_id="session.reason-map",
+        task_id="task.reason-map",
+        host_event_id=decision.trigger_event_id or "event.reason-map",
+    )
+    assert event.reason_codes == (process_reason,)
 
 
 def test_process_audit_requires_receipt_for_rejected_terminal_event() -> None:
