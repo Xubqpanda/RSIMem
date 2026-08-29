@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from ..lifecycle import RawResourceUsage
 from .extraction_optimizer_contracts import (
     EXTRACTION_OPTIMIZER_TIMEOUT_SECONDS,
+    EXTRACTION_OPTIMIZER_OUTPUT_SCHEMA,
     ExtractionOptimizerCompletion,
     ExtractionOptimizerConfig,
     ExtractionOptimizerRequest,
@@ -62,7 +63,18 @@ class OpenAICompatibleExtractionOptimizerClient:
             temperature=float(config.temperature),
             max_tokens=config.max_output_tokens,
             timeout=config.timeout_seconds,
-            response_format={"type": "json_object"},
+            # ``json_object`` only guarantees syntactic JSON and the Luna
+            # endpoint has been observed to omit required contract fields in
+            # that mode.  Send the frozen schema at the provider boundary so
+            # the response is constrained before our strict parser sees it.
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "extraction_optimizer_result",
+                    "strict": True,
+                    "schema": EXTRACTION_OPTIMIZER_OUTPUT_SCHEMA,
+                },
+            },
         )
         duration_ms = max(0, round((self._clock() - started) * 1_000))
         output = self._output_text(response)
