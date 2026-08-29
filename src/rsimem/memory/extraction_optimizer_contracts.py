@@ -694,8 +694,18 @@ def build_extraction_optimizer_gate_request(
         raise ValueError("optimizer corpus was not produced by the parent policy body")
     if not reason_codes or len(reason_codes) != len(set(reason_codes)):
         raise ValueError("optimizer gate requires unique reason codes")
+    # A gate request must remain constructible even when a logical case has
+    # conflicting replicate labels; the caller records that conflict as the
+    # fail-closed reason instead of silently voting it away.
+    grouped_primary: dict[str, list[ExtractionOptimizerCorpusExample]] = {}
+    for value in corpus.examples:
+        if value.primary:
+            grouped_primary.setdefault(
+                logical_case_id_for_example(value),
+                [],
+            ).append(value)
     primary = tuple(sorted(
-        logical_primary_examples(corpus),
+        (min(values, key=lambda item: item.example_id) for values in grouped_primary.values()),
         key=lambda value: value.example_id,
     ))
     label_counts = {
