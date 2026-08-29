@@ -1181,6 +1181,115 @@ class JsonExtractionValidationDecisionStore:
             return decision
 
 
+class JsonExtractionValidationObservationStore:
+    """Crash-safe content-free storage for raw validation observations.
+
+    Observations are persisted separately from the derived validation decision
+    so that a decision can always be recomputed from the exact raw evidence.
+    The store is bound to one frozen split and rejects observations from any
+    other family/template/manifest before writing them.
+    """
+
+    def __init__(
+        self,
+        root: Path,
+        *,
+        split: ExtractionPromptValidationSplit,
+    ) -> None:
+        if not isinstance(split, ExtractionPromptValidationSplit):
+            raise TypeError("validation observation store requires a validation split")
+        self.root = root.expanduser().resolve()
+        self.split = split
+
+    @contextmanager
+    def _lock(self, operation: int):
+        self.root.mkdir(parents=True, exist_ok=True)
+        with (self.root / ".extraction-observations.lock").open(
+            "a+", encoding="utf-8"
+        ) as lock:
+            fcntl.flock(lock.fileno(), operation)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    @staticmethod
+    def _path(root: Path, observation_id: str) -> Path:
+        _require_id(observation_id, "validation observation ID")
+        return root / f"{observation_id}.json"
+
+    def put(
+        self,
+        observation: ExtractionValidationObservation,
+    ) -> tuple[Path, bool]:
+        if not isinstance(observation, ExtractionValidationObservation):
+            raise TypeError("validation observation store requires observations")
+        if not self.split.permits(observation):
+            raise ValueError("validation observation is outside the frozen split")
+        path = self._path(self.root, observation.observation_id)
+        serialized = _canonical(observation.payload()) + "\n"
+        with self._lock(fcntl.LOCK_EX):
+            if path.exists():
+                if path.read_text(encoding="utf-8") != serialized:
+                    raise ValueError(
+                        "validation observation conflicts with its ID"
+                    )
+                return path, False
+            descriptor, temporary = tempfile.mkstemp(
+                prefix=".extraction-observation.",
+                dir=self.root,
+            )
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    handle.write(serialized)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, path)
+                directory = os.open(self.root, os.O_RDONLY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
+            except BaseException:
+                try:
+                    os.unlink(temporary)
+                except OSError:
+                    pass
+                raise
+        return path, True
+
+    def get(self, observation_id: str) -> ExtractionValidationObservation | None:
+        path = self._path(self.root, observation_id)
+        with self._lock(fcntl.LOCK_SH):
+            if not path.exists():
+                return None
+            try:
+                observation = ExtractionValidationObservation.from_payload(
+                    json.loads(path.read_text(encoding="utf-8"))
+                )
+            except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+                raise ValueError("malformed extraction validation observation") from exc
+            if observation.observation_id != observation_id:
+                raise ValueError("validation observation filename mismatch")
+            if not self.split.permits(observation):
+                raise ValueError("stored validation observation is outside the frozen split")
+            return observation
+
+    def records(self) -> tuple[ExtractionValidationObservation, ...]:
+        with self._lock(fcntl.LOCK_SH):
+            paths = tuple(sorted(
+                path for path in self.root.glob("extraction-observation.*.json")
+                if path.is_file()
+            ))
+        values = tuple(
+            observation
+            for path in paths
+            for observation in (self.get(path.stem),)
+            if observation is not None
+        )
+        return tuple(sorted(values, key=lambda value: value.observation_id))
+
+
 class ExtractionValidationReplay:
     """Require a stored decision to equal a fresh raw-observation evaluation."""
 
