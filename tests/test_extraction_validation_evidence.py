@@ -25,6 +25,7 @@ from rsimem.memory.extraction_projection import (
 from rsimem.memory.extraction_prompt_validation import (
     ExtractionPromptValidationSplit,
     ExtractionSplitAssignment,
+    JsonExtractionValidationObservationStore,
     ExtractionValidationSplitRole,
     ExtractionValidationVariant,
 )
@@ -233,6 +234,10 @@ def test_formal_validation_evidence_assembles_and_replays_content_free(
     assert len(batch.observations) == 6
     assert len(batch.safety_evidence) == 6
     assert len(batch.evidence_joins) == 6
+    observation_store = JsonExtractionValidationObservationStore(
+        root / "validation_observations", split=split
+    )
+    assert observation_store.records() == batch.observations
     assert {value.variant for value in batch.observations} == set(
         ExtractionValidationVariant
     )
