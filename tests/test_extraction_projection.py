@@ -19,6 +19,7 @@ from rsimem.memory.extraction_feedback import (
 )
 from rsimem.memory.extraction_projection import Mem0FlatExtractionSourceProjector
 from rsimem.memory.extraction_projection import JsonExtractionSourceRecordStore
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.live_writeback import StaticSemanticWritebackRuntime
 from rsimem.memory_systems.mem0_flat import (
     FakeCompletionClient,
@@ -211,6 +212,14 @@ def test_source_record_store_is_restart_safe_and_fails_closed(tmp_path) -> None:
         )
         assert record.activation.semantic_policy == runtime.policy.semantic_manifest
         assert record.activation.persisted_artifact_ids == record.artifact_ids
+        assert record.evidence_plane is EvidencePlane.BENCHMARK_AUDIT
+        assert record.evidence_source is EvidenceSourceKind.BENCHMARK_CONTRACT
+        with pytest.raises(ValueError, match="family-bound extraction source"):
+            replace(
+                record,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
         with pytest.raises(ValueError, match="activation fingerprint differs"):
             replace(record, extraction_output_digest="0" * 64)
         store = JsonExtractionSourceRecordStore(path)

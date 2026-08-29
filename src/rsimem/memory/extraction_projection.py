@@ -25,7 +25,11 @@ from .extraction_feedback import (
     default_feedback_contract_registry,
     detect_extracted_fact_semantic_keys,
 )
-from .evidence_planes import validate_plane_source
+from .evidence_planes import (
+    EvidencePlane,
+    EvidenceSourceKind,
+    validate_plane_source,
+)
 from .ingestion import InternalMemoryAction, MemoryIngestStatus
 from .live_writeback import ExtractionRuntimeBinding, StaticSemanticBoundaryResult
 from .prompt_components import SemanticPolicyManifest
@@ -35,9 +39,9 @@ from ..memory_systems.mem0_flat.policy import (
 )
 
 
-EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION = 3
+EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION = 4
 EXTRACTION_ACTIVATION_FINGERPRINT_SCHEMA_VERSION = 1
-LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION = 1
+LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION = 2
 
 
 def _canonical(value: object) -> str:
@@ -290,11 +294,20 @@ class ExtractionSourceRecord:
     source: ExtractionSourceEvidence
     activation: ExtractionActivationFingerprint
     content_digest: str
+    evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
     schema_version: int = EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         if self.schema_version != EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION:
             raise ValueError("unsupported extraction source record schema")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        if plane is not EvidencePlane.BENCHMARK_AUDIT or source is not EvidenceSourceKind.BENCHMARK_CONTRACT:
+            raise ValueError(
+                "family-bound extraction source must be benchmark_audit evidence"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         if any(not isinstance(value, str) or not value.strip() for value in (
             self.family_id,
             self.stage,
@@ -364,6 +377,8 @@ class ExtractionSourceRecord:
             "extraction_output_digest": self.extraction_output_digest,
             "source": self.source.payload(),
             "activation": self.activation.payload(),
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
         }
 
     @classmethod
@@ -397,6 +412,8 @@ class ExtractionSourceRecord:
             "extraction_output_digest": extraction_output_digest,
             "source": source.payload(),
             "activation": activation.payload(),
+            "evidence_plane": EvidencePlane.BENCHMARK_AUDIT.value,
+            "evidence_source": EvidenceSourceKind.BENCHMARK_CONTRACT.value,
         }
         return cls(
             family_id,
@@ -412,6 +429,8 @@ class ExtractionSourceRecord:
             source,
             activation,
             hashlib.sha256(_canonical(identity).encode("utf-8")).hexdigest(),
+            evidence_plane=EvidencePlane.BENCHMARK_AUDIT,
+            evidence_source=EvidenceSourceKind.BENCHMARK_CONTRACT,
         )
 
     @classmethod
@@ -432,6 +451,8 @@ class ExtractionSourceRecord:
             "source",
             "activation",
             "content_digest",
+            "evidence_plane",
+            "evidence_source",
         }
         if not isinstance(value, dict) or set(value) != fields:
             raise ValueError("malformed extraction source record")
@@ -457,6 +478,8 @@ class ExtractionSourceRecord:
             ExtractionSourceEvidence.from_payload(value["source"]),
             ExtractionActivationFingerprint.from_payload(value["activation"]),
             value["content_digest"],
+            EvidencePlane(value["evidence_plane"]),
+            EvidenceSourceKind(value["evidence_source"]),
             schema_version=value["schema_version"],
         )
 
@@ -607,11 +630,25 @@ class LiveExtractionFeedbackRecord:
     use_operation_id: str
     outcome_operation_id: str
     dataset: ExtractionFeedbackDataset
+    evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
     schema_version: int = LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         if self.schema_version != LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION:
             raise ValueError("unsupported live extraction feedback schema")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        if plane is not EvidencePlane.BENCHMARK_AUDIT or source is not EvidenceSourceKind.BENCHMARK_CONTRACT:
+            raise ValueError(
+                "family-bound live feedback must be benchmark_audit evidence"
+            )
+        if (
+            self.dataset.evidence_plane is not plane
+            or self.dataset.evidence_source is not source
+        ):
+            raise ValueError("live feedback dataset plane/source differs")
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         for value in (
             self.record_id,
             self.family_id,
@@ -664,6 +701,8 @@ class LiveExtractionFeedbackRecord:
             "dataset_id": self.dataset.dataset_id,
             "source_projection_digest": self.dataset.source_projection_digest,
             "contract_digest": self.dataset.contract_digest,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
         }
 
     def payload(self) -> dict[str, object]:
@@ -708,6 +747,8 @@ class LiveExtractionFeedbackRecord:
             "dataset_id": dataset.dataset_id,
             "source_projection_digest": dataset.source_projection_digest,
             "contract_digest": dataset.contract_digest,
+            "evidence_plane": EvidencePlane.BENCHMARK_AUDIT.value,
+            "evidence_source": EvidenceSourceKind.BENCHMARK_CONTRACT.value,
         }
         record_id = (
             "live-extraction-feedback."
@@ -728,6 +769,8 @@ class LiveExtractionFeedbackRecord:
             use_operation_id,
             outcome_operation_id,
             dataset,
+            evidence_plane=EvidencePlane.BENCHMARK_AUDIT,
+            evidence_source=EvidenceSourceKind.BENCHMARK_CONTRACT,
         )
 
     @classmethod
@@ -749,6 +792,8 @@ class LiveExtractionFeedbackRecord:
             "dataset_id",
             "source_projection_digest",
             "contract_digest",
+            "evidence_plane",
+            "evidence_source",
         }
         if not isinstance(value, dict) or set(value) != identity_fields | {
             "record_id",
@@ -779,6 +824,8 @@ class LiveExtractionFeedbackRecord:
                 value["use_operation_id"],
                 value["outcome_operation_id"],
                 dataset,
+                evidence_plane=value["evidence_plane"],
+                evidence_source=value["evidence_source"],
                 schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
