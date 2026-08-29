@@ -17,6 +17,11 @@ from rsimem.memory.process_feedback import (
     ProcessEventStatus,
     audit_process_events,
 )
+from rsimem.memory.process_corpus import (
+    JsonProcessCorpusStore,
+    ProcessCorpus,
+    ensure_process_corpus_has_no_evaluation_fields,
+)
 from rsimem.memory.trigger_policy import HostTriggerAdapter
 
 
@@ -130,3 +135,57 @@ def test_process_audit_checks_policy_and_host_revision_joins() -> None:
         source_revisions={event.event_id: "revision.other"},
     )
     assert any("source revision" in error for error in errors)
+
+
+def test_process_corpus_is_separate_from_evaluation_score_and_restart_safe(tmp_path) -> None:
+    _, _, replay = _replay()
+    corpus = ProcessCorpus.create(
+        replay.process_events,
+        split_role="pilot",
+        family_id="SM01_preference_adoption",
+        task_template_group_id="sm01-process-pilot",
+        task_manifest_digest="a" * 64,
+    )
+    ensure_process_corpus_has_no_evaluation_fields(corpus.payload())
+    path = tmp_path / "corpus.json"
+    store = JsonProcessCorpusStore(path)
+    assert store.put(corpus)[1] is True
+    assert store.put(corpus)[1] is False
+    assert JsonProcessCorpusStore(path).get() == corpus
+    with pytest.raises(ValueError, match="evaluation-only"):
+        ensure_process_corpus_has_no_evaluation_fields({"task_score": 1.0})
+
+
+def test_process_corpus_rejects_duplicate_or_cross_family_events() -> None:
+    _, _, replay = _replay()
+    with pytest.raises(ValueError, match="event IDs"):
+        ProcessCorpus.create(
+            (*replay.process_events, replay.process_events[0]),
+            split_role="pilot",
+            family_id="SM01_preference_adoption",
+            task_template_group_id="sm01-process-pilot",
+            task_manifest_digest="a" * 64,
+        )
+    foreign = ProcessEvent.create(
+        kind=ProcessEventKind.HOST_LIFECYCLE,
+        status=ProcessEventStatus.PENDING,
+        run_id="run.process",
+        variant="native+ledger",
+        trace_id="trace.process",
+        episode_id="episode.process",
+        session_id="session.process",
+        task_id="task.process",
+        host_event_id="event.process.foreign",
+        source_revision="revision.process",
+        input_payload={},
+        output_payload={},
+        family_id="SM02_constraint_retention",
+    )
+    with pytest.raises(ValueError, match="family"):
+        ProcessCorpus.create(
+            (*replay.process_events, foreign),
+            split_role="pilot",
+            family_id="SM01_preference_adoption",
+            task_template_group_id="sm01-process-pilot",
+            task_manifest_digest="a" * 64,
+        )

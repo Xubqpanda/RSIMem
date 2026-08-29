@@ -114,6 +114,13 @@ from .process_feedback import (
     ProcessEventStatus,
     audit_process_events,
 )
+from .process_corpus import (
+    PROCESS_CORPUS_SCHEMA,
+    PROCESS_CORPUS_SCHEMA_VERSION,
+    JsonProcessCorpusStore,
+    ProcessCorpus,
+    ensure_process_corpus_has_no_evaluation_fields,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -209,4 +216,9 @@ __all__ = [
     "ProcessEventKind",
     "ProcessEventStatus",
     "audit_process_events",
+    "PROCESS_CORPUS_SCHEMA",
+    "PROCESS_CORPUS_SCHEMA_VERSION",
+    "JsonProcessCorpusStore",
+    "ProcessCorpus",
+    "ensure_process_corpus_has_no_evaluation_fields",
 ]
