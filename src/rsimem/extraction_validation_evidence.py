@@ -31,6 +31,7 @@ from .memory.extraction_projection import (
     LiveExtractionFeedbackRecord,
 )
 from .memory.extraction_prompt_validation import (
+    JsonExtractionValidationObservationStore,
     ExtractionPromptValidationSplit,
     ExtractionValidationObservation,
     ExtractionValidationSafetyEvidence,
@@ -497,6 +498,7 @@ def assemble_extraction_matched_evidence_batch(
     offline_decision: ExtractionOfflineValidationDecision,
     split: ExtractionPromptValidationSplit,
     output_path: Path | None = None,
+    observation_store_path: Path | None = None,
 ) -> ExtractionMatchedEvidenceBatch:
     root = batch_root.expanduser().resolve()
     manifest_path = root / "batch_manifest.json"
@@ -688,6 +690,19 @@ def assemble_extraction_matched_evidence_batch(
                 audit_digest,
             ))
     ordered = tuple(sorted(observations, key=lambda value: value.observation_id))
+    # Persist raw observations before deriving the matched decision.  The
+    # decision evaluator below intentionally consumes the reloaded records so
+    # a restart/replay cannot silently substitute an in-memory observation.
+    observation_store = JsonExtractionValidationObservationStore(
+        observation_store_path or (root / "validation_observations"),
+        split=split,
+    )
+    for observation in ordered:
+        observation_store.put(observation)
+    persisted = observation_store.records()
+    if persisted != ordered:
+        raise ValueError("persisted validation observations differ from assembly")
+    ordered = persisted
     safety_ordered = tuple(sorted(safety_values, key=lambda value: value.evidence_id))
     joins_ordered = tuple(sorted(joins, key=lambda value: value.observation_id))
     decision = ExtractionMatchedTrialEvaluator().evaluate(
