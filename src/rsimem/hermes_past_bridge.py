@@ -91,6 +91,10 @@ from .memory.extraction_optimizer_capture import (
     ExtractionOptimizerSourceCapture,
     JsonExtractionOptimizerCaptureLog,
 )
+from .memory.opportunity import (
+    JsonOpportunityEvidenceLog,
+    OpportunityEvidence,
+)
 from .memory.extraction_projection import (
     JsonLiveExtractionFeedbackRecordLog,
     JsonExtractionSourceRecordStore,
@@ -382,6 +386,10 @@ class HermesPastBenchBridge:
         static_completion_client: CompletionClient | None = None,
         static_operation_evidence_path: Path | None = None,
         static_mutation_receipt_path: Path | None = None,
+        opportunity_evidence_path: Path | None = None,
+        opportunity_evidence_provider: Callable[
+            [Mapping[str, Any]], Sequence[OpportunityEvidence]
+        ] | None = None,
     ) -> None:
         if config.mode == HermesExecutionMode.NATIVE:
             raise ValueError("native mode must not construct an RSIMem bridge")
@@ -394,6 +402,11 @@ class HermesPastBenchBridge:
         self._task_id = task_id
         self._family_id = family_id
         self._stage = stage
+        self._opportunity_evidence_provider = opportunity_evidence_provider
+        self._opportunity_evidence_log = JsonOpportunityEvidenceLog(
+            opportunity_evidence_path
+            or self.evidence_path.with_name("rsimem_opportunities.jsonl")
+        )
         self._snapshot_collector = HermesStateSnapshotCollector()
         self.ledger = MemoryLedgerObserver(
             run_id=run_id,
@@ -696,6 +709,42 @@ class HermesPastBenchBridge:
         """Content-free process observations captured for this bridge run."""
 
         return self._process_feedback.events
+
+    @property
+    def opportunity_evidence(self) -> tuple[OpportunityEvidence, ...]:
+        """Deployment-visible opportunities emitted by the host adapter.
+
+        Family/stage benchmark contracts are intentionally absent from this
+        collection.  They remain available only through the explicit audit
+        projection used by :class:`SemanticFeedbackResolver`.
+        """
+
+        return self._opportunity_evidence_log.records()
+
+    def _record_runtime_opportunities(
+        self,
+        result: Mapping[str, Any],
+    ) -> tuple[OpportunityEvidence, ...]:
+        provider = self._opportunity_evidence_provider
+        if provider is None:
+            return ()
+        values = provider(result)
+        if isinstance(values, OpportunityEvidence):
+            values = (values,)
+        if not isinstance(values, Sequence) or isinstance(values, (str, bytes)):
+            raise TypeError("opportunity provider must return a sequence")
+        recorded: list[OpportunityEvidence] = []
+        for evidence in values:
+            if not isinstance(evidence, OpportunityEvidence):
+                raise TypeError("opportunity provider returned a non-evidence value")
+            # The contract itself enforces pure-process plane/source identity;
+            # this check makes the bridge boundary explicit and protects
+            # against future contract widening.
+            if evidence.evidence_plane.value != "pure_process":
+                raise ValueError("runtime opportunity must be pure_process evidence")
+            self._opportunity_evidence_log.append(evidence)
+            recorded.append(evidence)
+        return tuple(recorded)
 
     @property
     def process_feedback_event_ids(self) -> tuple[str, ...]:
@@ -1669,6 +1718,11 @@ class HermesPastBenchBridge:
                 value for value in raw_messages if isinstance(value, Mapping)
             )
         current_input = self._current_input(result)
+        # Runtime opportunity evidence is supplied by a host/application
+        # adapter from deployment-visible input, environment or tool schema.
+        # Do this before constructing the benchmark-audit projection so the
+        # two evidence planes cannot be conflated.
+        self._record_runtime_opportunities(result)
         current_keys = detect_current_input_semantic_keys(
             self._family_id,
             current_input,

@@ -35,6 +35,8 @@ from rsimem.lifecycle import (
     run_sm01_preference_fixture,
 )
 from rsimem.memory import (
+    OpportunityEvidence,
+    OpportunitySurface,
     MemoryArtifact,
     MemoryHit,
     MemoryKind,
@@ -407,6 +409,67 @@ def test_past_bench_bridge_routes_real_hermes_read_surfaces(tmp_path: Path) -> N
     assert PRIVATE_PREFERENCE not in serialized
     assert "requested task table" not in serialized
     assert "Use the requested columns" not in serialized
+
+
+def test_past_bench_bridge_records_runtime_opportunity_without_family_leakage(
+    tmp_path: Path,
+) -> None:
+    home = _hermes_home(tmp_path)
+
+    def provider(result):
+        assert result["messages"][0]["role"] == "user"
+        return (OpportunityEvidence.create(
+            source_surface=OpportunitySurface.CURRENT_INPUT,
+            semantic_requirement="resource.share.recipient_policy",
+            observation_time="2026-08-30T01:02:03Z",
+            operation_id="op.current-input.v1",
+            provenance_id="provenance.run-bridge.v1",
+            source_payload={"input_digest": "a" * 64},
+        ),)
+
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-bridge-opportunity",
+        trace_id="trace-bridge-opportunity",
+        episode_id="episode-bridge-opportunity",
+        session_id="session-bridge-opportunity",
+        task_id="task-bridge-opportunity",
+        experiment_variant="native+adapter+ledger",
+        family_id="SM02_constraint_retention",
+        stage="eval_near",
+        opportunity_evidence_provider=provider,
+    )
+    try:
+        recorded = bridge._record_runtime_opportunities({
+            "messages": [{"role": "user", "content": "visible request"}],
+        })
+        assert len(recorded) == 1
+        assert bridge.opportunity_evidence == recorded
+        payload = json.dumps(recorded[0].payload(), ensure_ascii=True)
+        assert "family_id" not in payload
+        assert "stage" not in payload
+    finally:
+        bridge.close()
+
+    restarted = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-bridge-opportunity",
+        trace_id="trace-bridge-opportunity",
+        episode_id="episode-bridge-opportunity",
+        session_id="session-bridge-opportunity",
+        task_id="task-bridge-opportunity",
+        experiment_variant="native+adapter+ledger",
+        family_id="SM02_constraint_retention",
+        stage="eval_near",
+    )
+    try:
+        assert restarted.opportunity_evidence == recorded
+    finally:
+        restarted.close()
 
 
 def test_past_bench_bridge_failure_policy_controls_native_bypass(

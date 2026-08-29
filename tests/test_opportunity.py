@@ -7,6 +7,7 @@ import pytest
 
 from rsimem.memory.opportunity import (
     ApplicationOpportunitySchema,
+    JsonOpportunityEvidenceLog,
     OpportunityEvidence,
     OpportunityResolutionStatus,
     OpportunitySurface,
@@ -146,3 +147,23 @@ def test_opportunity_identity_does_not_depend_on_family_or_stage() -> None:
     )
     assert first.evidence_id == second.evidence_id
     assert "SM02" not in json.dumps(first.payload())
+
+
+def test_opportunity_log_is_restart_safe_and_rejects_conflicts(tmp_path) -> None:
+    path = tmp_path / "opportunities.jsonl"
+    first = _evidence()
+    log = JsonOpportunityEvidenceLog(path)
+    assert log.append(first) is True
+    assert log.append(first) is False
+    assert JsonOpportunityEvidenceLog(path).records() == (first,)
+
+    conflicting = first.payload()
+    conflicting["source_digest"] = "b" * 64
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        + json.dumps(conflicting, ensure_ascii=True, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="malformed opportunity evidence"):
+        JsonOpportunityEvidenceLog(path)
