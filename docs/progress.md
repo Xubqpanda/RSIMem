@@ -1,6 +1,6 @@
 # RSIMem Progress
 
-Last updated: 2026-08-29
+Last updated: 2026-08-30
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
@@ -73,12 +73,16 @@ optimizer gate correctly returned `NO_PROPOSAL` without a candidate. Full raw
 usage, trace, ledger, and audit evidence is recorded in
 [`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md).
 
-The current Stage 3B/3D process-signal census joins the clean SM01, SM02 and
-SM05 parent pilots without using evaluation scores. It confirms stable
-observability for all six stages, RUN/SKIP variation at the exposure boundary,
-and sparse outcome variation for the other fixed layers. Extraction remains
-the first layer to open; the family-level counts and replay interpretation are
-recorded in [`extraction_stage3_process_signal_census_20260829.md`](extraction_stage3_process_signal_census_20260829.md).
+The current Stage 3B/3D process-signal work joins clean parent pilots without
+using evaluation scores. The new SM02 and SM05 reruns use the latest
+family-free process projection and replay-stable logical-case store. They
+confirm lifecycle observability and tool-closure joins, but both remain
+`STOP_NO_SIGNAL`: extraction is shadow `pending`, no artifact/use/outcome
+chain is attributable, and no N+1 candidate is unlocked. Detailed dated
+reports are [`extraction_stage2_sm02_process_signal_final_20260830.md`](extraction_stage2_sm02_process_signal_final_20260830.md) and
+[`extraction_stage2_sm05_process_signal_20260830.md`](extraction_stage2_sm05_process_signal_20260830.md). Extraction remains the first
+layer to open only after a signal-ready case; the other five layers stay
+shadow/validation-only.
 
 The follow-up SM02 process-signal pilot exercised the generalized family
 launcher and both configured endpoints. Two primary-provider replicates passed
