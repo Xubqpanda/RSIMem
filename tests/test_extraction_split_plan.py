@@ -57,3 +57,9 @@ def test_split_plan_rejects_cross_role_manifest_and_missing_roles() -> None:
         ))
     with pytest.raises(ValueError, match="train, validation"):
         ExtractionSplitPlan.create((_assignment(ExtractionSplitRole.TRAIN, 1),))
+    with pytest.raises(ValueError, match="train, validation"):
+        ExtractionSplitPlan.create((
+            _assignment(ExtractionSplitRole.TRAIN, 1),
+            _assignment(ExtractionSplitRole.TRAIN, 2),
+            _assignment(ExtractionSplitRole.FINAL_TEST, 3),
+        ))

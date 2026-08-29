@@ -82,7 +82,8 @@ class ExtractionSplitPlan:
         _id(self.plan_id, "split plan ID")
         if not self.assignments:
             raise ValueError("extraction split plan requires assignments")
-        if {value.role for value in self.assignments} != set(ExtractionSplitRole):
+        roles = tuple(value.role for value in self.assignments)
+        if set(roles) != set(ExtractionSplitRole) or len(roles) != len(set(roles)):
             raise ValueError("split plan must contain train, validation, and final-test roles")
         groups: set[tuple[str, str]] = set()
         manifests: dict[str, ExtractionSplitRole] = {}
