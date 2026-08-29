@@ -619,6 +619,12 @@ proposals, but the candidate content-safety gate rejected corpus-specific
 value copying on both attempts, so no candidate was written. Details are in
 [`extraction_stage3_sm05_optimizer_20260829.md`](extraction_stage3_sm05_optimizer_20260829.md).
 
+Commit `3373a78` adds an explicit `ExtractionSplitPlan` contract and optional
+matched-preflight validation. The current SM01, SM02, and SM05 pilots all
+occupy train roles, so there is no uncontaminated authored semantic family left
+for held-out validation; the split audit records this rather than reusing a
+train manifest ([`extraction_stage3_split_audit_20260829.md`](extraction_stage3_split_audit_20260829.md)).
+
 ## Update Policy
 
 Update this file whenever a milestone is completed, its acceptance criteria change, or evidence reveals a new blocker. Mark an item complete only after its implementation, tests, and required experiment evidence are all available. Record detailed numerical results in a separate dated report and link that report here rather than embedding provisional paper results in the checklist.
