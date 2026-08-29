@@ -119,6 +119,8 @@ from .process_corpus import (
     PROCESS_CORPUS_SCHEMA_VERSION,
     JsonProcessCorpusStore,
     ProcessCorpus,
+    ProcessSignalCensus,
+    census_process_events,
     ensure_process_corpus_has_no_evaluation_fields,
 )
 
@@ -220,5 +222,7 @@ __all__ = [
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
     "ProcessCorpus",
+    "ProcessSignalCensus",
+    "census_process_events",
     "ensure_process_corpus_has_no_evaluation_fields",
 ]
