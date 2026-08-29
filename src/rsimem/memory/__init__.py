@@ -99,6 +99,16 @@ from .policy_audit import (
     audit_policy_evidence,
     audit_policy_evidence_or_raise,
 )
+from .process_feedback import (
+    PROCESS_FEEDBACK_SCHEMA,
+    PROCESS_FEEDBACK_SCHEMA_VERSION,
+    PROCESS_REASON_CODES,
+    JsonProcessFeedbackLedger,
+    ProcessEvent,
+    ProcessEventKind,
+    ProcessEventStatus,
+    audit_process_events,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -183,4 +193,12 @@ __all__ = [
     "PolicyAuditReport",
     "audit_policy_evidence",
     "audit_policy_evidence_or_raise",
+    "PROCESS_FEEDBACK_SCHEMA",
+    "PROCESS_FEEDBACK_SCHEMA_VERSION",
+    "PROCESS_REASON_CODES",
+    "JsonProcessFeedbackLedger",
+    "ProcessEvent",
+    "ProcessEventKind",
+    "ProcessEventStatus",
+    "audit_process_events",
 ]

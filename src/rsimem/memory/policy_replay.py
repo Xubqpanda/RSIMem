@@ -34,6 +34,7 @@ from .policy_contracts import (
 from .source_selection_policy import DeterministicSourceSelectionPolicy
 from .trigger_policy import DeterministicTriggerPolicy
 from .exposure_policy import DeterministicExposurePolicy
+from .process_feedback import ProcessEvent
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +43,7 @@ class PolicyReplayResult:
     decisions: tuple[PolicyDecision, ...]
     lineage: PolicyLineage
     audit: PolicyAuditReport
+    process_events: tuple[ProcessEvent, ...] = ()
 
 
 class DeterministicPolicyReplay:
@@ -88,7 +90,10 @@ class DeterministicPolicyReplay:
         if trigger.action != DecisionAction.RUN:
             lineage = PolicyLineage.from_decisions(decisions)
             report = _audit_decisions(decisions)
-            return PolicyReplayResult(event, tuple(decisions), lineage, report)
+            return PolicyReplayResult(
+                event, tuple(decisions), lineage, report,
+                _process_events(snapshot, event, decisions),
+            )
 
         extraction = ExtractionDecision.create(
             policy_version="fixed.extraction.parent.v1",
@@ -109,7 +114,10 @@ class DeterministicPolicyReplay:
         if extraction.action != DecisionAction.RUN:
             lineage = PolicyLineage.from_decisions(decisions)
             report = _audit_decisions(decisions)
-            return PolicyReplayResult(event, tuple(decisions), lineage, report)
+            return PolicyReplayResult(
+                event, tuple(decisions), lineage, report,
+                _process_events(snapshot, event, decisions),
+            )
 
         safety = SafetyBoundary(
             active_segment_ids=snapshot.active_segment_ids,
@@ -176,7 +184,10 @@ class DeterministicPolicyReplay:
             injection_receipt_ids=lineage.injection_receipt_ids,
             require_all_layers=False,
         )
-        return PolicyReplayResult(event, tuple(decisions), lineage, report)
+        return PolicyReplayResult(
+            event, tuple(decisions), lineage, report,
+            _process_events(snapshot, event, decisions),
+        )
 
 
 def _audit_decisions(
@@ -194,6 +205,30 @@ def _audit_decisions(
         injection_receipt_ids=injection_receipt_ids,
         require_all_layers=require_all_layers,
     )
+
+
+def _process_events(
+    snapshot: ContextSnapshot,
+    event: TriggerEvent,
+    decisions: Sequence[PolicyDecision],
+) -> tuple[ProcessEvent, ...]:
+    """Project every replayed decision into content-free process evidence."""
+
+    result: list[ProcessEvent] = []
+    for decision in decisions:
+        result.append(ProcessEvent.from_policy_decision(
+            decision,
+            run_id=snapshot.run_id,
+            variant="deterministic",
+            trace_id=snapshot.episode_id,
+            episode_id=snapshot.episode_id,
+            session_id=snapshot.session_id,
+            task_id=snapshot.task_id,
+            host_event_id=event.event_id,
+            family_id=None,
+            stage=None,
+        ))
+    return tuple(result)
 
 
 __all__ = ["PolicyReplayResult", "DeterministicPolicyReplay"]
