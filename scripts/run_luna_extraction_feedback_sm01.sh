@@ -232,6 +232,7 @@ import sys
 from pathlib import Path
 from rsimem.memory.extraction_projection import JsonExtractionSourceRecordStore
 from rsimem.memory.process_corpus import JsonProcessCorpusStore, ProcessCorpus
+from rsimem.memory.pure_process import JsonPureProcessCorpusStore, PureProcessCorpus
 from rsimem.memory.process_feedback import JsonProcessFeedbackLedger, audit_process_events
 run_dir = Path(sys.argv[1])
 audit = json.loads((run_dir / "audit.json").read_text(encoding="utf-8"))
@@ -260,13 +261,15 @@ corpus = ProcessCorpus.create(
     task_template_group_id=split["taskTemplateGroupId"],
     task_manifest_digest=split["taskManifestDigest"],
 )
+pure_corpus = PureProcessCorpus.create(events)
 # Shared-cold traces can expose the same logical event in both the nested
 # shared directory and the run directory.  Collapse exact duplicates before
-# auditing; ProcessCorpus.create still rejects conflicting payloads.
+# auditing; both corpus forms reject conflicting payloads.
 process_errors = audit_process_events(corpus.events)
 if process_errors:
     raise ValueError("formal process feedback audit failed: " + "; ".join(process_errors))
 JsonProcessCorpusStore(run_dir / "process_corpus.json").put(corpus)
+JsonPureProcessCorpusStore(run_dir / "pure_process_corpus.json").put(pure_corpus)
 ' "${trace_dir}"; then
     manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" failed process_corpus
     exit 1

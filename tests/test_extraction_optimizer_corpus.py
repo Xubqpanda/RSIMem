@@ -12,6 +12,7 @@ from rsimem.memory.extraction_feedback import (
     ExtractionFeedbackLevel,
     FactDisposition,
 )
+from rsimem.memory.evidence_planes import EvidencePlane
 from rsimem.memory.extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
     ExtractionOptimizerCorpusExample,
@@ -174,6 +175,13 @@ def test_corpus_identity_is_canonical_and_covers_content_and_split() -> None:
         examples=(_example(),),
     )
     assert changed.corpus_id != first.corpus_id
+
+
+def test_optimizer_example_rejects_benchmark_and_final_evidence_planes() -> None:
+    baseline = _example()
+    for plane in (EvidencePlane.BENCHMARK_AUDIT, EvidencePlane.FINAL_EVALUATION):
+        with pytest.raises(ValueError, match="optimizer requires pure_process"):
+            replace(baseline, evidence_plane=plane)
 
 
 def test_resolved_labels_and_useful_three_stage_evidence_fail_closed() -> None:

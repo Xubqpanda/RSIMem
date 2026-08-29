@@ -1,0 +1,52 @@
+"""Explicit boundaries between runtime process, benchmark audit, and scoring evidence."""
+
+from __future__ import annotations
+
+from enum import StrEnum
+from typing import Mapping
+
+
+class EvidencePlane(StrEnum):
+    PURE_PROCESS = "pure_process"
+    BENCHMARK_AUDIT = "benchmark_audit"
+    FINAL_EVALUATION = "final_evaluation"
+
+
+_FORBIDDEN_PROCESS_KEYS = frozenset({
+    "family_id", "familyId", "stage", "grader", "answer_key", "answerKey",
+    "hidden_expectation", "hiddenExpectation", "official_score", "officialScore",
+    "task_score", "taskScore",
+})
+
+
+def validate_pure_process_payload(value: object) -> None:
+    """Reject benchmark/scoring metadata in a pure-process learner payload."""
+
+    def walk(item: object) -> None:
+        if isinstance(item, Mapping):
+            overlap = _FORBIDDEN_PROCESS_KEYS.intersection(item)
+            if overlap:
+                raise ValueError(
+                    "pure-process evidence contains forbidden evaluation fields: "
+                    + ", ".join(sorted(overlap))
+                )
+            for child in item.values():
+                walk(child)
+        elif isinstance(item, (list, tuple)):
+            for child in item:
+                walk(child)
+
+    walk(value)
+
+
+def require_optimizer_plane(plane: EvidencePlane | str) -> EvidencePlane:
+    resolved = EvidencePlane(plane)
+    if resolved != EvidencePlane.PURE_PROCESS:
+        raise ValueError(
+            "optimizer requires pure_process evidence; benchmark/final evidence "
+            "is diagnostic-only"
+        )
+    return resolved
+
+
+__all__ = ["EvidencePlane", "require_optimizer_plane", "validate_pure_process_payload"]

@@ -146,6 +146,7 @@ PY
 import json, sys
 from pathlib import Path
 from rsimem.memory.process_corpus import JsonProcessCorpusStore, ProcessCorpus
+from rsimem.memory.pure_process import JsonPureProcessCorpusStore, PureProcessCorpus
 from rsimem.memory.process_feedback import JsonProcessFeedbackLedger, audit_process_events
 run_dir, manifest_path = map(Path, sys.argv[1:])
 events = tuple(
@@ -164,13 +165,15 @@ corpus = ProcessCorpus.create(
     task_template_group_id=split["taskTemplateGroupId"],
     task_manifest_digest=split["taskManifestDigest"],
 )
+pure_corpus = PureProcessCorpus.create(events)
 # Shared-cold traces may be present under both the nested shared directory and
 # the attempt directory.  Collapse exact logical duplicates before auditing;
-# ProcessCorpus.create still rejects conflicting payloads for one event ID.
+# Both corpus forms reject conflicting payloads for one event ID.
 process_errors = audit_process_events(corpus.events)
 if process_errors:
     raise ValueError("formal process feedback audit failed: " + "; ".join(process_errors))
 JsonProcessCorpusStore(run_dir / "process_corpus.json").put(corpus)
+JsonPureProcessCorpusStore(run_dir / "pure_process_corpus.json").put(pure_corpus)
 PY
     then
       manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" failed process_corpus

@@ -24,6 +24,7 @@ from rsimem.memory.extraction_optimizer_builder import (
     ExtractionFactContent,
     ExtractionOptimizerCorpusBuilder,
 )
+from rsimem.memory.evidence_planes import EvidencePlane
 from rsimem.memory.extraction_optimizer_audit import audit_optimizer_corpus_isolation
 from rsimem.memory.extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
@@ -55,6 +56,13 @@ from extraction_fingerprint_support import extraction_activation_fixture
 
 TSV_KEY = "preference.summary.tsv"
 FACT_TEXT = "The user prefers four-column TSV task summaries."
+
+
+def test_optimizer_builder_rejects_benchmark_audit_plane() -> None:
+    with pytest.raises(ValueError, match="optimizer requires pure_process"):
+        ExtractionOptimizerCorpusBuilder(
+            evidence_plane=EvidencePlane.BENCHMARK_AUDIT
+        )
 
 
 def _projection(content: str = "Always provide my task summary as TSV.") -> ExtractionSourceProjection:
