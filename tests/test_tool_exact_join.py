@@ -42,6 +42,11 @@ def test_exact_call_result_join_replays_and_projects_two_events() -> None:
     assert len(events) == 2
     assert events[0].kind.value == "tool_call"
     assert events[1].kind.value == "tool_result"
+    assert events[0].tool_call_id == join.call_id
+    assert events[0].tool_name_digest == join.tool_name_digest
+    assert events[0].retry_identity == join.retry_identity
+    assert events[1].tool_result_id == join.result_id
+    assert events[1].tool_success is True
     serialized = json.dumps(events[0].payload(), ensure_ascii=True)
     assert "arguments" not in serialized
     assert ToolCallResultJoin.from_payload(json.loads(json.dumps(join.payload()))) == join

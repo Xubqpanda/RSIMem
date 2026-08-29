@@ -156,6 +156,11 @@ class ProcessEvent:
     lineage_id: str | None = None
     execution_receipt_ids: tuple[str, ...] = ()
     reason_codes: tuple[str, ...] = ("decision_observed",)
+    tool_call_id: str | None = None
+    tool_result_id: str | None = None
+    tool_name_digest: str | None = None
+    retry_identity: str | None = None
+    tool_success: bool | None = None
     family_id: str | None = None
     stage: str | None = None
     schema_version: int = PROCESS_FEEDBACK_SCHEMA_VERSION
@@ -185,6 +190,17 @@ class ProcessEvent:
             object.__setattr__(self, "policy_layer", PolicyLayer(self.policy_layer))
         if self.lineage_id is not None:
             _id(self.lineage_id, "lineage ID")
+        for value, name in (
+            (self.tool_call_id, "tool call ID"),
+            (self.tool_result_id, "tool result ID"),
+            (self.retry_identity, "tool retry identity"),
+        ):
+            if value is not None:
+                _id(value, name)
+        if self.tool_name_digest is not None:
+            _digest(self.tool_name_digest, "tool name digest")
+        if self.tool_success is not None and type(self.tool_success) is not bool:
+            raise TypeError("tool success must be bool or None")
         if self.family_id is not None:
             _id(self.family_id, "family ID")
         if self.stage is not None:
@@ -209,6 +225,34 @@ class ProcessEvent:
             raise ValueError("process event ID mismatch")
         if self.policy_layer is None and self.policy_decision_id is not None:
             raise ValueError("policy decision requires policy layer")
+        if self.kind is ProcessEventKind.TOOL_CALL:
+            if any(value is not None for value in (
+                self.tool_call_id, self.tool_result_id, self.tool_name_digest,
+                self.retry_identity, self.tool_success,
+            )) and (
+                self.tool_call_id is None
+                or self.tool_name_digest is None
+                or self.retry_identity is None
+                or self.tool_result_id is not None
+                or self.tool_success is not None
+            ):
+                raise ValueError("tool call event has result fields")
+        elif self.kind is ProcessEventKind.TOOL_RESULT:
+            if any(value is not None for value in (
+                self.tool_call_id, self.tool_result_id, self.tool_name_digest,
+                self.retry_identity, self.tool_success,
+            )) and (
+                self.tool_call_id is None
+                or self.tool_result_id is None
+                or self.tool_name_digest is None
+                or self.retry_identity is None
+            ):
+                raise ValueError("tool result event lacks exact identity")
+        elif any(value is not None for value in (
+            self.tool_call_id, self.tool_result_id, self.tool_name_digest,
+            self.retry_identity, self.tool_success,
+        )):
+            raise ValueError("non-tool process event has tool identity")
 
     @classmethod
     def create(
@@ -233,6 +277,11 @@ class ProcessEvent:
         lineage_id: str | None = None,
         execution_receipt_ids: Sequence[str] = (),
         reason_codes: Sequence[str] = ("decision_observed",),
+        tool_call_id: str | None = None,
+        tool_result_id: str | None = None,
+        tool_name_digest: str | None = None,
+        retry_identity: str | None = None,
+        tool_success: bool | None = None,
         family_id: str | None = None,
         stage: str | None = None,
     ) -> "ProcessEvent":
@@ -258,6 +307,11 @@ class ProcessEvent:
             "lineage_id": lineage_id,
             "execution_receipt_ids": list(execution_receipt_ids),
             "reason_codes": list(reason_codes),
+            "tool_call_id": tool_call_id,
+            "tool_result_id": tool_result_id,
+            "tool_name_digest": tool_name_digest,
+            "retry_identity": retry_identity,
+            "tool_success": tool_success,
             "family_id": family_id,
             "stage": stage,
         }
@@ -280,6 +334,11 @@ class ProcessEvent:
             lineage_id=lineage_id,
             execution_receipt_ids=tuple(execution_receipt_ids),
             reason_codes=tuple(reason_codes),
+            tool_call_id=tool_call_id,
+            tool_result_id=tool_result_id,
+            tool_name_digest=tool_name_digest,
+            retry_identity=retry_identity,
+            tool_success=tool_success,
             family_id=family_id,
             stage=stage,
         )
@@ -358,6 +417,11 @@ class ProcessEvent:
             "lineage_id": self.lineage_id,
             "execution_receipt_ids": list(self.execution_receipt_ids),
             "reason_codes": list(self.reason_codes),
+            "tool_call_id": self.tool_call_id,
+            "tool_result_id": self.tool_result_id,
+            "tool_name_digest": self.tool_name_digest,
+            "retry_identity": self.retry_identity,
+            "tool_success": self.tool_success,
             "family_id": self.family_id,
             "stage": self.stage,
         }
@@ -377,7 +441,8 @@ class ProcessEvent:
             "variant", "trace_id", "episode_id", "session_id", "task_id",
             "host_event_id", "source_revision", "input_digest", "output_digest",
             "policy_decision_id", "policy_layer", "lineage_id", "execution_receipt_ids",
-            "reason_codes", "family_id", "stage",
+            "reason_codes", "tool_call_id", "tool_result_id", "tool_name_digest",
+            "retry_identity", "tool_success", "family_id", "stage",
         }
         if not isinstance(value, Mapping) or set(value) != fields:
             raise ValueError("malformed process feedback event")
@@ -395,7 +460,10 @@ class ProcessEvent:
                 input_digest=value["input_digest"], output_digest=value["output_digest"],
                 policy_decision_id=value["policy_decision_id"], policy_layer=value["policy_layer"],
                 lineage_id=value["lineage_id"], execution_receipt_ids=tuple(value["execution_receipt_ids"]),
-                reason_codes=tuple(value["reason_codes"]), family_id=value["family_id"],
+                reason_codes=tuple(value["reason_codes"]),
+                tool_call_id=value["tool_call_id"], tool_result_id=value["tool_result_id"],
+                tool_name_digest=value["tool_name_digest"], retry_identity=value["retry_identity"],
+                tool_success=value["tool_success"], family_id=value["family_id"],
                 stage=value["stage"], schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
