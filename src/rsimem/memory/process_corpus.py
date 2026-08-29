@@ -321,14 +321,21 @@ def census_process_events(events: Iterable[ProcessEvent]) -> ProcessSignalCensus
 def ensure_process_corpus_has_no_evaluation_fields(value: object) -> None:
     """Reject score/grader/answer fields before learner ingestion."""
 
+    # Accept no naming convention as a bypass: benchmark reporters commonly
+    # use camelCase while runtime contracts use snake_case.  Delimiters are
+    # removed before comparison, but a suffix such as ``score_digest`` is not
+    # rejected unless the field itself is an evaluation field.
     forbidden = {
-        "score", "task_score", "official_score", "officialEvaluation", "grader",
-        "answer", "answer_key", "hidden_expectation", "judge", "expectation",
+        "score", "taskscore", "officialscore", "officialevaluation", "grader",
+        "answer", "answerkey", "hiddenexpectation", "judge", "expectation",
     }
+
+    def normalized_key(key: object) -> str:
+        return re.sub(r"[^a-z0-9]", "", str(key).lower())
 
     def walk(item: object) -> None:
         if isinstance(item, Mapping):
-            overlap = forbidden.intersection(str(key) for key in item)
+            overlap = forbidden.intersection(normalized_key(key) for key in item)
             if overlap:
                 raise ValueError("evaluation-only field leaked into process corpus")
             for child in item.values():
