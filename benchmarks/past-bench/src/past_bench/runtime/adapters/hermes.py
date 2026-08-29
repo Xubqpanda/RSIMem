@@ -202,6 +202,15 @@ class HermesAdapter(RuntimeAdapter):
                 status="error",
                 error=f"{type(exc).__name__}: {exc}",
             )
+        # Preserve the process-corpus join identity even when execution fails
+        # after the RSIMem bridge has been attached.  The corpus itself stays
+        # on the owner-controlled artifact path; only its content-free
+        # identity crosses the runtime protocol boundary.
+        if self._rsimem_bridge is not None:
+            response.process_feedback_event_ids = list(
+                self._rsimem_bridge.process_feedback_event_ids
+            )
+            response.process_feedback_digest = self._rsimem_bridge.process_feedback_digest
         response.model_time_s = time.monotonic() - started
         self._completed_response = response
         return response

@@ -231,6 +231,26 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
     )
 
 
+def test_past_bench_error_response_keeps_process_identity(monkeypatch) -> None:
+    """A post-bridge failure must not sever the process-corpus join."""
+
+    adapter = HermesAdapter.__new__(HermesAdapter)
+    adapter._completed_response = None
+    adapter._rsimem_bridge = types.SimpleNamespace(
+        process_feedback_event_ids=("process-event.example",),
+        process_feedback_digest="a" * 64,
+    )
+
+    def fail_run_agent():
+        raise RuntimeError("fixture failure")
+
+    monkeypatch.setattr(adapter, "_run_agent", fail_run_agent)
+    response = adapter.step(StepRequest(session_id="session-error", step_id=0))
+    assert response.status == "error"
+    assert response.process_feedback_event_ids == ["process-event.example"]
+    assert response.process_feedback_digest == "a" * 64
+
+
 def test_past_bench_emits_explicit_lifecycle_boundaries(
     tmp_path: Path,
     monkeypatch,
