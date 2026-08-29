@@ -234,6 +234,10 @@ from rsimem.memory.extraction_projection import JsonExtractionSourceRecordStore
 from rsimem.memory.process_corpus import JsonProcessCorpusStore, ProcessCorpus
 from rsimem.memory.pure_process import JsonPureProcessCorpusStore, PureProcessCorpus
 from rsimem.memory.process_feedback import JsonProcessFeedbackLedger, audit_process_events
+from rsimem.memory.process_signal import (
+    JsonProcessSignalCaseStore,
+    build_process_signal_cases,
+)
 run_dir = Path(sys.argv[1])
 audit = json.loads((run_dir / "audit.json").read_text(encoding="utf-8"))
 if audit.get("ok") is not True or audit.get("issues") != []:
@@ -270,6 +274,26 @@ if process_errors:
     raise ValueError("formal process feedback audit failed: " + "; ".join(process_errors))
 JsonProcessCorpusStore(run_dir / "process_corpus.json").put(corpus)
 JsonPureProcessCorpusStore(run_dir / "pure_process_corpus.json").put(pure_corpus)
+attempt = next(
+    item for item in manifest["attemptHistory"]
+    if Path(item["outputDirectory"]).resolve() == run_dir.resolve()
+    or Path(item["outputDirectory"]).name == run_dir.name
+)
+method = attempt["method"]
+policy_digest = manifest["semanticPolicy"]["activeArtifactByMethod"][method]["artifactDigest"]
+cases = build_process_signal_cases(
+    corpus.events,
+    frozen_policy_digest=policy_digest,
+    source_task_template_id="source." + split["taskTemplateGroupId"],
+    future_task_template_id="future." + split["taskTemplateGroupId"],
+    observation_window="completed-task.v1",
+    replicate_id="replicate." + str(attempt["replicate"]),
+)
+if not cases:
+    raise ValueError("formal extraction run emitted no process signal cases")
+case_store = JsonProcessSignalCaseStore(run_dir / "process_signal_cases.jsonl")
+for case in cases:
+    case_store.append(case)
 ' "${trace_dir}"; then
     manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" failed process_corpus
     exit 1
