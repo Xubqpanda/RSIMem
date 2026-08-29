@@ -93,6 +93,9 @@ activation evidence.
 Process-corpus evaluator isolation now normalizes field names across casing and
 separator conventions, preventing camelCase or hyphenated score/answer keys from
 crossing the learner boundary.
+Process audit terminal semantics now also require an execution receipt for
+`REJECTED` events; non-executing `SKIPPED`/`DEFERRED` decisions remain explicit
+and receipt-free by contract.
 
 ## Completed Work
 
