@@ -23,6 +23,11 @@ omitting it is a fail-closed configuration error.  The launcher defaults to
 this checked-in plan but accepts an explicitly supplied immutable replacement
 for a separately authored experiment.
 
+The same plan now gates formal feedback collection on the `train` assignment.
+Consequently, passing the SM03 validation config to the feedback launcher is
+rejected before any provider call; this prevents a validation family from
+being accidentally consumed as optimizer training data.
+
 This is a preflight and contract result, not a validation result.  No provider
 matched batch has been started.  Before running one, the candidate must have a
 trusted offline decision and trial profile, both repository trees must be
