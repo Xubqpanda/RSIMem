@@ -596,6 +596,18 @@ def test_malformed_idempotency_receipt_fails_closed(tmp_path, payload: str) -> N
         store.get("idem_bad")
 
 
+def test_malformed_idempotency_receipt_cannot_be_reserved_over(tmp_path) -> None:
+    receipt_path = tmp_path / "idempotency-receipts.json"
+    malformed = '{"idem_bad": "not-an-object"}'
+    receipt_path.write_text(malformed, encoding="utf-8")
+    store = JsonIdempotencyReceiptStore(receipt_path)
+    with pytest.raises(ValueError, match="malformed idempotency receipt"):
+        store.reserve_if_absent(
+            IdempotencyReceipt("idem_new", "plan-new", "mutation-new")
+        )
+    assert receipt_path.read_text(encoding="utf-8") == malformed
+
+
 def test_json_receipt_reservation_is_atomic_under_concurrency(tmp_path) -> None:
     receipt_path = tmp_path / "idempotency-receipts.json"
     receipt = IdempotencyReceipt("idem-concurrent", "plan-a", "mutation-a")
