@@ -84,3 +84,29 @@ def test_benchmark_or_final_plane_cannot_be_used_for_opportunity() -> None:
     evidence = _evidence()
     with pytest.raises(ValueError, match="plane and source identity"):
         replace(evidence, evidence_plane="benchmark_audit")
+
+
+def test_hidden_evaluation_payload_cannot_create_opportunity() -> None:
+    with pytest.raises(ValueError, match="forbidden evaluation fields"):
+        OpportunityEvidence.create(
+            source_surface=OpportunitySurface.TOOL_SCHEMA,
+            semantic_requirement="resource.share.recipient_policy",
+            observation_time="2026-08-30T01:02:03Z",
+            operation_id="op.hidden.v1",
+            provenance_id="provenance.hidden.v1",
+            source_payload={"hidden_expectation": "recipient"},
+        )
+
+
+def test_opportunity_identity_does_not_depend_on_family_or_stage() -> None:
+    first = _evidence()
+    second = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement="resource.share.recipient_policy",
+        observation_time="2026-08-30T01:02:03Z",
+        operation_id="op.tool-schema.v1",
+        provenance_id="provenance.run.v1",
+        source_payload={"tool_name_digest": "a" * 64, "success_field": True},
+    )
+    assert first.evidence_id == second.evidence_id
+    assert "SM02" not in json.dumps(first.payload())

@@ -16,7 +16,12 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Mapping
 
-from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
+from .evidence_planes import (
+    EvidencePlane,
+    EvidenceSourceKind,
+    validate_plane_source,
+    validate_pure_process_payload,
+)
 
 
 OPPORTUNITY_SCHEMA_VERSION = 1
@@ -213,6 +218,9 @@ class OpportunityEvidence:
         application_schema: ApplicationOpportunitySchema | None = None,
     ) -> "OpportunityEvidence":
         surface = OpportunitySurface(source_surface)
+        # Even deployment-visible payloads are untrusted at this boundary:
+        # reject benchmark/grader metadata before deriving the source digest.
+        validate_pure_process_payload(source_payload)
         if surface == OpportunitySurface.APPLICATION_SCHEMA:
             if application_schema is None or not application_schema.permits(semantic_requirement):
                 raise ValueError("application opportunity is not in the frozen schema")
