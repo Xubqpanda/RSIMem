@@ -682,7 +682,11 @@ class HermesPastBenchBridge:
 
     @property
     def process_feedback_event_ids(self) -> tuple[str, ...]:
-        return tuple(event.event_id for event in self.process_feedback)
+        # ProcessCorpus canonicalizes events by logical identity rather than
+        # append order.  Mirror that ordering here so concurrent/restarted
+        # writers cannot change the response digest while representing the
+        # same process evidence set.
+        return tuple(sorted(event.event_id for event in self.process_feedback))
 
     @property
     def process_feedback_digest(self) -> str:

@@ -215,6 +215,7 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
             json.loads(line)["event_id"]
             for line in process_path.read_text(encoding="utf-8").splitlines()
         ] if process_path.exists() else []
+        process_ids.sort()
         assert response.process_feedback_event_ids == process_ids
         if not process_path.exists():
             assert response.process_feedback_digest is None
@@ -577,5 +578,5 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
         "task_outcome",
     }
     assert all("score" not in event and "grader" not in event for event in process_events)
-    assert response.process_feedback_event_ids == [event["event_id"] for event in process_events]
+    assert response.process_feedback_event_ids == sorted(event["event_id"] for event in process_events)
     assert audit_process_events(process_path) == ()
