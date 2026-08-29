@@ -42,14 +42,24 @@ candidate artifact was written and no policy was activated. The rejection is
 recorded as `candidate_corpus_value`; the persisted optimizer result retains
 only request/completion identities and raw usage.
 
-The optimizer request used one model request with 44,170 input tokens, 479
-output tokens and 216 reasoning tokens. This accounting is separate from the
-PAST-Bench task traces. The durable result is under the ignored
+The initial v1 rejection used one model request with 44,170 input tokens, 479
+output tokens and 216 reasoning tokens. The v2 recovery used one model request
+with 44,214 input tokens, 515 output tokens and 236 reasoning tokens. These
+accounting vectors are separate from the PAST-Bench task traces. Durable
+results are under the ignored
 `outputs/extraction_optimizer_owner/sm02-feedback-20260829-rerun-main/` tree.
 
-This run therefore does not provide an N+1 candidate or permit matched
-validation. It does provide an auditable train corpus, a strict safety
-rejection, and evidence that the provider path is currently reachable. The
-next valid step is to author or collect another predeclared training batch or
-adjust the optimizer proposal only under a new frozen budget; the rejected
-completion must not be retried indefinitely against the same validation data.
+The first v2 completion was malformed and was rejected with
+`completion_contract_invalid`. A single recovery request under the same frozen
+v2 budget produced an abstract, schema-valid candidate
+`extraction-prompt.a45dca366abeb0cd24bf6dacbe8859014caaaf0b`. Static safety and
+the deterministic extraction suite both pass. The candidate is still only a
+proposal: it has not been evaluated on the independent SM03 validation split,
+activated, or used in a matched effect run.
+
+The v2 recovery therefore provides a trusted N+1 candidate, but does not yet
+provide an offline acceptance decision or permit matched validation. The next
+valid step is to collect independent SM03 parent/candidate validation
+observations under a separately recorded pre-validation scope, then run the
+offline quality and safety gate exactly once before preparing the validation
+trial profile.
