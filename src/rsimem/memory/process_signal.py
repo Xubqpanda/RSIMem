@@ -66,6 +66,7 @@ class ProcessSignalCase:
     extraction_attributable: bool
     abstract_hypothesis_digest: str | None
     observation_complete: bool
+    stage_diagnosis_observed: bool = True
     invalid_reason_code: str | None = None
     evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
     evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
@@ -99,6 +100,7 @@ class ProcessSignalCase:
             (self.outcome_observed, "outcome observed"),
             (self.extraction_attributable, "extraction attribution"),
             (self.observation_complete, "observation completeness"),
+            (self.stage_diagnosis_observed, "stage diagnosis"),
         ):
             if type(value) is not bool:
                 raise TypeError(f"{name} must be bool")
@@ -126,6 +128,7 @@ class ProcessSignalCase:
             "extraction_attributable": self.extraction_attributable,
             "abstract_hypothesis_digest": self.abstract_hypothesis_digest,
             "observation_complete": self.observation_complete,
+            "stage_diagnosis_observed": self.stage_diagnosis_observed,
             "invalid_reason_code": self.invalid_reason_code,
             "evidence_plane": self.evidence_plane.value,
             "evidence_source": self.evidence_source.value,
@@ -146,6 +149,7 @@ class ProcessSignalCase:
         extraction_attributable: bool,
         abstract_hypothesis_digest: str | None,
         observation_complete: bool,
+        stage_diagnosis_observed: bool = True,
         invalid_reason_code: str | None = None,
     ) -> "ProcessSignalCase":
         values = {
@@ -160,6 +164,7 @@ class ProcessSignalCase:
             "extraction_attributable": extraction_attributable,
             "abstract_hypothesis_digest": abstract_hypothesis_digest,
             "observation_complete": observation_complete,
+            "stage_diagnosis_observed": stage_diagnosis_observed,
             "invalid_reason_code": invalid_reason_code,
             "evidence_plane": EvidencePlane.PURE_PROCESS,
             "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION,
@@ -197,6 +202,15 @@ class ProcessSignalCase:
             or event.status is ProcessEventStatus.UNKNOWN
             for event in values
         )
+        diagnosis_reasons = {
+            "absence",
+            "non_use",
+            "retrieval_miss",
+            "retrieval_failure",
+            "injection_failure",
+            "tool_failure",
+            "adapter_failure",
+        }
         return cls.create(
             logical_case_id=logical_case_id,
             physical_observation_ids=physical_observation_ids,
@@ -215,6 +229,10 @@ class ProcessSignalCase:
             extraction_attributable=extraction_attributable,
             abstract_hypothesis_digest=abstract_hypothesis_digest,
             observation_complete=complete,
+            stage_diagnosis_observed=any(
+                diagnosis_reasons.intersection(event.reason_codes)
+                for event in values
+            ),
         )
 
     @property
@@ -233,8 +251,10 @@ class ProcessSignalCase:
         )
         if not all(required_observation):
             return ProcessSignalCaseStatus.OBSERVABLE_ONLY
-        if not self.extraction_attributable:
+        if not self.stage_diagnosis_observed:
             return ProcessSignalCaseStatus.OBSERVABLE_ONLY
+        if not self.extraction_attributable:
+            return ProcessSignalCaseStatus.DIAGNOSTIC_ONLY
         if self.abstract_hypothesis_digest is None:
             return ProcessSignalCaseStatus.DIAGNOSTIC_ONLY
         return ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL
@@ -254,7 +274,7 @@ class ProcessSignalCase:
             "physical_observation_ids", "source_observed", "extraction_observed",
             "persistence_observed", "retrieval_observed", "exposure_observed",
             "outcome_observed", "extraction_attributable", "abstract_hypothesis_digest",
-            "observation_complete", "invalid_reason_code", "evidence_plane",
+            "observation_complete", "stage_diagnosis_observed", "invalid_reason_code", "evidence_plane",
             "evidence_source", "status",
         }
         if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != PROCESS_SIGNAL_SCHEMA:
@@ -271,6 +291,7 @@ class ProcessSignalCase:
                 extraction_attributable=value["extraction_attributable"],
                 abstract_hypothesis_digest=value["abstract_hypothesis_digest"],
                 observation_complete=value["observation_complete"],
+                stage_diagnosis_observed=value["stage_diagnosis_observed"],
                 invalid_reason_code=value["invalid_reason_code"],
                 evidence_plane=value["evidence_plane"], evidence_source=value["evidence_source"],
                 schema_version=value["schema_version"],
