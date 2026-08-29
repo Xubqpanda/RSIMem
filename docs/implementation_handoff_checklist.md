@@ -970,6 +970,8 @@ formal usage/process-corpus audit，且失败结果不得进入训练或质量�
 `run_luna_extraction_feedback_sm01.sh` 与 `run_luna_extraction_matched.sh` 已在
 manifest/preflight 注册后、首个 benchmark task 前自动执行该 gate，并将
 content-free 结果保存为 batch 内的 `provider_probe.json`。
+clean detached worktree 的本地 HTTP fixture 已验证失败 probe 会在首个
+PAST-Bench task 前退出且不产生 task trace。
 
 ## 10. 三阶段完成定义
 

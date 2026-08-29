@@ -85,6 +85,8 @@ explicit diagnostic code.
 Both formal extraction launchers now run the probe after manifest/preflight
 registration and before the first benchmark task, persisting only the safe
 `provider_probe.json` result and stopping early on failure.
+This fail-fast path was verified in a clean detached worktree with a local HTTP
+fixture: the launcher exited before creating any PAST-Bench task trace.
 
 The PAST-Bench Hermes adapter now transports only content-free process-corpus
 identity (`event_ids` and a stable digest) in `StepResponse`; it never exposes

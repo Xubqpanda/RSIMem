@@ -26,3 +26,7 @@ The formal feedback and matched launchers run this probe automatically after
 manifest/preflight registration and before the first PAST-Bench task.  The
 content-free result is saved as `provider_probe.json` in the batch directory;
 failed probes leave the registered attempt without starting benchmark work.
+
+The launcher gate has been exercised in a clean detached worktree with a local
+HTTP fixture: a non-completion response produced `provider_probe.json` and the
+launcher exited before creating a PAST-Bench task trace.
