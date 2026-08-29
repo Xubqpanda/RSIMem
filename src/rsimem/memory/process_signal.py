@@ -9,10 +9,13 @@ replicate conflicts remain visible diagnostics.
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
+import os
 import re
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import Iterable, Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
@@ -331,6 +334,77 @@ class ProcessSignalCaseCensus:
         }
 
 
+class JsonProcessSignalCaseStore:
+    """Atomic, restart-safe storage for logical process-signal cases."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+
+    @staticmethod
+    def _canonical(value: Mapping[str, object]) -> str:
+        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+    def _read_unlocked(self) -> dict[str, str]:
+        if not self.path.exists():
+            return {}
+        records: dict[str, str] = {}
+        for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                case = ProcessSignalCase.from_payload(json.loads(line))
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"malformed process-signal case at line {line_number}"
+                ) from exc
+            canonical = self._canonical(case.payload())
+            previous = records.get(case.case_id)
+            if previous is not None and previous != canonical:
+                raise ValueError("conflicting process-signal case")
+            records[case.case_id] = canonical
+        return records
+
+    def records(self) -> tuple[ProcessSignalCase, ...]:
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
+            try:
+                records = self._read_unlocked()
+                return tuple(
+                    ProcessSignalCase.from_payload(json.loads(value))
+                    for value in records.values()
+                )
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def append(self, case: ProcessSignalCase) -> bool:
+        if not isinstance(case, ProcessSignalCase):
+            raise TypeError("process-signal store accepts ProcessSignalCase only")
+        serialized = self._canonical(case.payload())
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                records = self._read_unlocked()
+                previous = records.get(case.case_id)
+                if previous is not None:
+                    if previous != serialized:
+                        raise ValueError("conflicting process-signal case")
+                    return False
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    handle.write(serialized + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                return True
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def census(self) -> ProcessSignalCaseCensus:
+        return census_process_signal_cases(self.records())
+
+
 def census_process_signal_cases(cases: Iterable[ProcessSignalCase]) -> ProcessSignalCaseCensus:
     values = tuple(cases)
     if any(not isinstance(value, ProcessSignalCase) for value in values):
@@ -364,6 +438,7 @@ __all__ = [
     "PROCESS_SIGNAL_SCHEMA_VERSION",
     "ProcessSignalCase",
     "ProcessSignalCaseCensus",
+    "JsonProcessSignalCaseStore",
     "ProcessSignalCaseStatus",
     "census_process_signal_cases",
 ]

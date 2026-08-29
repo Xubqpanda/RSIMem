@@ -6,6 +6,7 @@ from dataclasses import replace
 import pytest
 
 from rsimem.memory.process_signal import (
+    JsonProcessSignalCaseStore,
     ProcessSignalCase,
     ProcessSignalCaseStatus,
     census_process_signal_cases,
@@ -99,6 +100,22 @@ def test_census_counts_all_physical_observations_inside_one_case() -> None:
         observation_complete=True,
     )
     assert census_process_signal_cases((case,)).physical_observation_count == 2
+
+
+def test_process_signal_case_store_replays_logical_census(tmp_path) -> None:
+    path = tmp_path / "process-signal.jsonl"
+    first = _case(physical="physical-observation.store.1")
+    second = _case(hypothesis=None, physical="physical-observation.store.2")
+    store = JsonProcessSignalCaseStore(path)
+    assert store.append(first) is True
+    assert store.append(first) is False
+    assert store.append(second) is True
+    replay = JsonProcessSignalCaseStore(path)
+    assert {case.case_id for case in replay.records()} == {first.case_id, second.case_id}
+    census = replay.census()
+    assert census.physical_observation_count == 2
+    assert census.logical_case_count == 1
+    assert census.conflict_case_count == 1
 
 
 def test_projection_from_process_events_never_infers_extraction_attribution() -> None:
