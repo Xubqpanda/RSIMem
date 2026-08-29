@@ -19,6 +19,8 @@ The typed memory runtime is connected to the PAST-Bench Hermes execution path be
 Raw extraction-validation observations now have a separate crash-safe,
 frozen-split-bound store, so prompt-quality decisions remain reconstructible
 from persisted observations rather than depending on a derived decision file.
+Matched evidence assembly now reloads those durable observations before running
+the evaluator, completing the raw-observation-to-decision replay boundary.
 
 The Hermes, static semantic writeback, operation graph, feedback store, and
 activation/rollback foundations are complete. The former Phase 2J/2K work is
