@@ -189,6 +189,16 @@ def test_sm03_fact_correction_contract_resolves_corrected_value() -> None:
     assert harmful.outcome_status == OperationStatus.FAILED
     assert harmful.outcome_reason_code == "memory_use_harmfully_attributed"
 
+    stale_reference = resolver.resolve(future, _observation(
+        family_id="SM03_fact_correction",
+        response=(
+            "The previous Phoenix freeze date was 2026-06-14. "
+            "The note was shared with the rollout owners."
+        ),
+        task_keys=("fact.phoenix.release_freeze_date",),
+    ))
+    assert stale_reference.outcome_status == OperationStatus.FAILED
+
 
 def test_sm03_fact_correction_keys_are_deterministic_and_confounded() -> None:
     key = "fact.phoenix.release_freeze_date"
