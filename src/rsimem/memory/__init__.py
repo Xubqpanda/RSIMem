@@ -158,6 +158,12 @@ from .logical_case import (
     PhysicalObservation,
     resolve_logical_case,
 )
+from .revocation import (
+    REVOCATION_SCHEMA,
+    REVOCATION_SCHEMA_VERSION,
+    JsonRevocationRegistry,
+    RevocationEntry,
+)
 
 __all__ = [
     "MemoryAccessMode",
@@ -280,6 +286,10 @@ __all__ = [
     "LogicalCaseResolutionStatus",
     "PhysicalObservation",
     "resolve_logical_case",
+    "REVOCATION_SCHEMA",
+    "REVOCATION_SCHEMA_VERSION",
+    "JsonRevocationRegistry",
+    "RevocationEntry",
     "PROCESS_CORPUS_SCHEMA",
     "PROCESS_CORPUS_SCHEMA_VERSION",
     "JsonProcessCorpusStore",
