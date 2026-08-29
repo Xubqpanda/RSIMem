@@ -1049,6 +1049,8 @@ def test_live_bridge_trigger_and_source_decisions_replay_from_persisted_evidence
     first_process_digest = bridge.process_feedback_digest
     bridge.close()
     assert {event["layer"] for event in first} == {"trigger", "source_selection"}
+    assert {event["evidencePlane"] for event in first} == {"pure_process"}
+    assert {event["evidenceSource"] for event in first} == {"runtime_observation"}
 
     restarted = HermesPastBenchBridge(
         home,
