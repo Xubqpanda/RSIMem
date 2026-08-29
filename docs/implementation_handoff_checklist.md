@@ -1002,6 +1002,12 @@ actionable count为0，低于冻结门槛2；optimizer以0次模型调用返回`
 这被接受为 strict attribution 的 no-signal pilot，不再阻止 exploratory end-to-end feasibility；但第三阶段仍必须先逐层完成六层 decision/evidence feasibility case。验收记录见
 [`extraction_stage2e_feedback_v10_20260828.md`](extraction_stage2e_feedback_v10_20260828.md)；
 此前provider失败记录见[`extraction_stage2e_provider_attempts_20260828.md`](extraction_stage2e_provider_attempts_20260828.md)。
+2026-08-29 的后续 clean-worktree SM02 重试仍未形成 eligible batch：主 endpoint
+在首个 replicate 的 reflection 请求遇到容量错误，备用 endpoint 的 9 条 trace
+均为 think-only 空响应且缺少 usage。两次 attempt 均以
+`incomplete_model_usage` fail-closed，完整 manifest/raw trace 仅作为 provider
+diagnostic 保留，详见
+[`extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md`](extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md)。
 后续顺序仍严格按照：
 
 ```text

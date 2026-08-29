@@ -65,6 +65,14 @@ errors; incomplete attempts remain excluded from optimizer and activation. Raw
 usage and process-corpus diagnostics are recorded in
 [`extraction_stage3_sm02_process_pilot_20260829.md`](extraction_stage3_sm02_process_pilot_20260829.md).
 
+A subsequent clean-worktree retry tested the same family against each endpoint
+separately. The primary retry stopped after a provider-capacity failure and the
+backup retry produced empty think-only responses with missing usage on every
+trace; both audits therefore failed closed as `incomplete_model_usage`. Their
+manifests and raw traces are retained, but neither attempt is a task negative
+or optimizer input. See
+[`extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md`](extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md).
+
 The PAST-Bench Hermes adapter now transports only content-free process-corpus
 identity (`event_ids` and a stable digest) in `StepResponse`; it never exposes
 official score or grader fields to the policy path. An evaluator-free static
