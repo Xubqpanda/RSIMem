@@ -7,7 +7,7 @@ from rsimem.memory.exposure_policy import (
     ExposurePolicyConfig,
     InjectionReceiptStatus,
 )
-from rsimem.memory.policy_contracts import ExposureMode
+from rsimem.memory.policy_contracts import DecisionAction, ExposureMode, SafetyBoundary
 from rsimem.memory.trigger_policy import HostTriggerAdapter
 
 
@@ -46,6 +46,18 @@ def test_selective_mode_and_budget_zero_are_deterministic() -> None:
     replay = policy.decide(_event(), ("artifact.1", "artifact.2"), artifact_token_counts=(1, 1), budget_tokens=0)
     assert first == replay
     assert first.action.value == "SKIP"
+
+
+def test_invalid_safety_boundary_fails_closed_without_injection() -> None:
+    decision = DeterministicExposurePolicy().decide(
+        _event(),
+        ("artifact.1",),
+        safety=SafetyBoundary(schema_valid=False),
+    )
+    assert decision.action is DecisionAction.SKIP
+    assert decision.execution_status.value == "skipped"
+    assert decision.selected_artifact_ids == ()
+    assert decision.reason_codes == ("safety_boundary_invalid",)
 
 
 def test_receipt_rejects_revision_mismatch() -> None:
