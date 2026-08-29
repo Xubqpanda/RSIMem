@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import pytest
 
-from rsimem.memory.final_evaluation import FinalEvaluationRecord
+from rsimem.memory.final_evaluation import FinalEvaluationRecord, JsonFinalEvaluationStore
 
 
 def _record(**overrides: object) -> FinalEvaluationRecord:
@@ -43,3 +43,28 @@ def test_final_evaluation_rejects_wrong_plane_and_non_numeric_score() -> None:
         replace(_record(), evidence_plane="pure_process")
     with pytest.raises(TypeError, match="metric value"):
         _record(metric_value=True)
+
+
+def test_final_evaluation_store_is_isolated_restart_safe_and_idempotent(tmp_path) -> None:
+    path = tmp_path / "final-evaluation.jsonl"
+    record = _record()
+    store = JsonFinalEvaluationStore(path)
+    assert store.append(record) is True
+    assert store.append(record) is False
+    assert JsonFinalEvaluationStore(path).records() == (record,)
+
+    conflicting = record.payload()
+    conflicting["metric_value"] = 0.5
+    path.write_text(
+        path.read_text(encoding="utf-8")
+        + json.dumps(conflicting, ensure_ascii=True, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="malformed final evaluation record"):
+        JsonFinalEvaluationStore(path)
+
+
+def test_final_evaluation_store_rejects_non_reporter_values(tmp_path) -> None:
+    with pytest.raises(TypeError, match="FinalEvaluationRecord"):
+        JsonFinalEvaluationStore(tmp_path / "final.jsonl").append({})
