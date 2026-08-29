@@ -19,6 +19,7 @@ from ..models.content import TextBlock
 from ..models.scoring import compute_task_score, is_pass
 from ..models.self_evolve import (
     RSIMemAdaptiveWritebackConfig,
+    RSIMemExtractionOfflineValidationProfile,
     RSIMemExtractionTrialProfile,
 )
 from ..models.task import Prompt, TaskDefinition
@@ -57,6 +58,8 @@ def build_hermes_extra_body(
     rsimem_adaptive_policy_source_path: str = "",
     rsimem_extraction_trial_profile: RSIMemExtractionTrialProfile | dict | None = None,
     rsimem_extraction_trial_source_path: str = "",
+    rsimem_extraction_offline_profile: RSIMemExtractionOfflineValidationProfile | dict | None = None,
+    rsimem_extraction_offline_source_path: str = "",
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -131,8 +134,23 @@ def build_hermes_extra_body(
                 "extraction_runtime_scope": "matched_validation",
                 "extraction_runtime_config_path": str(target_config),
             })
+        elif rsimem_extraction_offline_profile is not None:
+            profile = RSIMemExtractionOfflineValidationProfile.model_validate(
+                rsimem_extraction_offline_profile
+            )
+            target_config = _materialize_extraction_offline_bundle(
+                source_config_path=rsimem_extraction_offline_source_path,
+                artifacts_dir=artifacts_dir,
+                expected_profile=profile,
+            )
+            semantic_writeback.update({
+                "extraction_runtime_scope": "offline_validation",
+                "extraction_runtime_config_path": str(target_config),
+            })
         elif rsimem_extraction_trial_source_path:
             raise ValueError("extraction trial source requires a trial profile")
+        elif rsimem_extraction_offline_source_path:
+            raise ValueError("extraction offline source requires a profile")
         enabled_toolsets = [
             toolset for toolset in enabled_toolsets if toolset != "memory"
         ]
@@ -141,6 +159,8 @@ def build_hermes_extra_body(
     elif (
         rsimem_extraction_trial_profile is not None
         or rsimem_extraction_trial_source_path
+        or rsimem_extraction_offline_profile is not None
+        or rsimem_extraction_offline_source_path
     ) and persistence_enabled:
         raise ValueError("extraction trial requires static semantic writeback")
 
@@ -231,6 +251,39 @@ def _materialize_extraction_trial_bundle(
     copied_profile = RSIMemExtractionTrialProfile.model_validate(copied.profile())
     if copied_profile != expected_profile:
         raise ValueError("attempt-local extraction trial profile differs")
+    return target_config
+
+
+def _materialize_extraction_offline_bundle(
+    *,
+    source_config_path: str,
+    artifacts_dir: Path,
+    expected_profile: RSIMemExtractionOfflineValidationProfile,
+) -> Path:
+    if not source_config_path:
+        raise ValueError("extraction offline validation requires a source config")
+    source = Path(source_config_path).expanduser().resolve()
+    from rsimem.extraction_validation_runtime import (
+        EXTRACTION_OFFLINE_CANDIDATE_FILE,
+        EXTRACTION_OFFLINE_CONFIG_FILE,
+        load_extraction_offline_validation_profile,
+    )
+    resolved = load_extraction_offline_validation_profile(source)
+    actual = RSIMemExtractionOfflineValidationProfile.model_validate(resolved.profile())
+    if actual != expected_profile:
+        raise ValueError("extraction offline source profile differs from manifest")
+    target_root = artifacts_dir.expanduser().resolve() / "rsimem_extraction_offline"
+    targets = {
+        resolved.config_path: target_root / EXTRACTION_OFFLINE_CONFIG_FILE,
+        resolved.candidate_artifact_path: target_root / EXTRACTION_OFFLINE_CANDIDATE_FILE,
+    }
+    for source_path, target_path in targets.items():
+        _copy_immutable_file(source_path, target_path)
+    target_config = target_root / EXTRACTION_OFFLINE_CONFIG_FILE
+    copied = load_extraction_offline_validation_profile(target_config)
+    copied_profile = RSIMemExtractionOfflineValidationProfile.model_validate(copied.profile())
+    if copied_profile != expected_profile:
+        raise ValueError("attempt-local extraction offline profile differs")
     return target_config
 
 
@@ -676,6 +729,12 @@ class HermesPersistenceBackend(PersistenceBackend):
             ),
             rsimem_extraction_trial_source_path=(
                 sequence.hermes.rsimem_extraction_trial_source_path
+            ),
+            rsimem_extraction_offline_profile=(
+                sequence.hermes.rsimem_extraction_offline_profile
+            ),
+            rsimem_extraction_offline_source_path=(
+                sequence.hermes.rsimem_extraction_offline_source_path
             ),
         )
 

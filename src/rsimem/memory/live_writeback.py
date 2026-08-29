@@ -86,6 +86,7 @@ class StaticSemanticWritebackMode(StrEnum):
 
 class ExtractionPromptRuntimeScope(StrEnum):
     ROOT_STATIC = "root_static"
+    OFFLINE_VALIDATION = "offline_validation"
     MATCHED_VALIDATION = "matched_validation"
 
 
@@ -141,9 +142,12 @@ class ExtractionRuntimeBinding:
             for value in digests
         ):
             raise ValueError("extraction runtime binding digest is invalid")
-        if self.deployment_scope == ExtractionPromptRuntimeScope.MATCHED_VALIDATION:
+        if self.deployment_scope in {
+            ExtractionPromptRuntimeScope.MATCHED_VALIDATION,
+            ExtractionPromptRuntimeScope.OFFLINE_VALIDATION,
+        }:
             if not isinstance(self.trial_id, str) or not self.trial_id.strip():
-                raise ValueError("matched extraction binding requires a trial ID")
+                raise ValueError("validated extraction binding requires a validation ID")
         elif self.trial_id is not None:
             raise ValueError("root extraction binding cannot carry a trial ID")
 
@@ -158,11 +162,12 @@ class ExtractionRuntimeBinding:
         trial_id: str | None,
     ) -> "ExtractionRuntimeBinding":
         scope = ExtractionPromptRuntimeScope(deployment_scope)
-        if scope == ExtractionPromptRuntimeScope.MATCHED_VALIDATION:
+        if scope in {
+            ExtractionPromptRuntimeScope.MATCHED_VALIDATION,
+            ExtractionPromptRuntimeScope.OFFLINE_VALIDATION,
+        }:
             if not trial_id or policy_artifact.parent_artifact_id is None:
-                raise ValueError(
-                    "matched extraction runtime requires a child artifact and trial ID"
-                )
+                raise ValueError("validated extraction runtime requires a child artifact and validation ID")
         elif trial_id is not None or policy_artifact.parent_artifact_id is not None:
             raise ValueError("root extraction runtime cannot bind a trial candidate")
         if (
@@ -453,16 +458,16 @@ class StaticSemanticWritebackConfig:
             raise ValueError("adaptive semantic fields require adaptive_utility mode")
         if not self.enabled and self.feedback_contract != SemanticFeedbackContract.DISABLED:
             raise ValueError("semantic feedback contract requires writeback mode")
-        if self.matched_extraction_enabled:
+        if self.validated_extraction_enabled:
             if self.mode != StaticSemanticWritebackMode.STATIC:
                 raise ValueError(
-                    "matched extraction runtime requires plain static writeback"
+                    "validated extraction runtime requires plain static writeback"
                 )
             if not isinstance(self.extraction_runtime_config_path, str) or not (
                 self.extraction_runtime_config_path.strip()
             ):
                 raise ValueError(
-                    "matched extraction runtime requires an explicit config path"
+                    "validated extraction runtime requires an explicit config path"
                 )
         elif self.extraction_runtime_config_path is not None:
             raise ValueError(
@@ -488,7 +493,7 @@ class StaticSemanticWritebackConfig:
     def plain_extraction_parent(self) -> bool:
         return (
             self.mode == StaticSemanticWritebackMode.STATIC
-            and not self.matched_extraction_enabled
+            and not self.validated_extraction_enabled
         )
 
     @property
@@ -499,12 +504,23 @@ class StaticSemanticWritebackConfig:
         )
 
     @property
+    def offline_extraction_enabled(self) -> bool:
+        return (
+            self.extraction_runtime_scope
+            == ExtractionPromptRuntimeScope.OFFLINE_VALIDATION
+        )
+
+    @property
+    def validated_extraction_enabled(self) -> bool:
+        return self.matched_extraction_enabled or self.offline_extraction_enabled
+
+    @property
     def method_identity(self) -> str | None:
         return {
             StaticSemanticWritebackMode.DISABLED: None,
             StaticSemanticWritebackMode.STATIC: (
                 MATCHED_EXTRACTION_CANDIDATE_ID
-                if self.matched_extraction_enabled
+                if self.validated_extraction_enabled
                 else STATIC_EXTRACTION_PARENT_ID
             ),
             StaticSemanticWritebackMode.STATIC_UTILITY: LEGACY_STATIC_UTILITY_ID,
