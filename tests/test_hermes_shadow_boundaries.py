@@ -162,10 +162,15 @@ def test_duplicate_tool_call_id_is_marked_duplicate_and_fails_closed(tmp_path) -
     finally:
         bridge.close()
     joins = bridge.tool_call_result_joins
-    assert len(joins) == 1
-    assert joins[0].duplicate_call is True
-    resolution = resolve_tool_call_result(joins[0])
-    assert resolution.status is ToolJoinResolutionStatus.DUPLICATE
+    assert len(joins) == 2
+    assert all(join.duplicate_call for join in joins)
+    assert sum(join.result_present for join in joins) == 1
+    assert sum(event.kind.value == "tool_call" for event in bridge.process_feedback) == 2
+    assert sum(event.kind.value == "tool_result" for event in bridge.process_feedback) == 1
+    assert all(
+        resolve_tool_call_result(join).status is ToolJoinResolutionStatus.DUPLICATE
+        for join in joins
+    )
 
 
 def test_duplicate_tool_call_id_without_result_remains_duplicate_missing_closure(tmp_path) -> None:
@@ -193,8 +198,10 @@ def test_duplicate_tool_call_id_without_result_remains_duplicate_missing_closure
     finally:
         bridge.close()
     joins = bridge.tool_call_result_joins
-    assert len(joins) == 1
-    assert joins[0].duplicate_call is True
-    assert joins[0].result_present is False
-    resolution = resolve_tool_call_result(joins[0])
-    assert resolution.status is ToolJoinResolutionStatus.DUPLICATE
+    assert len(joins) == 2
+    assert all(join.duplicate_call for join in joins)
+    assert all(join.result_present is False for join in joins)
+    assert all(
+        resolve_tool_call_result(join).status is ToolJoinResolutionStatus.DUPLICATE
+        for join in joins
+    )
