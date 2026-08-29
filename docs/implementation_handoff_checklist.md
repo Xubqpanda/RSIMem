@@ -854,6 +854,7 @@ Family规则：
 `665 passed`；下方 `656 passed` 记录保留为此前 process-audit 基线。
 matched process-corpus gate 反向测试后，当前计数进一步更新为 `666 passed`。
 rejected-terminal receipt 反向测试后，当前计数更新为 `667 passed`。
+policy reason-code 保真反向测试后，当前计数更新为 `671 passed`。
 
 本轮在新增 process-feedback、process-corpus 与 admission anti-collapse
 回归后，RSIMem 当前验证计数为 `665 passed`；PAST-Bench 仍为 `397 passed,
