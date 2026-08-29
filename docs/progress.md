@@ -621,9 +621,12 @@ value copying on both attempts, so no candidate was written. Details are in
 
 Commit `3373a78` adds an explicit `ExtractionSplitPlan` contract and optional
 matched-preflight validation. The current SM01, SM02, and SM05 pilots all
-occupy train roles, so there is no uncontaminated authored semantic family left
-for held-out validation; the split audit records this rather than reusing a
-train manifest ([`extraction_stage3_split_audit_20260829.md`](extraction_stage3_split_audit_20260829.md)).
+occupy train roles, so none of those manifests may be relabeled as validation.
+An explicit held-out plan now reserves SM03 fact correction for validation and
+SM04 rule migration for final test (`configs/extraction_split_plan_sm02_sm03_sm04.json`).
+SM03 is registered as an extraction-only validation contract with its update
+prompt frozen; the plan is identity bookkeeping only and no matched validation
+has run yet ([`extraction_stage3_split_audit_20260829.md`](extraction_stage3_split_audit_20260829.md)).
 
 ## Update Policy
 

@@ -63,6 +63,20 @@ def test_checked_in_feedback_config_and_plain_parent_are_valid() -> None:
     assert parent.model_profile == "semantic-ingestion-default-v1"
 
 
+def test_checked_in_sm03_validation_config_resolves_registered_contract() -> None:
+    config = preflight.load_extraction_preflight_config(
+        ROOT / "configs/extraction_validation_sm03.json"
+    )
+    contract = preflight.default_feedback_contract_registry().resolver(
+        config["familyId"]
+    ).contract
+    assert config["familyId"] == "SM03_fact_correction"
+    assert config["taskTemplateGroupId"] == "sm03-correction-heldout-validation-v1"
+    assert contract.opportunity.memory_scope_keys == (
+        "fact.phoenix.release_freeze_date",
+    )
+
+
 def test_task_template_digest_covers_all_family_files(tmp_path: Path) -> None:
     family = _family(tmp_path)
     first = preflight.resolved_task_template_profile(family)

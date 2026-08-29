@@ -1404,15 +1404,11 @@ class _NotesFamilyResolver:
             # Quoting the stale value while explicitly describing the
             # correction is not harmful evidence.  A stale-only response is
             # harmful only when it is not framed as historical context.
-            correction_context = any(
-                token in response
-                for token in (
-                    "obsolete",
-                    "corrected",
-                    "replaces",
-                    "replaced",
-                    "previous",
-                    "superseded",
+            correction_context = (
+                any(token in response for token in ("obsolete", "superseded"))
+                or (
+                    "replaced" in response
+                    and any(token in response for token in (" by ", " with "))
                 )
             )
             explicit_use = corrected
