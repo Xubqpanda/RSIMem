@@ -12,10 +12,11 @@ from pathlib import Path
 import re
 from typing import Sequence
 
+from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 from .policy_contracts import PolicyDecision, content_digest
 
 
-POLICY_EVIDENCE_SCHEMA_VERSION = 1
+POLICY_EVIDENCE_SCHEMA_VERSION = 2
 # Experiment variants legitimately use ``+`` (for example
 # ``native+adapter+ledger``), so the join identity grammar includes it.
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
@@ -48,6 +49,8 @@ class PolicyDecisionEvidence:
     trace_id: str = "unscoped"
     family_id: str | None = None
     stage: str | None = None
+    evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
     schema_version: int = POLICY_EVIDENCE_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -78,6 +81,23 @@ class PolicyDecisionEvidence:
             if value is not None:
                 if not value.strip() or _IDENTIFIER.fullmatch(value) is None:
                     raise ValueError(f"{name} must be a stable identifier")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        expected_plane = (
+            EvidencePlane.BENCHMARK_AUDIT
+            if self.family_id is not None or self.stage is not None
+            else EvidencePlane.PURE_PROCESS
+        )
+        expected_source = (
+            EvidenceSourceKind.BENCHMARK_CONTRACT
+            if expected_plane is EvidencePlane.BENCHMARK_AUDIT
+            else EvidenceSourceKind.RUNTIME_OBSERVATION
+        )
+        if plane is not expected_plane or source is not expected_source:
+            raise ValueError(
+                "policy evidence plane/source does not match benchmark metadata"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         if self.trigger_event_id is not None and not self.trigger_event_id.strip():
             raise ValueError("trigger event ID must not be empty")
         if self.execution_receipt_id is not None and not self.execution_receipt_id.strip():
@@ -112,7 +132,21 @@ class PolicyDecisionEvidence:
         trace_id: str = "unscoped",
         family_id: str | None = None,
         stage: str | None = None,
+        evidence_plane: EvidencePlane | str | None = None,
+        evidence_source: EvidenceSourceKind | str | None = None,
     ) -> "PolicyDecisionEvidence":
+        expected_plane = (
+            EvidencePlane.BENCHMARK_AUDIT
+            if family_id is not None or stage is not None
+            else EvidencePlane.PURE_PROCESS
+        )
+        expected_source = (
+            EvidenceSourceKind.BENCHMARK_CONTRACT
+            if expected_plane is EvidencePlane.BENCHMARK_AUDIT
+            else EvidenceSourceKind.RUNTIME_OBSERVATION
+        )
+        resolved_plane = expected_plane if evidence_plane is None else EvidencePlane(evidence_plane)
+        resolved_source = expected_source if evidence_source is None else EvidenceSourceKind(evidence_source)
         identity = {
             "run_id": run_id,
             "episode_id": episode_id,
@@ -136,6 +170,8 @@ class PolicyDecisionEvidence:
             "trace_id": trace_id,
             "family_id": family_id,
             "stage": stage,
+            "evidence_plane": resolved_plane.value,
+            "evidence_source": resolved_source.value,
         }
         return cls(
             event_id=f"policy-event.{content_digest(identity)[:40]}",
@@ -163,6 +199,8 @@ class PolicyDecisionEvidence:
             trace_id=trace_id,
             family_id=family_id,
             stage=stage,
+            evidence_plane=resolved_plane,
+            evidence_source=resolved_source,
         )
 
     def payload(self) -> dict[str, object]:
@@ -193,6 +231,8 @@ class PolicyDecisionEvidence:
             "traceId": self.trace_id,
             "familyId": self.family_id,
             "stage": self.stage,
+            "evidencePlane": self.evidence_plane.value,
+            "evidenceSource": self.evidence_source.value,
         }
 
     @classmethod
@@ -203,7 +243,8 @@ class PolicyDecisionEvidence:
             "action", "executionStatus", "reasonCodes", "inputDigest", "outputDigest",
             "lineageId", "triggerEventId", "executionReceiptId", "mutationReceiptIds",
             "injectionReceiptIds", "futureFeedbackIds",
-            "variant", "traceId", "familyId", "stage",
+            "variant", "traceId", "familyId", "stage", "evidencePlane",
+            "evidenceSource",
         }
         if not isinstance(value, dict) or set(value) != fields:
             raise ValueError("malformed policy evidence event")
@@ -222,6 +263,8 @@ class PolicyDecisionEvidence:
                 future_feedback_ids=tuple(value["futureFeedbackIds"]),
                 variant=value["variant"], trace_id=value["traceId"],
                 family_id=value["familyId"], stage=value["stage"],
+                evidence_plane=value["evidencePlane"],
+                evidence_source=value["evidenceSource"],
                 schema_version=value["schemaVersion"],
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -251,6 +294,8 @@ class PolicyDecisionEvidence:
             'trace_id': result.trace_id,
             'family_id': result.family_id,
             'stage': result.stage,
+            'evidence_plane': result.evidence_plane.value,
+            'evidence_source': result.evidence_source.value,
         }
         expected_event_id = f"policy-event.{content_digest(event_identity)[:40]}"
         if result.event_id != expected_event_id:
