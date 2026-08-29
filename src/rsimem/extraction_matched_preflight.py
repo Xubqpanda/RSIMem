@@ -54,7 +54,7 @@ def initialize_formal_matched_validation_batch(
     run_config_path: Path,
     experiment_config_path: Path,
     trial_config_path: Path,
-    split_plan_path: Path | None = None,
+    split_plan_path: Path,
     agent: str = "hermes-luna",
 ) -> str:
     config = load_extraction_preflight_config(experiment_config_path)
@@ -65,13 +65,12 @@ def initialize_formal_matched_validation_batch(
     candidate_policy = _semantic_policy(trial.candidate)
     matched = MatchedSemanticPolicyManifest.create(parent_policy, candidate_policy)
     task_profile = resolved_task_template_profile(family_root)
-    if split_plan_path is not None:
-        load_extraction_split_plan(split_plan_path).assignment_for(
-            role=ExtractionSplitRole.VALIDATION,
-            family_id=config["familyId"],
-            task_template_group_id=config["taskTemplateGroupId"],
-            task_manifest_digest=task_profile["taskManifestDigest"],
-        )
+    load_extraction_split_plan(split_plan_path).assignment_for(
+        role=ExtractionSplitRole.VALIDATION,
+        family_id=config["familyId"],
+        task_template_group_id=config["taskTemplateGroupId"],
+        task_manifest_digest=task_profile["taskManifestDigest"],
+    )
     model_profile = resolved_model_profile(
         agent_registry_path,
         run_config_path,
@@ -129,7 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run-config", type=Path, required=True)
     parser.add_argument("--experiment-config", type=Path, required=True)
     parser.add_argument("--trial-config", type=Path, required=True)
-    parser.add_argument("--split-plan", type=Path)
+    parser.add_argument("--split-plan", type=Path, required=True)
     parser.add_argument("--agent", default="hermes-luna")
     return parser
 
