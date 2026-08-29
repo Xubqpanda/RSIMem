@@ -108,6 +108,20 @@ PROCESS_REASON_CODES = frozenset({
     "adapter_failure",
 })
 
+# Policy ledgers retain the full layer-specific reason.  This bounded mapping
+# keeps the process corpus vocabulary stable while preserving the distinction
+# between no eligible work and an unsupported host boundary.
+PROCESS_POLICY_REASON_MAP = {
+    "trigger_not_run": "absence",
+    "no_eligible_source": "absence",
+    "task_not_completed": "absence",
+    "duplicate_event": "absence",
+    "duplicate_source_revision": "absence",
+    "shadow_only": "unsupported_boundary",
+    "unsupported_trigger": "unsupported_boundary",
+    "parent_disabled": "unsupported_boundary",
+}
+
 
 def _layer_kind(layer: PolicyLayer) -> ProcessEventKind:
     return {
@@ -295,7 +309,9 @@ class ProcessEvent:
         # corpus vocabulary intentionally small and stable, while the richer
         # policy reason remains available in the policy ledger.
         mapped = tuple(
-            value if value in PROCESS_REASON_CODES else "decision_observed"
+            value
+            if value in PROCESS_REASON_CODES
+            else PROCESS_POLICY_REASON_MAP.get(value, "decision_observed")
             for value in decision.reason_codes
         )
         reason_codes = tuple(dict.fromkeys(mapped)) or ("decision_observed",)
