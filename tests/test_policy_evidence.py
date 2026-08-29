@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
@@ -63,3 +64,15 @@ def test_evidence_payload_round_trips() -> None:
         mutation_receipt_ids=("receipt.mutation",),
     )
     assert PolicyDecisionEvidence.from_payload(evidence.payload()) == evidence
+
+
+def test_policy_evidence_ledger_reserves_one_concurrent_writer(tmp_path) -> None:
+    path = tmp_path / "policy-concurrent.jsonl"
+
+    def record_once() -> PolicyDecisionEvidence:
+        return _record(JsonPolicyDecisionLedger(path))
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        records = tuple(executor.map(lambda _: record_once(), range(8)))
+    assert len({item.event_id for item in records}) == 1
+    assert len(JsonPolicyDecisionLedger(path).events) == 1
