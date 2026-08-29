@@ -3,7 +3,8 @@
 The clean parent batch `s1-sm05-feedback-20260829-v1` completed three
 replicates over the nine-episode `SM05_weak_trigger_preference_adoption`
 family. All three attempts passed the runtime audit and produced 36 feedback
-records, 21 source captures, and 89 canonical process events. The strict
+records and 21 source captures. Each run had 89 canonical process events;
+the batch-level canonical process corpus contains 267 events. The strict
 primary distribution was:
 
 | label | count |

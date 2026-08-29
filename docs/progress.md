@@ -611,7 +611,8 @@ not ACTIVE or matched-validation evidence. The retry report is in
 An independent SM05 process pilot (`s1-sm05-feedback-20260829-v1`) then
 completed three clean nine-episode replicates. It produced 24 extraction-owned
 `missed` and 12 `unresolved` primary observations, with 89 canonical process
-events. The optimizer request initially exceeded the frozen input budget; the
+events per replicate (267 in the batch-level process corpus). The optimizer
+request initially exceeded the frozen input budget; the
 deterministic replica compaction in commit `f194bf8` reduced it to 158,538
 characters while retaining all primary IDs. The provider returned schema-valid
 proposals, but the candidate content-safety gate rejected corpus-specific
