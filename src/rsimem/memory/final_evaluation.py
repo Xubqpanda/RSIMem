@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
 import json
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
@@ -163,8 +166,91 @@ class FinalEvaluationRecord:
             raise ValueError("malformed final evaluation record") from exc
 
 
+class JsonFinalEvaluationStore:
+    """Crash-safe append-only storage owned exclusively by the final reporter.
+
+    This store accepts only :class:`FinalEvaluationRecord` values.  Keeping a
+    separate file and reader prevents score-bearing records from entering the
+    pure-process or optimizer corpus by accident.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+        self._records: dict[str, str] = {}
+        self._load()
+
+    @staticmethod
+    def _canonical(value: Mapping[str, object]) -> str:
+        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        for line_number, line in enumerate(
+            self.path.read_text(encoding="utf-8").splitlines(), 1
+        ):
+            if not line.strip():
+                continue
+            try:
+                record = FinalEvaluationRecord.from_payload(json.loads(line))
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"malformed final evaluation record at line {line_number}"
+                ) from exc
+            canonical = self._canonical(record.payload())
+            previous = self._records.get(record.report_id)
+            if previous is not None and previous != canonical:
+                raise ValueError("conflicting final evaluation record")
+            self._records[record.report_id] = canonical
+
+    def records(self) -> tuple[FinalEvaluationRecord, ...]:
+        """Reload and return records in stable report-ID order."""
+
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
+            try:
+                self._records.clear()
+                self._load()
+                return tuple(
+                    FinalEvaluationRecord.from_payload(json.loads(value))
+                    for _, value in sorted(self._records.items())
+                )
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def append(self, record: FinalEvaluationRecord) -> bool:
+        """Persist a record once; conflicting identity fails closed."""
+
+        if not isinstance(record, FinalEvaluationRecord):
+            raise TypeError("final evaluation store accepts FinalEvaluationRecord only")
+        serialized = self._canonical(record.payload())
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                self._records.clear()
+                self._load()
+                previous = self._records.get(record.report_id)
+                if previous is not None:
+                    if previous != serialized:
+                        raise ValueError("conflicting final evaluation record")
+                    return False
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    handle.write(serialized + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                self._records[record.report_id] = serialized
+                return True
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
 __all__ = [
     "FINAL_EVALUATION_SCHEMA",
     "FINAL_EVALUATION_SCHEMA_VERSION",
     "FinalEvaluationRecord",
+    "JsonFinalEvaluationStore",
 ]
