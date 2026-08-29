@@ -7,6 +7,7 @@ import pytest
 from rsimem.memory.artifact_set import (
     ArtifactSetResolutionStatus,
     ArtifactSetSemanticBinding,
+    JsonArtifactSetBindingLog,
     resolve_artifact_set,
 )
 
@@ -38,6 +39,15 @@ def test_complete_set_has_one_primary_unit_and_replays() -> None:
     )
     assert result.status == ArtifactSetResolutionStatus.COMPLETE
     assert result.primary is True
+
+
+def test_artifact_set_log_is_restart_safe(tmp_path) -> None:
+    path = tmp_path / "bindings.jsonl"
+    binding = _binding()
+    log = JsonArtifactSetBindingLog(path)
+    assert log.append(binding) is True
+    assert log.append(binding) is False
+    assert JsonArtifactSetBindingLog(path).records() == (binding,)
 
 
 def test_one_artifact_can_carry_multiple_fact_members() -> None:
