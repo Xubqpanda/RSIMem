@@ -128,6 +128,23 @@ class _PromptMemoryStore:
                     limit=100,
                 ))
                 self._snapshots[target] = hits
+            query_digest = hashlib.sha256(
+                json.dumps(
+                    {"kind": "semantic", "namespace": target, "query": "", "limit": 100},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+            self._bridge._record_process_observation(
+                kind=ProcessEventKind.RETRIEVAL,
+                status=ProcessEventStatus.SUCCESS if hits else ProcessEventStatus.FAILED,
+                host_event_id=self._bridge._last_host_event_id or f"event.semantic-query.{query_digest[:40]}",
+                source_revision=self._bridge._last_host_source_revision or self._bridge._exposure_context_revision(),
+                input_payload={"query_digest": query_digest, "namespace": target, "limit": 100},
+                output_payload={"hit_count": len(hits), "exposure": "eager_system_prompt"},
+                reason_codes=("decision_observed",) if hits else ("retrieval_miss",),
+                execution_receipt_ids=(f"receipt.semantic-query.{query_digest[:24]}",),
+            )
             if not hits:
                 return None
             self._bridge.runtime.mark_injected(hits, surface="system_prompt")
@@ -209,6 +226,23 @@ class _SessionDb:
                     "offset": offset,
                 },
             ))
+            query_digest = hashlib.sha256(
+                json.dumps(
+                    {"kind": "episodic", "query": query, "limit": limit, "offset": offset},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()
+            self._bridge._record_process_observation(
+                kind=ProcessEventKind.RETRIEVAL,
+                status=ProcessEventStatus.SUCCESS if hits else ProcessEventStatus.FAILED,
+                host_event_id=self._bridge._last_host_event_id or f"event.episodic-query.{query_digest[:40]}",
+                source_revision=self._bridge._last_host_source_revision or self._bridge._exposure_context_revision(),
+                input_payload={"query_digest": query_digest, "limit": limit, "offset": offset},
+                output_payload={"hit_count": len(hits)},
+                reason_codes=("decision_observed",) if hits else ("retrieval_miss",),
+                execution_receipt_ids=(f"receipt.episodic-query.{query_digest[:24]}",),
+            )
             results = []
             for hit in hits:
                 metadata = hit.artifact.metadata
@@ -1816,6 +1850,23 @@ class HermesPastBenchBridge:
                         query,
                         limit=100 if _tool_name == "skills_list" else 5,
                     ))
+                    query_digest = hashlib.sha256(
+                        json.dumps(
+                            {"kind": "procedural", "query": query, "limit": 100 if _tool_name == "skills_list" else 5},
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest()
+                    self._record_process_observation(
+                        kind=ProcessEventKind.RETRIEVAL,
+                        status=ProcessEventStatus.SUCCESS if hits else ProcessEventStatus.FAILED,
+                        host_event_id=self._last_host_event_id or f"event.procedural-query.{query_digest[:40]}",
+                        source_revision=self._last_host_source_revision or self._exposure_context_revision(),
+                        input_payload={"query_digest": query_digest, "tool": _tool_name},
+                        output_payload={"hit_count": len(hits)},
+                        reason_codes=("decision_observed",) if hits else ("retrieval_miss",),
+                        execution_receipt_ids=(f"receipt.procedural-query.{query_digest[:24]}",),
+                    )
                     projected_hits = hits
                     if _tool_name == "skill_view" and not projected_hits:
                         projected_hits = self.runtime.query(MemoryQuery(
