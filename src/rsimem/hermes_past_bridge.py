@@ -1207,7 +1207,10 @@ class HermesPastBenchBridge:
                 result_present=False,
             ))
         for join in joins:
-            for event in join.process_events():
+            for event in join.process_events(
+                family_id=self._family_id,
+                stage=self._stage,
+            ):
                 self._process_feedback.record(event)
 
     def _record_extraction_source(
