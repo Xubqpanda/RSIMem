@@ -382,6 +382,8 @@ class HermesPastBenchBridge:
         self._trigger_observations: list[TriggerObservation] = []
         self._source_selection_policy = DeterministicSourceSelectionPolicy()
         self._source_selection_decisions: list[SourceSelectionDecision] = []
+        self._last_host_event_id: str | None = None
+        self._last_host_source_revision: str | None = None
         self._policy_evidence = JsonPolicyDecisionLedger(
             self.evidence_path.with_name("rsimem_policy_decisions.jsonl"),
             variant=experiment_variant,
@@ -1202,6 +1204,13 @@ class HermesPastBenchBridge:
         are reduced to digests by :class:`ProcessEvent`.
         """
 
+        # Prefer the most recent real host boundary.  Synthetic IDs are only
+        # used for an observation that happens before the first boundary has
+        # been delivered by the host adapter.
+        if self._last_host_event_id is not None:
+            host_event_id = self._last_host_event_id
+        if self._last_host_source_revision is not None:
+            source_revision = self._last_host_source_revision
         self._process_feedback.record(ProcessEvent.create(
             kind=kind,
             status=status,
@@ -1521,6 +1530,9 @@ class HermesPastBenchBridge:
         trigger_event: TriggerEvent,
     ) -> SourceSelectionDecision:
         """Record trigger/source decisions for every trusted host boundary."""
+
+        self._last_host_event_id = trigger_event.event_id
+        self._last_host_source_revision = snapshot.context_revision
 
         existing_source = next(
             (
