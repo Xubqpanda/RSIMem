@@ -600,6 +600,14 @@ optimizer JSON twice; strict parsing rejected both and produced no candidate.
 This is recorded as provider/model-output diagnostics, not a task negative,
 in [`extraction_stage3_sm02_feedback_v5_20260829.md`](extraction_stage3_sm02_feedback_v5_20260829.md).
 
+After the provider recovered, a bounded retry confirmed that the endpoint's
+`json_object` mode still omitted the required top-level `reason_codes`. The
+adapter was changed in commit `d2d06fc` to send the frozen strict JSON Schema
+response contract. The unchanged SM02 corpus then yielded one schema-valid
+`PROPOSE`; candidate static safety passed and the artifact remains a proposal,
+not ACTIVE or matched-validation evidence. The retry report is in
+[`extraction_stage3_sm02_optimizer_retry_20260829.md`](extraction_stage3_sm02_optimizer_retry_20260829.md).
+
 ## Update Policy
 
 Update this file whenever a milestone is completed, its acceptance criteria change, or evidence reveals a new blocker. Mark an item complete only after its implementation, tests, and required experiment evidence are all available. Record detailed numerical results in a separate dated report and link that report here rather than embedding provisional paper results in the checklist.
