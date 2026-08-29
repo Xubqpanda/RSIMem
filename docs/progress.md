@@ -137,6 +137,9 @@ before any mutation reservation is recorded.
 The process-feedback ledger now has an equivalent concurrent-writer regression
 test: one canonical event is reserved across eight writers and all retries are
 idempotent.
+Policy-decision evidence uses the same lock-protected atomic replacement and
+now has a concurrent-writer regression test as well; identical evidence events
+remain a single canonical record across independent ledger instances.
 
 ## Completed Work
 
