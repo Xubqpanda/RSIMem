@@ -4,6 +4,8 @@ from dataclasses import replace
 import json
 from pathlib import Path
 
+import pytest
+
 from rsimem.extraction_preparation import (
     audit_extraction_feedback_batch,
     build_extraction_optimizer_corpus,
@@ -129,13 +131,16 @@ def test_build_corpus_exactly_joins_private_and_public_live_evidence(
     assert corpus.examples
     assert sum(value.primary for value in corpus.examples) == 1
     assert store.path.stat().st_mode & 0o777 == 0o600
-    replay = JsonExtractionOptimizerCorpusStore(
-        attempt,
-        owner_controlled_root=owner,
-        attempt_id="attempt.train-v1",
-        split=OptimizerCorpusSplit.TRAIN,
-    ).read_for_optimizer()
-    assert replay == corpus
+    # The fixture intentionally carries benchmark-audit attribution.  It may
+    # be persisted for diagnosis, but the optimizer read boundary must reject
+    # it instead of silently treating audit labels as pure deployment signal.
+    with pytest.raises(ValueError, match="optimizer requires pure_process"):
+        JsonExtractionOptimizerCorpusStore(
+            attempt,
+            owner_controlled_root=owner,
+            attempt_id="attempt.train-v1",
+            split=OptimizerCorpusSplit.TRAIN,
+        ).read_for_optimizer()
 
 
 def test_audit_rejects_incomplete_operation_join(tmp_path: Path) -> None:
