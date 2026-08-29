@@ -13,7 +13,10 @@ from .memory.extraction_optimizer_contracts import (
 )
 from .memory.extraction_optimizer_provider import OpenAICompatibleExtractionOptimizerClient
 from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStore
-from .memory.extraction_policy_artifact import ExtractionPromptPolicyArtifact
+from .memory.extraction_policy_artifact import (
+    EXTRACTION_POLICY_SCHEMA_VERSION,
+    ExtractionPromptPolicyArtifact,
+)
 from .memory.extraction_policy_store import JsonExtractionPolicyStore
 from .memory.extraction_prompt_optimizer import (
     ExtractionOptimizerDecision,
@@ -61,7 +64,7 @@ class _DeferredExtractionOptimizerClient:
             )
         self.revocation_registry.assert_active(
             artifact_id=request.parent_artifact_id,
-            artifact_schema_version=1,
+            artifact_schema_version=EXTRACTION_POLICY_SCHEMA_VERSION,
             artifact_digest=request.parent_artifact_digest,
             evidence_plane="pure_process",
             evidence_source="runtime_observation",
