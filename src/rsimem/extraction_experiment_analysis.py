@@ -32,6 +32,7 @@ from .memory.operation_graph import (
     OperationKind,
     materialize_operation_graph,
 )
+from .memory.process_feedback import JsonProcessFeedbackLedger, ProcessEvent
 
 
 EXTRACTION_ANALYSIS_SCHEMA_VERSION = 1
@@ -138,6 +139,26 @@ def _feedback_records(run_dir: Path) -> tuple[LiveExtractionFeedbackRecord, ...]
         identity="record_id",
         payload=lambda value: value.payload(),
     )
+
+
+def _process_events(run_dir: Path) -> tuple[ProcessEvent, ...]:
+    """Read the bridge process corpus without touching evaluation results."""
+
+    records: list[ProcessEvent] = []
+    seen: dict[str, str] = {}
+    for path in sorted(run_dir.rglob("rsimem_process_feedback.jsonl")):
+        for event in JsonProcessFeedbackLedger(path).events:
+            canonical = json.dumps(
+                event.payload(), ensure_ascii=True, sort_keys=True,
+                separators=(",", ":"),
+            )
+            previous = seen.get(event.event_id)
+            if previous is not None and previous != canonical:
+                raise ValueError(f"conflicting process feedback identity: {event.event_id}")
+            if previous is None:
+                records.append(event)
+                seen[event.event_id] = canonical
+    return tuple(records)
 
 
 def _terminal_attempts(manifest: dict[str, Any]) -> tuple[dict[str, Any], ...]:
@@ -454,6 +475,7 @@ def _run_evidence(
     ledger = _read_jsonl(run_dir / "ledger.jsonl")
     sources = _source_records(run_dir)
     feedback = _feedback_records(run_dir)
+    process_events = _process_events(run_dir)
     split = manifest["split"]
     expected_artifact = manifest["semanticPolicy"]["activeArtifactByMethod"][
         attempt["method"]
@@ -517,6 +539,7 @@ def _run_evidence(
         "runName": attempt["runName"],
         "sources": sources,
         "feedback": feedback,
+        "processEvents": process_events,
         "quality": _quality(sources, feedback, safety),
         "rawUsage": _raw_usage(comparison, audit, ledger, run_dir),
     }
@@ -628,6 +651,21 @@ def _usage_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
             "mean": mean(known) if known else None,
         }
     return result
+
+
+def _process_corpus_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+    """Summarize process observations separately from evaluation quality."""
+
+    events = [event for row in rows for event in row["processEvents"]]
+    by_kind = Counter(event.kind.value for event in events)
+    by_reason = Counter(reason for event in events for reason in event.reason_codes)
+    return {
+        "eventCount": len(events),
+        "eventIds": sorted(event.event_id for event in events),
+        "byKind": dict(sorted(by_kind.items())),
+        "byReason": dict(sorted(by_reason.items())),
+        "evaluationScoreAccessible": False,
+    }
 
 
 def _paired_usage_delta(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
@@ -754,6 +792,7 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
             "runName": row["runName"],
             "quality": row["quality"],
             "rawUsage": row["rawUsage"],
+            "processFeedback": [event.payload() for event in row["processEvents"]],
         } for row in rows],
         "summaryByMethod": {
             method: {
@@ -764,6 +803,7 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
             for method, method_rows in by_method.items()
         },
         "activationFunnel": funnel,
+        "processCorpus": _process_corpus_summary(rows),
         "pairedRawUsageDelta": _paired_usage_delta(rows),
         "claimGate": {
             "operationAttributedExtractionAdaptation": _claim(
