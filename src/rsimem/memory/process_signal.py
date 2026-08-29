@@ -16,6 +16,7 @@ from enum import StrEnum
 from typing import Iterable, Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
+from .process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 
 
 PROCESS_SIGNAL_SCHEMA_VERSION = 1
@@ -165,6 +166,56 @@ class ProcessSignalCase:
             "schema_version": PROCESS_SIGNAL_SCHEMA_VERSION,
         }
         return cls(case_id=f"process-signal-case.{_digest(values)[:40]}", **values)
+
+    @classmethod
+    def from_process_events(
+        cls,
+        *,
+        logical_case_id: str,
+        physical_observation_ids: tuple[str, ...],
+        events: Iterable[ProcessEvent],
+        extraction_attributable: bool = False,
+        abstract_hypothesis_digest: str | None = None,
+    ) -> "ProcessSignalCase":
+        """Project stage coverage without inferring attribution from outcomes."""
+
+        values = tuple(events)
+        if any(not isinstance(event, ProcessEvent) for event in values):
+            raise TypeError("process signal projection requires ProcessEvent values")
+        terminal = {
+            ProcessEventStatus.SUCCESS,
+            ProcessEventStatus.FAILED,
+            ProcessEventStatus.EXECUTED,
+            ProcessEventStatus.REJECTED,
+        }
+        by_kind = {
+            kind: any(event.kind is kind and event.status in terminal for event in values)
+            for kind in ProcessEventKind
+        }
+        complete = bool(values) and not any(
+            "observation_censored" in event.reason_codes
+            or event.status is ProcessEventStatus.UNKNOWN
+            for event in values
+        )
+        return cls.create(
+            logical_case_id=logical_case_id,
+            physical_observation_ids=physical_observation_ids,
+            source_observed=(
+                by_kind[ProcessEventKind.SOURCE_SELECTION]
+                or by_kind[ProcessEventKind.EXTRACTION]
+            ),
+            extraction_observed=by_kind[ProcessEventKind.EXTRACTION],
+            persistence_observed=by_kind[ProcessEventKind.COMMIT],
+            retrieval_observed=by_kind[ProcessEventKind.RETRIEVAL],
+            exposure_observed=by_kind[ProcessEventKind.EXPOSURE],
+            outcome_observed=(
+                by_kind[ProcessEventKind.TASK_OUTCOME]
+                or by_kind[ProcessEventKind.TOOL_RESULT]
+            ),
+            extraction_attributable=extraction_attributable,
+            abstract_hypothesis_digest=abstract_hypothesis_digest,
+            observation_complete=complete,
+        )
 
     @property
     def status(self) -> ProcessSignalCaseStatus:
