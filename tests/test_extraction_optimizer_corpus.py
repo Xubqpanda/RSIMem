@@ -114,6 +114,7 @@ def _example(
     delayed: OptimizerDelayedEvidence | None = None,
     label: ExtractionFeedbackLabel = ExtractionFeedbackLabel.USEFUL,
     ownership: OptimizerComponentOwnership = OptimizerComponentOwnership.EXTRACTION,
+    evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS,
 ) -> ExtractionOptimizerCorpusExample:
     boundary = OptimizerSecretBoundary()
     return ExtractionOptimizerCorpusExample.create(
@@ -132,6 +133,7 @@ def _example(
         source_messages=_source(boundary),
         extracted_facts=_facts(boundary),
         delayed_evidence=delayed or _delayed(boundary),
+        evidence_plane=evidence_plane,
     )
 
 
@@ -182,6 +184,16 @@ def test_optimizer_example_rejects_benchmark_and_final_evidence_planes() -> None
     for plane in (EvidencePlane.BENCHMARK_AUDIT, EvidencePlane.FINAL_EVALUATION):
         with pytest.raises(ValueError, match="optimizer requires pure_process"):
             replace(baseline, evidence_plane=plane)
+
+
+def test_optimizer_request_rejects_benchmark_audit_examples() -> None:
+    diagnostic = _example(evidence_plane=EvidencePlane.BENCHMARK_AUDIT)
+    from rsimem.memory.evidence_planes import require_optimizer_plane
+
+    # The optimizer request applies this same gate before constructing model
+    # input; benchmark-audit labels therefore cannot become learner evidence.
+    with pytest.raises(ValueError, match="optimizer requires pure_process"):
+        require_optimizer_plane(diagnostic.evidence_plane)
 
 
 def test_resolved_labels_and_useful_three_stage_evidence_fail_closed() -> None:

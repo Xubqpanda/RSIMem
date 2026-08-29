@@ -70,6 +70,43 @@ def test_pure_process_rejects_non_runtime_source_identity() -> None:
         )
 
 
+def test_pure_process_rebuild_preserves_lifecycle_without_family_or_stage() -> None:
+    events = tuple(
+        ProcessEvent.create(
+            kind=kind,
+            status=status,
+            run_id="run.lifecycle-v1",
+            variant="native+ledger",
+            trace_id="trace.lifecycle-v1",
+            episode_id="episode.lifecycle-v1",
+            session_id="session.lifecycle-v1",
+            task_id="task.lifecycle-v1",
+            host_event_id=f"event.lifecycle-{kind.value}",
+            source_revision="revision.lifecycle-v1",
+            input_payload={"kind": kind.value},
+            output_payload={"status": status.value},
+            execution_receipt_ids=(f"receipt.lifecycle-{kind.value}",),
+            family_id="SM02_constraint_retention",
+            stage="eval_near",
+        )
+        for kind, status in (
+            (ProcessEventKind.SOURCE_SELECTION, ProcessEventStatus.PENDING),
+            (ProcessEventKind.EXTRACTION, ProcessEventStatus.PENDING),
+            (ProcessEventKind.TASK_OUTCOME, ProcessEventStatus.SUCCESS),
+        )
+    )
+    corpus = PureProcessCorpus.create(events)
+    assert len(corpus.events) == len(events)
+    assert {event.kind for event in corpus.events} == {event.kind for event in events}
+    assert all(
+        "family_id" not in event.payload()
+        and "stage" not in event.payload()
+        and event.evidence_plane is EvidencePlane.PURE_PROCESS
+        and event.evidence_source is EvidenceSourceKind.RUNTIME_OBSERVATION
+        for event in corpus.events
+    )
+
+
 def test_pure_process_payload_rejects_evaluation_fields() -> None:
     with pytest.raises(ValueError, match="forbidden evaluation fields"):
         validate_pure_process_payload({"nested": {"officialScore": 0.5}})
