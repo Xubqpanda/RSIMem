@@ -23,6 +23,8 @@ Matched evidence assembly now reloads those durable observations before running
 the evaluator, completing the raw-observation-to-decision replay boundary.
 `ExtractionValidationReplay.verify_store()` now exposes the same restart-safe
 recomputation as a public API and rejects missing or extra observation IDs.
+It also binds replay to the persisted split ID, rejecting a decision replayed
+through a different split identity.
 The observation store also fixes final evidence files to mode `0600`.
 
 The Hermes, static semantic writeback, operation graph, feedback store, and
