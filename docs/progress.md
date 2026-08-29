@@ -81,7 +81,9 @@ The standard `rsimem.audit` report also emits `processEvidence` rows and marks
 the run failed when a process ledger cannot be structurally or semantically
 audited; policy-bound process events are additionally joined against the
 corresponding policy-decision ledger and fail closed when that ledger is absent
-or missing the referenced decision.
+or missing the referenced decision. Standard audit also checks each event's
+`runId`, `variant`, `traceId`, `taskId`, `familyId`, and `stage` against the
+comparison trace context.
 
 ## Completed Work
 
