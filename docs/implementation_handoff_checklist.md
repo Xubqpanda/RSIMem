@@ -1070,8 +1070,10 @@ SM04_rule_migration 作为 final_test，计划文件为
 `sm03_fact_correction_v1` contract 仅用于冻结 update prompt 下的 extraction
 validation。split 审计见
 [`extraction_stage3_split_audit_20260829.md`](extraction_stage3_split_audit_20260829.md)。
-正式 matched-preflight 和 launcher 现在强制提供该 split plan；省略计划会在
-模型调用前 fail closed。该计划只解除 split identity 阻塞，不代表 validation 已执行；后续仍需
+正式 feedback/matched-preflight launcher 都强制提供该 split plan；feedback
+只能使用 plan 的 `train` assignment，validation/final family 误传给 feedback
+会在模型调用前 fail closed；省略计划同样会失败。该计划只解除 split identity
+阻塞，不代表 validation 已执行；后续仍需
 candidate trial profile、clean trees、provider probe、完整 process corpus
 和 matched parent/proposal run。
 后续顺序仍严格按照：
