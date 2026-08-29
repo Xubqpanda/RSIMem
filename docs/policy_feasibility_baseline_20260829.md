@@ -98,6 +98,11 @@ git diff --check
 
 runner 会生成 7 个 case、写入 content-free evidence ledger，并在重复运行时复用相同 record IDs；它仍然只产生 feasibility/shadow 证据，不调用 provider。
 
+Provider connectivity 另做过一次单请求 smoke（不属于 feasibility 或
+PAST-Bench replicate）；仅 raw usage 保存在 ignored
+`outputs/provider_connectivity_smoke_20260829.json`，没有保留 prompt/response
+正文。
+
 Stage 2E 的 `rsimem.extraction_proposal` 现在也会写出
 `feasibility-hypothesis.json`。该文件只包含 optimizer result/request、parent
 and candidate artifact identity、training corpus digest、actionable evidence

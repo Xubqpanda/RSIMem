@@ -47,6 +47,11 @@ joined feedback records, 50 successful physical requests, and an issue-free
 audit. Detailed evidence and excluded attempts are recorded in
 [`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md).
 
+A single provider-connectivity smoke against the configured OpenAI-compatible
+endpoint also completed successfully; it records only raw usage in the ignored
+`outputs/provider_connectivity_smoke_20260829.json` and is not a benchmark or
+effect replicate.
+
 ## Completed Work
 
 ### Repository And Benchmark Foundation
