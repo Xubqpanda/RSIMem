@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+
+import pytest
+
 from rsimem.memory.commit_scheduler import (
     CommitScheduleStatus,
     CommitScheduler,
@@ -95,3 +99,34 @@ def test_commit_can_be_cancelled_without_mutation() -> None:
     cancelled = scheduler.cancel(schedule.schedule_id)
     assert cancelled.status is CommitScheduleStatus.CANCELLED
     assert scheduler.execute(schedule.schedule_id, current_revision="backend.rev.1", apply=lambda ids: "receipt.bad") == cancelled
+
+
+def test_commit_schedule_rejects_unhashable_or_non_json_mutation_ids(tmp_path) -> None:
+    with pytest.raises(ValueError, match="mutation IDs"):
+        _decision()  # sanity: the fixture itself remains valid
+        from rsimem.memory.commit_scheduler import CommitSchedule
+        CommitSchedule(
+            "schedule.invalid",
+            "decision.invalid",
+            "event.invalid",
+            ({"mutation": "bad"},),
+            "backend.rev.1",
+            "session_end",
+        )
+
+    path = tmp_path / "schedules.json"
+    path.write_text(json.dumps({
+        "schedule.invalid": {
+            "schedule_id": "schedule.invalid",
+            "decision_id": "decision.invalid",
+            "trigger_event_id": "event.invalid",
+            "mutation_ids": {"mutation.invalid": True},
+            "expected_revision": "backend.rev.1",
+            "execution_boundary": "session_end",
+            "status": "pending",
+            "receipt_id": None,
+            "failure_reason": None,
+        }
+    }))
+    with pytest.raises(ValueError, match="malformed commit schedule entry"):
+        JsonCommitScheduleStore(path).all()
