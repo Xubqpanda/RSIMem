@@ -10,11 +10,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import fcntl
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from typing import Mapping
+from pathlib import Path
 
 from .evidence_planes import (
     EvidencePlane,
@@ -323,6 +326,83 @@ class OpportunityEvidence:
             raise ValueError("malformed opportunity evidence") from exc
 
 
+class JsonOpportunityEvidenceLog:
+    """Crash-safe, idempotent storage for runtime opportunity evidence.
+
+    The log stores only the content-free :class:`OpportunityEvidence` payload
+    (source digest, operation identity and provenance).  It deliberately does
+    not accept benchmark-family labels or final-evaluation fields.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+        self._records: dict[str, str] = {}
+        self._load()
+
+    @staticmethod
+    def _canonical(value: Mapping[str, object]) -> str:
+        return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+    def _load(self) -> None:
+        if not self.path.exists():
+            return
+        for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                evidence = OpportunityEvidence.from_payload(json.loads(line))
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"malformed opportunity evidence at line {line_number}"
+                ) from exc
+            canonical = self._canonical(evidence.payload())
+            previous = self._records.get(evidence.evidence_id)
+            if previous is not None and previous != canonical:
+                raise ValueError("conflicting opportunity evidence")
+            self._records[evidence.evidence_id] = canonical
+
+    def records(self) -> tuple[OpportunityEvidence, ...]:
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
+            try:
+                # Reload under the lock so an independent bridge instance can
+                # observe records written since construction.
+                self._records.clear()
+                self._load()
+                return tuple(
+                    OpportunityEvidence.from_payload(json.loads(value))
+                    for value in self._records.values()
+                )
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def append(self, evidence: OpportunityEvidence) -> bool:
+        if not isinstance(evidence, OpportunityEvidence):
+            raise TypeError("opportunity log accepts OpportunityEvidence only")
+        serialized = self._canonical(evidence.payload())
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                self._records.clear()
+                self._load()
+                previous = self._records.get(evidence.evidence_id)
+                if previous is not None:
+                    if previous != serialized:
+                        raise ValueError("conflicting opportunity evidence")
+                    return False
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    handle.write(serialized + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                self._records[evidence.evidence_id] = serialized
+                return True
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
 @dataclass(frozen=True, slots=True)
 class OpportunityResolution:
     evidence_id: str
@@ -398,6 +478,7 @@ __all__ = [
     "ApplicationOpportunitySchema",
     "OPPORTUNITY_SCHEMA",
     "OpportunityEvidence",
+    "JsonOpportunityEvidenceLog",
     "OpportunityResolution",
     "OpportunityResolutionStatus",
     "OpportunitySurface",
