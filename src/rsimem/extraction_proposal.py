@@ -34,6 +34,8 @@ from .memory_systems.mem0_flat import (
 class _DeferredExtractionOptimizerClient:
     """Keep credentials and provider transport unreachable on NO_PROPOSAL."""
 
+    requires_revocation_registry = True
+
     def __init__(
         self,
         api_key_file: Path | None,

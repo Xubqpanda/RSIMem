@@ -567,6 +567,19 @@ def test_optimizer_revocation_gate_runs_before_provider_call(tmp_path) -> None:
     assert client.requests == []
 
 
+def test_real_provider_client_requires_registry_before_optimizer_call() -> None:
+    client = OpenAICompatibleExtractionOptimizerClient(
+        api_key="fixture-secret-token",
+        base_url="https://provider.example/v1",
+        sdk_client=SimpleNamespace(),
+    )
+    with pytest.raises(ValueError, match="revocation registry"):
+        ExtractionPromptOptimizer(client).propose(
+            _parent(),
+            _multi_corpus((ExtractionFeedbackLabel.USEFUL,) * 2),
+        )
+
+
 def test_model_no_proposal_is_preserved_with_usage() -> None:
     usage = RawResourceUsage(input_tokens=50, output_tokens=5, model_requests=1)
     client = CapturedExtractionOptimizerClient(
