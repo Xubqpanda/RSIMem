@@ -7,12 +7,15 @@ RSIMEM_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PAST_BENCH_ROOT="${PAST_BENCH_ROOT:-${RSIMEM_ROOT}/benchmarks/past-bench}"
 PAST_BENCH_BIN="${RSIMEM_ROOT}/.venv/bin/past-bench"
 PYTHON_BIN="${RSIMEM_ROOT}/.venv/bin/python"
-TASK_FAMILY="memory_ability/SM01_preference_adoption"
+TASK_FAMILY="${RSIMEM_EXTRACTION_TASK_FAMILY:-memory_ability/SM01_preference_adoption}"
 FAMILY_ROOT="${PAST_BENCH_ROOT}/self-evolve-tasks-v2/${TASK_FAMILY}"
 EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-${RSIMEM_ROOT}/configs/extraction_feedback_sm01.json}"
 AGENT_REGISTRY="${RSIMEM_AGENT_REGISTRY:-${RSIMEM_ROOT}/configs/agents.yaml}"
 RUN_CONFIG="${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml"
 METHOD="static-extraction-rsimem"
+FEEDBACK_CONTRACT="${RSIMEM_EXTRACTION_FEEDBACK_CONTRACT:-}"
+# The default SM01 invocation resolves to --rsimem-semantic-feedback-contract sm01_tsv_v1;
+# other registered families may be selected explicitly through the environment.
 
 if [[ -z "${GPT_LUNA_API_KEY:-}" ]]; then
   echo "GPT_LUNA_API_KEY is required." >&2
@@ -31,8 +34,21 @@ if [[ ! -x "${PAST_BENCH_BIN}" || ! -x "${PYTHON_BIN}" ]]; then
   exit 2
 fi
 if [[ ! -f "${FAMILY_ROOT}/family.yaml" ]]; then
-  echo "The vendored SM01 family is incomplete." >&2
+  echo "The requested vendored family is incomplete: ${TASK_FAMILY}" >&2
   exit 2
+fi
+
+if [[ -z "${FEEDBACK_CONTRACT}" ]]; then
+  FEEDBACK_CONTRACT="$(PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${TASK_FAMILY}" <<'PY'
+import sys
+from rsimem.memory.future_trace import SemanticFeedbackContract, _SEMANTIC_FEEDBACK_FAMILIES
+family = sys.argv[1].split("/", 1)[-1]
+matches = [contract.value for contract, value in _SEMANTIC_FEEDBACK_FAMILIES.items() if value == family]
+if len(matches) != 1:
+    raise SystemExit("family has no unique registered semantic feedback contract")
+print(matches[0])
+PY
+  )"
 fi
 
 batch_root="${RSIMEM_ROOT}/outputs/extraction_feedback/hermes_luna/${RSIMEM_BATCH_ID}"
@@ -134,7 +150,7 @@ for replicate in $(seq 1 "${replicates}"); do
       --rsimem-semantic-writeback-mode static \
       --rsimem-semantic-writeback-timeout-seconds 30 \
       --rsimem-semantic-writeback-max-output-tokens 4096 \
-      --rsimem-semantic-feedback-contract sm01_tsv_v1 \
+      --rsimem-semantic-feedback-contract "${FEEDBACK_CONTRACT}" \
       "${proxy_args[@]}"
   ); then
     manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" failed past_bench
