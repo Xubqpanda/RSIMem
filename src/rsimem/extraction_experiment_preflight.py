@@ -18,6 +18,7 @@ from .extraction_experiment_manifest import (
     resume_extraction_batch_manifest,
 )
 from .memory.extraction_feedback import default_feedback_contract_registry
+from .extraction_split_plan import ExtractionSplitRole, load_extraction_split_plan
 from .memory.extraction_prompt_validation import ExtractionAcceptanceCriteria
 from .memory.prompt_components import PromptAdapterRegistry, SemanticPolicyManifest
 from .memory_systems.mem0_flat import (
@@ -267,12 +268,19 @@ def initialize_formal_feedback_batch(
     agent_registry_path: Path,
     run_config_path: Path,
     experiment_config_path: Path,
+    split_plan_path: Path,
     agent: str = "hermes-luna",
 ) -> str:
     config = load_extraction_preflight_config(experiment_config_path)
     if family_root.expanduser().resolve().name != config["familyId"]:
         raise ValueError("PAST family and extraction experiment config disagree")
     task_profile = resolved_task_template_profile(family_root)
+    load_extraction_split_plan(split_plan_path).assignment_for(
+        role=ExtractionSplitRole.TRAIN,
+        family_id=config["familyId"],
+        task_template_group_id=config["taskTemplateGroupId"],
+        task_manifest_digest=task_profile["taskManifestDigest"],
+    )
     parent = resolved_plain_parent_policy()
     model_profile = resolved_model_profile(
         agent_registry_path,
@@ -348,6 +356,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--agent-registry", type=Path, required=True)
     parser.add_argument("--run-config", type=Path, required=True)
     parser.add_argument("--experiment-config", type=Path, required=True)
+    parser.add_argument("--split-plan", type=Path, required=True)
     parser.add_argument("--agent", default="hermes-luna")
     return parser
 
@@ -364,6 +373,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         agent_registry_path=args.agent_registry,
         run_config_path=args.run_config,
         experiment_config_path=args.experiment_config,
+        split_plan_path=args.split_plan,
         agent=args.agent,
     )
     print(json.dumps({

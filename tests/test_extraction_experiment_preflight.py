@@ -10,6 +10,13 @@ from rsimem.extraction_experiment_manifest import (
     CleanRepositoryRevision,
     load_extraction_manifest,
 )
+from rsimem.extraction_experiment_preflight import resolved_task_template_profile
+from rsimem.extraction_split_plan import (
+    ExtractionSplitAssignment,
+    ExtractionSplitPlan,
+    ExtractionSplitRole,
+    write_extraction_split_plan,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -138,6 +145,14 @@ def test_formal_feedback_preflight_builds_manifest_before_provider_call(
         ),
     )
     manifest_path = tmp_path / "output" / "batch_manifest.json"
+    task_digest = resolved_task_template_profile(family)["taskManifestDigest"]
+    split_plan = ExtractionSplitPlan.create((
+        ExtractionSplitAssignment(ExtractionSplitRole.TRAIN, "SM01_preference_adoption", "sm01-pipeline-pilot-train-v1", task_digest),
+        ExtractionSplitAssignment(ExtractionSplitRole.VALIDATION, "fixture-validation", "fixture-validation-v1", "1" * 64),
+        ExtractionSplitAssignment(ExtractionSplitRole.FINAL_TEST, "fixture-final", "fixture-final-v1", "2" * 64),
+    ))
+    split_plan_path = tmp_path / "split-plan.json"
+    write_extraction_split_plan(split_plan_path, split_plan)
 
     experiment_id = preflight.initialize_formal_feedback_batch(
         manifest_path=manifest_path,
@@ -149,6 +164,7 @@ def test_formal_feedback_preflight_builds_manifest_before_provider_call(
         agent_registry_path=registry,
         run_config_path=run,
         experiment_config_path=ROOT / "configs/extraction_feedback_sm01.json",
+        split_plan_path=split_plan_path,
     )
     manifest = load_extraction_manifest(manifest_path)
 
@@ -179,6 +195,7 @@ def test_formal_feedback_preflight_builds_manifest_before_provider_call(
         agent_registry_path=registry,
         run_config_path=run,
         experiment_config_path=ROOT / "configs/extraction_feedback_sm01.json",
+        split_plan_path=split_plan_path,
     )
     assert resumed == experiment_id
 
@@ -198,6 +215,7 @@ def test_formal_feedback_preflight_builds_manifest_before_provider_call(
             agent_registry_path=registry,
             run_config_path=run,
             experiment_config_path=ROOT / "configs/extraction_feedback_sm01.json",
+            split_plan_path=split_plan_path,
         )
 
 
@@ -220,5 +238,6 @@ def test_preflight_rejects_wrong_family_before_manifest_creation(
             agent_registry_path=registry,
             run_config_path=run,
             experiment_config_path=ROOT / "configs/extraction_feedback_sm01.json",
+            split_plan_path=tmp_path / "unused-split.json",
         )
     assert not manifest.exists()

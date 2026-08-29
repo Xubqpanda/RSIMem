@@ -100,3 +100,10 @@ def test_checked_in_heldout_plan_matches_current_vendored_families() -> None:
         task_template_group_id="sm04-migration-heldout-final-v1",
         task_manifest_digest="0022269fd7e8e033c0b9c50fd65930ebacc1bb3483734c4e2251a685a44470e0",
     )
+    with pytest.raises(ValueError, match="does not match split plan"):
+        plan.assignment_for(
+            role=ExtractionSplitRole.TRAIN,
+            family_id="SM03_fact_correction",
+            task_template_group_id="sm03-correction-heldout-validation-v1",
+            task_manifest_digest="cece4019357f08d7bde746e012683542a699e61756ede76c91d4f6641dced54c",
+        )
