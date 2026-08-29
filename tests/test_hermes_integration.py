@@ -905,6 +905,9 @@ def test_live_bridge_trigger_and_source_decisions_replay_from_persisted_evidence
     bridge.attach(agent)
     bridge.on_task_completed({"completed": True})
     first = bridge.policy_evidence
+    first_process = bridge.process_feedback
+    first_process_ids = bridge.process_feedback_event_ids
+    first_process_digest = bridge.process_feedback_digest
     bridge.close()
     assert {event["layer"] for event in first} == {"trigger", "source_selection"}
 
@@ -925,6 +928,9 @@ def test_live_bridge_trigger_and_source_decisions_replay_from_persisted_evidence
     restarted.attach(agent)
     restarted.on_task_completed({"completed": True})
     assert restarted.policy_evidence == first
+    assert restarted.process_feedback == first_process
+    assert restarted.process_feedback_event_ids == first_process_ids
+    assert restarted.process_feedback_digest == first_process_digest
     restarted.close()
     db.close()
 
