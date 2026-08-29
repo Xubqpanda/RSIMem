@@ -90,6 +90,9 @@ Matched validation evidence assembly now requires a valid, content-free
 `process_corpus.json` for every completed slot and verifies its declared split,
 family, task-template, manifest digest, and process-event audit before building
 activation evidence.
+Process-corpus evaluator isolation now normalizes field names across casing and
+separator conventions, preventing camelCase or hyphenated score/answer keys from
+crossing the learner boundary.
 
 ## Completed Work
 
