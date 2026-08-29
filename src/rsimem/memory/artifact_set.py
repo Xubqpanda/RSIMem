@@ -88,8 +88,6 @@ class ArtifactSetSemanticBinding:
         _id(self.semantic_unit_id, "semantic unit ID")
         _ids(self.member_artifact_ids, "member artifact IDs")
         _ids(self.member_fact_ids, "member fact IDs")
-        if len(self.member_artifact_ids) != len(self.member_fact_ids):
-            raise ValueError("artifact and fact members must align")
         if type(self.complete) is not bool:
             raise TypeError("artifact-set completeness must be bool")
         if self.semantic_key is not None and (

@@ -39,6 +39,23 @@ def test_complete_set_has_one_primary_unit_and_replays() -> None:
     assert result.primary is True
 
 
+def test_one_artifact_can_carry_multiple_fact_members() -> None:
+    binding = ArtifactSetSemanticBinding.create(
+        semantic_unit_id="semantic.preference.compound.v1",
+        member_artifact_ids=("artifact.compound.v1",),
+        member_fact_ids=("fact.a.v1", "fact.b.v1"),
+        complete=True,
+        source_digest="c" * 64,
+        provenance_id="provenance.extraction.compound.v1",
+    )
+    result = resolve_artifact_set(
+        binding,
+        retrieved_member_artifact_ids=binding.member_artifact_ids,
+        exposed_member_artifact_ids=binding.member_artifact_ids,
+    )
+    assert result.primary is True
+
+
 @pytest.mark.parametrize(
     ("retrieved", "exposed", "reason"),
     (
