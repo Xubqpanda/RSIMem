@@ -134,6 +134,9 @@ available for normal scheduling and recovery.
 The persistent idempotency store also has a regression guard proving that a
 malformed receipt cannot be overwritten by a later reservation; it fails closed
 before any mutation reservation is recorded.
+The process-feedback ledger now has an equivalent concurrent-writer regression
+test: one canonical event is reserved across eight writers and all retries are
+idempotent.
 
 ## Completed Work
 
