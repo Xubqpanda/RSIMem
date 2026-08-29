@@ -58,6 +58,13 @@ optimizer gate correctly returned `NO_PROPOSAL` without a candidate. Full raw
 usage, trace, ledger, and audit evidence is recorded in
 [`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md).
 
+The follow-up SM02 process-signal pilot exercised the generalized family
+launcher and both configured endpoints. Two primary-provider replicates passed
+audit, while one primary and one backup attempt failed with HTTP 503/capacity
+errors; incomplete attempts remain excluded from optimizer and activation. Raw
+usage and process-corpus diagnostics are recorded in
+[`extraction_stage3_sm02_process_pilot_20260829.md`](extraction_stage3_sm02_process_pilot_20260829.md).
+
 ## Completed Work
 
 ### Repository And Benchmark Foundation
