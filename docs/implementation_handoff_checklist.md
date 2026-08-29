@@ -846,7 +846,7 @@ Family规则：
 ### 3C：逐层解锁矩阵、联合 Policy 与论文边界
 
 本轮在新增 process-feedback、process-corpus 与 admission anti-collapse
-回归后，RSIMem 当前验证计数为 `654 passed`；PAST-Bench 仍为 `397 passed,
+回归后，RSIMem 当前验证计数为 `655 passed`；PAST-Bench 仍为 `397 passed,
 2 skipped`。旧段落中的 `649 passed` 是本轮改动前的 census 基线。
 
 完成可优化性验收后，后续真实效果实验的候选解锁顺序为：
