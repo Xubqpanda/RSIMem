@@ -82,6 +82,24 @@ def test_process_ledger_is_restart_safe_and_conflict_checked(tmp_path) -> None:
         JsonProcessFeedbackLedger(path).events
 
 
+def test_full_replay_process_chain_survives_restart(tmp_path) -> None:
+    _, _, replay = _replay()
+    path = tmp_path / "full-process.jsonl"
+    ledger = JsonProcessFeedbackLedger(path)
+    for event in replay.process_events:
+        assert ledger.record(event)[1] is True
+
+    restarted = JsonProcessFeedbackLedger(path)
+    restored = restarted.events
+    assert restored == replay.process_events
+    assert tuple(item.event_id for item in restored) == tuple(
+        item.event_id for item in replay.process_events
+    )
+    assert audit_process_events(restored) == ()
+    for event in replay.process_events:
+        assert restarted.record(event)[1] is False
+
+
 def test_process_reason_codes_keep_failure_stages_distinct() -> None:
     common = dict(
         run_id="run.process",
