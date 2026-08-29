@@ -107,6 +107,8 @@ class MemoryUseEvidence:
     outcome_success: bool | None
     observation_cutoff: str
     provenance_id: str
+    retrieval_failure: bool = False
+    injection_failure: bool = False
     observation_complete: bool = True
     behavioral_consistency: bool = False
     schema_version: int = MEMORY_USE_EVIDENCE_SCHEMA_VERSION
@@ -158,6 +160,8 @@ class MemoryUseEvidence:
             raise TypeError("observation completeness must be bool")
         if type(self.behavioral_consistency) is not bool:
             raise TypeError("behavioral consistency must be bool")
+        if type(self.retrieval_failure) is not bool or type(self.injection_failure) is not bool:
+            raise TypeError("retrieval/injection failure flags must be bool")
         if self.outcome_success is not None and type(self.outcome_success) is not bool:
             raise TypeError("outcome success must be bool or None")
         if self.outcome_kind is not None:
@@ -174,8 +178,10 @@ class MemoryUseEvidence:
             "artifact_set_id": self.artifact_set_id,
             "retrieval_operation_id": self.retrieval_operation_id,
             "retrieved_artifact_ids": list(self.retrieved_artifact_ids),
+            "retrieval_failure": self.retrieval_failure,
             "injection_operation_id": self.injection_operation_id,
             "injected_artifact_ids": list(self.injected_artifact_ids),
+            "injection_failure": self.injection_failure,
             "downstream_operation_id": self.downstream_operation_id,
             "used_artifact_ids": list(self.used_artifact_ids),
             "outcome_operation_id": self.outcome_operation_id,
@@ -197,8 +203,10 @@ class MemoryUseEvidence:
         artifact_set_id: str | None = None,
         retrieval_operation_id: str | None = None,
         retrieved_artifact_ids: tuple[str, ...] = (),
+        retrieval_failure: bool = False,
         injection_operation_id: str | None = None,
         injected_artifact_ids: tuple[str, ...] = (),
+        injection_failure: bool = False,
         downstream_operation_id: str | None = None,
         used_artifact_ids: tuple[str, ...] = (),
         outcome_operation_id: str | None = None,
@@ -214,8 +222,10 @@ class MemoryUseEvidence:
             "artifact_set_id": artifact_set_id,
             "retrieval_operation_id": retrieval_operation_id,
             "retrieved_artifact_ids": tuple(retrieved_artifact_ids),
+            "retrieval_failure": retrieval_failure,
             "injection_operation_id": injection_operation_id,
             "injected_artifact_ids": tuple(injected_artifact_ids),
+            "injection_failure": injection_failure,
             "downstream_operation_id": downstream_operation_id,
             "used_artifact_ids": tuple(used_artifact_ids),
             "outcome_operation_id": outcome_operation_id,
@@ -239,8 +249,9 @@ class MemoryUseEvidence:
     def from_payload(cls, value: object) -> "MemoryUseEvidence":
         fields = {
             "schema", "evidence_id", "schema_version", "artifact_ids", "artifact_set_id",
-            "retrieval_operation_id", "retrieved_artifact_ids", "injection_operation_id",
-            "injected_artifact_ids", "downstream_operation_id", "used_artifact_ids",
+            "retrieval_operation_id", "retrieved_artifact_ids", "retrieval_failure",
+            "injection_operation_id", "injected_artifact_ids", "injection_failure",
+            "downstream_operation_id", "used_artifact_ids",
             "outcome_operation_id", "outcome_kind", "outcome_success", "observation_cutoff",
             "provenance_id", "observation_complete", "behavioral_consistency",
             "evidence_plane", "evidence_source",
@@ -257,8 +268,10 @@ class MemoryUseEvidence:
                 artifact_set_id=value["artifact_set_id"],
                 retrieval_operation_id=value["retrieval_operation_id"],
                 retrieved_artifact_ids=tuple(value["retrieved_artifact_ids"]),
+                retrieval_failure=value["retrieval_failure"],
                 injection_operation_id=value["injection_operation_id"],
                 injected_artifact_ids=tuple(value["injected_artifact_ids"]),
+                injection_failure=value["injection_failure"],
                 downstream_operation_id=value["downstream_operation_id"],
                 used_artifact_ids=tuple(value["used_artifact_ids"]),
                 outcome_operation_id=value["outcome_operation_id"],
@@ -333,6 +346,17 @@ def resolve_memory_use(evidence: MemoryUseEvidence) -> MemoryUseResolution:
             evidence.outcome_success,
             False,
         )
+    if evidence.retrieval_failure:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.UNRESOLVED,
+            "retrieval_failure",
+            False,
+            evidence.behavioral_consistency,
+            False,
+            evidence.outcome_success,
+            True,
+        )
     if not evidence.retrieval_operation_id or not evidence.retrieved_artifact_ids:
         return MemoryUseResolution(
             evidence.evidence_id,
@@ -351,6 +375,17 @@ def resolve_memory_use(evidence: MemoryUseEvidence) -> MemoryUseResolution:
             MemoryUseResolutionStatus.UNRESOLVED,
             "retrieval_artifact_set_incomplete",
             exposure,
+            evidence.behavioral_consistency,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    if evidence.injection_failure:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.UNRESOLVED,
+            "injection_failure",
+            False,
             evidence.behavioral_consistency,
             False,
             evidence.outcome_success,
@@ -418,6 +453,17 @@ def resolve_memory_use(evidence: MemoryUseEvidence) -> MemoryUseResolution:
             "weak_string_match_only",
             True,
             True,
+            False,
+            evidence.outcome_success,
+            True,
+        )
+    if evidence.outcome_kind == OutcomeEvidenceKind.TOOL_FAILURE:
+        return MemoryUseResolution(
+            evidence.evidence_id,
+            MemoryUseResolutionStatus.UNRESOLVED,
+            "tool_failure_not_attributable",
+            True,
+            evidence.behavioral_consistency,
             False,
             evidence.outcome_success,
             True,
