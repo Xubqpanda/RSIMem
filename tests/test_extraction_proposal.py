@@ -118,6 +118,41 @@ def test_no_signal_proposal_does_not_call_provider_or_write_candidate(
     assert feasibility["candidate_artifact_id"] is None
 
 
+def test_rejected_candidate_is_persisted_without_deployable_artifact(
+    tmp_path: Path,
+) -> None:
+    corpus = _multi_corpus(("missed", "missed"))
+    store, owner = _store(tmp_path, corpus)
+    client = CapturedExtractionOptimizerClient(
+        lambda request: _proposal_output(
+            request,
+            rule_text="Remember Project Apollo as a durable preference.",
+        )
+    )
+
+    result = prepare_extraction_proposal(
+        corpus_store=store,
+        output_root=owner / "proposal-rejected",
+        client=client,
+    )
+
+    assert result.decision == ExtractionOptimizerDecision.NO_PROPOSAL
+    assert result.reason_codes == ("candidate_corpus_value",)
+    assert result.completion_id is not None
+    assert result.usage == client.usage
+    output = owner / "proposal-rejected"
+    persisted = json.loads((output / "optimizer-result.json").read_text())
+    assert persisted["decision"] == "NO_PROPOSAL"
+    assert persisted["reasonCodes"] == ["candidate_corpus_value"]
+    assert persisted["completionId"] == result.completion_id
+    assert not (output / "candidate-artifact.json").exists()
+    hypothesis = json.loads(
+        (output / "feasibility-hypothesis.json").read_text()
+    )
+    assert hypothesis["decision"] == "NO_PROPOSAL"
+    assert hypothesis["candidate_artifact_id"] is None
+
+
 def test_no_signal_cli_does_not_read_credentials_or_validate_provider(
     tmp_path: Path,
 ) -> None:

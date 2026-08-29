@@ -74,6 +74,31 @@ class ExtractionOptimizerDecision(StrEnum):
     PROPOSE = "PROPOSE"
 
 
+class CandidateValidationError(ValueError):
+    """A parsed provider proposal rejected by the content-safety boundary.
+
+    The exception keeps the completion metadata available to the outer
+    preparation layer.  That layer can persist a rejected result and usage
+    without retaining the untrusted candidate body or weakening the direct
+    optimizer API's fail-closed exception semantics.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        reason_code: str,
+        request: ExtractionOptimizerRequest,
+        completion_id: str,
+        usage: RawResourceUsage,
+    ) -> None:
+        super().__init__(message)
+        self.reason_code = reason_code
+        self.request = request
+        self.completion_id = completion_id
+        self.usage = usage
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceBoundRuleEdit:
     edit: ExtractionRuleEdit
@@ -253,7 +278,16 @@ class ExtractionPromptOptimizer:
                 None,
                 completion.usage,
             )
-        self._validate_candidate_content(parent, corpus, edits)
+        try:
+            self._validate_candidate_content(parent, corpus, edits)
+        except ValueError as exc:
+            raise CandidateValidationError(
+                str(exc),
+                reason_code=_candidate_validation_reason(str(exc)),
+                request=request,
+                completion_id=completion.completion_id,
+                usage=completion.usage,
+            ) from exc
         provenance = ExtractionGenerationProvenance(
             optimizer_model=self.config.model_id,
             optimizer_config_digest=self.config.config_digest,
@@ -515,6 +549,20 @@ def _identifier_list(value: object, name: str) -> tuple[str, ...]:
     if len(result) != len(set(result)):
         raise ValueError(f"{name} must be unique")
     return result
+
+
+def _candidate_validation_reason(message: str) -> str:
+    """Map internal safety diagnostics to non-sensitive stable reason codes."""
+
+    if message == "optimizer candidate contains forbidden instructions":
+        return "candidate_forbidden_instruction"
+    if message == "optimizer candidate copies corpus identity":
+        return "candidate_corpus_identity"
+    if message == "optimizer candidate copies a corpus-specific value":
+        return "candidate_corpus_value"
+    if message == "optimizer candidate copies corpus content":
+        return "candidate_corpus_content"
+    return "candidate_validation_failed"
 
 
 def _is_actionable(value: ExtractionOptimizerCorpusExample) -> bool:

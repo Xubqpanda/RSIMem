@@ -16,6 +16,7 @@ from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStor
 from .memory.extraction_policy_artifact import ExtractionPromptPolicyArtifact
 from .memory.extraction_policy_store import JsonExtractionPolicyStore
 from .memory.extraction_prompt_optimizer import (
+    CandidateValidationError,
     ExtractionOptimizerDecision,
     ExtractionOptimizerResult,
     ExtractionPromptOptimizer,
@@ -117,10 +118,24 @@ def prepare_extraction_proposal(
     parent = Mem0FlatPromptAdapter().export_root_policy_artifact(
         MEM0_FLAT_EXTRACTION_SLOT_ID
     )
-    result = ExtractionPromptOptimizer(
-        client,
-        config=FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
-    ).propose(parent, corpus)
+    try:
+        result = ExtractionPromptOptimizer(
+            client,
+            config=FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+        ).propose(parent, corpus)
+    except CandidateValidationError as exc:
+        # Persist the rejected completion metadata and usage before building
+        # the content-free hypothesis.  Candidate text remains unreachable
+        # from the durable result and can never be deployed.
+        result = ExtractionPromptOptimizer._result(
+            ExtractionOptimizerDecision.NO_PROPOSAL,
+            (exc.reason_code,),
+            exc.request,
+            exc.completion_id,
+            (),
+            None,
+            exc.usage,
+        )
     output = output_root.expanduser().resolve()
     _write_immutable(output / "optimizer-result.json", result_payload(result))
     _write_immutable(
