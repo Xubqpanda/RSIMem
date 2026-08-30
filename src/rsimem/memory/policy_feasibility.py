@@ -1274,7 +1274,9 @@ class JsonFeasibilityEvidenceLedger:
     """Crash-safe, idempotent storage for replay identities."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Keep the final component unresolved so replay evidence cannot be
+        # redirected through a symlink.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
         self._records: dict[str, str] = {}
         self._load()
@@ -1287,6 +1289,10 @@ class JsonFeasibilityEvidenceLedger:
         )
 
     def _load(self) -> None:
+        if self.path.is_symlink():
+            raise ValueError("feasibility evidence ledger cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("feasibility evidence ledger lock cannot be a symlink")
         # Reload from the authoritative file rather than merging with a
         # possibly stale in-memory cache.  If the file was removed or replaced
         # between attempts, verification must fail closed.
@@ -1354,6 +1360,10 @@ class JsonFeasibilityEvidenceLedger:
 
     @contextmanager
     def _lock(self):
+        if self.path.is_symlink():
+            raise ValueError("feasibility evidence ledger cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("feasibility evidence ledger lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
