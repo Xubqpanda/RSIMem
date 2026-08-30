@@ -27,11 +27,18 @@ from rsimem.extraction_proposal import (
     _read_api_key_file,
     main,
     prepare_extraction_proposal,
+    prepare_pure_extraction_proposal,
+)
+from rsimem.memory.pure_extraction import JsonPureExtractionOptimizerCorpusStore
+from rsimem.memory.pure_extraction_optimizer import (
+    JsonPureExtractionOptimizerContentCaptureStore,
 )
 from rsimem.memory.prompt_components import canonical_json
 from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
 from test_extraction_optimizer_contracts import _multi_corpus, _parent, _proposal_output
+from test_pure_extraction_optimizer import _corpus as _pure_corpus
+from test_pure_extraction_optimizer import _fixture as _pure_fixture
 
 
 def _store(tmp_path: Path, corpus):
@@ -126,6 +133,37 @@ def test_no_signal_proposal_does_not_call_provider_or_write_candidate(
     )
     assert feasibility["decision"] == "NO_PROPOSAL"
     assert feasibility["candidate_artifact_id"] is None
+
+
+def test_pure_proposal_preparation_uses_pure_stores_without_legacy_projection(
+    tmp_path: Path,
+) -> None:
+    parent, example, capture = _pure_fixture()
+    owner = tmp_path / "owner"
+    corpus_path = owner / "pure-corpus.json"
+    capture_path = owner / "pure-captures.jsonl"
+    corpus_store = JsonPureExtractionOptimizerCorpusStore(corpus_path)
+    corpus_store.write(_pure_corpus(example))
+    capture_store = JsonPureExtractionOptimizerContentCaptureStore(capture_path)
+    capture_store.append(capture)
+    client = CapturedExtractionOptimizerClient("{")
+    result = prepare_pure_extraction_proposal(
+        corpus_store=corpus_store,
+        capture_store=capture_store,
+        output_root=owner / "proposal",
+        client=client,
+    )
+    # The frozen config requires two independent actionable logical cases, so
+    # this one-case fixture must produce a deterministic gate without a model
+    # call while still persisting the pure hypothesis projection.
+    assert result.decision == ExtractionOptimizerDecision.NO_PROPOSAL
+    assert result.reason_codes == ("insufficient_actionable_extraction_signal",)
+    assert client.requests == []
+    hypothesis = json.loads(
+        (owner / "proposal" / "feasibility-hypothesis.json").read_text()
+    )
+    assert hypothesis["projectionSchema"] == "pure-extraction-optimizer-hypothesis-v1"
+    assert hypothesis["corpusId"] == corpus_store.read().corpus_id
 
 
 def test_rejected_candidate_is_persisted_without_deployable_artifact(
