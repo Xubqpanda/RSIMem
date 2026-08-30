@@ -30,6 +30,13 @@ from .memory.extraction_optimizer_corpus import (
     OptimizerComponentOwnership,
     OptimizerCorpusRetention,
     OptimizerCorpusSplit,
+    PROCESS_SIGNAL_GATE_NO_SIGNAL,
+    PROCESS_SIGNAL_GATE_NOT_BOUND,
+    PROCESS_SIGNAL_GATE_READY,
+)
+from .memory.process_signal import (
+    JsonProcessSignalCaseStore,
+    ProcessSignalCaseStatus,
 )
 from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStore
 from .memory.extraction_projection import (
@@ -116,6 +123,41 @@ def _capture_paths(batch_dir: Path) -> tuple[Path, ...]:
 
 def _operation_paths(batch_dir: Path) -> tuple[Path, ...]:
     return tuple(sorted(batch_dir.rglob("rsimem_semantic_operations.jsonl")))
+
+
+def _process_signal_paths(batch_dir: Path) -> tuple[Path, ...]:
+    return tuple(sorted(batch_dir.rglob("process_signal_cases.jsonl")))
+
+
+def _process_signal_gate(
+    batch_dir: Path,
+) -> tuple[str, int, int]:
+    """Return the bound process-signal gate and its case counts.
+
+    A batch without process-signal case files is a legacy/unit fixture and is
+    intentionally marked ``not_bound``. Once a case store is present, the
+    optimizer must observe at least one explicit optimization signal before a
+    provider request can be made.
+    """
+
+    paths = _process_signal_paths(batch_dir)
+    if not paths:
+        return PROCESS_SIGNAL_GATE_NOT_BOUND, 0, 0
+    cases = []
+    for path in paths:
+        cases.extend(JsonProcessSignalCaseStore(path).records())
+    optimization = sum(
+        case.status is ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL
+        for case in cases
+    )
+    if not cases:
+        return PROCESS_SIGNAL_GATE_NO_SIGNAL, 0, 0
+    gate = (
+        PROCESS_SIGNAL_GATE_READY
+        if optimization
+        else PROCESS_SIGNAL_GATE_NO_SIGNAL
+    )
+    return gate, len(cases), optimization
 
 
 def _raw_source_versions(batch_dir: Path) -> tuple[int, ...]:
@@ -267,6 +309,9 @@ class ExtractionFeedbackBatchAudit:
     corpus_ready: bool
     optimizer_signal_ready: bool
     reason_codes: tuple[str, ...]
+    process_signal_gate: str = PROCESS_SIGNAL_GATE_NOT_BOUND
+    process_signal_case_count: int = 0
+    process_signal_optimization_count: int = 0
     schema_version: int = EXTRACTION_PREPARATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -274,6 +319,24 @@ class ExtractionFeedbackBatchAudit:
             raise ValueError("unsupported extraction preparation audit schema")
         if not self.reason_codes:
             raise ValueError("extraction preparation audit requires reasons")
+        if self.process_signal_gate not in {
+            PROCESS_SIGNAL_GATE_NOT_BOUND,
+            PROCESS_SIGNAL_GATE_NO_SIGNAL,
+            PROCESS_SIGNAL_GATE_READY,
+        }:
+            raise ValueError("extraction preparation process-signal gate is invalid")
+        for value, name in (
+            (self.process_signal_case_count, "process signal case count"),
+            (self.process_signal_optimization_count, "process signal optimization count"),
+        ):
+            if type(value) is not int or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+        if self.process_signal_optimization_count > self.process_signal_case_count:
+            raise ValueError("process signal optimization count exceeds case count")
+        if self.process_signal_gate == PROCESS_SIGNAL_GATE_READY and not self.process_signal_optimization_count:
+            raise ValueError("ready process-signal gate requires an optimization case")
+        if self.process_signal_gate == PROCESS_SIGNAL_GATE_NO_SIGNAL and self.process_signal_optimization_count:
+            raise ValueError("no-signal gate cannot carry optimization cases")
         expected = f"extraction-preparation-audit.{content_digest(self.identity_payload())[:40]}"
         if self.audit_id != expected:
             raise ValueError("extraction preparation audit ID mismatch")
@@ -297,6 +360,9 @@ class ExtractionFeedbackBatchAudit:
             ),
             "corpusReady": self.corpus_ready,
             "optimizerSignalReady": self.optimizer_signal_ready,
+            "processSignalGate": self.process_signal_gate,
+            "processSignalCaseCount": self.process_signal_case_count,
+            "processSignalOptimizationCount": self.process_signal_optimization_count,
             "reasonCodes": list(self.reason_codes),
         }
 
@@ -333,6 +399,25 @@ def audit_extraction_feedback_batch(
         value for value in captures
         if isinstance(value, ExtractionOptimizerFeedbackCapture)
     )
+    process_signal_gate = PROCESS_SIGNAL_GATE_NOT_BOUND
+    process_signal_case_count = 0
+    process_signal_optimization_count = 0
+    process_signal_paths = _process_signal_paths(root)
+    if process_signal_paths:
+        try:
+            (
+                process_signal_gate,
+                process_signal_case_count,
+                process_signal_optimization_count,
+            ) = _process_signal_gate(root)
+        except (OSError, ValueError):
+            reasons.append("process_signal_evidence_invalid")
+            process_signal_gate = PROCESS_SIGNAL_GATE_NO_SIGNAL
+        if (
+            process_signal_gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
+            and "process_signal_evidence_invalid" not in reasons
+        ):
+            reasons.append("no_optimization_process_signal")
     primary_counts, actionable = _primary_feedback_counts(feedback_payloads)
     if not raw_sources:
         reasons.append("source_evidence_missing")
@@ -373,6 +458,8 @@ def audit_extraction_feedback_batch(
         corpus_ready
         and actionable
         >= FROZEN_EXTRACTION_OPTIMIZER_CONFIG.minimum_actionable_primary_examples
+        and process_signal_gate
+        in {PROCESS_SIGNAL_GATE_NOT_BOUND, PROCESS_SIGNAL_GATE_READY}
     )
     if corpus_ready and not optimizer_signal_ready:
         reasons.append("insufficient_actionable_extraction_signal")
@@ -394,6 +481,9 @@ def audit_extraction_feedback_batch(
         "corpus_ready": corpus_ready,
         "optimizer_signal_ready": optimizer_signal_ready,
         "reason_codes": tuple(reasons),
+        "process_signal_gate": process_signal_gate,
+        "process_signal_case_count": process_signal_case_count,
+        "process_signal_optimization_count": process_signal_optimization_count,
     }
     identity = {
         "schemaVersion": EXTRACTION_PREPARATION_SCHEMA_VERSION,
@@ -413,6 +503,9 @@ def audit_extraction_feedback_batch(
         ),
         "corpusReady": corpus_ready,
         "optimizerSignalReady": optimizer_signal_ready,
+        "processSignalGate": process_signal_gate,
+        "processSignalCaseCount": process_signal_case_count,
+        "processSignalOptimizationCount": process_signal_optimization_count,
         "reasonCodes": list(values["reason_codes"]),
     }
     return ExtractionFeedbackBatchAudit(
@@ -463,6 +556,7 @@ def build_extraction_optimizer_corpus(
         observation_cutoff=observation_cutoff,
         retention=retention,
         examples=tuple(examples),
+        process_signal_gate=audit.process_signal_gate,
     )
     public_payloads = {
         "source_records": [value.payload() for value in sources],

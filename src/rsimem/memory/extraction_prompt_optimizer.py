@@ -25,6 +25,7 @@ from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
     ExtractionOptimizerCorpusExample,
     OptimizerComponentOwnership,
+    PROCESS_SIGNAL_GATE_NO_SIGNAL,
 )
 from .extraction_policy_artifact import (
     ExtractionGenerationProvenance,
@@ -230,6 +231,22 @@ class ExtractionPromptOptimizer:
         if len(planes) != 1:
             raise ValueError("optimizer corpus mixes evidence planes")
         require_optimizer_plane(next(iter(planes)))
+        if corpus.process_signal_gate == PROCESS_SIGNAL_GATE_NO_SIGNAL:
+            request = build_extraction_optimizer_gate_request(
+                parent,
+                corpus,
+                reason_codes=("no_optimization_process_signal",),
+                config=self.config,
+            )
+            return self._result(
+                ExtractionOptimizerDecision.NO_PROPOSAL,
+                ("no_optimization_process_signal",),
+                request,
+                None,
+                (),
+                None,
+                RawResourceUsage(),
+            )
         if self.revocation_registry is not None:
             self.revocation_registry.assert_active(
                 artifact_id=corpus.corpus_id,
