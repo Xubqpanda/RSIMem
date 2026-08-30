@@ -102,9 +102,11 @@ The optimizer corpus now also records a process-signal gate. Batches with a
 bound process-signal case store but no replicated generalizable signal (at least
 two logical cases supporting one abstract hypothesis) are retained for
 diagnosis and rejected before any optimizer provider request, even if legacy
-actionable labels are present. Preparation also rejects case stores with
-missing or mixed protocol/replicate/window metadata. Unbound unit fixtures
-remain explicitly marked `not_bound`.
+actionable labels are present. The corpus persists the protocol ID, canonical
+case-set digest, case/optimization counts, and supporting hypothesis digest;
+preparation also rejects case stores with missing or mixed
+protocol/replicate/window metadata. Unbound unit fixtures remain explicitly
+marked `not_bound`.
 
 The follow-up SM02 process-signal pilot exercised the generalized family
 launcher and both configured endpoints. Two primary-provider replicates passed
