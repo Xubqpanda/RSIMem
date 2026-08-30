@@ -485,7 +485,8 @@ class HermesPastBenchBridge:
         )
         self.pure_extraction_feedback_store = JsonPureExtractionFeedbackRecordStore(
             pure_extraction_feedback_path
-            or self.evidence_path.with_name("rsimem_pure_extraction_feedback.jsonl")
+            or self.evidence_path.with_name("rsimem_pure_extraction_feedback.jsonl"),
+            schema_registry=self._application_opportunity_schema_registry,
         )
         # A local, unbound signal case is useful for runtime diagnostics even
         # when the formal batch protocol has not yet been supplied by the

@@ -58,6 +58,7 @@ from .memory.pure_extraction import (
     PureExtractionSourceRecord,
     prepare_pure_extraction_corpus,
 )
+from .memory.opportunity import JsonApplicationOpportunitySchemaRegistry
 from .memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     OperationGraph,
@@ -165,7 +166,16 @@ def _pure_feedback_records(batch_dir: Path) -> tuple[PureExtractionFeedbackRecor
         (
             value
             for path in _pure_feedback_paths(batch_dir)
-            for value in JsonPureExtractionFeedbackRecordStore(path).records()
+            for value in JsonPureExtractionFeedbackRecordStore(
+                path,
+                schema_registry=(
+                    JsonApplicationOpportunitySchemaRegistry(
+                        path.with_name("application_opportunity_schemas.jsonl")
+                    )
+                    if path.with_name("application_opportunity_schemas.jsonl").exists()
+                    else None
+                ),
+            ).records()
         ),
         identity="record_id",
         payload=lambda value: value.payload(),

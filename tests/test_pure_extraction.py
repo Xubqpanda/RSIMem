@@ -21,7 +21,12 @@ from rsimem.memory.pure_extraction import (
     prepare_pure_extraction_corpus,
     PureExtractionSourceRecord,
 )
-from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
+from rsimem.memory.opportunity import (
+    ApplicationOpportunitySchema,
+    JsonApplicationOpportunitySchemaRegistry,
+    OpportunityEvidence,
+    OpportunitySurface,
+)
 from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
 from rsimem.memory.use_attribution import MemoryUseEvidence, OutcomeEvidenceKind
 from rsimem.memory.tool_exact_join import ToolCallResultJoin
@@ -194,6 +199,51 @@ def test_pure_feedback_store_is_restart_safe_and_rejects_benchmark_fields(tmp_pa
     payload["family_id"] = "SM01_forbidden"
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="malformed pure extraction"):
+        JsonPureExtractionFeedbackRecordStore(path).records()
+
+
+def test_pure_feedback_store_replays_application_schema_opportunity(tmp_path) -> None:
+    _, source, *_ = _fixture()
+    schema = ApplicationOpportunitySchema.create(
+        schema_id="application.notes",
+        version="v1",
+        requirement_ids=("application.notes.share",),
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.APPLICATION_SCHEMA,
+        semantic_requirement="application.notes.share",
+        observation_time="2026-08-30T01:02:03Z",
+        operation_id="op.application-notes.share",
+        provenance_id="provenance.pure-v1",
+        source_payload={"schema_event": "published"},
+        application_schema=schema,
+    )
+    record = PureExtractionFeedbackRecord.create(
+        source_record_id="pure-source.application-schema",
+        source_projection_digest=source.source.source_projection_digest,
+        extraction_set_id=source.source.extraction_set_id,
+        opportunity=opportunity,
+        memory_use=None,
+        observation_window="window.completed-v1",
+        provenance_id="provenance.pure-v1",
+    )
+    registry = JsonApplicationOpportunitySchemaRegistry(
+        tmp_path / "application-schemas.jsonl"
+    )
+    assert registry.register(schema) is True
+    path = tmp_path / "pure-feedback.jsonl"
+    assert JsonPureExtractionFeedbackRecordStore(
+        path,
+        schema_registry=registry,
+    ).append(record) is True
+    restarted = JsonPureExtractionFeedbackRecordStore(
+        path,
+        schema_registry=JsonApplicationOpportunitySchemaRegistry(
+            tmp_path / "application-schemas.jsonl"
+        ),
+    )
+    assert restarted.records() == (record,)
+    with pytest.raises(ValueError, match="schema registry"):
         JsonPureExtractionFeedbackRecordStore(path).records()
 
 
