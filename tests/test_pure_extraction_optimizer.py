@@ -196,6 +196,7 @@ def _fixture() -> tuple[
         example.example_id,
         "logical-case.pure-request",
         ("physical-observation.pure-request",),
+        source,
         projection,
         source_messages,
         extracted_facts,
@@ -341,6 +342,23 @@ def test_pure_optimizer_capture_binds_source_structure() -> None:
         )
 
 
+def test_pure_optimizer_capture_binds_fact_lineage() -> None:
+    parent, example, capture = _fixture()
+    tampered = replace(
+        capture,
+        extracted_facts=(replace(
+            capture.extracted_facts[0],
+            persisted_artifact_id="artifact.foreign",
+        ),),
+    )
+    with pytest.raises(ValueError, match="fact lineage"):
+        build_pure_extraction_optimizer_request(
+            parent,
+            _corpus(example),
+            captures=(tampered,),
+        )
+
+
 def test_pure_optimizer_capture_store_is_restart_safe_and_conflict_checked(tmp_path) -> None:
     _, example, capture = _fixture()
     path = tmp_path / "owner" / "pure-captures.jsonl"
@@ -354,6 +372,7 @@ def test_pure_optimizer_capture_store_is_restart_safe_and_conflict_checked(tmp_p
         capture.example_id,
         capture.logical_case_id,
         ("physical-observation.other",),
+        capture.source_record,
         capture.source_projection,
         capture.source_messages,
         capture.extracted_facts,
@@ -366,6 +385,7 @@ def test_pure_optimizer_capture_store_is_restart_safe_and_conflict_checked(tmp_p
         "pure-extraction-example.other",
         "logical-case.other",
         capture.physical_observation_ids,
+        capture.source_record,
         capture.source_projection,
         capture.source_messages,
         capture.extracted_facts,
