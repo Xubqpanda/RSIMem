@@ -248,6 +248,21 @@ def test_pure_optimizer_request_requires_actionable_content_capture() -> None:
         build_pure_extraction_optimizer_request(parent, _corpus(example))
 
 
+def test_pure_optimizer_request_rejects_capture_outside_corpus() -> None:
+    parent, example, capture = _fixture()
+    extra = replace(
+        capture,
+        example_id="pure-extraction-example.extra",
+        physical_observation_ids=("physical-observation.extra",),
+    )
+    with pytest.raises(ValueError, match="not present in the corpus"):
+        build_pure_extraction_optimizer_request(
+            parent,
+            _corpus(example),
+            captures=(capture, extra),
+        )
+
+
 def test_pure_optimizer_request_fails_closed_without_ready_gate() -> None:
     parent, example, capture = _fixture()
     blocked = PureExtractionOptimizerCorpus.create(
