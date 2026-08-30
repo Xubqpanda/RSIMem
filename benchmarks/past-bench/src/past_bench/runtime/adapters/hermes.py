@@ -732,6 +732,15 @@ class HermesAdapter(RuntimeAdapter):
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
 
+        # RSIMem's deployment-only extraction source log is kept under the
+        # shared Hermes home so later episodes can join future evidence.  Copy
+        # the append-only payload into the run capture as well, making the
+        # automatic pure-process dataflow auditable and consumable by offline
+        # preparation without exposing model-visible memory text.
+        pure_source = hermes_home / ".rsimem" / "pure_extraction_sources.jsonl"
+        if pure_source.exists():
+            shutil.copy2(pure_source, target_dir / "pure_extraction_sources.jsonl")
+
         state_db = hermes_home / "state.db"
         if state_db.exists():
             shutil.copy2(state_db, target_dir / "state.db")

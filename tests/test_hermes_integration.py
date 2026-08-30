@@ -58,6 +58,10 @@ from rsimem.memory.extraction_projection import (
     ExtractionSourceRecord,
     JsonExtractionSourceRecordStore,
 )
+from rsimem.memory.pure_extraction import (
+    JsonPureExtractionFeedbackRecordStore,
+    JsonPureExtractionSourceRecordStore,
+)
 from rsimem.memory.extraction_optimizer_capture import (
     ExtractionOptimizerFeedbackCapture,
     ExtractionOptimizerSourceCapture,
@@ -1589,6 +1593,11 @@ def test_live_bridge_compiles_completed_task_without_lifecycle_evaluator(
     assert bridge.source_selection_decisions[0].action.value == "RUN"
     assert bridge.static_results[0].writeback.logical_exit is True
     assert len(client.calls) == 2
+    pure_sources = JsonPureExtractionSourceRecordStore(
+        home / ".rsimem" / "pure_extraction_sources.jsonl"
+    ).records()
+    assert len(pure_sources) == 1
+    assert pure_sources[0].activation.compilation_id == bridge.static_results[0].compilation_id
     db.close()
 
 
@@ -1901,6 +1910,15 @@ def test_live_bridge_joins_restarted_source_to_future_feedback(tmp_path: Path) -
     })
     eval_bridge.close()
     eval_db.close()
+
+    pure_feedback = JsonPureExtractionFeedbackRecordStore(
+        tmp_path / "eval" / "rsimem_pure_extraction_feedback.jsonl"
+    ).records()
+    # The runtime now materializes deployment-only feedback automatically;
+    # without an application-owned opportunity provider these records remain
+    # unresolved rather than inheriting the benchmark audit label.
+    assert len(pure_feedback) == 1
+    assert all(item.attribution.value == "unresolved" for item in pure_feedback)
 
     graph = materialize_operation_graph(
         AppendOnlyOperationEvidenceLog(eval_operations).events
