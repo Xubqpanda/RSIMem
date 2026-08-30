@@ -331,22 +331,41 @@ if not cases:
 case_store = JsonProcessSignalCaseStore(run_dir / "process_signal_cases.jsonl")
 for case in cases:
     case_store.append(case)
-pure_feedback_paths = tuple(run_dir.rglob("rsimem_pure_extraction_feedback.jsonl"))
-if pure_feedback_paths and any(path.read_text(encoding="utf-8").strip() for path in pure_feedback_paths):
-    pure_corpus = build_pure_extraction_corpus_from_batch(
-        run_dir,
-        observation_cutoff="2026-08-30T23:59:59Z",
-        process_signal_protocol_id=protocol.protocol_id,
-    )
-    JsonPureExtractionOptimizerCorpusStore(
-        run_dir / "pure_extraction_optimizer_corpus.json"
-    ).write(pure_corpus)
 ' "${trace_dir}"; then
     manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" failed process_corpus
     exit 1
   fi
   manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" completed ""
 done
+
+# Build one batch-level pure-process corpus after all replicates have emitted
+# their source, feedback and protocol-bound process-signal artifacts.  A
+# per-run corpus would undercount logical cases and could never satisfy the
+# replicated-signal gate.
+PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${batch_root}" "${manifest_path}" <<'PY'
+import sys
+from pathlib import Path
+from rsimem.extraction_preparation import build_pure_extraction_corpus_from_batch
+from rsimem.memory.pure_extraction import JsonPureExtractionOptimizerCorpusStore
+from rsimem.memory.signal_protocol import (
+    PROCESS_SIGNAL_PROTOCOL_FILENAME,
+    JsonProcessSignalAnalysisProtocolStore,
+)
+batch_root, manifest_path = map(Path, sys.argv[1:])
+protocol = JsonProcessSignalAnalysisProtocolStore(
+    batch_root / PROCESS_SIGNAL_PROTOCOL_FILENAME
+).get()
+if protocol is None:
+    raise ValueError("formal batch has no frozen process signal protocol")
+corpus = build_pure_extraction_corpus_from_batch(
+    batch_root,
+    observation_cutoff="2026-08-30T23:59:59Z",
+    process_signal_protocol_id=protocol.protocol_id,
+)
+JsonPureExtractionOptimizerCorpusStore(
+    batch_root / "pure_extraction_optimizer_corpus.json"
+).write(corpus)
+PY
 
 PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" \
   -m rsimem.extraction_experiment_analysis \
