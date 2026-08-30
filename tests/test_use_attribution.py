@@ -144,6 +144,23 @@ def test_operation_graph_rejects_cross_task_chain() -> None:
     assert result.reason_code == "operation_join_invalid"
 
 
+def test_operation_graph_requires_causal_parent_edges() -> None:
+    graph = _operation_graph()
+    broken = OperationGraph(
+        graph.artifacts,
+        tuple(
+            replace(item, parent_operation_ids=())
+            if item.operation_id == "op.outcome.v1"
+            else item
+            for item in graph.operations
+        ),
+        graph.mutations,
+    )
+    result = resolve_memory_use(_evidence(), operation_graph=broken)
+    assert result.status == MemoryUseResolutionStatus.UNRESOLVED
+    assert result.reason_code == "operation_join_invalid"
+
+
 @pytest.mark.parametrize(
     ("operation_id", "status", "evidence_overrides"),
     (
