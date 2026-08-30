@@ -544,10 +544,13 @@ class JsonProcessFeedbackLedger:
         self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
 
-    @contextmanager
-    def _lock(self):
+    def _assert_not_symlink(self) -> None:
         if self.path.is_symlink():
             raise ValueError("process feedback ledger cannot be a symlink")
+
+    @contextmanager
+    def _lock(self):
+        self._assert_not_symlink()
         if self.lock_path.is_symlink():
             raise ValueError("process feedback ledger lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -559,6 +562,7 @@ class JsonProcessFeedbackLedger:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def _read(self) -> dict[str, str]:
+        self._assert_not_symlink()
         records: dict[str, str] = {}
         if not self.path.exists():
             return records
@@ -601,6 +605,7 @@ class JsonProcessFeedbackLedger:
                         handle.write(json.dumps(item, ensure_ascii=True, sort_keys=True) + "\n")
                     handle.flush()
                     os.fsync(handle.fileno())
+                self._assert_not_symlink()
                 os.replace(temporary, self.path)
             finally:
                 if os.path.exists(temporary):
