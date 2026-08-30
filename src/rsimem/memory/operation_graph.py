@@ -458,11 +458,17 @@ class AppendOnlyOperationEvidenceLog:
     """Idempotent append-only JSONL evidence; no mutable graph is stored."""
 
     def __init__(self, output_path: Path | None = None) -> None:
-        self.output_path = output_path.expanduser().resolve() if output_path else None
+        self.output_path = (
+            Path(os.path.abspath(os.path.expanduser(os.fspath(output_path))))
+            if output_path
+            else None
+        )
         self._events: list[dict[str, Any]] = []
         self._canonical_by_id: dict[str, str] = {}
         self._lock = threading.RLock()
         if self.output_path is not None:
+            if self.output_path.is_symlink():
+                raise ValueError("operation evidence log cannot be a symlink")
             self.output_path.parent.mkdir(parents=True, exist_ok=True)
             self._load()
 
@@ -473,6 +479,8 @@ class AppendOnlyOperationEvidenceLog:
 
     def _load(self) -> None:
         assert self.output_path is not None
+        if self.output_path.is_symlink():
+            raise ValueError("operation evidence log cannot be a symlink")
         if not self.output_path.exists():
             return
         for line_number, line in enumerate(self.output_path.read_text(encoding="utf-8").splitlines(), 1):
@@ -509,6 +517,8 @@ class AppendOnlyOperationEvidenceLog:
                     raise ValueError(f"conflicting operation evidence event: {event_id}")
                 return False
             if self.output_path is not None:
+                if self.output_path.is_symlink():
+                    raise ValueError("operation evidence log cannot be a symlink")
                 with self.output_path.open("a", encoding="utf-8") as handle:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
                     handle.write(canonical + "\n")
