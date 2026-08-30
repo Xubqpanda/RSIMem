@@ -371,6 +371,10 @@ class ProcessSignalCaseCensus:
             "logicalCaseCount": self.logical_case_count,
             "statusCounts": dict(self.status_counts),
             "conflictCaseCount": self.conflict_case_count,
+            "conflictRate": (
+                self.conflict_case_count / self.logical_case_count
+                if self.logical_case_count else None
+            ),
             "replicateConsistentCaseCount": consistent,
             "replicateConsistency": (
                 consistent / self.logical_case_count
@@ -470,9 +474,19 @@ def census_process_signal_cases(cases: Iterable[ProcessSignalCase]) -> ProcessSi
     conflicts = 0
     for logical_case_id, group in by_logical.items():
         labels = {case.status for case in group}
-        status = ProcessSignalCaseStatus.AMBIGUOUS if len(labels) > 1 else next(iter(labels))
+        hypotheses = {
+            case.abstract_hypothesis_digest
+            for case in group
+            if case.status is ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL
+        }
+        conflict = len(labels) > 1 or len(hypotheses) > 1
+        status = (
+            ProcessSignalCaseStatus.AMBIGUOUS
+            if conflict
+            else next(iter(labels))
+        )
         statuses[status.value] = statuses.get(status.value, 0) + 1
-        if len(labels) > 1:
+        if conflict:
             conflicts += 1
     return ProcessSignalCaseCensus(
         physical_observation_count=len(physical_seen),
