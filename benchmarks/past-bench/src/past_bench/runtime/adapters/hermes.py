@@ -222,10 +222,6 @@ def _past_bench_opportunity_provider(
                 surface_name == "tool_schema"
                 and application_schema is not None
                 and key in application_schema.requirement_ids
-                and not (
-                    key == _PAST_SHARE_POLICY_KEY
-                    and "recipient" in "\n".join(_past_visible_messages(result)).casefold()
-                )
             )
             evidence_surface = (
                 OpportunitySurface.APPLICATION_SCHEMA
