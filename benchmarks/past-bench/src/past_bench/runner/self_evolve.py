@@ -243,6 +243,23 @@ def build_hermes_extra_body(
     ) and persistence_enabled:
         raise ValueError("extraction trial requires static semantic writeback")
 
+    rsimem_payload = {
+        "mode": rsimem_mode,
+        "adapter_failure_policy": rsimem_adapter_failure_policy,
+        "verify_native_projection": rsimem_verify_native_projection,
+        "evidence_path": str(artifacts_dir / "rsimem_memory_events.jsonl"),
+        "lifecycle": {
+            "evaluator_mode": rsimem_lifecycle_evaluator_mode,
+            "policy_version": rsimem_lifecycle_policy_version,
+            "compiler_version": rsimem_lifecycle_compiler_version,
+            "timeout_seconds": rsimem_lifecycle_timeout_seconds,
+            "max_output_tokens": rsimem_lifecycle_max_output_tokens,
+        },
+        "semantic_writeback": semantic_writeback,
+    }
+    if application_schema is not None:
+        rsimem_payload["application_opportunity_schema"] = application_schema
+
     return {
         "hermes": {
             "persistence_enabled": persistence_enabled,
@@ -264,21 +281,7 @@ def build_hermes_extra_body(
             },
             "initial_home_fixture_dir": str(initial_home_fixture_dir) if initial_home_fixture_dir else "",
             "preseed_artifacts_dir": str(preseed_artifacts_dir) if preseed_artifacts_dir else "",
-            "rsimem": {
-                "mode": rsimem_mode,
-                "adapter_failure_policy": rsimem_adapter_failure_policy,
-                "verify_native_projection": rsimem_verify_native_projection,
-                "evidence_path": str(artifacts_dir / "rsimem_memory_events.jsonl"),
-                "application_opportunity_schema": application_schema,
-                "lifecycle": {
-                    "evaluator_mode": rsimem_lifecycle_evaluator_mode,
-                    "policy_version": rsimem_lifecycle_policy_version,
-                    "compiler_version": rsimem_lifecycle_compiler_version,
-                    "timeout_seconds": rsimem_lifecycle_timeout_seconds,
-                    "max_output_tokens": rsimem_lifecycle_max_output_tokens,
-                },
-                "semantic_writeback": semantic_writeback,
-            },
+            "rsimem": rsimem_payload,
         }
     }
 
