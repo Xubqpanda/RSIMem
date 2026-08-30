@@ -746,6 +746,21 @@ def _operation_join_error(
     if len(contexts) > 1:
         return "operation_join_invalid"
 
+    # Matching operation kinds and execution context is not enough: a caller
+    # must prove the causal retrieval -> injection -> use -> outcome chain.
+    # Require each present downstream operation to name the immediately
+    # preceding stage as a parent.  This prevents unrelated operations from
+    # being stitched together merely because they share artifact IDs.
+    parent_edges = (
+        (retrieval, injection),
+        (injection, downstream),
+        (downstream, outcome),
+    )
+    for parent, child in parent_edges:
+        if parent is not None and child is not None:
+            if parent.operation_id not in child.parent_operation_ids:
+                return "operation_join_invalid"
+
     if retrieval is not None and evidence.retrieved_artifact_ids and not set(
         evidence.retrieved_artifact_ids
     ).issubset(set(retrieval.output_artifact_ids) | set(retrieval.input_artifact_ids)):
