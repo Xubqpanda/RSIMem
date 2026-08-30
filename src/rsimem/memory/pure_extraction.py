@@ -1581,10 +1581,33 @@ class _JsonPureExtractionStore:
                     raise ValueError("conflicting pure extraction record")
                 return False
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as handle:
-                handle.write(serialized + "\n")
-                handle.flush()
-                os.fsync(handle.fileno())
+            # Rewrite through a temporary file and atomically replace the
+            # destination instead of appending directly.  A direct append
+            # can leave a truncated final JSONL record when the host process
+            # is interrupted between write(2) calls; a concurrent artifact
+            # copier can then observe that partial line and fail a later
+            # episode.  The exclusive lock protects the read/replace
+            # transaction, while os.replace ensures readers see either the
+            # old complete log or the new complete log.
+            descriptor, temporary = tempfile.mkstemp(
+                prefix=self.path.name + ".", dir=self.path.parent
+            )
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    for existing_record in existing:
+                        handle.write(_canonical(existing_record.payload()) + "\n")
+                    handle.write(serialized + "\n")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, self.path)
+                directory = os.open(self.path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
         return True
 
 
