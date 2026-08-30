@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from rsimem.extraction_preparation import (
+    build_pure_extraction_corpus_from_batch,
     _process_signal_gate,
     _optimizer_signal_is_ready,
     ExtractionFeedbackBatchAudit,
@@ -74,7 +75,67 @@ from rsimem.memory.process_signal import (
     ProcessSignalCase,
     ProcessSignalCaseStatus,
 )
+from rsimem.memory.pure_extraction import (
+    JsonPureExtractionFeedbackRecordStore,
+    JsonPureExtractionSourceRecordStore,
+    PureExtractionFeedbackRecord,
+    PureExtractionSourceRecord,
+)
 from test_extraction_optimizer_builder import _fixture
+
+
+def test_build_pure_extraction_corpus_from_captured_batch_is_gate_bound(
+    tmp_path: Path,
+) -> None:
+    projection, family_source, *_ = _fixture()
+    source = PureExtractionSourceRecord.from_family_record(
+        family_source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.batch-pure-v1",
+    )
+    feedback = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=source,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.batch-pure-v1",
+        provenance_id=source.provenance_id,
+    )
+    source_store = JsonPureExtractionSourceRecordStore(
+        tmp_path / "run" / "pure_extraction_sources.jsonl"
+    )
+    feedback_store = JsonPureExtractionFeedbackRecordStore(
+        tmp_path / "run" / "rsimem_pure_extraction_feedback.jsonl"
+    )
+    source_store.append(source)
+    feedback_store.append(feedback)
+    case_store = JsonProcessSignalCaseStore(
+        tmp_path / "run" / "process_signal_cases.jsonl"
+    )
+    case_store.append(ProcessSignalCase.create(
+        logical_case_id="logical-case.batch-pure-v1",
+        physical_observation_ids=("physical-observation.batch-pure-v1",),
+        source_observed=True,
+        extraction_observed=True,
+        persistence_observed=True,
+        retrieval_observed=False,
+        exposure_observed=False,
+        outcome_observed=False,
+        extraction_attributable=False,
+        abstract_hypothesis_digest=None,
+        observation_complete=True,
+        analysis_protocol_id="signal-protocol.batch-pure-v1",
+        replicate_id="replicate.batch-pure-v1",
+        observation_window="window.batch-pure-v1",
+    ))
+    corpus = build_pure_extraction_corpus_from_batch(
+        tmp_path,
+        observation_cutoff="2026-08-30T00:00:00Z",
+        process_signal_protocol_id="signal-protocol.batch-pure-v1",
+    )
+    assert corpus.process_signal_gate == "no_signal"
+    assert corpus.process_signal_case_count == 1
+    assert corpus.process_signal_optimization_count == 0
+    assert len(corpus.examples) == 1
 
 
 def _write_graph(path: Path, graph) -> None:

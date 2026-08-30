@@ -255,6 +255,8 @@ from rsimem.memory.process_signal import (
     JsonProcessSignalCaseStore,
     build_process_signal_cases,
 )
+from rsimem.extraction_preparation import build_pure_extraction_corpus_from_batch
+from rsimem.memory.pure_extraction import JsonPureExtractionOptimizerCorpusStore
 from rsimem.memory.signal_protocol import (
     PROCESS_SIGNAL_OBSERVATION_WINDOW,
     PROCESS_SIGNAL_PROTOCOL_FILENAME,
@@ -271,6 +273,11 @@ if utility.get("events") != 0:
 paths = tuple(run_dir.rglob("extraction_sources.jsonl"))
 if not paths or not any(JsonExtractionSourceRecordStore(path).records() for path in paths):
     raise ValueError("formal extraction run emitted no source evidence")
+pure_paths = tuple(run_dir.rglob("pure_extraction_sources.jsonl"))
+if not pure_paths:
+    raise ValueError("formal extraction run emitted no pure source evidence")
+if not any(path.read_text(encoding="utf-8").strip() for path in pure_paths):
+    raise ValueError("formal extraction run emitted an empty pure source log")
 process_paths = tuple(run_dir.rglob("rsimem_process_feedback.jsonl"))
 events = tuple(
     event
@@ -324,6 +331,16 @@ if not cases:
 case_store = JsonProcessSignalCaseStore(run_dir / "process_signal_cases.jsonl")
 for case in cases:
     case_store.append(case)
+pure_feedback_paths = tuple(run_dir.rglob("rsimem_pure_extraction_feedback.jsonl"))
+if pure_feedback_paths and any(path.read_text(encoding="utf-8").strip() for path in pure_feedback_paths):
+    pure_corpus = build_pure_extraction_corpus_from_batch(
+        run_dir,
+        observation_cutoff="2026-08-30T23:59:59Z",
+        process_signal_protocol_id=protocol.protocol_id,
+    )
+    JsonPureExtractionOptimizerCorpusStore(
+        run_dir / "pure_extraction_optimizer_corpus.json"
+    ).write(pure_corpus)
 ' "${trace_dir}"; then
     manifest_call record "${replicate}" "${ordinal}" "${METHOD}" "${run_name}" failed process_corpus
     exit 1

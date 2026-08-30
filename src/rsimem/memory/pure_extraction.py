@@ -1292,7 +1292,9 @@ class PureExtractionOptimizerCorpus:
             examples=examples,
             process_signal_gate="ready" if ready else "no_signal",
             process_signal_protocol_id=process_signal_protocol_id,
-            process_signal_case_digest=expected_case_digest,
+            process_signal_case_digest=(
+                expected_case_digest if census.logical_case_count else None
+            ),
             process_signal_case_count=census.logical_case_count,
             process_signal_optimization_count=optimization_count,
             process_signal_hypothesis_digest=hypothesis_digest,

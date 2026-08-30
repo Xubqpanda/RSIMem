@@ -176,6 +176,11 @@ from rsimem.memory.signal_protocol import (
     validate_protocol_for_extraction_manifest,
 )
 run_dir, manifest_path = map(Path, sys.argv[1:])
+pure_paths = tuple(run_dir.rglob("pure_extraction_sources.jsonl"))
+if not pure_paths:
+    raise ValueError("formal matched run emitted no pure source evidence")
+if not any(path.read_text(encoding="utf-8").strip() for path in pure_paths):
+    raise ValueError("formal matched run emitted an empty pure source log")
 events = tuple(
     event
     for path in sorted(run_dir.rglob("rsimem_process_feedback.jsonl"))

@@ -593,6 +593,39 @@ def test_runtime_opportunity_provider_receives_scope_free_input(tmp_path: Path) 
     }]
 
 
+def test_runtime_opportunities_can_be_materialized_from_explicit_result_field(
+    tmp_path: Path,
+) -> None:
+    bridge = HermesPastBenchBridge(
+        _hermes_home(tmp_path),
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-explicit-opportunity",
+        trace_id="trace-explicit-opportunity",
+        episode_id="episode-explicit-opportunity",
+        session_id="session-explicit-opportunity",
+        task_id="task-explicit-opportunity",
+        experiment_variant="native+adapter+ledger",
+    )
+    evidence = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.USER_REQUEST,
+        semantic_requirement="preference.output.concise",
+        observation_time="2026-08-30T01:02:03Z",
+        operation_id="op.explicit-opportunity.v1",
+        provenance_id="provenance.explicit-opportunity.v1",
+        source_payload={"request_digest": "a" * 64},
+    )
+    try:
+        recorded = bridge._record_runtime_opportunities({
+            "family_id": "SM01_preference_adoption",
+            "stage": "eval_near",
+            "rsimem_opportunities": [evidence.payload()],
+        })
+    finally:
+        bridge.close()
+    assert recorded == (evidence,)
+
+
 def test_past_bench_bridge_records_generic_memory_use_join(tmp_path: Path) -> None:
     bridge = HermesPastBenchBridge(
         _hermes_home(tmp_path),
