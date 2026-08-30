@@ -122,10 +122,8 @@ class ProcessSignalCase:
             self.replicate_id,
             self.observation_window,
         )
-        if (self.replicate_id is None) != (self.observation_window is None):
-            raise ValueError("process signal replicate/window metadata must be complete")
-        if self.analysis_protocol_id is not None and (
-            self.replicate_id is None or self.observation_window is None
+        if any(value is not None for value in metadata) and any(
+            value is None for value in metadata
         ):
             raise ValueError("process signal protocol metadata must be complete")
         for value, name in (
@@ -526,8 +524,10 @@ def build_process_signal_cases(
             physical_observation_ids=(physical_id,),
             events=task_events,
             analysis_protocol_id=analysis_protocol_id,
-            replicate_id=replicate_id,
-            observation_window=observation_window,
+            replicate_id=replicate_id if analysis_protocol_id is not None else None,
+            observation_window=(
+                observation_window if analysis_protocol_id is not None else None
+            ),
         ))
     return tuple(cases)
 
