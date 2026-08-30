@@ -25,6 +25,7 @@ from rsimem.memory.policy_feasibility import (
     FeedbackChain,
     FeasibilityOutcome,
     FeasibilityStatus,
+    LayerBenefitExplanation,
     LayerIntervention,
     JsonFeasibilityEvidenceLedger,
     PolicyHypothesis,
@@ -252,6 +253,27 @@ def test_missing_missed_node_also_degrades_without_reward() -> None:
     )
     assert case.outcome is FeasibilityOutcome.UNRESOLVED
     assert "incomplete_missed_feedback" in case.reason_codes
+
+
+def test_incomplete_harmful_node_also_degrades_without_negative_reward() -> None:
+    parent, candidate = _replays()
+    case = LayerIntervention(
+        case_id="case.incomplete_harmful",
+        target_layer=PolicyLayer.EXTRACTION,
+        parent=parent,
+        candidate=candidate,
+        parent_artifact=_artifact("fixed.extraction.parent.v1", PolicyArtifactKind.FIXED),
+        candidate_artifact=_artifact(
+            "adaptive.extraction.candidate.v1",
+            PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE,
+        ),
+        process_signal=True,
+        outcome=FeasibilityOutcome.HARMFUL,
+        reason_codes=("incomplete_harm",),
+    )
+    assert case.outcome is FeasibilityOutcome.UNRESOLVED
+    assert "incomplete_harmful_feedback" in case.reason_codes
+    assert case.benefit_explanation.outcome_status == "unresolved"
 
 
 def test_candidate_must_change_target_layer_and_artifact_scope() -> None:
@@ -582,7 +604,7 @@ def test_feasibility_replay_rejects_unhashable_id_values() -> None:
     payload["reason_codes"] = [{"reason": "not-a-string"}]
     with pytest.raises(ValueError, match="malformed feasibility evidence record"):
         FeasibilityEvidenceRecord.from_payload({
-            "schemaVersion": 2,
+            "schemaVersion": 3,
             "recordId": "feasibility-record.invalid",
             "replayPayload": payload,
         })
@@ -599,6 +621,21 @@ def test_executable_feasibility_census_replays_and_persists(tmp_path) -> None:
     for case in cases:
         ledger.verify_case(case)
     assert first.payload()["caseCount"] == 7
+
+
+def test_each_fixture_layer_has_explicit_benefit_explanation() -> None:
+    cases = build_default_feasibility_cases()
+    assert {case.target_layer for case in cases} == set(PolicyLayer)
+    for case in cases:
+        explanation = case.benefit_explanation
+        assert isinstance(explanation, LayerBenefitExplanation)
+        assert explanation.target_layer is case.target_layer
+        assert explanation.payload()["mechanism_code"]
+        assert explanation.summary
+        assert explanation.outcome is case.outcome
+        assert case.replay_payload["benefit_explanation"] == explanation.payload()
+    report = run_default_feasibility_census().payload()
+    assert all("benefitExplanation" in item for item in report["cases"])
 
 
 def test_every_layer_case_has_matched_process_intervention_identity() -> None:
@@ -922,6 +959,10 @@ def _layer_case(
     feedback = (
         FeedbackChain("opportunity.layer", "use.layer", "outcome.layer")
         if outcome is FeasibilityOutcome.USEFUL
+        else FeedbackChain(
+            "opportunity.layer", "use.layer", "outcome.layer"
+        )
+        if outcome is FeasibilityOutcome.HARMFUL
         else FeedbackChain(
             source_id="source.layer",
             demand_id="demand.layer",

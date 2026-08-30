@@ -67,6 +67,117 @@ class FeasibilityStatus(StrEnum):
     VALIDATION_ONLY = "validation-only"
 
 
+_LAYER_BENEFIT_MECHANISMS = {
+    PolicyLayer.TRIGGER: (
+        "boundary_eligibility",
+        "Trigger variation changes whether downstream formation is eligible.",
+    ),
+    PolicyLayer.SOURCE_SELECTION: (
+        "formation_input_scope",
+        "Source variation changes which completed context enters formation.",
+    ),
+    PolicyLayer.EXTRACTION: (
+        "candidate_fact_set",
+        "Extraction variation changes the candidate durable-fact set.",
+    ),
+    PolicyLayer.ADMISSION: (
+        "mutation_admission",
+        "Admission variation changes mutation kind, target, or acceptance.",
+    ),
+    PolicyLayer.COMMIT: (
+        "mutation_scheduling",
+        "Commit variation changes mutation scheduling and receipt identity.",
+    ),
+    PolicyLayer.EXPOSURE: (
+        "future_context_exposure",
+        "Exposure variation changes which artifacts enter future context.",
+    ),
+}
+
+
+@dataclass(frozen=True, slots=True)
+class LayerBenefitExplanation:
+    """Content-free explanation of what a layer intervention can change.
+
+    This is a mechanism explanation, not a claim that a task improved.  The
+    outcome status is kept explicit so unresolved/censored cases cannot be
+    mistaken for a benefit or harm signal.
+    """
+
+    target_layer: PolicyLayer
+    mechanism_code: str
+    outcome: FeasibilityOutcome
+    outcome_status: str
+
+    def __post_init__(self) -> None:
+        layer = PolicyLayer(self.target_layer)
+        object.__setattr__(self, "target_layer", layer)
+        outcome = FeasibilityOutcome(self.outcome)
+        object.__setattr__(self, "outcome", outcome)
+        mechanism = _LAYER_BENEFIT_MECHANISMS.get(layer)
+        if mechanism is None or self.mechanism_code != mechanism[0]:
+            raise ValueError("benefit explanation mechanism does not match target layer")
+        expected_status = (
+            "resolved" if outcome in {
+                FeasibilityOutcome.USEFUL,
+                FeasibilityOutcome.HARMFUL,
+                FeasibilityOutcome.MISSED,
+            } else "unresolved"
+        )
+        if self.outcome_status != expected_status:
+            raise ValueError("benefit explanation outcome status is invalid")
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        target_layer: PolicyLayer,
+        outcome: FeasibilityOutcome,
+    ) -> "LayerBenefitExplanation":
+        layer = PolicyLayer(target_layer)
+        resolved = FeasibilityOutcome(outcome) in {
+            FeasibilityOutcome.USEFUL,
+            FeasibilityOutcome.HARMFUL,
+            FeasibilityOutcome.MISSED,
+        }
+        return cls(
+            target_layer=layer,
+            mechanism_code=_LAYER_BENEFIT_MECHANISMS[layer][0],
+            outcome=FeasibilityOutcome(outcome),
+            outcome_status="resolved" if resolved else "unresolved",
+        )
+
+    @property
+    def summary(self) -> str:
+        return _LAYER_BENEFIT_MECHANISMS[self.target_layer][1]
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "target_layer": self.target_layer.value,
+            "mechanism_code": self.mechanism_code,
+            "outcome": self.outcome.value,
+            "outcome_status": self.outcome_status,
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "LayerBenefitExplanation":
+        fields = {"target_layer", "mechanism_code", "outcome", "outcome_status"}
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed layer benefit explanation")
+        try:
+            result = cls(
+                target_layer=value["target_layer"],
+                mechanism_code=value["mechanism_code"],
+                outcome=value["outcome"],
+                outcome_status=value["outcome_status"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed layer benefit explanation") from exc
+        if result.payload() != dict(value):
+            raise ValueError("non-canonical layer benefit explanation")
+        return result
+
+
 @dataclass(frozen=True, slots=True)
 class FeedbackChain:
     """Evidence IDs for an attributable outcome.
@@ -99,6 +210,12 @@ class FeedbackChain:
     @property
     def complete_useful(self) -> bool:
         return all((self.opportunity_id, self.use_id, self.outcome_id))
+
+    @property
+    def complete_harmful(self) -> bool:
+        """Whether an observed harm has a complete opportunity/use/outcome chain."""
+
+        return self.complete_useful
 
     @property
     def complete_missed(self) -> bool:
@@ -748,6 +865,7 @@ class LayerIntervention:
     reason_codes: tuple[str, ...] = ()
     process_feedback: ProcessFeedback | None = None
     hypothesis: PolicyHypothesis | None = None
+    benefit_explanation: LayerBenefitExplanation | None = None
 
     @classmethod
     def from_extraction_feedback(
@@ -823,12 +941,32 @@ class LayerIntervention:
             outcome = FeasibilityOutcome.UNRESOLVED
             if "incomplete_useful_feedback" not in reasons:
                 reasons = (*reasons, "incomplete_useful_feedback")
+        elif outcome == FeasibilityOutcome.HARMFUL and not self.feedback.complete_harmful:
+            # Harm is an outcome claim too.  Without an attributable chain it
+            # must remain unresolved rather than becoming a negative reward.
+            outcome = FeasibilityOutcome.UNRESOLVED
+            if "incomplete_harmful_feedback" not in reasons:
+                reasons = (*reasons, "incomplete_harmful_feedback")
         elif outcome == FeasibilityOutcome.MISSED and not self.feedback.complete_missed:
             outcome = FeasibilityOutcome.UNRESOLVED
             if "incomplete_missed_feedback" not in reasons:
                 reasons = (*reasons, "incomplete_missed_feedback")
         object.__setattr__(self, "outcome", outcome)
         object.__setattr__(self, "reason_codes", reasons)
+        explanation = self.benefit_explanation
+        if explanation is None:
+            explanation = LayerBenefitExplanation.create(
+                target_layer=self.target_layer,
+                outcome=outcome,
+            )
+        if not isinstance(explanation, LayerBenefitExplanation):
+            raise ValueError("benefit explanation has the wrong type")
+        if (
+            explanation.target_layer != self.target_layer
+            or explanation.outcome != outcome
+        ):
+            raise ValueError("benefit explanation does not match intervention")
+        object.__setattr__(self, "benefit_explanation", explanation)
         self._validate_feedback(outcome)
         if self.action_changed is False:
             raise ValueError("candidate must change the target-layer decision fingerprint")
@@ -848,6 +986,8 @@ class LayerIntervention:
     def _validate_feedback(self, outcome: FeasibilityOutcome) -> None:
         if outcome == FeasibilityOutcome.USEFUL and not self.feedback.complete_useful:
             raise ValueError("useful feedback requires opportunity/use/outcome chain")
+        if outcome == FeasibilityOutcome.HARMFUL and not self.feedback.complete_harmful:
+            raise ValueError("harmful feedback requires opportunity/use/outcome chain")
         if outcome == FeasibilityOutcome.MISSED and not self.feedback.complete_missed:
             raise ValueError("missed feedback requires source/demand/absence/outcome chain")
         if outcome in {FeasibilityOutcome.UNRESOLVED, FeasibilityOutcome.CENSORED} and (
@@ -984,6 +1124,7 @@ class LayerIntervention:
             "outcome": self.outcome.value,
             "feedback_ids": list(self.feedback.ids),
             "reason_codes": list(self.reason_codes),
+            "benefit_explanation": self.benefit_explanation.payload(),
             "intervention_fingerprint": self.intervention_fingerprint,
             "process_feedback": (
                 self.process_feedback.payload()
@@ -994,7 +1135,7 @@ class LayerIntervention:
         }
 
 
-FEASIBILITY_EVIDENCE_SCHEMA_VERSION = 2
+FEASIBILITY_EVIDENCE_SCHEMA_VERSION = 3
 POLICY_FEASIBILITY_REPORT_SCHEMA_VERSION = 2
 
 
@@ -1018,7 +1159,7 @@ class FeasibilityEvidenceRecord:
             "candidate_source_revision", "parent_decision_ids", "candidate_decision_ids",
             "parent_lineage_id", "candidate_lineage_id", "parent_audit_ok",
             "candidate_audit_ok", "process_signal", "outcome", "feedback_ids",
-            "reason_codes", "intervention_fingerprint", "process_feedback",
+            "reason_codes", "benefit_explanation", "intervention_fingerprint", "process_feedback",
             "hypothesis",
         }
         if set(payload) != required:
@@ -1058,6 +1199,12 @@ class FeasibilityEvidenceRecord:
                 raise ValueError("feasibility replay flags are invalid")
         outcome = FeasibilityOutcome(payload["outcome"])
         payload["outcome"] = outcome.value
+        explanation = LayerBenefitExplanation.from_payload(payload["benefit_explanation"])
+        if (
+            explanation.target_layer.value != payload["target_layer"]
+            or explanation.outcome is not outcome
+        ):
+            raise ValueError("benefit explanation does not match feasibility outcome")
         object.__setattr__(self, "replay_payload", MappingProxyType(payload))
         expected = f"feasibility-record.{content_digest(payload)[:40]}"
         if self.record_id != expected:
@@ -1341,6 +1488,10 @@ class PolicyFeasibilityReport:
                         if case.process_feedback is not None
                         else None
                     ),
+                    "benefitExplanation": {
+                        **case.benefit_explanation.payload(),
+                        "summary": case.benefit_explanation.summary,
+                    },
                     "hypothesis": (
                         case.hypothesis.payload()
                         if case.hypothesis is not None
@@ -1386,7 +1537,11 @@ def build_feasibility_report(cases: Iterable[LayerIntervention]) -> PolicyFeasib
         )
         complete_count = sum(
             1 for case in items
-            if case.feedback.complete_useful or case.feedback.complete_missed
+            if (
+                case.feedback.complete_useful
+                or case.feedback.complete_harmful
+                or case.feedback.complete_missed
+            )
         )
         ambiguous_count = sum(
             1
@@ -1440,6 +1595,7 @@ __all__ = [
     "POLICY_FEASIBILITY_REPORT_SCHEMA_VERSION",
     "FeasibilityOutcome",
     "FeasibilityStatus",
+    "LayerBenefitExplanation",
     "FeedbackChain",
     "feedback_chain_from_extraction_example",
     "build_extraction_feedback_interventions",
