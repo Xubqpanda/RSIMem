@@ -1560,6 +1560,11 @@ class HermesPastBenchBridge:
                     candidate_artifacts = set(observed.artifact_ids) or set(
                         observed.retrieved_artifact_ids
                     )
+                    source_artifact_ids = {
+                        fact.artifact_id
+                        for fact in source.source.facts
+                        if fact.artifact_id is not None
+                    }
                     source_match_count = sum(
                         bool(
                             candidate_artifacts.intersection({
@@ -1570,7 +1575,10 @@ class HermesPastBenchBridge:
                         )
                         for item in sources
                     )
-                    if source_match_count != 1:
+                    if (
+                        source_match_count != 1
+                        or not candidate_artifacts.issubset(source_artifact_ids)
+                    ):
                         observed = None
                     if observed is None:
                         memory_use = None
