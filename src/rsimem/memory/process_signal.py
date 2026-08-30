@@ -418,6 +418,14 @@ class ProcessSignalCaseCensus:
             raise ValueError("process signal status counts are invalid")
         if sum(values.values()) != self.logical_case_count:
             raise ValueError("process signal status counts do not cover cases")
+        optimization_count = values.get(
+            ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL.value,
+            0,
+        )
+        if sum(hypothesis_counts.values()) > optimization_count:
+            raise ValueError(
+                "process signal hypothesis counts exceed optimization cases"
+            )
         object.__setattr__(self, "status_counts", dict(sorted(values.items())))
         object.__setattr__(
             self,
