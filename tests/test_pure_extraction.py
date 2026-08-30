@@ -44,9 +44,18 @@ def test_family_projection_strips_benchmark_scope_and_replays() -> None:
     )
     assert projected.source_projection_digest == pure.source_projection_digest
     assert projected.extraction_set_id == pure.extraction_set_id
+    assert projected.source.available_semantic_keys == ()
     assert "family_id" not in pure.payload()
     assert "stage" not in pure.payload()
     assert PureExtractionSourceRecord.from_payload(pure.payload()) == pure
+
+    visible = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.pure-v1",
+        visible_semantic_keys=("preference.summary.tsv",),
+    )
+    assert visible.source.available_semantic_keys == ("preference.summary.tsv",)
 
     # The projection's identity is independent of the family/stage fields;
     # re-projecting the same captured record is replay-stable.

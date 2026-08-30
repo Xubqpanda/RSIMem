@@ -228,6 +228,7 @@ class PureExtractionSourceRecord:
         source_projection_id: str | None = None,
         context_revision: str | None = None,
         provenance_id: str | None = None,
+        visible_semantic_keys: tuple[str, ...] = (),
     ) -> "PureExtractionSourceRecord":
         """Project a family-bound audit record without copying its labels.
 
@@ -247,6 +248,20 @@ class PureExtractionSourceRecord:
         provenance = provenance_id or (
             f"extraction-provenance.{record.activation.fingerprint_digest[:40]}"
         )
+        # ``available_semantic_keys`` on the legacy record may have been
+        # populated by a family contract parser.  Only an explicit caller
+        # projection is trusted for the deployment-only plane.
+        if not isinstance(visible_semantic_keys, tuple):
+            raise TypeError("visible semantic keys must be a tuple")
+        source_evidence = record.source
+        sanitized_source = ExtractionSourceEvidence(
+            source_evidence.source_id,
+            source_evidence.source_projection_digest,
+            source_evidence.extraction_set_id,
+            source_evidence.status,
+            visible_semantic_keys,
+            source_evidence.facts,
+        )
         return cls.create(
             source_projection_id=projection_id,
             source_projection_digest=record.source.source_projection_digest,
@@ -256,7 +271,7 @@ class PureExtractionSourceRecord:
             extraction_artifact_id=record.extraction_artifact_id,
             extraction_artifact_digest=record.extraction_artifact_digest,
             extraction_output_digest=record.extraction_output_digest,
-            source=record.source,
+            source=sanitized_source,
             activation=record.activation,
             provenance_id=provenance,
         )
