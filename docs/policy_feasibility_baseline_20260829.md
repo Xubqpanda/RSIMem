@@ -21,7 +21,7 @@ Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable pref
 
 每个 case 都保留 `event -> decision -> receipt/lineage` 的 content-free identity。用例还覆盖：缺少 useful/missed 证据链节点时自动降级为 `unresolved`，candidate 不改变目标层时拒绝，重复 case ID 时拒绝，以及 parent/candidate replay audit 失败时拒绝。
 
-当前 feasibility evidence ledger schema 为 v2；此前只保存 ID 的 v1 记录不会被静默迁移，而是明确 fail closed。
+当前 feasibility evidence ledger schema 为 v3；此前只保存 ID 的 v1/v2 记录不会被静默迁移，而是明确 fail closed。v3 额外固定每个 intervention 的 layer-benefit explanation。
 
 `build_extraction_feedback_fixture()` 提供了同一 past snapshot 的两个确定性
 delayed outcome：`MISSED` 分支让 Policy N 省略 durable TSV preference，未来
