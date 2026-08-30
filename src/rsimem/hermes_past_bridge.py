@@ -877,7 +877,29 @@ class HermesPastBenchBridge:
     ) -> tuple[OpportunityEvidence, ...]:
         provider = self._opportunity_evidence_provider
         if provider is None:
-            return ()
+            # A host may attach already-materialized application evidence to
+            # the completion result without installing a Python callback.
+            # This is intentionally an explicit field; no opportunity is
+            # inferred from task IDs, stages, final strings or tool names.
+            raw = result.get("rsimem_opportunities")
+            if raw is None:
+                raw = result.get("opportunity_evidence")
+            if raw is None:
+                self._last_runtime_opportunities = ()
+                return ()
+            if isinstance(raw, Mapping) or isinstance(raw, OpportunityEvidence):
+                raw = (raw,)
+            if isinstance(raw, (str, bytes)) or not isinstance(raw, Iterable):
+                raise TypeError("runtime opportunity evidence must be iterable")
+            values = []
+            for item in raw:
+                if isinstance(item, OpportunityEvidence):
+                    values.append(item)
+                else:
+                    values.append(OpportunityEvidence.from_payload(item))
+            recorded = self.record_opportunity_evidence(tuple(values))
+            self._last_runtime_opportunities = recorded
+            return recorded
         # Keep benchmark scope out of the runtime opportunity surface.  The
         # bridge may itself be running a PAST-Bench case, but family/stage are
         # audit metadata and must not influence a deployment-visible provider.
