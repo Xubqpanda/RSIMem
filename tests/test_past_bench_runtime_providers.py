@@ -113,6 +113,74 @@ def test_past_opportunity_provider_uses_frozen_public_schema_for_generic_future_
     assert values[0].source_surface.value == "application_schema"
 
 
+def test_past_opportunity_provider_treats_supplied_schema_as_authoritative() -> None:
+    """Legacy notes text must not manufacture pure opportunities in a formal run."""
+
+    schema = {
+        "schema_id": "past-bench.notes.application.v1",
+        "schema_version": 1,
+        "application_contract": {
+            "schema_id": "past-bench.notes.application.v1",
+            "schema_version": 2,
+            "version": "v1",
+            "requirement_ids": ["application.notes.share.recipient_policy"],
+            "schema_digest": "122c4d36732dd4a2824d1b48944eed2aa80e9bf10ad51f596ba143673051797f",
+        },
+        "opportunities": [{
+            "semantic_key": "application.notes.share.recipient_policy",
+            "surface": "tool_schema",
+            "tool_name": "notes_share",
+            "required_parameter": "recipients",
+        }],
+    }
+    values = _past_bench_opportunity_provider({
+        "messages": [{
+            "role": "user",
+            "content": "Use TSV with owner, priority, task, and due_date columns.",
+        }],
+        "rsimem_application_schema": schema,
+        "rsimem_source_provenance_id": "pure-extraction-provenance.schema-authority",
+    })
+    assert values == ()
+
+
+def test_past_opportunity_provider_supports_non_notes_schema_tools() -> None:
+    """Application-owned tool schemas are not coupled to the notes prefix."""
+
+    from rsimem.memory.opportunity import ApplicationOpportunitySchema
+
+    contract = ApplicationOpportunitySchema.create(
+        schema_id="calendar.application.v1",
+        version="v1",
+        requirement_ids=("application.calendar.read.policy",),
+    )
+    schema = {
+        "schema_id": "calendar.application.v1",
+        "schema_version": 1,
+        "application_contract": contract.payload(),
+        "opportunities": [{
+            "semantic_key": "application.calendar.read.policy",
+            "surface": "tool_schema",
+            "tool_name": "calendar_read",
+            "required_parameter": "calendar_id",
+        }],
+    }
+    values = _past_bench_opportunity_provider({
+        "messages": [{
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "calendar_read"}}],
+        }],
+        "rsimem_application_schema": schema,
+        "rsimem_source_records": [{
+            "provenance_id": "pure-extraction-provenance.calendar",
+            "semantic_keys": ["application.calendar.read.policy"],
+        }],
+    })
+    assert len(values) == 1
+    assert values[0].semantic_requirement == "application.calendar.read.policy"
+    assert values[0].source_surface.value == "application_schema"
+
+
 def test_application_schema_is_derived_from_visible_tool_contract() -> None:
     task = TaskDefinition.model_validate({
         "task_id": "schema-fixture",
