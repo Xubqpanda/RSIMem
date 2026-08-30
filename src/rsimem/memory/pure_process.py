@@ -117,6 +117,8 @@ class PureProcessEvent:
             raise ValueError("pure-process event has the wrong source identity")
         object.__setattr__(self, "evidence_plane", plane)
         object.__setattr__(self, "evidence_source", source)
+        object.__setattr__(self, "kind", ProcessEventKind(self.kind))
+        object.__setattr__(self, "status", ProcessEventStatus(self.status))
         for value, name in (
             (self.event_id, "pure-process event ID"),
             (self.run_id, "run ID"),
@@ -137,12 +139,59 @@ class PureProcessEvent:
             object.__setattr__(self, "policy_layer", PolicyLayer(self.policy_layer))
         if self.lineage_id is not None:
             _id(self.lineage_id, "lineage ID")
-        if len(self.execution_receipt_ids) != len(set(self.execution_receipt_ids)):
-            raise ValueError("pure-process receipt IDs must be unique")
-        if len(self.reason_codes) != len(set(self.reason_codes)):
-            raise ValueError("pure-process reason codes must be unique")
+        if len(self.execution_receipt_ids) != len(set(self.execution_receipt_ids)) or any(
+            not isinstance(value, str) or not value for value in self.execution_receipt_ids
+        ):
+            raise ValueError("pure-process receipt IDs must be unique stable identifiers")
+        if len(self.reason_codes) != len(set(self.reason_codes)) or any(
+            not isinstance(value, str) or not value for value in self.reason_codes
+        ):
+            raise ValueError("pure-process reason codes must be unique strings")
         if self.policy_decision_id is not None and self.policy_layer is None:
             raise ValueError("policy decision requires policy layer")
+        for value, name in (
+            (self.tool_call_id, "tool call ID"),
+            (self.tool_result_id, "tool result ID"),
+            (self.retry_identity, "tool retry identity"),
+        ):
+            if value is not None:
+                _id(value, name)
+        if self.tool_name_digest is not None:
+            _digest(self.tool_name_digest, "tool name digest")
+        if self.tool_success is not None and type(self.tool_success) is not bool:
+            raise TypeError("tool success must be bool or None")
+        if self.kind is ProcessEventKind.TOOL_CALL:
+            if any(value is not None for value in (
+                self.tool_call_id, self.tool_result_id, self.tool_name_digest,
+                self.retry_identity, self.tool_success,
+            )) and (
+                self.tool_call_id is None
+                or self.tool_name_digest is None
+                or self.retry_identity is None
+                or self.tool_result_id is not None
+                or self.tool_success is not None
+            ):
+                raise ValueError("pure-process tool call has incomplete result fields")
+        elif self.kind is ProcessEventKind.TOOL_RESULT:
+            if any(value is not None for value in (
+                self.tool_call_id, self.tool_result_id, self.tool_name_digest,
+                self.retry_identity, self.tool_success,
+            )) and (
+                self.tool_call_id is None
+                or self.tool_result_id is None
+                or self.tool_name_digest is None
+                or self.retry_identity is None
+            ):
+                raise ValueError("pure-process tool result lacks exact identity")
+            if self.tool_success is True and self.status is not ProcessEventStatus.SUCCESS:
+                raise ValueError("pure-process successful tool result has a non-success status")
+            if self.tool_success is False and self.status is not ProcessEventStatus.FAILED:
+                raise ValueError("pure-process failed tool result has a non-failed status")
+        elif any(value is not None for value in (
+            self.tool_call_id, self.tool_result_id, self.tool_name_digest,
+            self.retry_identity, self.tool_success,
+        )):
+            raise ValueError("pure-process non-tool event has tool identity")
         expected = f"pure-process-event.{content_digest(self.identity_payload())[:40]}"
         if self.event_id != expected:
             raise ValueError("pure-process event ID mismatch")

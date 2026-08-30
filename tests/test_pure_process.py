@@ -95,6 +95,7 @@ def test_pure_process_rebuild_preserves_lifecycle_without_family_or_stage() -> N
             (ProcessEventKind.TASK_OUTCOME, ProcessEventStatus.SUCCESS),
         )
     )
+
     corpus = PureProcessCorpus.create(events)
     assert len(corpus.events) == len(events)
     assert {event.kind for event in corpus.events} == {event.kind for event in events}
@@ -105,6 +106,20 @@ def test_pure_process_rebuild_preserves_lifecycle_without_family_or_stage() -> N
         and event.evidence_source is EvidenceSourceKind.RUNTIME_OBSERVATION
         for event in corpus.events
     )
+
+
+def test_pure_process_rejects_malformed_tool_identity() -> None:
+    event = _event()
+    payload = event.payload()
+    payload["tool_success"] = "false"
+    with pytest.raises((TypeError, ValueError), match="tool success|malformed"):
+        type(event).from_payload(payload)
+
+    payload = event.payload()
+    payload["kind"] = ProcessEventKind.TASK_OUTCOME.value
+    payload["event_id"] = "pure-process-event." + "0" * 40
+    with pytest.raises(ValueError, match="tool identity|event ID|malformed"):
+        type(event).from_payload(payload)
 
 
 def test_pure_process_payload_rejects_evaluation_fields() -> None:
