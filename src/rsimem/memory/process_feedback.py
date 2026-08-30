@@ -273,6 +273,10 @@ class ProcessEvent:
                 or self.retry_identity is None
             ):
                 raise ValueError("tool result event lacks exact identity")
+            if self.tool_success is True and self.status is not ProcessEventStatus.SUCCESS:
+                raise ValueError("successful tool result has a non-success status")
+            if self.tool_success is False and self.status is not ProcessEventStatus.FAILED:
+                raise ValueError("failed tool result has a non-failed status")
         elif any(value is not None for value in (
             self.tool_call_id, self.tool_result_id, self.tool_name_digest,
             self.retry_identity, self.tool_success,

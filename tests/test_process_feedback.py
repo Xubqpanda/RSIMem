@@ -214,6 +214,42 @@ def test_process_reason_codes_keep_failure_stages_distinct() -> None:
 
 
 @pytest.mark.parametrize(
+    ("status", "tool_success", "message"),
+    (
+        (ProcessEventStatus.FAILED, True, "successful tool result"),
+        (ProcessEventStatus.SUCCESS, False, "failed tool result"),
+        (ProcessEventStatus.UNKNOWN, True, "successful tool result"),
+    ),
+)
+def test_tool_result_status_must_match_explicit_success(
+    status: ProcessEventStatus,
+    tool_success: bool,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        ProcessEvent.create(
+            kind=ProcessEventKind.TOOL_RESULT,
+            status=status,
+            run_id="run.tool-status",
+            variant="native+ledger",
+            trace_id="trace.tool-status",
+            episode_id="episode.tool-status",
+            session_id="session.tool-status",
+            task_id="task.tool-status",
+            host_event_id="event.tool-status",
+            source_revision="revision.tool-status",
+            input_payload={"result_id": "result.tool-status"},
+            output_payload={"success": tool_success},
+            execution_receipt_ids=("receipt.tool-status",),
+            tool_call_id="call.tool-status",
+            tool_result_id="result.tool-status",
+            tool_name_digest="a" * 64,
+            retry_identity="retry.tool-status",
+            tool_success=tool_success,
+        )
+
+
+@pytest.mark.parametrize(
     ("policy_reason", "process_reason"),
     (
         ("trigger_not_run", "absence"),
