@@ -201,6 +201,32 @@ def test_process_audit_rejects_tool_type_mismatch_and_cross_task_join() -> None:
     assert any("crosses task boundary" in error for error in errors)
 
 
+def test_process_audit_rejects_duplicate_call_id_across_retries() -> None:
+    events = tuple(
+        ProcessEvent.create(
+            kind=ProcessEventKind.TOOL_CALL,
+            status=ProcessEventStatus.EXECUTED,
+            run_id="run.audit-duplicate.v1",
+            variant="native",
+            trace_id="trace.audit-duplicate.v1",
+            episode_id="episode.audit-duplicate.v1",
+            session_id="session.audit-duplicate.v1",
+            task_id="task.audit-duplicate.v1",
+            host_event_id=f"event.audit-duplicate.{retry}",
+            source_revision="revision.audit-duplicate.v1",
+            input_payload={},
+            output_payload={},
+            execution_receipt_ids=(f"receipt.audit-duplicate.{retry}",),
+            tool_call_id="call.audit-duplicate.v1",
+            tool_name_digest="a" * 64,
+            retry_identity=retry,
+        )
+        for retry in ("retry.audit-duplicate.0", "retry.audit-duplicate.1")
+    )
+    errors = audit_process_events(events)
+    assert any("duplicate tool call ID" in error for error in errors)
+
+
 @pytest.mark.parametrize(
     "overrides",
     (
