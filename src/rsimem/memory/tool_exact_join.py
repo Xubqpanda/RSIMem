@@ -131,8 +131,12 @@ class ToolCallResultJoin:
                 raise TypeError(f"{name} must be bool")
         if self.call_present and self.call_id is None:
             raise ValueError("present tool call requires call ID")
+        if not self.call_present and self.call_id is not None and not self.orphan_result:
+            raise ValueError("absent tool call cannot carry a call ID")
         if self.result_present and self.result_id is None:
             raise ValueError("present tool result requires result ID")
+        if not self.result_present and self.result_id is not None:
+            raise ValueError("absent tool result cannot carry a result ID")
         identity = self._identity_payload()
         if self.join_id != f"tool-join.{_digest(identity)[:40]}":
             raise ValueError("tool join ID mismatch")

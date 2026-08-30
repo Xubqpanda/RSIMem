@@ -135,6 +135,18 @@ def test_missing_receipt_identity_is_not_exact() -> None:
     assert result.reason_code == "missing_receipt_identity"
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    (
+        {"result_present": False, "result_id": "result.present-when-absent"},
+        {"call_present": False, "call_id": "call.present-when-absent"},
+    ),
+)
+def test_presence_flags_cannot_disagree_with_tool_ids(overrides) -> None:
+    with pytest.raises(ValueError, match="cannot carry"):
+        _join(**overrides)
+
+
 def test_unknown_result_success_is_not_reported_as_failure() -> None:
     events = _join(success=None).process_events()
     assert events[-1].status.value == "unknown"
