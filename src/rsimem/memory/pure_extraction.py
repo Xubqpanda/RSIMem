@@ -46,8 +46,9 @@ PURE_EXTRACTION_FEEDBACK_SCHEMA = "rsimem-pure-extraction-feedback-v1"
 PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION = 1
 PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION = 1
 PURE_EXTRACTION_OPTIMIZER_SCHEMA = "rsimem-pure-extraction-optimizer-v1"
-PURE_EXTRACTION_CORPUS_SCHEMA_VERSION = 1
-PURE_EXTRACTION_CORPUS_SCHEMA = "rsimem-pure-extraction-corpus-v1"
+PURE_EXTRACTION_CORPUS_SCHEMA_VERSION = 2
+PURE_EXTRACTION_CORPUS_SCHEMA = "rsimem-pure-extraction-corpus-v2"
+PURE_PROCESS_SIGNAL_GATES = frozenset({"not_bound", "no_signal", "ready"})
 _IDENTIFIER = r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$"
 
 
@@ -898,6 +899,7 @@ class PureExtractionOptimizerCorpus:
     split: str
     observation_cutoff: str
     examples: tuple[PureExtractionOptimizerExample, ...]
+    process_signal_gate: str = "not_bound"
     schema_version: int = PURE_EXTRACTION_CORPUS_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -908,6 +910,8 @@ class PureExtractionOptimizerCorpus:
             raise ValueError("pure extraction corpus split is invalid")
         if not isinstance(self.observation_cutoff, str) or not self.observation_cutoff.endswith("Z"):
             raise ValueError("pure extraction corpus cutoff is invalid")
+        if self.process_signal_gate not in PURE_PROCESS_SIGNAL_GATES:
+            raise ValueError("pure extraction process-signal gate is invalid")
         try:
             datetime.fromisoformat(self.observation_cutoff.removesuffix("Z") + "+00:00")
         except ValueError as exc:
@@ -931,6 +935,7 @@ class PureExtractionOptimizerCorpus:
             "split": self.split,
             "observation_cutoff": self.observation_cutoff,
             "example_ids": [value.example_id for value in self.examples],
+            "process_signal_gate": self.process_signal_gate,
         }
 
     def payload(self) -> dict[str, object]:
@@ -948,6 +953,7 @@ class PureExtractionOptimizerCorpus:
         split: str,
         observation_cutoff: str,
         examples: tuple[PureExtractionOptimizerExample, ...],
+        process_signal_gate: str = "not_bound",
     ) -> "PureExtractionOptimizerCorpus":
         ordered = tuple(sorted(examples, key=lambda value: value.example_id))
         identity = {
@@ -955,19 +961,21 @@ class PureExtractionOptimizerCorpus:
             "split": split,
             "observation_cutoff": observation_cutoff,
             "example_ids": [value.example_id for value in ordered],
+            "process_signal_gate": process_signal_gate,
         }
         return cls(
             corpus_id=f"pure-extraction-corpus.{content_digest(identity)[:40]}",
             split=split,
             observation_cutoff=observation_cutoff,
             examples=ordered,
+            process_signal_gate=process_signal_gate,
         )
 
     @classmethod
     def from_payload(cls, value: object) -> "PureExtractionOptimizerCorpus":
         fields = {
             "schema", "corpus_id", "schema_version", "split", "observation_cutoff",
-            "example_ids", "examples",
+            "example_ids", "examples", "process_signal_gate",
         }
         if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != PURE_EXTRACTION_CORPUS_SCHEMA:
             raise ValueError("malformed pure extraction optimizer corpus")
@@ -980,6 +988,7 @@ class PureExtractionOptimizerCorpus:
                 split=value["split"],
                 observation_cutoff=value["observation_cutoff"],
                 examples=examples,
+                process_signal_gate=value["process_signal_gate"],
                 schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -1258,6 +1267,10 @@ class JsonPureExtractionOptimizerCorpusStore:
         result = self.read()
         if result.split != "train":
             raise PermissionError("pure optimizer can read only the training corpus")
+        if result.process_signal_gate != "ready":
+            raise PermissionError(
+                "pure optimizer process-signal gate is not ready"
+            )
         for example in result.examples:
             if example.evidence_plane is not EvidencePlane.PURE_PROCESS:
                 raise ValueError("pure optimizer corpus contains non-pure evidence")
@@ -1298,6 +1311,7 @@ __all__ = [
     "PURE_EXTRACTION_FEEDBACK_SCHEMA_VERSION",
     "PURE_EXTRACTION_CORPUS_SCHEMA",
     "PURE_EXTRACTION_CORPUS_SCHEMA_VERSION",
+    "PURE_PROCESS_SIGNAL_GATES",
     "PURE_EXTRACTION_OPTIMIZER_SCHEMA",
     "PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION",
     "PURE_EXTRACTION_SOURCE_SCHEMA",
