@@ -702,6 +702,7 @@ class HermesAdapter(RuntimeAdapter):
         static_writeback_config = StaticSemanticWritebackConfig.from_mapping(
             rsimem_cfg.get("semantic_writeback")
         )
+        rsimem_writeback_enabled = static_writeback_config.enabled
         lifecycle_complete = None
         if (
             lifecycle_config.evaluator_mode
