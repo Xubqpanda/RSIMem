@@ -131,7 +131,7 @@ def _process_signal_paths(batch_dir: Path) -> tuple[Path, ...]:
 
 def _process_signal_gate(
     batch_dir: Path,
-) -> tuple[str, int, int]:
+) -> tuple[str, str | None, str | None, int, int, str | None]:
     """Return the bound process-signal gate and its case counts.
 
     A batch without process-signal case files is a legacy/unit fixture and is
@@ -142,12 +142,12 @@ def _process_signal_gate(
 
     paths = _process_signal_paths(batch_dir)
     if not paths:
-        return PROCESS_SIGNAL_GATE_NOT_BOUND, 0, 0
+        return PROCESS_SIGNAL_GATE_NOT_BOUND, None, None, 0, 0, None
     cases = []
     for path in paths:
         cases.extend(JsonProcessSignalCaseStore(path).records())
     if not cases:
-        return PROCESS_SIGNAL_GATE_NO_SIGNAL, 0, 0
+        return PROCESS_SIGNAL_GATE_NO_SIGNAL, None, None, 0, 0, None
     metadata = {
         (
             case.analysis_protocol_id,
@@ -162,6 +162,10 @@ def _process_signal_gate(
     windows = {item[2] for item in metadata}
     if len(protocols) != 1 or len(windows) != 1:
         raise ValueError("process-signal cases mix frozen protocols")
+    protocol_id = next(iter(protocols))
+    case_digest = content_digest(
+        [case.payload() for case in sorted(cases, key=lambda item: item.case_id)]
+    )
     optimization_cases = [
         case
         for case in cases
@@ -174,16 +178,26 @@ def _process_signal_gate(
             by_hypothesis.setdefault(case.abstract_hypothesis_digest, set()).add(
                 case.logical_case_id
             )
-    supports_general_edit = any(
-        len(logical_case_ids) >= 2
-        for logical_case_ids in by_hypothesis.values()
-    )
+    supporting_hypotheses = {
+        hypothesis
+        for hypothesis, logical_case_ids in by_hypothesis.items()
+        if len(logical_case_ids) >= 2
+    }
+    supports_general_edit = len(supporting_hypotheses) == 1
+    hypothesis_digest = next(iter(supporting_hypotheses), None)
     gate = (
         PROCESS_SIGNAL_GATE_READY
         if supports_general_edit
         else PROCESS_SIGNAL_GATE_NO_SIGNAL
     )
-    return gate, len(cases), optimization
+    return (
+        gate,
+        protocol_id,
+        case_digest,
+        len(cases),
+        optimization,
+        hypothesis_digest,
+    )
 
 
 def _raw_source_versions(batch_dir: Path) -> tuple[int, ...]:
@@ -336,8 +350,11 @@ class ExtractionFeedbackBatchAudit:
     optimizer_signal_ready: bool
     reason_codes: tuple[str, ...]
     process_signal_gate: str = PROCESS_SIGNAL_GATE_NOT_BOUND
+    process_signal_protocol_id: str | None = None
+    process_signal_case_digest: str | None = None
     process_signal_case_count: int = 0
     process_signal_optimization_count: int = 0
+    process_signal_hypothesis_digest: str | None = None
     schema_version: int = EXTRACTION_PREPARATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -351,6 +368,15 @@ class ExtractionFeedbackBatchAudit:
             PROCESS_SIGNAL_GATE_READY,
         }:
             raise ValueError("extraction preparation process-signal gate is invalid")
+        if self.process_signal_protocol_id is not None:
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}", self.process_signal_protocol_id):
+                raise ValueError("process signal protocol identity is invalid")
+        for value, name in (
+            (self.process_signal_case_digest, "process signal case digest"),
+            (self.process_signal_hypothesis_digest, "process signal hypothesis digest"),
+        ):
+            if value is not None and not re.fullmatch(r"[0-9a-f]{64}", value):
+                raise ValueError(f"{name} must be sha256")
         for value, name in (
             (self.process_signal_case_count, "process signal case count"),
             (self.process_signal_optimization_count, "process signal optimization count"),
@@ -359,6 +385,24 @@ class ExtractionFeedbackBatchAudit:
                 raise ValueError(f"{name} must be a non-negative integer")
         if self.process_signal_optimization_count > self.process_signal_case_count:
             raise ValueError("process signal optimization count exceeds case count")
+        if self.process_signal_case_count == 0 and self.process_signal_case_digest is not None:
+            raise ValueError("empty process signal gate cannot carry case digest")
+        if self.process_signal_case_count and (
+            self.process_signal_protocol_id is None
+            or self.process_signal_case_digest is None
+        ):
+            raise ValueError("bound process signal gate requires provenance")
+        if self.process_signal_gate == PROCESS_SIGNAL_GATE_NOT_BOUND and any((
+            self.process_signal_protocol_id is not None,
+            self.process_signal_case_digest is not None,
+            self.process_signal_case_count,
+            self.process_signal_optimization_count,
+            self.process_signal_hypothesis_digest is not None,
+        )):
+            raise ValueError("unbound process signal gate cannot carry evidence")
+        if self.process_signal_gate == PROCESS_SIGNAL_GATE_READY:
+            if self.process_signal_optimization_count < 2 or self.process_signal_hypothesis_digest is None:
+                raise ValueError("ready process signal gate requires replicated hypothesis")
         if self.process_signal_gate == PROCESS_SIGNAL_GATE_READY and not self.process_signal_optimization_count:
             raise ValueError("ready process-signal gate requires an optimization case")
         if self.process_signal_gate == PROCESS_SIGNAL_GATE_NO_SIGNAL and self.process_signal_optimization_count:
@@ -387,8 +431,11 @@ class ExtractionFeedbackBatchAudit:
             "corpusReady": self.corpus_ready,
             "optimizerSignalReady": self.optimizer_signal_ready,
             "processSignalGate": self.process_signal_gate,
+            "processSignalProtocolId": self.process_signal_protocol_id,
+            "processSignalCaseDigest": self.process_signal_case_digest,
             "processSignalCaseCount": self.process_signal_case_count,
             "processSignalOptimizationCount": self.process_signal_optimization_count,
+            "processSignalHypothesisDigest": self.process_signal_hypothesis_digest,
             "reasonCodes": list(self.reason_codes),
         }
 
@@ -426,19 +473,30 @@ def audit_extraction_feedback_batch(
         if isinstance(value, ExtractionOptimizerFeedbackCapture)
     )
     process_signal_gate = PROCESS_SIGNAL_GATE_NOT_BOUND
+    process_signal_protocol_id = None
+    process_signal_case_digest = None
     process_signal_case_count = 0
     process_signal_optimization_count = 0
+    process_signal_hypothesis_digest = None
     process_signal_paths = _process_signal_paths(root)
     if process_signal_paths:
         try:
             (
                 process_signal_gate,
+                process_signal_protocol_id,
+                process_signal_case_digest,
                 process_signal_case_count,
                 process_signal_optimization_count,
+                process_signal_hypothesis_digest,
             ) = _process_signal_gate(root)
         except (OSError, ValueError):
             reasons.append("process_signal_evidence_invalid")
             process_signal_gate = PROCESS_SIGNAL_GATE_NO_SIGNAL
+            process_signal_protocol_id = None
+            process_signal_case_digest = None
+            process_signal_case_count = 0
+            process_signal_optimization_count = 0
+            process_signal_hypothesis_digest = None
         if (
             process_signal_gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
             and "process_signal_evidence_invalid" not in reasons
@@ -508,8 +566,11 @@ def audit_extraction_feedback_batch(
         "optimizer_signal_ready": optimizer_signal_ready,
         "reason_codes": tuple(reasons),
         "process_signal_gate": process_signal_gate,
+        "process_signal_protocol_id": process_signal_protocol_id,
+        "process_signal_case_digest": process_signal_case_digest,
         "process_signal_case_count": process_signal_case_count,
         "process_signal_optimization_count": process_signal_optimization_count,
+        "process_signal_hypothesis_digest": process_signal_hypothesis_digest,
     }
     identity = {
         "schemaVersion": EXTRACTION_PREPARATION_SCHEMA_VERSION,
@@ -530,8 +591,11 @@ def audit_extraction_feedback_batch(
         "corpusReady": corpus_ready,
         "optimizerSignalReady": optimizer_signal_ready,
         "processSignalGate": process_signal_gate,
+        "processSignalProtocolId": process_signal_protocol_id,
+        "processSignalCaseDigest": process_signal_case_digest,
         "processSignalCaseCount": process_signal_case_count,
         "processSignalOptimizationCount": process_signal_optimization_count,
+        "processSignalHypothesisDigest": process_signal_hypothesis_digest,
         "reasonCodes": list(values["reason_codes"]),
     }
     return ExtractionFeedbackBatchAudit(
@@ -583,6 +647,11 @@ def build_extraction_optimizer_corpus(
         retention=retention,
         examples=tuple(examples),
         process_signal_gate=audit.process_signal_gate,
+        process_signal_protocol_id=audit.process_signal_protocol_id,
+        process_signal_case_digest=audit.process_signal_case_digest,
+        process_signal_case_count=audit.process_signal_case_count,
+        process_signal_optimization_count=audit.process_signal_optimization_count,
+        process_signal_hypothesis_digest=audit.process_signal_hypothesis_digest,
     )
     public_payloads = {
         "source_records": [value.payload() for value in sources],
