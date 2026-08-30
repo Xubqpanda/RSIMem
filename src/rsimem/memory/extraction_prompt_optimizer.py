@@ -26,6 +26,7 @@ from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpusExample,
     OptimizerComponentOwnership,
     PROCESS_SIGNAL_GATE_NO_SIGNAL,
+    PROCESS_SIGNAL_GATE_NOT_BOUND,
 )
 from .extraction_policy_artifact import (
     ExtractionGenerationProvenance,
@@ -247,21 +248,6 @@ class ExtractionPromptOptimizer:
                 None,
                 RawResourceUsage(),
             )
-        if self.revocation_registry is not None:
-            self.revocation_registry.assert_active(
-                artifact_id=corpus.corpus_id,
-                artifact_schema_version=corpus.schema_version,
-                artifact_digest=corpus.corpus_digest,
-                evidence_plane=EvidencePlane.PURE_PROCESS,
-                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
-            )
-            self.revocation_registry.assert_active(
-                artifact_id=parent.artifact_id,
-                artifact_schema_version=parent.schema_version,
-                artifact_digest=parent.artifact_digest,
-                evidence_plane=EvidencePlane.PURE_PROCESS,
-                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
-            )
         try:
             primary = logical_primary_examples(corpus)
         except ValueError as exc:
@@ -331,6 +317,40 @@ class ExtractionPromptOptimizer:
         ):
             raise ValueError(
                 "optimizer provider proposal requires a revocation registry"
+            )
+        if self.revocation_registry is not None:
+            self.revocation_registry.assert_active(
+                artifact_id=corpus.corpus_id,
+                artifact_schema_version=corpus.schema_version,
+                artifact_digest=corpus.corpus_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
+            self.revocation_registry.assert_active(
+                artifact_id=parent.artifact_id,
+                artifact_schema_version=parent.schema_version,
+                artifact_digest=parent.artifact_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
+        if (
+            getattr(self.client, "requires_process_signal_gate", False)
+            and corpus.process_signal_gate == PROCESS_SIGNAL_GATE_NOT_BOUND
+        ):
+            request = build_extraction_optimizer_gate_request(
+                parent,
+                corpus,
+                reason_codes=("process_signal_gate_missing",),
+                config=self.config,
+            )
+            return self._result(
+                ExtractionOptimizerDecision.NO_PROPOSAL,
+                ("process_signal_gate_missing",),
+                request,
+                None,
+                (),
+                None,
+                RawResourceUsage(),
             )
         request = build_extraction_optimizer_request(
             parent,

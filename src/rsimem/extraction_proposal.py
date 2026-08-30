@@ -38,6 +38,7 @@ class _DeferredExtractionOptimizerClient:
     """Keep credentials and provider transport unreachable on NO_PROPOSAL."""
 
     requires_revocation_registry = True
+    requires_process_signal_gate = True
 
     def __init__(
         self,
