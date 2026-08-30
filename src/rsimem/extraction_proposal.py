@@ -59,6 +59,8 @@ class _DeferredExtractionOptimizerClient:
         # deterministic gate may return NO_PROPOSAL without credentials, but
         # any actual model call must bind the parent artifact to an explicit,
         # owner-controlled revocation registry first.
+        if request.provider_eligible is not True:
+            raise ValueError("optimizer gate request cannot reach the provider")
         if self.revocation_registry is None:
             raise ValueError(
                 "optimizer provider proposal requires a revocation registry"

@@ -13,6 +13,7 @@ from rsimem.memory.extraction_prompt_optimizer import (
 from rsimem.memory.extraction_optimizer_contracts import (
     EXTRACTION_OPTIMIZER_OUTPUT_SCHEMA_DIGEST,
     FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+    build_extraction_optimizer_gate_request,
     build_extraction_optimizer_request,
 )
 from rsimem.memory.extraction_optimizer_corpus import (
@@ -248,6 +249,24 @@ def test_formal_provider_entry_requires_bound_process_signal_gate(tmp_path: Path
     ).propose(_parent(), corpus)
     assert result.decision == ExtractionOptimizerDecision.NO_PROPOSAL
     assert result.reason_codes == ("process_signal_gate_missing",)
+
+
+def test_deferred_provider_rejects_gate_request_before_reading_credentials(
+    tmp_path: Path,
+) -> None:
+    corpus = _multi_corpus(("useful", "useful"))
+    request = build_extraction_optimizer_gate_request(
+        _parent(),
+        corpus,
+        reason_codes=("process_signal_gate_missing",),
+    )
+    client = _DeferredExtractionOptimizerClient(
+        tmp_path / "missing-api-key",
+        "https://coding.tu-zi.com/v1",
+    )
+
+    with pytest.raises(ValueError, match="gate request cannot reach the provider"):
+        client.complete(request, FROZEN_EXTRACTION_OPTIMIZER_CONFIG)
 
 
 def test_malformed_completion_is_persisted_without_deployable_artifact(
