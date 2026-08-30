@@ -175,6 +175,12 @@ class PureExtractionSourceRecord:
         activation: ExtractionActivationFingerprint,
         provenance_id: str,
     ) -> "PureExtractionSourceRecord":
+        if not isinstance(source, ExtractionSourceEvidence):
+            raise TypeError("pure extraction source evidence has the wrong type")
+        from .extraction_projection import ExtractionActivationFingerprint
+
+        if not isinstance(activation, ExtractionActivationFingerprint):
+            raise TypeError("pure extraction activation has the wrong type")
         values = {
             "source_projection_id": source_projection_id,
             "source_projection_digest": source_projection_digest,
