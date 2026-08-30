@@ -672,6 +672,18 @@ def test_every_layer_case_has_matched_process_intervention_identity() -> None:
         assert feedback.observed_after_digest == case.candidate_decision.output_digest
         assert feedback.observed_before_digest != feedback.observed_after_digest
         assert case.action_changed is True
+        target_events = tuple(
+            event
+            for event in case.candidate.process_events
+            if event.policy_layer is case.target_layer
+        )
+        assert len(target_events) == 1
+        assert target_events[0].policy_decision_id == case.candidate_decision.decision_id
+        assert target_events[0].input_digest == case.candidate_decision.input_digest
+        assert target_events[0].output_digest == case.candidate_decision.output_digest
+        assert target_events[0].event_id == type(target_events[0]).from_payload(
+            target_events[0].payload()
+        ).event_id
 
 
 def test_optimizer_corpus_primary_examples_feed_extraction_census() -> None:
