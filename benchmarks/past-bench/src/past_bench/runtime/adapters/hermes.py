@@ -837,7 +837,10 @@ class HermesAdapter(RuntimeAdapter):
             HermesLifecycleConfig,
             HermesLifecycleEvaluatorMode,
         )
-        from rsimem.memory.live_writeback import StaticSemanticWritebackConfig
+        from rsimem.memory.live_writeback import (
+            SemanticFeedbackContract,
+            StaticSemanticWritebackConfig,
+        )
 
         metadata = self.request.runtime_config.metadata
         experiment_variant = str(metadata.get("experiment_variant") or "").strip()
@@ -852,6 +855,20 @@ class HermesAdapter(RuntimeAdapter):
             rsimem_cfg.get("semantic_writeback")
         )
         rsimem_writeback_enabled = static_writeback_config.enabled
+        application_schema = rsimem_cfg.get("application_opportunity_schema")
+        if (
+            rsimem_writeback_enabled
+            and static_writeback_config.feedback_contract
+            != SemanticFeedbackContract.DISABLED
+            and not isinstance(application_schema, Mapping)
+        ):
+            # Once a formal feedback contract is enabled, the host must
+            # provide its frozen public application schema.  Without this
+            # boundary a missing schema would silently re-enable the legacy
+            # benchmark text parser and contaminate the pure-process plane.
+            raise ValueError(
+                "semantic feedback requires a frozen application opportunity schema"
+            )
         lifecycle_complete = None
         if (
             lifecycle_config.evaluator_mode
@@ -943,9 +960,7 @@ class HermesAdapter(RuntimeAdapter):
                 else None
             ),
             application_opportunity_schema=(
-                rsimem_cfg.get("application_opportunity_schema")
-                if isinstance(rsimem_cfg.get("application_opportunity_schema"), Mapping)
-                else None
+                application_schema if isinstance(application_schema, Mapping) else None
             ),
         )
         try:
