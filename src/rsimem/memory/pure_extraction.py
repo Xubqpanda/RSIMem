@@ -368,6 +368,13 @@ class PureExtractionFeedbackRecord:
         if self.artifact_set_binding is not None and not isinstance(self.artifact_set_binding, ArtifactSetSemanticBinding):
             raise TypeError("pure extraction artifact-set binding has the wrong type")
         object.__setattr__(self, "attribution", PureExtractionAttribution(self.attribution))
+        if self.opportunity is not None and self.opportunity.provenance_id != self.provenance_id:
+            raise ValueError("opportunity provenance does not match extraction feedback")
+        if (
+            self.artifact_set_binding is not None
+            and self.artifact_set_binding.provenance_id != self.provenance_id
+        ):
+            raise ValueError("artifact-set provenance does not match extraction feedback")
         if self.memory_use is not None:
             if self.memory_use.provenance_id != self.provenance_id:
                 raise ValueError("memory-use provenance does not match extraction feedback")
@@ -521,6 +528,15 @@ class PureExtractionFeedbackRecord:
 
         if not isinstance(source, PureExtractionSourceRecord):
             raise TypeError("pure extraction feedback source has the wrong type")
+        if source.provenance_id != provenance_id:
+            raise ValueError("source provenance does not match extraction feedback")
+        if opportunity is not None and opportunity.provenance_id != provenance_id:
+            raise ValueError("opportunity provenance does not match extraction feedback")
+        if (
+            artifact_set_binding is not None
+            and artifact_set_binding.provenance_id != provenance_id
+        ):
+            raise ValueError("artifact-set provenance does not match extraction feedback")
         from .opportunity import OpportunityResolutionStatus, resolve_opportunity
         from .use_attribution import MemoryUseResolutionStatus, resolve_memory_use
 
@@ -770,6 +786,8 @@ class PureExtractionOptimizerExample:
             raise ValueError("pure optimizer source projection join mismatch")
         if feedback.extraction_set_id != source.extraction_set_id:
             raise ValueError("pure optimizer extraction set join mismatch")
+        if feedback.provenance_id != source.provenance_id:
+            raise ValueError("pure optimizer provenance join mismatch")
         if feedback.observation_window == "window.unbound":
             raise ValueError("pure optimizer observation window is unbound")
         if (
