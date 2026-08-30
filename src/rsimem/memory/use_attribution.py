@@ -713,7 +713,12 @@ def _operation_join_error(
         if not evidence.injection_failure:
             return "operation_join_invalid"
     if downstream is not None and downstream.status is not OperationStatus.SUCCESS:
-        return "operation_join_invalid"
+        # A retrieval/exposure that was not used is represented by a
+        # deterministic ``NONE`` use operation.  This is a valid non-use
+        # observation, not a malformed operation join; only a claimed used
+        # artifact requires a successful downstream operation.
+        if evidence.used_artifact_ids or downstream.status is not OperationStatus.NONE:
+            return "operation_join_invalid"
     if outcome is not None:
         if evidence.outcome_success is True and outcome.status is not OperationStatus.SUCCESS:
             return "operation_join_invalid"

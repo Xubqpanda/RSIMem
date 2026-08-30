@@ -1733,7 +1733,9 @@ class HermesPastBenchBridge:
             outcome_success=(
                 None
                 if (
-                    not observation_complete
+                    not outcome.used_artifact_ids
+                    or not outcome.outcome_operation_id
+                    or not observation_complete
                     or outcome_kind is None
                     or outcome_kind is OutcomeEvidenceKind.TOOL_FAILURE
                 )
