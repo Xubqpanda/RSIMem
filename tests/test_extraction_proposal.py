@@ -17,6 +17,7 @@ from rsimem.memory.extraction_optimizer_contracts import (
 )
 from rsimem.memory.extraction_optimizer_corpus import (
     EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
+    PROCESS_SIGNAL_GATE_NOT_BOUND,
     OptimizerCorpusRetention,
     OptimizerCorpusSplit,
 )
@@ -231,6 +232,22 @@ def test_formal_provider_entry_requires_revocation_registry_before_credentials(
     )
     with pytest.raises(ValueError, match="revocation registry"):
         client.complete(request, FROZEN_EXTRACTION_OPTIMIZER_CONFIG)
+
+
+def test_formal_provider_entry_requires_bound_process_signal_gate(tmp_path: Path) -> None:
+    from rsimem.memory.extraction_prompt_optimizer import ExtractionPromptOptimizer
+
+    corpus = _multi_corpus(("useful", "useful"))
+    assert corpus.process_signal_gate == PROCESS_SIGNAL_GATE_NOT_BOUND
+    registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    registry.initialize()
+    client = _DeferredExtractionOptimizerClient(None, "https://coding.tu-zi.com/v1")
+    result = ExtractionPromptOptimizer(
+        client,
+        revocation_registry=registry,
+    ).propose(_parent(), corpus)
+    assert result.decision == ExtractionOptimizerDecision.NO_PROPOSAL
+    assert result.reason_codes == ("process_signal_gate_missing",)
 
 
 def test_malformed_completion_is_persisted_without_deployable_artifact(
