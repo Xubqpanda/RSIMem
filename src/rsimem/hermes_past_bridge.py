@@ -1325,7 +1325,7 @@ class HermesPastBenchBridge:
         if not isinstance(raw_messages, (list, tuple)):
             return
         messages = tuple(value for value in raw_messages if isinstance(value, Mapping))
-        calls: dict[str, list[tuple[str, str, str, str]]] = {}
+        calls: dict[str, list[tuple[str, str, str, str, bool]]] = {}
         call_counts: dict[str, int] = {}
         duplicate_call_ids: set[str] = set(self._tool_call_ids_seen)
         emitted_result_ids: set[str] = set()
@@ -1363,6 +1363,11 @@ class HermesPastBenchBridge:
                 )
                 if count or call_id in self._tool_call_ids_seen:
                     duplicate_call_ids.add(raw_call_id)
+                declared_task_id = call.get("task_id", message.get("task_id"))
+                cross_task = (
+                    declared_task_id is not None
+                    and str(declared_task_id) != self._task_id
+                )
                 calls.setdefault(raw_call_id, []).append(
                     (
                         call_id,
@@ -1372,6 +1377,7 @@ class HermesPastBenchBridge:
                         + hashlib.sha256(
                             f"{call_id}:{retry_identity}".encode("utf-8")
                         ).hexdigest()[:24],
+                        cross_task,
                     )
                 )
         for message in messages:
@@ -1411,6 +1417,11 @@ class HermesPastBenchBridge:
                 or result_id in duplicate_result_ids
             )
             emitted_result_ids.add(result_id)
+            declared_task_id = message.get("task_id")
+            result_cross_task = (
+                declared_task_id is not None
+                and str(declared_task_id) != self._task_id
+            )
             if not call_occurrences:
                 orphan_call_id = (
                     "orphan-call."
@@ -1436,6 +1447,7 @@ class HermesPastBenchBridge:
                     call_present=False,
                     result_present=True,
                     orphan_result=True,
+                    cross_task=result_cross_task,
                 ))
                 continue
             # A result referring to a duplicated call ID cannot identify
@@ -1443,7 +1455,9 @@ class HermesPastBenchBridge:
             # occurrence for deterministic projection and retain the
             # duplicate flag; the remaining occurrences are emitted as
             # duplicate/missing call-only joins below.
-            call_id, name, retry_identity, call_receipt = call_occurrences[0]
+            call_id, name, retry_identity, call_receipt, call_cross_task = (
+                call_occurrences[0]
+            )
             joins.append(ToolCallResultJoin.create(
                 call_id=call_id,
                 result_id=result_id,
@@ -1465,6 +1479,7 @@ class HermesPastBenchBridge:
                 duplicate_call=raw_call_id in duplicate_call_ids,
                 duplicate_result=duplicate_result,
                 type_mismatch=not valid_result,
+                cross_task=call_cross_task or result_cross_task,
             ))
         represented_calls = {
             (join.call_id, join.retry_identity)
@@ -1472,7 +1487,7 @@ class HermesPastBenchBridge:
             if join.call_present
         }
         for raw_call_id, occurrences in calls.items():
-            for call_id, name, retry_identity, call_receipt in occurrences:
+            for call_id, name, retry_identity, call_receipt, cross_task in occurrences:
                 if (call_id, retry_identity) in represented_calls:
                     continue
                 joins.append(ToolCallResultJoin.create(
@@ -1494,6 +1509,7 @@ class HermesPastBenchBridge:
                     call_present=True,
                     result_present=False,
                     duplicate_call=raw_call_id in duplicate_call_ids,
+                    cross_task=cross_task,
                 ))
         for join in joins:
             previous = self._tool_call_result_joins.get(join.join_id)
