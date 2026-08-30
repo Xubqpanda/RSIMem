@@ -326,7 +326,12 @@ def build_default_feasibility_cases() -> tuple[LayerIntervention, ...]:
          FeedbackChain(opportunity_id="opportunity.useful", use_id="use.useful", outcome_id="outcome.useful"), "extraction-useful"),
         (PolicyLayer.EXTRACTION, FeasibilityOutcome.MISSED,
          FeedbackChain(source_id="source.missed", demand_id="demand.missed", absence_id="absence.missed", outcome_id="outcome.missed"), "extraction-missed"),
-        (PolicyLayer.ADMISSION, FeasibilityOutcome.HARMFUL, FeedbackChain(), "admission"),
+        (PolicyLayer.ADMISSION, FeasibilityOutcome.HARMFUL,
+         FeedbackChain(
+             opportunity_id="opportunity.admission",
+             use_id="use.admission",
+             outcome_id="outcome.admission",
+         ), "admission"),
         (PolicyLayer.COMMIT, FeasibilityOutcome.USEFUL,
          FeedbackChain(opportunity_id="opportunity.commit", use_id="use.commit", outcome_id="outcome.commit"), "commit"),
         (PolicyLayer.EXPOSURE, FeasibilityOutcome.USEFUL,
