@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -97,6 +98,23 @@ def test_pure_feedback_requires_censored_status_for_incomplete_observation() -> 
         observation_complete=False,
     )
     assert PureExtractionFeedbackRecord.from_payload(censored.payload()) == censored
+
+
+def test_pure_feedback_rejects_malformed_tool_join_collection() -> None:
+    _, source, *_ = _fixture()
+    record = PureExtractionFeedbackRecord.create(
+        source_record_id="pure-source.v1",
+        source_projection_digest=source.source.source_projection_digest,
+        extraction_set_id=source.source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.completed-v1",
+        provenance_id="provenance.pure-v1",
+    )
+    with pytest.raises(TypeError, match="tool joins must be a tuple"):
+        replace(record, tool_joins=[])  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="wrong type"):
+        replace(record, tool_joins=(object(),))  # type: ignore[arg-type]
 
 
 def test_pure_feedback_requires_one_provenance_across_evidence_joins() -> None:
