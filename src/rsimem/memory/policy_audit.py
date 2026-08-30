@@ -114,6 +114,27 @@ def audit_policy_evidence(
             errors.append("missing policy layers: " + ",".join(missing))
 
     lifecycle = _read_lifecycle_events(lifecycle_events)
+    # Lifecycle evidence is joined independently of the ledger builder too.
+    # Validate the complete host identity here so callers cannot bypass the
+    # run/variant/trace/task/family/stage boundary by invoking this audit
+    # helper directly.
+    if lifecycle:
+        owner = evidence[0]
+        lifecycle_identity = {
+            "runId": run_id if run_id is not None else owner.run_id,
+            "variant": variant if variant is not None else owner.variant,
+            "traceId": trace_id if trace_id is not None else owner.trace_id,
+            "taskId": task_id if task_id is not None else owner.task_id,
+            "familyId": family_id if family_id is not None else owner.family_id,
+            "stage": stage if stage is not None else owner.stage,
+        }
+        for index, event in enumerate(lifecycle):
+            for field, expected_value in lifecycle_identity.items():
+                if expected_value is not None and event.get(field) != expected_value:
+                    errors.append(
+                        f"lifecycle event {field} does not match policy evidence "
+                        f"at index {index}"
+                    )
     snapshot_ids = {
         str(event.get("snapshotId"))
         for event in lifecycle

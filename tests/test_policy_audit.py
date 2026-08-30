@@ -58,3 +58,30 @@ def test_policy_audit_joins_lifecycle_snapshot_and_rejects_missing_snapshot(tmp_
     report = audit_policy_evidence(path, lifecycle_events=lifecycle)
     assert not report.ok
     assert any("snapshot" in error for error in report.errors)
+
+
+def test_policy_audit_rejects_lifecycle_identity_mismatch(tmp_path) -> None:
+    path = tmp_path / "policy.jsonl"
+    _write(path)
+    lifecycle = {
+        "kind": "context_snapshot",
+        "runId": "run.fixture",
+        "variant": "native+ledger",
+        "traceId": "trace.fixture",
+        "taskId": "task.other",
+        "familyId": None,
+        "stage": None,
+        "snapshotId": "snapshot.fixture",
+    }
+    lifecycle_path = tmp_path / "lifecycle.jsonl"
+    lifecycle_path.write_text(json.dumps(lifecycle) + "\n", encoding="utf-8")
+    report = audit_policy_evidence(
+        path,
+        run_id="run.fixture",
+        variant="native+ledger",
+        trace_id="trace.fixture",
+        task_id="task.fixture",
+        lifecycle_events=lifecycle_path,
+    )
+    assert not report.ok
+    assert any("lifecycle event taskId" in error for error in report.errors)
