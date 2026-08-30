@@ -89,6 +89,16 @@ def test_symlinked_registry_fails_closed(tmp_path) -> None:
         )
 
 
+def test_symlinked_registry_lock_fails_closed(tmp_path) -> None:
+    path = tmp_path / "revocations.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    registry = JsonRevocationRegistry(path)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        registry.initialize()
+
+
 def test_same_artifact_with_different_digest_is_a_registry_conflict(tmp_path) -> None:
     registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
     registry.initialize()

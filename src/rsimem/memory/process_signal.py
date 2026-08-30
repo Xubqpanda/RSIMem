@@ -445,6 +445,8 @@ class JsonProcessSignalCaseStore:
 
     def records(self) -> tuple[ProcessSignalCase, ...]:
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.lock_path.is_symlink():
+            raise ValueError("process-signal case lock cannot be a symlink")
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
             try:
@@ -461,6 +463,8 @@ class JsonProcessSignalCaseStore:
             raise TypeError("process-signal store accepts ProcessSignalCase only")
         serialized = self._canonical(case.payload())
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.lock_path.is_symlink():
+            raise ValueError("process-signal case lock cannot be a symlink")
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
             try:

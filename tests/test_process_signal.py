@@ -206,6 +206,15 @@ def test_process_signal_case_store_fails_closed_on_symlink(tmp_path) -> None:
         JsonProcessSignalCaseStore(path).records()
 
 
+def test_process_signal_case_store_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "process-signal.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonProcessSignalCaseStore(path).records()
+
+
 def test_build_process_signal_cases_separates_logical_and_physical_identity() -> None:
     common = dict(
         run_id="run.builder.v1",

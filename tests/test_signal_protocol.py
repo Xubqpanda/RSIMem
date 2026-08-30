@@ -92,6 +92,15 @@ def test_protocol_store_fails_closed_on_symlink(tmp_path) -> None:
         JsonProcessSignalAnalysisProtocolStore(path).get()
 
 
+def test_protocol_store_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "signal-protocol.json"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonProcessSignalAnalysisProtocolStore(path).get()
+
+
 def test_protocol_manifest_binding_is_deterministic_and_result_independent() -> None:
     manifest = {
         "split": {
