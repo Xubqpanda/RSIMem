@@ -14,6 +14,8 @@ from rsimem.memory.extraction_feedback import (
 )
 from rsimem.memory.evidence_planes import EvidencePlane
 from rsimem.memory.extraction_optimizer_corpus import (
+    PROCESS_SIGNAL_GATE_NO_SIGNAL,
+    PROCESS_SIGNAL_GATE_READY,
     ExtractionOptimizerCorpus,
     ExtractionOptimizerCorpusExample,
     OptimizerArtifactLineage,
@@ -177,6 +179,44 @@ def test_corpus_identity_is_canonical_and_covers_content_and_split() -> None:
         examples=(_example(),),
     )
     assert changed.corpus_id != first.corpus_id
+
+
+def test_process_signal_gate_is_part_of_corpus_identity() -> None:
+    baseline = ExtractionOptimizerCorpus.create(
+        batch_id="batch.signal-gate-v1",
+        attempt_id="attempt.signal-gate-v1",
+        split=OptimizerCorpusSplit.TRAIN,
+        observation_cutoff="2026-08-21T00:00:00Z",
+        retention=OptimizerCorpusRetention.DELETE_AFTER_POLICY_DECISION,
+        examples=(_example(),),
+    )
+    no_signal = ExtractionOptimizerCorpus.create(
+        batch_id=baseline.batch_id,
+        attempt_id=baseline.attempt_id,
+        split=baseline.split,
+        observation_cutoff=baseline.observation_cutoff,
+        retention=baseline.retention,
+        examples=baseline.examples,
+        process_signal_gate=PROCESS_SIGNAL_GATE_NO_SIGNAL,
+    )
+    ready = ExtractionOptimizerCorpus.create(
+        batch_id=baseline.batch_id,
+        attempt_id=baseline.attempt_id,
+        split=baseline.split,
+        observation_cutoff=baseline.observation_cutoff,
+        retention=baseline.retention,
+        examples=baseline.examples,
+        process_signal_gate=PROCESS_SIGNAL_GATE_READY,
+    )
+    assert baseline.process_signal_gate != no_signal.process_signal_gate
+    assert no_signal.corpus_id != ready.corpus_id
+    assert ExtractionOptimizerCorpus.from_payload(
+        json.loads(json.dumps(no_signal.payload()))
+    ) == no_signal
+    malformed = no_signal.payload()
+    malformed["process_signal_gate"] = "invalid"
+    with pytest.raises(ValueError, match="malformed extraction optimizer corpus"):
+        ExtractionOptimizerCorpus.from_payload(malformed)
 
 
 def test_optimizer_example_rejects_benchmark_and_final_evidence_planes() -> None:

@@ -16,6 +16,7 @@ from rsimem.memory.extraction_optimizer_capture import (
     JsonExtractionOptimizerCaptureLog,
 )
 from rsimem.memory.extraction_optimizer_corpus import OptimizerCorpusSplit
+from rsimem.memory.extraction_optimizer_corpus import PROCESS_SIGNAL_GATE_NO_SIGNAL
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     EvidenceKind,
@@ -82,6 +83,22 @@ def test_stage_one_style_legacy_batch_is_audited_without_fabricating_signal(
         "source_optimizer_capture_missing",
         "feedback_optimizer_capture_missing",
     )
+
+
+def test_process_signal_case_store_without_signal_blocks_optimizer_gate(
+    tmp_path: Path,
+) -> None:
+    case_path = tmp_path / "run" / "process_signal_cases.jsonl"
+    case_path.parent.mkdir(parents=True)
+    case_path.write_text("", encoding="utf-8")
+
+    audit = audit_extraction_feedback_batch(tmp_path, batch_id="batch.no-signal-v1")
+
+    assert audit.process_signal_gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
+    assert audit.process_signal_case_count == 0
+    assert audit.process_signal_optimization_count == 0
+    assert "no_optimization_process_signal" in audit.reason_codes
+    assert audit.optimizer_signal_ready is False
 
 
 def test_build_corpus_exactly_joins_private_and_public_live_evidence(

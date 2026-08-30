@@ -20,8 +20,16 @@ from .evidence_planes import EvidencePlane, require_optimizer_plane
 from .prompt_components import content_digest
 
 
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 3
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v3"
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 4
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v4"
+PROCESS_SIGNAL_GATE_NOT_BOUND = "not_bound"
+PROCESS_SIGNAL_GATE_NO_SIGNAL = "no_signal"
+PROCESS_SIGNAL_GATE_READY = "ready"
+_PROCESS_SIGNAL_GATES = frozenset({
+    PROCESS_SIGNAL_GATE_NOT_BOUND,
+    PROCESS_SIGNAL_GATE_NO_SIGNAL,
+    PROCESS_SIGNAL_GATE_READY,
+})
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
@@ -767,6 +775,7 @@ class ExtractionOptimizerCorpus:
     retention: OptimizerCorpusRetention
     activation_artifact_id: str | None
     examples: tuple[ExtractionOptimizerCorpusExample, ...]
+    process_signal_gate: str = PROCESS_SIGNAL_GATE_NOT_BOUND
     corpus_schema: str = EXTRACTION_OPTIMIZER_CORPUS_SCHEMA
     schema_version: int = EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION
 
@@ -786,6 +795,8 @@ class ExtractionOptimizerCorpus:
         _require_utc(self.observation_cutoff, "optimizer corpus cutoff")
         object.__setattr__(self, "split", OptimizerCorpusSplit(self.split))
         object.__setattr__(self, "retention", OptimizerCorpusRetention(self.retention))
+        if self.process_signal_gate not in _PROCESS_SIGNAL_GATES:
+            raise ValueError("optimizer corpus process-signal gate is invalid")
         if not self.examples:
             raise ValueError("optimizer corpus requires examples")
         if self.examples != tuple(sorted(self.examples, key=_example_sort_key)):
@@ -821,6 +832,7 @@ class ExtractionOptimizerCorpus:
         retention: OptimizerCorpusRetention,
         examples: tuple[ExtractionOptimizerCorpusExample, ...],
         activation_artifact_id: str | None = None,
+        process_signal_gate: str = PROCESS_SIGNAL_GATE_NOT_BOUND,
     ) -> "ExtractionOptimizerCorpus":
         values = {
             "batch_id": batch_id,
@@ -830,6 +842,7 @@ class ExtractionOptimizerCorpus:
             "retention": OptimizerCorpusRetention(retention),
             "activation_artifact_id": activation_artifact_id,
             "examples": tuple(sorted(examples, key=_example_sort_key)),
+            "process_signal_gate": process_signal_gate,
             "corpus_schema": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA,
             "schema_version": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
         }
@@ -853,6 +866,7 @@ class ExtractionOptimizerCorpus:
             "retention": values["retention"].value,
             "activation_artifact_id": values["activation_artifact_id"],
             "examples": [value.payload() for value in values["examples"]],
+            "process_signal_gate": values["process_signal_gate"],
         }
 
     def identity_payload(self) -> dict[str, object]:
@@ -866,6 +880,7 @@ class ExtractionOptimizerCorpus:
             "retention": self.retention,
             "activation_artifact_id": self.activation_artifact_id,
             "examples": self.examples,
+            "process_signal_gate": self.process_signal_gate,
         })
 
     def payload(self) -> dict[str, object]:
@@ -880,7 +895,7 @@ class ExtractionOptimizerCorpus:
         payload = _strict(value, {
             "schema_version", "corpus_schema", "corpus_id", "corpus_digest",
             "batch_id", "attempt_id", "split", "observation_cutoff",
-            "retention", "activation_artifact_id", "examples",
+            "retention", "activation_artifact_id", "examples", "process_signal_gate",
         }, "extraction optimizer corpus")
         if not isinstance(payload["examples"], list):
             raise ValueError("malformed optimizer corpus examples")
@@ -898,6 +913,7 @@ class ExtractionOptimizerCorpus:
                     ExtractionOptimizerCorpusExample.from_payload(item)
                     for item in payload["examples"]
                 ),
+                process_signal_gate=payload["process_signal_gate"],
                 corpus_schema=payload["corpus_schema"],
                 schema_version=payload["schema_version"],
             )

@@ -27,6 +27,7 @@ from rsimem.memory.extraction_optimizer_contracts import (
     logical_case_id_for_example,
 )
 from rsimem.memory.extraction_optimizer_corpus import (
+    PROCESS_SIGNAL_GATE_NO_SIGNAL,
     ExtractionOptimizerCorpus,
     ExtractionOptimizerCorpusExample,
     OptimizerArtifactLineage,
@@ -214,6 +215,26 @@ def test_request_groups_one_primary_unit_with_source_set_fact_annotations() -> N
     assert "official_grader" not in request.input_json
     assert EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION not in request.input_json
     assert build_extraction_optimizer_request(_parent(), _corpus()) == request
+
+
+def test_process_signal_no_signal_gate_blocks_actionable_provider_request() -> None:
+    baseline = _corpus()
+    gated = ExtractionOptimizerCorpus.create(
+        batch_id=baseline.batch_id,
+        attempt_id=baseline.attempt_id,
+        split=baseline.split,
+        observation_cutoff=baseline.observation_cutoff,
+        retention=baseline.retention,
+        examples=baseline.examples,
+        process_signal_gate=PROCESS_SIGNAL_GATE_NO_SIGNAL,
+    )
+    client = CapturedExtractionOptimizerClient(
+        lambda request: '{"decision":"PROPOSE","reason_codes":["actionable_extraction_signal"],"edits":[]}'
+    )
+    result = ExtractionPromptOptimizer(client).propose(_parent(), gated)
+    assert result.decision == ExtractionOptimizerDecision.NO_PROPOSAL
+    assert result.reason_codes == ("no_optimization_process_signal",)
+    assert client.requests == []
 
 
 def test_logical_case_identity_ignores_request_boundary_and_run_ids() -> None:
