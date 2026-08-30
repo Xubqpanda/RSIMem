@@ -50,6 +50,14 @@ from .memory.extraction_projection import (
     JsonLiveExtractionFeedbackRecordLog,
     LiveExtractionFeedbackRecord,
 )
+from .memory.pure_extraction import (
+    JsonPureExtractionFeedbackRecordStore,
+    JsonPureExtractionSourceRecordStore,
+    PureExtractionFeedbackRecord,
+    PureExtractionOptimizerCorpus,
+    PureExtractionSourceRecord,
+    prepare_pure_extraction_corpus,
+)
 from .memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     OperationGraph,
@@ -130,6 +138,38 @@ def _operation_paths(batch_dir: Path) -> tuple[Path, ...]:
 
 def _process_signal_paths(batch_dir: Path) -> tuple[Path, ...]:
     return tuple(sorted(batch_dir.rglob("process_signal_cases.jsonl")))
+
+
+def _pure_source_paths(batch_dir: Path) -> tuple[Path, ...]:
+    return tuple(sorted(batch_dir.rglob("pure_extraction_sources.jsonl")))
+
+
+def _pure_feedback_paths(batch_dir: Path) -> tuple[Path, ...]:
+    return tuple(sorted(batch_dir.rglob("rsimem_pure_extraction_feedback.jsonl")))
+
+
+def _pure_source_records(batch_dir: Path) -> tuple[PureExtractionSourceRecord, ...]:
+    return _deduplicate(
+        (
+            value
+            for path in _pure_source_paths(batch_dir)
+            for value in JsonPureExtractionSourceRecordStore(path).records()
+        ),
+        identity="record_id",
+        payload=lambda value: value.payload(),
+    )
+
+
+def _pure_feedback_records(batch_dir: Path) -> tuple[PureExtractionFeedbackRecord, ...]:
+    return _deduplicate(
+        (
+            value
+            for path in _pure_feedback_paths(batch_dir)
+            for value in JsonPureExtractionFeedbackRecordStore(path).records()
+        ),
+        identity="record_id",
+        payload=lambda value: value.payload(),
+    )
 
 
 def _process_signal_observation_window(batch_dir: Path) -> str:
@@ -763,6 +803,49 @@ def build_extraction_optimizer_corpus(
     )
     store.write(corpus)
     return audit, corpus, store
+
+
+def build_pure_extraction_corpus_from_batch(
+    batch_dir: Path,
+    *,
+    observation_cutoff: str,
+    process_signal_protocol_id: str,
+) -> PureExtractionOptimizerCorpus:
+    """Join automatically captured pure source/feedback artifacts.
+
+    This helper is deliberately separate from the legacy family-bound
+    preparation path.  A batch may contain repeated run captures of the
+    shared Hermes-home source log; record stores deduplicate exact identities
+    before the pure optimizer corpus is assembled.  The process-signal case
+    files are the only gate input; no benchmark labels or scores are read.
+    """
+
+    from .memory.process_signal import census_process_signal_cases
+
+    root = batch_dir.expanduser().resolve()
+    sources = _pure_source_records(root)
+    feedback = _pure_feedback_records(root)
+    if not sources:
+        raise ValueError("pure extraction source evidence is missing")
+    if not feedback:
+        raise ValueError("pure extraction feedback evidence is missing")
+    cases = tuple(
+        case
+        for path in _process_signal_paths(root)
+        for case in JsonProcessSignalCaseStore(path).records()
+    )
+    if not cases:
+        raise ValueError("pure extraction process-signal cases are missing")
+    census = census_process_signal_cases(cases)
+    return prepare_pure_extraction_corpus(
+        sources=sources,
+        feedback=feedback,
+        split="train",
+        observation_cutoff=observation_cutoff,
+        process_signal_protocol_id=process_signal_protocol_id,
+        process_signal_case_digest=None,
+        process_signal_census=census,
+    )
 
 
 def _write_json(path: Path, value: object) -> None:
