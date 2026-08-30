@@ -71,7 +71,8 @@ replicate ID 和 observation window 会写入每个 case。Analyzer 在 census �
 case 拼接进结果。
 
 `LayerFeasibilityCensus` 还记录 process-signal、action/outcome variation、
-每层的 `benefitExplanationCodes`、ambiguity 和失败 reason。coverage、empty、missed 等 extraction-specific
+每层的 `benefitExplanationCodes`、ambiguity 和失败 reason。Process-signal census
+另外报告 consistent logical-case count 与 replicate consistency ratio。coverage、empty、missed 等 extraction-specific
 指标不从 policy fixture 猜测，而由 offline validation 的
 `OfflineRatioEvidence` 提供 numerator/denominator/unknown。raw calls/tokens/
 retry/latency/storage 继续使用 lifecycle `RawResourceUsage`，injection 与
