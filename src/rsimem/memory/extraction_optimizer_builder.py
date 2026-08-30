@@ -20,6 +20,11 @@ from .extraction_optimizer_corpus import (
     OptimizerSourceMessage,
 )
 from .extraction_projection import ExtractionSourceRecord, LiveExtractionFeedbackRecord
+from .pure_extraction import (
+    PureExtractionFeedbackRecord,
+    PureExtractionOptimizerExample,
+    PureExtractionSourceRecord,
+)
 from .extraction_source import ExtractionSourceProjection
 from .operation_graph import ArtifactKind, OperationGraph, OperationKind
 from .optimizer_content_boundary import OptimizerSecretBoundary
@@ -206,6 +211,7 @@ class ExtractionOptimizerCorpusBuilder:
                 evidence_plane=evidence_plane,
             ))
         return tuple(examples)
+
 
     @staticmethod
     def _validate_record_join(
@@ -435,3 +441,36 @@ class ExtractionOptimizerCorpusBuilder:
         if reasons & {"outcome_unknown", "task_incomplete"}:
             return OptimizerComponentOwnership.OUTCOME
         return OptimizerComponentOwnership.UNRESOLVED
+
+
+class PureExtractionOptimizerBuilder:
+    """Build generic optimizer identities from pure-process projections only."""
+
+    def build_example(
+        self,
+        *,
+        source: PureExtractionSourceRecord,
+        feedback: PureExtractionFeedbackRecord,
+    ) -> PureExtractionOptimizerExample:
+        if not isinstance(source, PureExtractionSourceRecord) or not isinstance(
+            feedback, PureExtractionFeedbackRecord
+        ):
+            raise TypeError("pure optimizer builder requires pure-process source/feedback records")
+        return PureExtractionOptimizerExample.from_records(source, feedback)
+
+    def build_examples(
+        self,
+        *,
+        sources: tuple[PureExtractionSourceRecord, ...],
+        feedback: tuple[PureExtractionFeedbackRecord, ...],
+    ) -> tuple[PureExtractionOptimizerExample, ...]:
+        source_by_id = {value.record_id: value for value in sources}
+        if len(source_by_id) != len(sources):
+            raise ValueError("pure optimizer source identities must be unique")
+        result = []
+        for record in feedback:
+            source = source_by_id.get(record.source_record_id)
+            if source is None:
+                raise ValueError("pure optimizer source/feedback join is incomplete")
+            result.append(self.build_example(source=source, feedback=record))
+        return tuple(result)
