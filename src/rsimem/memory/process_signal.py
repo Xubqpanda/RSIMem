@@ -612,9 +612,40 @@ def build_process_signal_cases(
         grouped.setdefault(event.task_id, []).append(event)
     cases: list[ProcessSignalCase] = []
     for task_id, task_events in sorted(grouped.items()):
+        # ``task_id``/run identifiers are physical observation metadata and
+        # must not split one semantic case across provider replicates.  Bind
+        # the source extraction set to stable process digests instead.  When
+        # an extraction event is present, its source revision and IO digests
+        # identify the frozen source set; selection-only traces fall back to
+        # the stable source-template identity.
+        source_events = tuple(
+            event
+            for event in task_events
+            if event.kind in {
+                ProcessEventKind.SOURCE_SELECTION,
+                ProcessEventKind.EXTRACTION,
+            }
+        )
+        source_identity = [
+            {
+                "kind": event.kind.value,
+                "source_revision": event.source_revision,
+                "input_digest": event.input_digest,
+                "output_digest": event.output_digest,
+            }
+            for event in sorted(
+                source_events,
+                key=lambda event: (
+                    event.kind.value,
+                    event.source_revision,
+                    event.input_digest,
+                    event.output_digest,
+                ),
+            )
+        ]
         source_set = "extraction-set." + _digest({
-            "task_id": task_id,
             "source_task_template_id": source_task_template_id,
+            "source_events": source_identity,
         })[:32]
         identity = LogicalCaseIdentity.create(
             frozen_policy_digest=frozen_policy_digest,
