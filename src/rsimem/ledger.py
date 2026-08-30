@@ -590,12 +590,9 @@ class LifecycleLedgerObserver:
                 "evaluationId": data.get("evaluationId"),
                 "planId": data.get("planId"),
                 "mutationId": data.get("mutationId"),
-                "status": data.get("status"),
-                "reasonCodes": data.get("reasonCodes"),
             }
             if data.get("executionId") is not None:
                 identity["executionId"] = data["executionId"]
-                identity["operationIds"] = data.get("operationIds")
             event_id = f"evt_{_json_hash(identity)}"
             event = {
                 "schemaVersion": SCHEMA_VERSION,
