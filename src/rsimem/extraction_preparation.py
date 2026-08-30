@@ -454,6 +454,10 @@ class ExtractionFeedbackBatchAudit:
         if self.process_signal_gate == PROCESS_SIGNAL_GATE_READY:
             if self.process_signal_optimization_count < 2 or self.process_signal_hypothesis_digest is None:
                 raise ValueError("ready process signal gate requires replicated hypothesis")
+        if self.optimizer_signal_ready and self.process_signal_gate != PROCESS_SIGNAL_GATE_READY:
+            raise ValueError(
+                "optimizer signal readiness requires a ready process-signal gate"
+            )
         expected = f"extraction-preparation-audit.{content_digest(self.identity_payload())[:40]}"
         if self.audit_id != expected:
             raise ValueError("extraction preparation audit ID mismatch")

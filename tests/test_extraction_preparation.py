@@ -9,6 +9,7 @@ import pytest
 from rsimem.extraction_preparation import (
     _process_signal_gate,
     _optimizer_signal_is_ready,
+    ExtractionFeedbackBatchAudit,
     audit_extraction_feedback_batch,
     build_extraction_optimizer_corpus,
 )
@@ -21,6 +22,25 @@ def test_optimizer_signal_requires_ready_pure_process_gate() -> None:
         actionable_primary_count=99,
         process_signal_gate="not_bound",
     )
+
+
+def test_batch_audit_cannot_claim_optimizer_ready_without_ready_gate() -> None:
+    with pytest.raises(ValueError, match="requires a ready process-signal gate"):
+        ExtractionFeedbackBatchAudit(
+            audit_id="audit.invalid-gate",
+            batch_id="batch.invalid-gate",
+            source_count=1,
+            feedback_count=1,
+            source_schema_versions=(4,),
+            feedback_schema_versions=(2,),
+            source_capture_count=1,
+            feedback_capture_count=1,
+            primary_label_counts={"unresolved": 0},
+            actionable_primary_count=2,
+            corpus_ready=True,
+            optimizer_signal_ready=True,
+            reason_codes=("test",),
+        )
     assert not _optimizer_signal_is_ready(
         corpus_ready=True,
         actionable_primary_count=99,
