@@ -836,6 +836,20 @@ def build_pure_extraction_corpus_from_batch(
     )
     if not cases:
         raise ValueError("pure extraction process-signal cases are missing")
+    # The protocol identity is part of the frozen batch contract, not merely
+    # metadata supplied to the resulting corpus.  Reject cases from another
+    # protocol (or unbound legacy cases) before deriving any optimizer input;
+    # otherwise a stale case file could silently contaminate provenance.
+    if any(
+        case.analysis_protocol_id != process_signal_protocol_id
+        or case.replicate_id is None
+        or case.observation_window is None
+        for case in cases
+    ):
+        raise ValueError("pure extraction process-signal cases are not bound to the requested protocol")
+    windows = {case.observation_window for case in cases}
+    if len(windows) != 1:
+        raise ValueError("pure extraction process-signal cases mix observation windows")
     census = census_process_signal_cases(cases)
     return prepare_pure_extraction_corpus(
         sources=sources,
