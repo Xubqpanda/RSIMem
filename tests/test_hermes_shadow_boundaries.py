@@ -134,6 +134,53 @@ def test_task_result_projects_every_tool_call_and_result_without_content(tmp_pat
     assert "secret" not in serialized
 
 
+def test_skill_tool_wrapper_projects_an_exact_call_result_closure(tmp_path) -> None:
+    bridge = _bridge(tmp_path, [])
+    try:
+        bridge._record_skill_process(
+            "skill_view",
+            "private-skill-name",
+            '{"success": true, "content": "private skill body"}',
+        )
+        events = bridge.process_feedback
+        joins = bridge.tool_call_result_joins
+    finally:
+        bridge.close()
+
+    assert len(joins) == 1
+    join = joins[0]
+    assert resolve_tool_call_result(join).status is ToolJoinResolutionStatus.COMPLETE
+    assert join.call_id is not None
+    assert join.result_id is not None
+    assert len(events) == 2
+    assert {event.kind.value for event in events} == {"tool_call", "tool_result"}
+    assert all(event.tool_call_id == join.call_id for event in events)
+    result = next(event for event in events if event.kind.value == "tool_result")
+    assert result.tool_result_id == join.result_id
+    serialized = json.dumps([event.payload() for event in events], ensure_ascii=True)
+    assert "private-skill-name" not in serialized
+    assert "private skill body" not in serialized
+
+
+def test_skill_tool_wrapper_keeps_malformed_result_censored(tmp_path) -> None:
+    bridge = _bridge(tmp_path, [])
+    try:
+        bridge._record_skill_process("skills_list", "query", "not-json")
+        join = bridge.tool_call_result_joins[-1]
+        result = next(
+            event
+            for event in bridge.process_feedback
+            if event.kind.value == "tool_result"
+        )
+    finally:
+        bridge.close()
+
+    assert join.type_mismatch is True
+    assert resolve_tool_call_result(join).status is ToolJoinResolutionStatus.TYPE_MISMATCH
+    assert result.status.value == "unknown"
+    assert result.reason_codes == ("schema_failure",)
+
+
 @pytest.mark.parametrize("content", ("not-json", '{"success": "false"}'))
 def test_malformed_tool_result_is_type_mismatch_not_tool_failure(
     tmp_path,
