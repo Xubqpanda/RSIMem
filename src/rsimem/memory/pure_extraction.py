@@ -938,6 +938,24 @@ class PureExtractionOptimizerCorpus:
         ):
             if type(value) is not int or value < 0:
                 raise ValueError(f"{name} must be a non-negative integer")
+        if self.process_signal_optimization_count > self.process_signal_case_count:
+            raise ValueError(
+                "pure process-signal optimization count exceeds case count"
+            )
+        if self.process_signal_case_count == 0 and self.process_signal_case_digest is not None:
+            raise ValueError("empty pure process-signal corpus cannot carry a case digest")
+        if self.process_signal_case_count and (
+            self.process_signal_protocol_id is None
+            or self.process_signal_case_digest is None
+        ):
+            raise ValueError("bound pure process-signal corpus requires provenance")
+        if self.process_signal_gate == "not_bound" and any((
+            self.process_signal_protocol_id is not None,
+            self.process_signal_case_digest is not None,
+            self.process_signal_case_count,
+            self.process_signal_optimization_count,
+        )):
+            raise ValueError("unbound pure process-signal corpus cannot carry evidence")
         # A ready corpus must satisfy the same replicated-signal minimum as
         # the shared extraction preparation gate.  A single optimization
         # observation is diagnostic evidence, not a generalizable policy
