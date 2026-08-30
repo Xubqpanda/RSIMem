@@ -216,6 +216,7 @@ def _corpus(example: PureExtractionOptimizerExample) -> PureExtractionOptimizerC
         process_signal_case_digest="a" * 64,
         process_signal_case_count=2,
         process_signal_optimization_count=2,
+        process_signal_hypothesis_digest="b" * 64,
     )
 
 
