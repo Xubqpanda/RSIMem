@@ -334,6 +334,7 @@ class PureExtractionFeedbackRecord:
             raise TypeError("pure extraction memory-use evidence has the wrong type")
         if self.artifact_set_binding is not None and not isinstance(self.artifact_set_binding, ArtifactSetSemanticBinding):
             raise TypeError("pure extraction artifact-set binding has the wrong type")
+        object.__setattr__(self, "attribution", PureExtractionAttribution(self.attribution))
         if self.memory_use is not None:
             if self.memory_use.provenance_id != self.provenance_id:
                 raise ValueError("memory-use provenance does not match extraction feedback")
@@ -341,6 +342,17 @@ class PureExtractionFeedbackRecord:
                 raise ValueError("artifact-set binding does not match memory-use evidence")
             if self.memory_use.artifact_set_id is not None and self.artifact_set_binding is None:
                 raise ValueError("memory-use artifact set requires a trusted binding")
+        if self.attribution in {
+            PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
+            PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
+        }:
+            if self.opportunity is None or self.memory_use is None:
+                raise ValueError("attributable extraction feedback requires opportunity and use evidence")
+            if not self.memory_use.used_artifact_ids:
+                raise ValueError("attributable extraction feedback requires used artifacts")
+            expected_outcome = self.attribution is PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
+            if self.memory_use.outcome_success is not expected_outcome:
+                raise ValueError("attributable extraction feedback outcome is inconsistent")
         join_ids = tuple(join.join_id for join in self.tool_joins)
         if len(join_ids) != len(set(join_ids)):
             raise ValueError("pure extraction tool joins must be unique")
@@ -351,7 +363,6 @@ class PureExtractionFeedbackRecord:
                 raise ValueError("tool join provenance does not match extraction feedback")
         if type(self.observation_complete) is not bool:
             raise TypeError("pure extraction observation completeness must be bool")
-        object.__setattr__(self, "attribution", PureExtractionAttribution(self.attribution))
         if not self.observation_complete and self.attribution is not PureExtractionAttribution.CENSORED:
             raise ValueError("incomplete pure extraction observation must be censored")
         if self.attribution is PureExtractionAttribution.CENSORED and self.observation_complete:
@@ -631,6 +642,29 @@ class PureExtractionOptimizerExample:
             raise ValueError("pure optimizer source projection join mismatch")
         if feedback.extraction_set_id != source.extraction_set_id:
             raise ValueError("pure optimizer extraction set join mismatch")
+        if (
+            feedback.attribution
+            in {
+                PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
+                PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
+            }
+            and feedback.opportunity is not None
+            and feedback.opportunity.semantic_requirement
+            not in source.source.available_semantic_keys
+        ):
+            raise ValueError("pure optimizer opportunity is not bound to source evidence")
+        if feedback.attribution in {
+            PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
+            PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
+        }:
+            source_artifacts = {
+                value.artifact_id
+                for value in source.source.facts
+                if value.artifact_id is not None
+            }
+            used = set(feedback.memory_use.used_artifact_ids) if feedback.memory_use else set()
+            if not used or not used.issubset(source_artifacts):
+                raise ValueError("pure optimizer attribution escapes source artifacts")
         opportunity_id = feedback.opportunity.evidence_id if feedback.opportunity else None
         opportunity_operation_id = feedback.opportunity.operation_id if feedback.opportunity else None
         memory_use_id = feedback.memory_use.evidence_id if feedback.memory_use else None
