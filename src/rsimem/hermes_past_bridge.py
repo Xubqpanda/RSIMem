@@ -863,14 +863,14 @@ class HermesPastBenchBridge:
         """
 
         forbidden = frozenset({
-            "family_id", "familyId", "stage", "benchmark_family",
-            "benchmarkFamily", "benchmark_stage", "benchmarkStage",
+            "familyid", "stage", "benchmarkfamily", "benchmarkstage",
         })
         if isinstance(value, Mapping):
             return {
                 key: HermesPastBenchBridge._strip_benchmark_scope(child)
                 for key, child in value.items()
-                if str(key) not in forbidden
+                if "".join(char for char in str(key).casefold() if char.isalnum())
+                not in forbidden
             }
         if isinstance(value, list):
             return [HermesPastBenchBridge._strip_benchmark_scope(child) for child in value]
