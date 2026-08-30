@@ -1180,6 +1180,33 @@ def test_lifecycle_ledger_appends_incrementally_and_resumes(tmp_path: Path) -> N
         )
 
 
+def test_lifecycle_ledger_reloads_external_append_and_rejects_symlink_lock(
+    tmp_path: Path,
+) -> None:
+    fixture = run_sm01_preference_fixture()
+    output = tmp_path / "lifecycle-reload.jsonl"
+    first = LifecycleLedgerObserver(
+        variant="native+adapter+ledger",
+        trace_id="trace-lifecycle-reload",
+        output_path=output,
+    )
+    first.record(fixture.events[0])
+    second = LifecycleLedgerObserver(
+        variant="native+adapter+ledger",
+        trace_id="trace-lifecycle-reload",
+        output_path=output,
+    )
+    second.record(fixture.events[1])
+    assert len(first.events) == 2
+
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    output.with_name(output.name + ".lock").unlink()
+    output.with_name(output.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        first.events
+
+
 def test_lifecycle_ledger_restart_rejects_schema_invalid_object(tmp_path: Path) -> None:
     output = tmp_path / "lifecycle.jsonl"
     output.write_text(
