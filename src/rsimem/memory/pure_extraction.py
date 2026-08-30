@@ -33,7 +33,11 @@ from .extraction_feedback import (
     ExtractedFactEvidence,
     FactDisposition,
 )
-from .opportunity import OpportunityEvidence
+from .opportunity import (
+    ApplicationOpportunitySchema,
+    JsonApplicationOpportunitySchemaRegistry,
+    OpportunityEvidence,
+)
 from .prompt_components import content_digest
 from .tool_exact_join import (
     ToolCallResultJoin,
@@ -763,7 +767,12 @@ class PureExtractionFeedbackRecord:
         )
 
     @classmethod
-    def from_payload(cls, value: object) -> "PureExtractionFeedbackRecord":
+    def from_payload(
+        cls,
+        value: object,
+        *,
+        application_schema: ApplicationOpportunitySchema | None = None,
+    ) -> "PureExtractionFeedbackRecord":
         fields = {
             "schema", "record_id", "schema_version", "attribution_schema_version",
             "source_record_id", "source_projection_digest", "extraction_set_id",
@@ -781,7 +790,14 @@ class PureExtractionFeedbackRecord:
                 source_record_id=value["source_record_id"],
                 source_projection_digest=value["source_projection_digest"],
                 extraction_set_id=value["extraction_set_id"],
-                opportunity=OpportunityEvidence.from_payload(value["opportunity"]) if value["opportunity"] is not None else None,
+                opportunity=(
+                    OpportunityEvidence.from_payload(
+                        value["opportunity"],
+                        application_schema=application_schema,
+                    )
+                    if value["opportunity"] is not None
+                    else None
+                ),
                 memory_use=MemoryUseEvidence.from_payload(value["memory_use"]) if value["memory_use"] is not None else None,
                 artifact_set_binding=ArtifactSetSemanticBinding.from_payload(value["artifact_set_binding"]) if value["artifact_set_binding"] is not None else None,
                 tool_joins=tuple(ToolCallResultJoin.from_payload(item) for item in value["tool_joins"]),
@@ -1528,6 +1544,9 @@ class _JsonPureExtractionStore:
         self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
 
+    def _parse_record(self, value: object) -> object:
+        return self.record_type.from_payload(value)
+
     @contextmanager
     def _lock(self, operation: int) -> Iterator[None]:
         if self.path.is_symlink():
@@ -1551,7 +1570,7 @@ class _JsonPureExtractionStore:
             if not line.strip():
                 raise ValueError(f"malformed pure extraction store at line {line_number}")
             try:
-                record = self.record_type.from_payload(json.loads(line))
+                record = self._parse_record(json.loads(line))
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
                 raise ValueError(
                     "malformed pure extraction store at "
@@ -1727,6 +1746,36 @@ class JsonPureExtractionSourceRecordStore(_JsonPureExtractionStore):
 
 class JsonPureExtractionFeedbackRecordStore(_JsonPureExtractionStore):
     record_type = PureExtractionFeedbackRecord
+
+    def __init__(
+        self,
+        path: Path,
+        *,
+        schema_registry: JsonApplicationOpportunitySchemaRegistry | None = None,
+    ) -> None:
+        if schema_registry is not None and not isinstance(
+            schema_registry, JsonApplicationOpportunitySchemaRegistry
+        ):
+            raise TypeError("pure extraction feedback schema registry has the wrong type")
+        self.schema_registry = schema_registry
+        super().__init__(path)
+
+    def _parse_record(self, value: object) -> object:
+        application_schema = None
+        if isinstance(value, Mapping) and isinstance(value.get("opportunity"), Mapping):
+            opportunity = value["opportunity"]
+            if opportunity.get("source_surface") == "application_schema":
+                if self.schema_registry is None:
+                    raise ValueError("application opportunity schema registry is required")
+                application_schema = self.schema_registry.resolve(
+                    opportunity["application_schema_id"],
+                    opportunity["application_schema_version"],
+                    opportunity["application_schema_digest"],
+                )
+        return self.record_type.from_payload(
+            value,
+            application_schema=application_schema,
+        )
 
 
 # Verbose aliases make the evidence plane explicit at call sites while
