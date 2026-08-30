@@ -272,6 +272,25 @@ def test_retrieval_injection_and_tool_failures_are_separate_diagnostics() -> Non
     assert tool.reason_code == "tool_failure_not_attributable"
 
 
+@pytest.mark.parametrize(
+    ("outcome_kind", "outcome_success", "message"),
+    (
+        (OutcomeEvidenceKind.TOOL_SUCCESS, False, "tool-success"),
+        (OutcomeEvidenceKind.TOOL_FAILURE, True, "tool-failure"),
+    ),
+)
+def test_tool_outcome_kind_must_match_success_flag(
+    outcome_kind: OutcomeEvidenceKind,
+    outcome_success: bool,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        _evidence(
+            outcome_kind=outcome_kind,
+            outcome_success=outcome_success,
+        )
+
+
 def test_artifact_set_binding_is_supported_without_fact_multiplication() -> None:
     binding = ArtifactSetSemanticBinding.create(
         semantic_unit_id="semantic.preference.rule.v1",

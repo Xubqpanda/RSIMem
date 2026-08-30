@@ -173,6 +173,16 @@ class MemoryUseEvidence:
             raise TypeError("outcome success must be bool or None")
         if self.outcome_kind is not None:
             object.__setattr__(self, "outcome_kind", OutcomeEvidenceKind(self.outcome_kind))
+            if (
+                self.outcome_kind is OutcomeEvidenceKind.TOOL_SUCCESS
+                and self.outcome_success is not True
+            ):
+                raise ValueError("tool-success outcome must have success=true")
+            if (
+                self.outcome_kind is OutcomeEvidenceKind.TOOL_FAILURE
+                and self.outcome_success is not False
+            ):
+                raise ValueError("tool-failure outcome must have success=false")
         _require_timestamp(self.observation_cutoff, "observation cutoff")
         digest = _digest(self._identity_payload())
         if self.evidence_id != f"memory-use-evidence.{digest[:40]}":
