@@ -12,6 +12,7 @@ import fcntl
 import hashlib
 import json
 import os
+import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
@@ -225,6 +226,7 @@ class PureExtractionSourceRecord:
         record: object,
         *,
         source_projection_id: str | None = None,
+        context_revision: str | None = None,
         provenance_id: str | None = None,
     ) -> "PureExtractionSourceRecord":
         """Project a family-bound audit record without copying its labels.
@@ -248,7 +250,8 @@ class PureExtractionSourceRecord:
         return cls.create(
             source_projection_id=projection_id,
             source_projection_digest=record.source.source_projection_digest,
-            context_revision=f"revision.{record.activation.fingerprint_digest[:40]}",
+            context_revision=context_revision
+            or f"revision.{record.activation.fingerprint_digest[:40]}",
             extraction_set_id=record.source.extraction_set_id,
             extraction_artifact_id=record.extraction_artifact_id,
             extraction_artifact_digest=record.extraction_artifact_digest,
@@ -873,7 +876,7 @@ class PureExtractionOptimizerCorpus:
         _id(self.corpus_id, "pure extraction corpus ID")
         if self.split not in {"train", "validation", "future_test"}:
             raise ValueError("pure extraction corpus split is invalid")
-        if not isinstance(self.observation_cutoff, str):
+        if not isinstance(self.observation_cutoff, str) or not self.observation_cutoff.endswith("Z"):
             raise ValueError("pure extraction corpus cutoff is invalid")
         try:
             datetime.fromisoformat(self.observation_cutoff.removesuffix("Z") + "+00:00")
@@ -1040,15 +1043,30 @@ class JsonPureExtractionOptimizerCorpusStore:
         serialized = _canonical(corpus.payload()) + "\n"
         with self._lock(fcntl.LOCK_EX):
             if self.path.exists():
+                if self.path.is_symlink():
+                    raise ValueError("pure extraction optimizer corpus cannot be a symlink")
                 existing = self._read_unlocked()
                 if existing != corpus:
                     raise ValueError("conflicting pure extraction optimizer corpus")
                 return False
             self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("w", encoding="utf-8") as handle:
-                handle.write(serialized)
-                handle.flush()
-                os.fsync(handle.fileno())
+            descriptor, temporary = tempfile.mkstemp(
+                prefix=self.path.name + ".", dir=self.path.parent
+            )
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    handle.write(serialized)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, self.path)
+                directory = os.open(self.path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
         return True
 
     def read(self) -> PureExtractionOptimizerCorpus:
@@ -1070,6 +1088,8 @@ class JsonPureExtractionOptimizerCorpusStore:
     def _read_unlocked(self) -> PureExtractionOptimizerCorpus | None:
         if not self.path.exists():
             return None
+        if self.path.is_symlink():
+            raise ValueError("pure extraction optimizer corpus cannot be a symlink")
         try:
             value = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
