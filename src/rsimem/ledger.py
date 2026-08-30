@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import json
 import math
@@ -526,18 +528,48 @@ class LifecycleLedgerObserver:
             if output_path
             else None
         )
+        self.lock_path = (
+            self.output_path.with_name(self.output_path.name + ".lock")
+            if self.output_path is not None
+            else None
+        )
         self._events: list[dict[str, Any]] = []
         self._events_by_id: dict[str, str] = {}
         self._lock = threading.RLock()
         if self.output_path is not None:
             if self.output_path.is_symlink():
                 raise ValueError("lifecycle ledger path cannot be a symlink")
+            assert self.lock_path is not None
+            if self.lock_path.is_symlink():
+                raise ValueError("lifecycle ledger lock cannot be a symlink")
             self.output_path.parent.mkdir(parents=True, exist_ok=True)
             self._load_existing()
+
+    @contextmanager
+    def _file_lock(self, operation: int):
+        if self.output_path is None or self.lock_path is None:
+            yield
+            return
+        if self.output_path.is_symlink():
+            raise ValueError("lifecycle ledger path cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("lifecycle ledger lock cannot be a symlink")
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), operation)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
     @property
     def events(self) -> tuple[dict[str, Any], ...]:
         with self._lock:
+            if self.output_path is not None:
+                with self._file_lock(fcntl.LOCK_SH):
+                    self._events.clear()
+                    self._events_by_id.clear()
+                    self._load_existing()
             return tuple(self._events)
 
     def _load_existing(self) -> None:
@@ -595,6 +627,33 @@ class LifecycleLedgerObserver:
         data: dict[str, Any],
     ) -> None:
         with self._lock:
+            file_guard = self._file_lock(fcntl.LOCK_EX)
+            with file_guard:
+                if self.output_path is not None:
+                    self._events.clear()
+                    self._events_by_id.clear()
+                    self._load_existing()
+                self._append_unlocked(
+                    kind=kind,
+                    run_id=run_id,
+                    episode_id=episode_id,
+                    session_id=session_id,
+                    task_id=task_id,
+                    snapshot_id=snapshot_id,
+                    data=data,
+                )
+
+    def _append_unlocked(
+        self,
+        *,
+        kind: str,
+        run_id: str,
+        episode_id: str,
+        session_id: str,
+        task_id: str,
+        snapshot_id: str | None,
+        data: dict[str, Any],
+    ) -> None:
             identity = {
                 "runId": run_id,
                 "variant": self.variant,
