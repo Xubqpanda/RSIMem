@@ -265,6 +265,26 @@ def test_hermes_extra_body_carries_application_schema_to_runtime() -> None:
     assert body["hermes"]["rsimem"]["application_opportunity_schema"] == schema
 
 
+def test_hermes_extra_body_rejects_feedback_without_application_schema() -> None:
+    with pytest.raises(ValueError, match="frozen application opportunity schema"):
+        build_hermes_extra_body(
+            home_dir=Path("/tmp/hermes-schema-home-missing"),
+            artifacts_dir=Path("/tmp/hermes-schema-artifacts-missing"),
+            persistence_enabled=True,
+            memory_enabled=False,
+            user_profile_enabled=False,
+            skills_enabled=False,
+            session_search_enabled=False,
+            memory_nudge_interval=0,
+            memory_flush_min_turns=0,
+            skill_creation_nudge_interval=0,
+            background_review_wait_s=0,
+            rsimem_mode="native+ledger",
+            rsimem_semantic_writeback_mode="static",
+            rsimem_semantic_feedback_contract="sm01_tsv_v1",
+        )
+
+
 def test_past_artifact_set_provider_requires_complete_multi_fact_source() -> None:
     source = ExtractionSourceEvidence(
         "source.provider-set",

@@ -161,6 +161,14 @@ def build_hermes_extra_body(
         application_schema = json.loads(
             json.dumps(rsimem_application_opportunity_schema, ensure_ascii=True, sort_keys=True)
         )
+    if (
+        semantic_writeback_mode != "disabled"
+        and semantic_writeback["feedback_contract"] != "disabled"
+        and application_schema is None
+    ):
+        raise ValueError(
+            "semantic feedback requires a frozen application opportunity schema"
+        )
     if semantic_writeback_mode in {"static", "static_utility", "adaptive_utility"}:
         if rsimem_mode != "native+ledger":
             raise ValueError("static semantic writeback requires native+ledger mode")
