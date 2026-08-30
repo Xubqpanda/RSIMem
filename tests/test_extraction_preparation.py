@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from rsimem.extraction_preparation import (
+    _process_signal_gate,
     audit_extraction_feedback_batch,
     build_extraction_optimizer_corpus,
 )
@@ -27,6 +28,7 @@ from rsimem.memory.extraction_projection import (
     JsonExtractionSourceRecordStore,
     JsonLiveExtractionFeedbackRecordLog,
 )
+from rsimem.memory.process_signal import JsonProcessSignalCaseStore, ProcessSignalCase
 from test_extraction_optimizer_builder import _fixture
 
 
@@ -99,6 +101,41 @@ def test_process_signal_case_store_without_signal_blocks_optimizer_gate(
     assert audit.process_signal_optimization_count == 0
     assert "no_optimization_process_signal" in audit.reason_codes
     assert audit.optimizer_signal_ready is False
+
+
+def test_process_signal_gate_requires_two_logical_cases_for_one_hypothesis(
+    tmp_path: Path,
+) -> None:
+    store = JsonProcessSignalCaseStore(tmp_path / "run" / "process_signal_cases.jsonl")
+
+    def case(logical_case_id: str, physical_id: str, hypothesis: str) -> ProcessSignalCase:
+        return ProcessSignalCase.create(
+            logical_case_id=logical_case_id,
+            physical_observation_ids=(physical_id,),
+            source_observed=True,
+            extraction_observed=True,
+            persistence_observed=True,
+            retrieval_observed=True,
+            exposure_observed=True,
+            outcome_observed=True,
+            extraction_attributable=True,
+            abstract_hypothesis_digest=hypothesis,
+            observation_complete=True,
+        )
+
+    first = case("logical-case.signal.1", "physical-observation.signal.1", "a" * 64)
+    second = case("logical-case.signal.2", "physical-observation.signal.2", "a" * 64)
+    assert store.append(first) is True
+    assert _process_signal_gate(tmp_path) == (PROCESS_SIGNAL_GATE_NO_SIGNAL, 1, 1)
+    assert store.append(second) is True
+    assert _process_signal_gate(tmp_path)[0] == "ready"
+
+    distinct = case("logical-case.signal.3", "physical-observation.signal.3", "b" * 64)
+    assert store.append(distinct) is True
+    gate, case_count, optimization_count = _process_signal_gate(tmp_path)
+    assert gate == "ready"
+    assert case_count == 3
+    assert optimization_count == 3
 
 
 def test_build_corpus_exactly_joins_private_and_public_live_evidence(
