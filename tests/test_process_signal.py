@@ -363,6 +363,65 @@ def test_build_process_signal_cases_ignore_physical_task_ids_when_source_trace_m
     assert first[0].logical_case_id == second[0].logical_case_id
 
 
+def test_extraction_output_variation_does_not_split_logical_case() -> None:
+    """Replicate output differences remain physical observations of one case."""
+
+    def make_events(extraction_output: str) -> tuple[ProcessEvent, ...]:
+        common = dict(
+            run_id="run.physical-output",
+            variant="native+ledger",
+            trace_id="trace.physical-output",
+            episode_id="episode.physical-output",
+            session_id="session.physical-output",
+            task_id="task.physical-output",
+            host_event_id="event.physical-output",
+            source_revision="revision.same-source",
+        )
+        events = []
+        for kind in (
+            ProcessEventKind.SOURCE_SELECTION,
+            ProcessEventKind.EXTRACTION,
+            ProcessEventKind.COMMIT,
+            ProcessEventKind.RETRIEVAL,
+            ProcessEventKind.EXPOSURE,
+            ProcessEventKind.TASK_OUTCOME,
+        ):
+            output_payload = (
+                {"selected": ["segment.user.v1"]}
+                if kind is ProcessEventKind.SOURCE_SELECTION
+                else {"extraction": extraction_output}
+                if kind is ProcessEventKind.EXTRACTION
+                else {"kind": kind.value}
+            )
+            events.append(ProcessEvent.create(
+                kind=kind,
+                status=ProcessEventStatus.SUCCESS,
+                input_payload={"source": "same"},
+                output_payload=output_payload,
+                **common,
+            ))
+        return tuple(events)
+
+    first = build_process_signal_cases(
+        make_events("facts-a"),
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.same-output",
+        future_task_template_id="future-template.same-output",
+        observation_window="window.same-output",
+        replicate_id="replicate.output-a",
+    )
+    second = build_process_signal_cases(
+        make_events("facts-b"),
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.same-output",
+        future_task_template_id="future-template.same-output",
+        observation_window="window.same-output",
+        replicate_id="replicate.output-b",
+    )
+    assert first[0].logical_case_id == second[0].logical_case_id
+    assert first[0].physical_observation_ids != second[0].physical_observation_ids
+
+
 def test_process_signal_case_protocol_binding_is_replay_stable() -> None:
     case = _case()
     bound = ProcessSignalCase.create(
