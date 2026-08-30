@@ -197,6 +197,9 @@ from .pure_extraction import (
     prepare_pure_extraction_corpus,
 )
 from .pure_extraction_optimizer import (
+    JsonPureExtractionOptimizerContentCaptureStore,
+    PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA,
+    PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA_VERSION,
     PureExtractionOptimizerContentCapture,
     build_pure_extraction_optimizer_gate_request,
     build_pure_extraction_optimizer_request,
@@ -384,6 +387,9 @@ __all__ = [
     "PureProcessExtractionSourceRecord",
     "prepare_pure_extraction_corpus",
     "PureExtractionOptimizerContentCapture",
+    "JsonPureExtractionOptimizerContentCaptureStore",
+    "PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA",
+    "PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA_VERSION",
     "build_pure_extraction_optimizer_gate_request",
     "build_pure_extraction_optimizer_request",
     "OpportunityResolution",

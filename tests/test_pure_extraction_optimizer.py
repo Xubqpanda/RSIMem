@@ -28,6 +28,7 @@ from rsimem.memory.pure_extraction import (
     PureExtractionSourceRecord,
 )
 from rsimem.memory.pure_extraction_optimizer import (
+    JsonPureExtractionOptimizerContentCaptureStore,
     PureExtractionOptimizerContentCapture,
     build_pure_extraction_optimizer_gate_request,
     build_pure_extraction_optimizer_request,
@@ -324,3 +325,38 @@ def test_pure_optimizer_capture_rejects_evaluation_text() -> None:
                 ),),
             ),),
         )
+
+
+def test_pure_optimizer_capture_store_is_restart_safe_and_conflict_checked(tmp_path) -> None:
+    _, example, capture = _fixture()
+    path = tmp_path / "owner" / "pure-captures.jsonl"
+    store = JsonPureExtractionOptimizerContentCaptureStore(path)
+    assert store.append(capture) is True
+    assert store.append(capture) is False
+    assert JsonPureExtractionOptimizerContentCaptureStore(path).records() == (capture,)
+    assert path.stat().st_mode & 0o777 == 0o600
+
+    conflicting = PureExtractionOptimizerContentCapture(
+        capture.example_id,
+        capture.logical_case_id,
+        ("physical-observation.other",),
+        capture.source_projection,
+        capture.source_messages,
+        capture.extracted_facts,
+        capture.delayed_evidence,
+    )
+    with pytest.raises(ValueError, match="conflicting"):
+        store.append(conflicting)
+
+    payload = capture.payload()
+    payload["family_id"] = "SM02_forbidden"
+    path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed"):
+        JsonPureExtractionOptimizerContentCaptureStore(path).records()
+
+    # A private content capture must never be readable through a permissive
+    # file mode after restart.
+    path.write_text(json.dumps(capture.payload()) + "\n", encoding="utf-8")
+    path.chmod(0o644)
+    with pytest.raises(PermissionError, match="permissions"):
+        JsonPureExtractionOptimizerContentCaptureStore(path).records()

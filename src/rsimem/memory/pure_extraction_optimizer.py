@@ -9,8 +9,14 @@ grader, or answer metadata is accepted here.
 
 from __future__ import annotations
 
+import fcntl
+import json
+import os
+import stat
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
 from typing import Mapping, Sequence
 
 from .evidence_planes import EvidencePlane, require_optimizer_plane, validate_pure_process_payload
@@ -47,6 +53,10 @@ _ACTIONABLE = {
     PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
     PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
 }
+PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA_VERSION = 1
+PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA = (
+    "rsimem-pure-extraction-optimizer-capture-v1"
+)
 
 
 def _id(value: object, name: str) -> None:
@@ -103,6 +113,161 @@ class PureExtractionOptimizerContentCapture:
             raise TypeError("pure optimizer capture fact has the wrong type")
         if not isinstance(self.delayed_evidence, OptimizerDelayedEvidence):
             raise TypeError("pure optimizer capture delayed evidence has the wrong type")
+
+    @property
+    def capture_id(self) -> str:
+        return "pure-optimizer-capture." + content_digest(self.identity_payload())[:40]
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA_VERSION,
+            "example_id": self.example_id,
+            "logical_case_id": self.logical_case_id,
+            "physical_observation_ids": list(self.physical_observation_ids),
+            "source_projection": self.source_projection.payload(),
+            "source_messages": [value.payload() for value in self.source_messages],
+            "extracted_facts": [value.payload() for value in self.extracted_facts],
+            "delayed_evidence": self.delayed_evidence.payload(),
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema": PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA,
+            "capture_id": self.capture_id,
+            **self.identity_payload(),
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "PureExtractionOptimizerContentCapture":
+        fields = {
+            "schema", "capture_id", "schema_version", "example_id",
+            "logical_case_id", "physical_observation_ids", "source_projection",
+            "source_messages", "extracted_facts", "delayed_evidence",
+        }
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != fields
+            or value.get("schema") != PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA
+        ):
+            raise ValueError("malformed pure optimizer content capture")
+        if not isinstance(value["physical_observation_ids"], list):
+            raise ValueError("malformed pure optimizer capture observations")
+        if not isinstance(value["source_messages"], list) or not isinstance(
+            value["extracted_facts"], list
+        ):
+            raise ValueError("malformed pure optimizer capture collections")
+        try:
+            result = cls(
+                example_id=value["example_id"],
+                logical_case_id=value["logical_case_id"],
+                physical_observation_ids=tuple(value["physical_observation_ids"]),
+                source_projection=ExtractionSourceProjection.from_payload(
+                    value["source_projection"]
+                ),
+                source_messages=tuple(
+                    OptimizerSourceMessage.from_payload(item)
+                    for item in value["source_messages"]
+                ),
+                extracted_facts=tuple(
+                    OptimizerExtractedFact.from_payload(item)
+                    for item in value["extracted_facts"]
+                ),
+                delayed_evidence=OptimizerDelayedEvidence.from_payload(
+                    value["delayed_evidence"]
+                ),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed pure optimizer content capture") from exc
+        if value["schema_version"] != PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA_VERSION:
+            raise ValueError("unsupported pure optimizer content capture schema")
+        if value["capture_id"] != result.capture_id:
+            raise ValueError("pure optimizer content capture ID mismatch")
+        if result.payload() != dict(value):
+            raise ValueError("non-canonical pure optimizer content capture")
+        return result
+
+
+class JsonPureExtractionOptimizerContentCaptureStore:
+    """Crash-safe owner-controlled persistence for pure optimizer captures."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+
+    @contextmanager
+    def _locked(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        os.chmod(self.lock_path, 0o600)
+        with os.fdopen(descriptor, "r+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def _read_unlocked(self) -> dict[str, PureExtractionOptimizerContentCapture]:
+        if self.path.is_symlink():
+            raise ValueError("pure optimizer capture file cannot be a symlink")
+        if not self.path.exists():
+            return {}
+        if stat.S_IMODE(self.path.stat().st_mode) & 0o077:
+            raise PermissionError("pure optimizer capture file permissions are too broad")
+        records: dict[str, PureExtractionOptimizerContentCapture] = {}
+        for line_number, line in enumerate(
+            self.path.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            if not line.strip():
+                raise ValueError(
+                    f"empty pure optimizer capture record at line {line_number}"
+                )
+            try:
+                capture = PureExtractionOptimizerContentCapture.from_payload(
+                    json.loads(line)
+                )
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"malformed pure optimizer capture at line {line_number}"
+                ) from exc
+            previous = records.get(capture.example_id)
+            if previous is not None and previous.payload() != capture.payload():
+                raise ValueError("conflicting pure optimizer content capture")
+            records[capture.example_id] = capture
+        return records
+
+    def records(self) -> tuple[PureExtractionOptimizerContentCapture, ...]:
+        with self._locked():
+            records = self._read_unlocked()
+        return tuple(records[key] for key in sorted(records))
+
+    def append(self, capture: PureExtractionOptimizerContentCapture) -> bool:
+        if not isinstance(capture, PureExtractionOptimizerContentCapture):
+            raise TypeError("pure optimizer capture store received the wrong type")
+        serialized = json.dumps(
+            capture.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":")
+        ) + "\n"
+        with self._locked():
+            records = self._read_unlocked()
+            previous = records.get(capture.example_id)
+            if previous is not None:
+                if previous.payload() != capture.payload():
+                    raise ValueError("conflicting pure optimizer content capture")
+                return False
+            descriptor = os.open(
+                self.path,
+                os.O_CREAT | os.O_APPEND | os.O_WRONLY,
+                0o600,
+            )
+            try:
+                os.chmod(self.path, 0o600)
+                encoded = serialized.encode("utf-8")
+                offset = 0
+                while offset < len(encoded):
+                    offset += os.write(descriptor, encoded[offset:])
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+            return True
 
 
 def _capture_for(
@@ -472,6 +637,9 @@ def build_pure_extraction_optimizer_gate_request(
 
 
 __all__ = [
+    "PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA",
+    "PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA_VERSION",
+    "JsonPureExtractionOptimizerContentCaptureStore",
     "PureExtractionOptimizerContentCapture",
     "build_pure_extraction_optimizer_gate_request",
     "build_pure_extraction_optimizer_request",
