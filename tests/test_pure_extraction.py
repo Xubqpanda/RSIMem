@@ -252,10 +252,19 @@ def test_pure_corpus_factory_uses_census_conflicts_as_no_signal() -> None:
         observation_cutoff="2026-08-24T00:00:00Z",
         examples=(example,),
         process_signal_protocol_id="protocol.census-v1",
-        process_signal_case_digest="b" * 64,
+        process_signal_case_digest=None,
         census=census,
     )
     assert corpus.process_signal_gate == "no_signal"
+    with pytest.raises(ValueError, match="case digest mismatch"):
+        PureExtractionOptimizerCorpus.create_from_process_signal_census(
+            split="train",
+            observation_cutoff="2026-08-24T00:00:00Z",
+            examples=(example,),
+            process_signal_protocol_id="protocol.census-v1",
+            process_signal_case_digest="f" * 64,
+            census=census,
+        )
 
 
 def test_family_bound_optimizer_builder_does_not_accept_pure_projection() -> None:
