@@ -591,11 +591,19 @@ class PureExtractionFeedbackRecord:
             ),
             None,
         )
+        # A censored bound join means the overall observation window is not
+        # complete, even when the caller did not mark the enclosing task as
+        # censored yet.  Propagate that fact to the feedback contract rather
+        # than downgrading it to an ordinary unresolved outcome.
+        effective_observation_complete = observation_complete and not any(
+            resolution.status is ToolJoinResolutionStatus.CENSORED
+            for _, resolution in bound_tool_join_resolutions
+        )
 
         opportunity_resolution = resolve_opportunity(
             opportunity,
             current_input_requirements=current_input_requirements,
-            observation_complete=observation_complete,
+            observation_complete=effective_observation_complete,
         )
         memory_resolution = None
         if memory_use is not None:
@@ -606,7 +614,7 @@ class PureExtractionFeedbackRecord:
             )
         attribution = PureExtractionAttribution.UNRESOLVED
         reasons: list[str] = []
-        if not observation_complete:
+        if not effective_observation_complete:
             attribution = PureExtractionAttribution.CENSORED
             reasons.append("observation_censored")
         elif opportunity_resolution.status is not OpportunityResolutionStatus.OBSERVED:
@@ -665,7 +673,7 @@ class PureExtractionFeedbackRecord:
             provenance_id=provenance_id,
             attribution=attribution,
             reason_codes=tuple(dict.fromkeys(reasons)),
-            observation_complete=observation_complete,
+            observation_complete=effective_observation_complete,
         )
 
     @classmethod
