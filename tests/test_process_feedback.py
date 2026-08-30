@@ -27,7 +27,11 @@ from rsimem.memory.process_corpus import (
     ensure_process_corpus_has_no_evaluation_fields,
 )
 from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
-from rsimem.memory.trigger_policy import DeterministicTriggerPolicy, HostTriggerAdapter
+from rsimem.memory.trigger_policy import (
+    DeterministicTriggerPolicy,
+    HostTriggerAdapter,
+    TriggerPolicyConfig,
+)
 
 
 def _replay():
@@ -462,3 +466,26 @@ def test_process_census_reports_layer_and_receipt_coverage() -> None:
             task_template_group_id="sm01-process-pilot",
             task_manifest_digest="a" * 64,
         )
+
+
+def test_process_census_reports_action_variation_from_policy_status() -> None:
+    snapshot, event, replay = _replay()
+    shadow = DeterministicPolicyReplay(
+        trigger=DeterministicTriggerPolicy(
+            config=TriggerPolicyConfig(task_completed_enabled=False),
+        )
+    ).run(
+        snapshot,
+        event,
+        backend=build_fixture_backend(),
+        candidate_fact_ids=("fact.tsv",),
+        artifact_ids=("artifact.tsv",),
+        mutation_ids=("mutation.tsv",),
+    )
+    census = census_process_events((*replay.process_events, *shadow.process_events))
+    assert census.layer_action_counts[PolicyLayer.TRIGGER.value] == {
+        "RUN": 1,
+        "SKIP": 1,
+    }
+    assert census.payload()["layerActionVariation"][PolicyLayer.TRIGGER.value] is True
+    assert census.payload()["layerActionVariation"][PolicyLayer.EXTRACTION.value] is False
