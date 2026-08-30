@@ -299,6 +299,57 @@ def test_build_process_signal_cases_separates_logical_and_physical_identity() ->
     assert first[0].physical_observation_ids != second[0].physical_observation_ids
 
 
+def test_build_process_signal_cases_ignore_physical_task_ids_when_source_trace_matches() -> None:
+    def make_events(task_id: str, run_id: str) -> tuple[ProcessEvent, ...]:
+        common = dict(
+            run_id=run_id,
+            variant="native+ledger",
+            trace_id=f"trace.{run_id}",
+            episode_id=f"episode.{run_id}",
+            session_id=f"session.{run_id}",
+            task_id=task_id,
+            host_event_id=f"event.{run_id}",
+            source_revision="revision.same-source",
+        )
+        return tuple(
+            ProcessEvent.create(
+                kind=kind,
+                status=ProcessEventStatus.SUCCESS,
+                input_digest=("1" * 64 if kind is ProcessEventKind.SOURCE_SELECTION else "2" * 64),
+                output_digest=("3" * 64 if kind is ProcessEventKind.SOURCE_SELECTION else "4" * 64),
+                input_payload={},
+                output_payload={},
+                **common,
+            )
+            for kind in (
+                ProcessEventKind.SOURCE_SELECTION,
+                ProcessEventKind.EXTRACTION,
+                ProcessEventKind.COMMIT,
+                ProcessEventKind.RETRIEVAL,
+                ProcessEventKind.EXPOSURE,
+                ProcessEventKind.TASK_OUTCOME,
+            )
+        )
+
+    first = build_process_signal_cases(
+        make_events("task.physical.one", "run.physical.one"),
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.same",
+        future_task_template_id="future-template.same",
+        observation_window="window.same",
+        replicate_id="replicate.one",
+    )
+    second = build_process_signal_cases(
+        make_events("task.physical.two", "run.physical.two"),
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.same",
+        future_task_template_id="future-template.same",
+        observation_window="window.same",
+        replicate_id="replicate.two",
+    )
+    assert first[0].logical_case_id == second[0].logical_case_id
+
+
 def test_process_signal_case_protocol_binding_is_replay_stable() -> None:
     case = _case()
     bound = ProcessSignalCase.create(
