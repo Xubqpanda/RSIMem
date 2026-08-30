@@ -475,6 +475,17 @@ class AppendOnlyOperationEvidenceLog:
     @property
     def events(self) -> tuple[dict[str, Any], ...]:
         with self._lock:
+            if self.output_path is not None:
+                if self.output_path.is_symlink():
+                    raise ValueError("operation evidence log cannot be a symlink")
+                with self.output_path.open("a+", encoding="utf-8") as handle:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_SH)
+                    try:
+                        self._events.clear()
+                        self._canonical_by_id.clear()
+                        self._load()
+                    finally:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
             return tuple(json.loads(_canonical_json(event)) for event in self._events)
 
     def _load(self) -> None:
@@ -511,20 +522,38 @@ class AppendOnlyOperationEvidenceLog:
             _validate_event(event)
             event_id = str(event["eventId"])
             canonical = _canonical_json(event)
-            existing = self._canonical_by_id.get(event_id)
-            if existing is not None:
-                if existing != canonical:
-                    raise ValueError(f"conflicting operation evidence event: {event_id}")
-                return False
             if self.output_path is not None:
                 if self.output_path.is_symlink():
                     raise ValueError("operation evidence log cannot be a symlink")
-                with self.output_path.open("a", encoding="utf-8") as handle:
+                with self.output_path.open("a+", encoding="utf-8") as handle:
                     fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-                    handle.write(canonical + "\n")
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+                    try:
+                        # Another process may have appended or replaced the
+                        # file since this instance was constructed.  The
+                        # on-disk file is authoritative under the lock.
+                        self._events.clear()
+                        self._canonical_by_id.clear()
+                        self._load()
+                        existing = self._canonical_by_id.get(event_id)
+                        if existing is not None:
+                            if existing != canonical:
+                                raise ValueError(
+                                    f"conflicting operation evidence event: {event_id}"
+                                )
+                            return False
+                        if self.output_path.is_symlink():
+                            raise ValueError("operation evidence log cannot be a symlink")
+                        handle.write(canonical + "\n")
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                    finally:
+                        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            else:
+                existing = self._canonical_by_id.get(event_id)
+                if existing is not None:
+                    if existing != canonical:
+                        raise ValueError(f"conflicting operation evidence event: {event_id}")
+                    return False
             value = json.loads(canonical)
             self._canonical_by_id[event_id] = canonical
             self._events.append(value)
