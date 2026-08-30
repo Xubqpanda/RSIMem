@@ -351,13 +351,19 @@ class JsonMutationReceiptStore:
     """Atomic JSON receipt store and durable target ownership resolver."""
 
     def __init__(self, path: Path) -> None:
-        self.path = path.expanduser().resolve()
+        # Preserve the final component so receipt state cannot be redirected
+        # into an unrelated file through a symlink.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
+        self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
 
     @contextmanager
     def _lock(self, operation: int):
+        if self.path.is_symlink():
+            raise ValueError("mutation receipt store cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("mutation receipt store lock cannot be a symlink")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        lock_path = self.path.with_suffix(self.path.suffix + ".lock")
-        with lock_path.open("w", encoding="utf-8") as lock:
+        with self.lock_path.open("w", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), operation)
             try:
                 yield
@@ -365,6 +371,8 @@ class JsonMutationReceiptStore:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
     def _read_unlocked(self) -> dict[str, MutationReceipt]:
+        if self.path.is_symlink():
+            raise ValueError("mutation receipt store cannot be a symlink")
         if not self.path.exists():
             return {}
         try:
@@ -389,6 +397,8 @@ class JsonMutationReceiptStore:
         return receipts
 
     def _write_unlocked(self, receipts: dict[str, MutationReceipt]) -> None:
+        if self.path.is_symlink():
+            raise ValueError("mutation receipt store cannot be a symlink")
         payload = {
             "schema_version": MUTATION_RECEIPT_SCHEMA_VERSION,
             "receipts": {
