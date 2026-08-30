@@ -303,6 +303,46 @@ def test_pure_corpus_factory_rejects_single_optimization_case() -> None:
     assert corpus.process_signal_gate == "no_signal"
 
 
+def test_pure_corpus_rejects_inconsistent_process_signal_counts() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.census-invalid-v1",
+    )
+    feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.completed-census-invalid-v1",
+        provenance_id="provenance.census-invalid-v1",
+    )
+    example = PureExtractionOptimizerExample.from_records(pure_source, feedback)
+    with pytest.raises(ValueError, match="exceeds case count"):
+        PureExtractionOptimizerCorpus.create(
+            split="train",
+            observation_cutoff="2026-08-24T00:00:00Z",
+            examples=(example,),
+            process_signal_gate="no_signal",
+            process_signal_protocol_id="protocol.census-invalid-v1",
+            process_signal_case_digest="a" * 64,
+            process_signal_case_count=1,
+            process_signal_optimization_count=2,
+        )
+    with pytest.raises(ValueError, match="unbound.*cannot carry"):
+        PureExtractionOptimizerCorpus.create(
+            split="train",
+            observation_cutoff="2026-08-24T00:00:00Z",
+            examples=(example,),
+            process_signal_gate="not_bound",
+            process_signal_protocol_id="protocol.census-invalid-v1",
+            process_signal_case_digest="a" * 64,
+            process_signal_case_count=1,
+        )
+
+
 def test_pure_optimizer_store_honors_shared_revocation_registry(tmp_path) -> None:
     projection, source, *_ = _fixture()
     pure_source = PureExtractionSourceRecord.from_family_record(
