@@ -315,7 +315,9 @@ class JsonPolicyDecisionLedger:
         family_id: str | None = None,
         stage: str | None = None,
     ) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Preserve the final path component so a policy ledger cannot be
+        # redirected through a symlink to an unrelated evidence file.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
         self.variant = variant
         self.trace_id = trace_id
@@ -335,6 +337,10 @@ class JsonPolicyDecisionLedger:
         return tuple(json.loads(value) for value in self._events.values())
 
     def _load(self) -> None:
+        if self.path.is_symlink():
+            raise ValueError("policy evidence ledger cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("policy evidence ledger lock cannot be a symlink")
         if not self.path.exists():
             return
         for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
@@ -388,6 +394,10 @@ class JsonPolicyDecisionLedger:
 
     @contextmanager
     def _lock(self):
+        if self.path.is_symlink():
+            raise ValueError("policy evidence ledger cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("policy evidence ledger lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
