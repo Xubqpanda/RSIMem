@@ -13,7 +13,7 @@ import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import yaml
 
@@ -30,6 +30,194 @@ from .sandbox_workspace import SandboxWorkspaceMirror
 _HERMES_ROOT_DEFAULT = Path(__file__).resolve().parents[4] / "agents" / "hermes-agent"
 _PAST_BENCH_TOOLSET = "past_bench_runtime"
 _MISSING = object()
+
+
+# These identifiers are owned by the public PAST-Bench notes application
+# surface.  They are deliberately not family/stage labels: the provider only
+# observes the user-visible request, notes tool calls/results and the bounded
+# source descriptors supplied by RSIMem.
+_PAST_OUTPUT_TSV_KEY = "application.notes.output.tsv"
+_PAST_SHARE_POLICY_KEY = "application.notes.share.recipient_policy"
+_PAST_OBSERVATION_TIME = "2000-01-01T00:00:00Z"
+
+
+def _past_visible_messages(result: Mapping[str, Any]) -> tuple[str, ...]:
+    values: list[str] = []
+    messages = result.get("messages")
+    if isinstance(messages, (list, tuple)):
+        for message in messages:
+            if not isinstance(message, Mapping):
+                continue
+            content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                values.append(content)
+            elif isinstance(content, (list, tuple)):
+                values.extend(
+                    str(item.get("text"))
+                    for item in content
+                    if isinstance(item, Mapping)
+                    and isinstance(item.get("text"), str)
+                    and item["text"].strip()
+                )
+    final = result.get("final_response")
+    if isinstance(final, str) and final.strip():
+        values.append(final)
+    return tuple(values)
+
+
+def _past_notes_tool_names(result: Mapping[str, Any]) -> tuple[str, ...]:
+    names: list[str] = []
+    messages = result.get("messages")
+    if not isinstance(messages, (list, tuple)):
+        return ()
+    for message in messages:
+        if not isinstance(message, Mapping):
+            continue
+        calls = message.get("tool_calls")
+        if not isinstance(calls, (list, tuple)):
+            continue
+        for call in calls:
+            if not isinstance(call, Mapping):
+                continue
+            function = call.get("function")
+            name = (
+                function.get("name")
+                if isinstance(function, Mapping)
+                else call.get("name")
+            )
+            if isinstance(name, str) and name.startswith("notes_"):
+                names.append(name)
+    return tuple(dict.fromkeys(names))
+
+
+def _past_semantic_keys(result: Mapping[str, Any]) -> tuple[str, ...]:
+    """Detect only public, deployment-visible notes requirements."""
+
+    text = "\n".join(_past_visible_messages(result)).casefold()
+    tools = set(_past_notes_tool_names(result))
+    keys: list[str] = []
+    if (
+        ("tsv" in text or "tab-separated" in text)
+        and all(field in text for field in ("owner", "priority", "task", "due_date"))
+    ):
+        keys.append(_PAST_OUTPUT_TSV_KEY)
+    if "notes_share" in tools:
+        # Recipient policy is observable from the public notes_share tool
+        # call/result closure.  No expected recipient list is consulted.
+        keys.append(_PAST_SHARE_POLICY_KEY)
+    return tuple(dict.fromkeys(keys))
+
+
+def _past_bench_opportunity_provider(
+    result: Mapping[str, Any],
+) -> tuple[Any, ...]:
+    """Build runtime opportunities from visible PAST-Bench notes evidence.
+
+    During the source boundary RSIMem supplies one trusted source provenance
+    ID.  During a future boundary it supplies content-free source descriptors;
+    only descriptors whose semantic key is corroborated by the current tool
+    or output observation receive an opportunity.
+    """
+
+    from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
+
+    if not isinstance(result, Mapping):
+        return ()
+    observed_keys = _past_semantic_keys(result)
+    if not observed_keys:
+        return ()
+    source_provenance = result.get("rsimem_source_provenance_id")
+    descriptors = result.get("rsimem_source_records")
+    source_records = tuple(
+        item for item in descriptors
+        if isinstance(item, Mapping)
+    ) if isinstance(descriptors, (list, tuple)) else ()
+    if isinstance(source_provenance, str) and source_provenance:
+        candidates = ((source_provenance, observed_keys, "current_input"),)
+    else:
+        candidates = tuple(
+            (
+                item.get("provenance_id"),
+                tuple(
+                    key for key in item.get("semantic_keys", ())
+                    if isinstance(key, str) and key in observed_keys
+                ),
+                "tool_schema",
+            )
+            for item in source_records
+            if isinstance(item.get("provenance_id"), str)
+        )
+    visible_digest = hashlib.sha256(
+        json.dumps(
+            {
+                "messages": _past_visible_messages(result),
+                "tools": _past_notes_tool_names(result),
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    values = []
+    for provenance_id, keys, surface_name in candidates:
+        if not isinstance(provenance_id, str) or not keys:
+            continue
+        surface = OpportunitySurface(surface_name)
+        for key in keys:
+            operation_id = (
+                "opportunity.notes."
+                + hashlib.sha256(
+                    f"{provenance_id}|{key}|{visible_digest}".encode("utf-8")
+                ).hexdigest()[:32]
+            )
+            values.append(OpportunityEvidence.create(
+                source_surface=surface,
+                semantic_requirement=key,
+                observation_time=str(result.get("observed_at") or _PAST_OBSERVATION_TIME),
+                operation_id=operation_id,
+                provenance_id=provenance_id,
+                source_payload={
+                    "visible_digest": visible_digest,
+                    "tool_names": _past_notes_tool_names(result),
+                },
+            ))
+    return tuple(values)
+
+
+def _past_bench_artifact_set_provider(
+    source: object,
+    *,
+    provenance_id: str | None = None,
+) -> tuple[Any, ...]:
+    """Bind a complete multi-fact extraction set to one visible key."""
+
+    from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
+    from rsimem.memory.extraction_feedback import ExtractionSourceEvidence
+
+    if not isinstance(source, ExtractionSourceEvidence):
+        return ()
+    facts = tuple(
+        fact for fact in source.facts
+        if fact.artifact_id is not None
+        and fact.disposition.value == "persisted"
+    )
+    keys = tuple(source.available_semantic_keys)
+    if provenance_id is None or len(facts) < 2 or len(keys) != 1:
+        return ()
+    return (ArtifactSetSemanticBinding.create(
+        semantic_unit_id=(
+            "notes.semantic-unit."
+            + hashlib.sha256(
+                f"{source.source_projection_digest}|{keys[0]}".encode("utf-8")
+            ).hexdigest()[:32]
+        ),
+        semantic_key=keys[0],
+        member_artifact_ids=tuple(fact.artifact_id for fact in facts),
+        member_fact_ids=tuple(fact.fact_id for fact in facts),
+        complete=True,
+        source_digest=source.source_projection_digest,
+        provenance_id=provenance_id,
+    ),)
 
 
 class _RecordedHermesCompletionClient:
@@ -593,6 +781,16 @@ class HermesAdapter(RuntimeAdapter):
             static_completion_client=static_completion_client,
             static_operation_evidence_path=(
                 capture_dir / "rsimem_semantic_operations.jsonl"
+            ),
+            opportunity_evidence_provider=(
+                _past_bench_opportunity_provider
+                if rsimem_writeback_enabled
+                else None
+            ),
+            artifact_set_binding_provider=(
+                _past_bench_artifact_set_provider
+                if rsimem_writeback_enabled
+                else None
             ),
         )
         try:
