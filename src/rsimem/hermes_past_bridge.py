@@ -114,6 +114,10 @@ from .memory.artifact_set import (
     ArtifactSetSemanticBinding,
     JsonArtifactSetBindingLog,
 )
+from .memory.pure_extraction import (
+    PureExtractionSourceProjector,
+    PureExtractionSourceRecord,
+)
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
 
 
@@ -777,6 +781,38 @@ class HermesPastBenchBridge:
     @property
     def artifact_set_bindings(self) -> tuple[ArtifactSetSemanticBinding, ...]:
         return self._artifact_set_binding_log.records()
+
+    def project_pure_extraction_source(
+        self,
+        boundary: StaticSemanticBoundaryResult,
+        *,
+        source_projection_id: str,
+        context_revision: str,
+        provenance_id: str,
+        visible_semantic_keys: tuple[str, ...] = (),
+        fact_semantic_keys: Mapping[str, tuple[str, ...]] | None = None,
+    ) -> PureExtractionSourceRecord:
+        """Project one live extraction boundary into the pure-process plane.
+
+        This is deliberately opt-in.  It does not consult ``family_id`` or
+        ``stage`` and does not persist a benchmark feedback label.  Callers
+        that have a trusted runtime observation can persist the returned
+        record with :class:`JsonPureExtractionSourceRecordStore` and join it
+        later with :class:`PureExtractionFeedbackRecord`.
+        """
+
+        if self.static_writeback is None:
+            raise ValueError("pure extraction projection requires static writeback")
+        return PureExtractionSourceProjector().project_record(
+            boundary,
+            self.static_writeback.policy,
+            self.static_writeback.extraction_runtime_binding,
+            source_projection_id=source_projection_id,
+            context_revision=context_revision,
+            provenance_id=provenance_id,
+            visible_semantic_keys=visible_semantic_keys,
+            fact_semantic_keys=fact_semantic_keys,
+        )
 
     def _record_runtime_opportunities(
         self,
