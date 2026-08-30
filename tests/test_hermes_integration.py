@@ -70,7 +70,10 @@ from rsimem.memory.operation_graph import (
     materialize_operation_graph,
 )
 from rsimem.memory.future_trace import SemanticFutureEvidence, SemanticOutcomeEvidence
-from rsimem.memory.use_attribution import MemoryUseResolutionStatus, resolve_memory_use
+from rsimem.memory.use_attribution import (
+    MemoryUseResolutionStatus,
+    resolve_memory_use,
+)
 from rsimem.memory.adaptive_policy import AdaptiveParameterName
 from rsimem.memory.adaptive_mem0_binding import TrustedAdaptiveMem0Parameter
 from rsimem.memory_systems.mem0_flat import (
@@ -562,6 +565,59 @@ def test_past_bench_bridge_records_generic_memory_use_join(tmp_path: Path) -> No
         assert "stage" not in serialized
     finally:
         bridge.close()
+
+
+def test_malformed_tool_outcome_does_not_create_failure_attribution(
+    tmp_path: Path,
+) -> None:
+    bridge = HermesPastBenchBridge(
+        _hermes_home(tmp_path),
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-memory-use-malformed",
+        trace_id="trace-memory-use-malformed",
+        episode_id="episode-memory-use-malformed",
+        session_id="session-memory-use-malformed",
+        task_id="task-memory-use-malformed",
+        experiment_variant="native+adapter+ledger",
+    )
+    future = SemanticFutureEvidence(
+        "op.query.malformed",
+        "op.retrieval.malformed",
+        "op.injection.malformed",
+        ("artifact.memory-use-malformed.v1",),
+        ("revision.memory-use-malformed.v1",),
+        "artifact.injection.memory-use-malformed",
+        ("artifact.memory-use-malformed.v1",),
+    )
+    outcome = SemanticOutcomeEvidence(
+        "op.use.malformed",
+        "op.outcome.malformed",
+        ("artifact.memory-use-malformed.v1",),
+        OperationStatus.SUCCESS,
+    )
+    try:
+        bridge._record_memory_use_evidence(
+            future,
+            outcome,
+            {
+                "completed": True,
+                "observed_at": "2026-08-30T01:02:03Z",
+                "messages": [{
+                    "role": "tool",
+                    "content": '{"success": "false"}',
+                }],
+            },
+        )
+        evidence = bridge.memory_use_evidence[0]
+    finally:
+        bridge.close()
+
+    assert evidence.outcome_kind is None
+    assert evidence.outcome_success is None
+    assert resolve_memory_use(evidence).status is (
+        MemoryUseResolutionStatus.BEHAVIORAL_CONSISTENCY
+    )
 
 
 def test_past_bench_bridge_validates_artifact_set_ownership(tmp_path: Path) -> None:
