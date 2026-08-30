@@ -121,6 +121,9 @@ def test_process_signal_gate_requires_two_logical_cases_for_one_hypothesis(
             extraction_attributable=True,
             abstract_hypothesis_digest=hypothesis,
             observation_complete=True,
+            analysis_protocol_id="signal-protocol.fixture",
+            replicate_id=physical_id.replace("physical-observation", "replicate"),
+            observation_window="window.fixture",
         )
 
     first = case("logical-case.signal.1", "physical-observation.signal.1", "a" * 64)
@@ -136,6 +139,67 @@ def test_process_signal_gate_requires_two_logical_cases_for_one_hypothesis(
     assert gate == "ready"
     assert case_count == 3
     assert optimization_count == 3
+
+
+def test_process_signal_gate_rejects_unbound_or_mixed_protocol_cases(
+    tmp_path: Path,
+) -> None:
+    def case(
+        logical_case_id: str,
+        physical_id: str,
+        protocol_id: str | None,
+        replicate_id: str | None,
+        window: str | None,
+    ) -> ProcessSignalCase:
+        return ProcessSignalCase.create(
+            logical_case_id=logical_case_id,
+            physical_observation_ids=(physical_id,),
+            source_observed=True,
+            extraction_observed=True,
+            persistence_observed=True,
+            retrieval_observed=True,
+            exposure_observed=True,
+            outcome_observed=True,
+            extraction_attributable=True,
+            abstract_hypothesis_digest="a" * 64,
+            observation_complete=True,
+            analysis_protocol_id=protocol_id,
+            replicate_id=replicate_id,
+            observation_window=window,
+        )
+
+    unbound_store = JsonProcessSignalCaseStore(
+        tmp_path / "unbound" / "process_signal_cases.jsonl"
+    )
+    unbound_store.append(case(
+        "logical-case.unbound",
+        "physical-observation.unbound",
+        None,
+        None,
+        None,
+    ))
+    with pytest.raises(ValueError, match="fully protocol bound"):
+        _process_signal_gate(tmp_path / "unbound")
+
+    mixed_store = JsonProcessSignalCaseStore(
+        tmp_path / "mixed" / "process_signal_cases.jsonl"
+    )
+    mixed_store.append(case(
+        "logical-case.mixed.1",
+        "physical-observation.mixed.1",
+        "signal-protocol.one",
+        "replicate.1",
+        "window.v1",
+    ))
+    mixed_store.append(case(
+        "logical-case.mixed.2",
+        "physical-observation.mixed.2",
+        "signal-protocol.two",
+        "replicate.2",
+        "window.v1",
+    ))
+    with pytest.raises(ValueError, match="mix frozen protocols"):
+        _process_signal_gate(tmp_path / "mixed")
 
 
 def test_build_corpus_exactly_joins_private_and_public_live_evidence(

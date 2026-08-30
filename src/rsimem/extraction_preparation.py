@@ -146,14 +146,28 @@ def _process_signal_gate(
     cases = []
     for path in paths:
         cases.extend(JsonProcessSignalCaseStore(path).records())
+    if not cases:
+        return PROCESS_SIGNAL_GATE_NO_SIGNAL, 0, 0
+    metadata = {
+        (
+            case.analysis_protocol_id,
+            case.replicate_id,
+            case.observation_window,
+        )
+        for case in cases
+    }
+    if any(any(value is None for value in item) for item in metadata):
+        raise ValueError("process-signal cases are not fully protocol bound")
+    protocols = {item[0] for item in metadata}
+    windows = {item[2] for item in metadata}
+    if len(protocols) != 1 or len(windows) != 1:
+        raise ValueError("process-signal cases mix frozen protocols")
     optimization_cases = [
         case
         for case in cases
         if case.status is ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL
     ]
     optimization = len(optimization_cases)
-    if not cases:
-        return PROCESS_SIGNAL_GATE_NO_SIGNAL, 0, 0
     by_hypothesis: dict[str, set[str]] = {}
     for case in optimization_cases:
         if case.abstract_hypothesis_digest is not None:
