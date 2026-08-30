@@ -556,6 +556,25 @@ def test_feasibility_evidence_ledger_rejects_corruption_and_conflict(tmp_path) -
         JsonFeasibilityEvidenceLedger(path)
 
 
+def test_feasibility_evidence_ledger_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "policy-feasibility.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonFeasibilityEvidenceLedger(path)
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_feasibility_evidence_ledger_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "policy-feasibility.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonFeasibilityEvidenceLedger(path)
+
+
 def test_feasibility_evidence_schema_bump_rejects_old_payload() -> None:
     case = _case(
         "case.schema_bump",
