@@ -914,6 +914,21 @@ def test_generated_event_ids_follow_logical_ids_when_evidence_is_reordered(
     assert tool_ids_first == tool_ids_second
 
 
+def test_tool_events_at_one_message_index_have_distinct_logical_ids(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    payload = json.loads(comparison.read_text(encoding="utf-8"))
+    episode = payload["with_persistence"]["episodes"][0]
+    episode["internal_tools"]["calls"] = [
+        {"name": "notes_share", "args": {"note_id": "n1"}, "message_index": 5},
+        {"name": "sandbox_file_write", "args": {"path": "x"}, "message_index": 5},
+    ]
+    comparison.write_text(json.dumps(payload), encoding="utf-8")
+    events = [event for event in build_events(comparison) if event["kind"] == "tool_call"]
+    assert len(events) == 2
+    assert len({event["eventId"] for event in events}) == 2
+    assert len({event["data"]["callId"] for event in events}) == 2
+
+
 def test_generated_event_id_conflict_is_not_silently_overwritten(tmp_path: Path) -> None:
     comparison = _fixture(tmp_path)
     payload = json.loads(comparison.read_text(encoding="utf-8"))
