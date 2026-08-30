@@ -1049,3 +1049,8 @@ def test_deterministic_fixture_covers_all_six_layers() -> None:
         if item.case_count
     )
     assert report.ok
+    assert report.optimization_ready_layers == (PolicyLayer.EXTRACTION,)
+    assert report.effect_experiment_ready is False
+    payload = report.payload()
+    assert payload["optimizationReadyLayers"] == ["extraction"]
+    assert payload["effectExperimentReady"] is False

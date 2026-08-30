@@ -1478,6 +1478,26 @@ class PolicyFeasibilityReport:
         return bool(self.cases) and all(item.status != FeasibilityStatus.DIAGNOSTIC_ONLY for item in self.census)
 
     @property
+    def optimization_ready_layers(self) -> tuple[PolicyLayer, ...]:
+        """Layers with enough deterministic evidence for a future proposal.
+
+        This is a feasibility classification only.  It never unlocks a live
+        effect experiment or claims that a real deployment improved.
+        """
+
+        return tuple(
+            item.layer
+            for item in self.census
+            if item.status is FeasibilityStatus.OPTIMIZATION_READY
+        )
+
+    @property
+    def effect_experiment_ready(self) -> bool:
+        """Whether a real matched effect experiment may start (always false here)."""
+
+        return False
+
+    @property
     def digest(self) -> str:
         """Stable digest for cross-process/restart report comparison."""
 
@@ -1487,6 +1507,10 @@ class PolicyFeasibilityReport:
         return {
             "schemaVersion": POLICY_FEASIBILITY_REPORT_SCHEMA_VERSION,
             "ok": self.ok,
+            "optimizationReadyLayers": [
+                layer.value for layer in self.optimization_ready_layers
+            ],
+            "effectExperimentReady": self.effect_experiment_ready,
             "caseCount": len(self.cases),
             "cases": [
                 {
