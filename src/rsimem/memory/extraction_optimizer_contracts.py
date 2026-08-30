@@ -434,7 +434,7 @@ def logical_case_id_for_example(
         "source_task_template_id": join.source_task_id,
         "source_extraction_set_digest": join.source_projection_digest,
         "future_task_template_id": join.feedback_task_id,
-        "observation_window": join.feedback_task_id,
+        "observation_window": join.observation_window,
     }
     return f"logical-case.{content_digest(identity)[:40]}"
 

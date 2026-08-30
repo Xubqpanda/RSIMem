@@ -294,6 +294,31 @@ def test_logical_case_identity_ignores_request_boundary_and_run_ids() -> None:
         different_future_task
     )
 
+    different_window_join = replace(
+        variant_join,
+        observation_window="window.other.v1",
+    )
+    different_window = ExtractionOptimizerCorpusExample.create(
+        primary_unit_id="feedback-unit.variant-window-v2",
+        level=base.level,
+        primary=True,
+        feedback_fact_id=base.feedback_fact_id,
+        feedback_semantic_key=base.feedback_semantic_key,
+        feedback_artifact_ids=base.feedback_artifact_ids,
+        exposure_mode=base.exposure_mode,
+        label=base.label,
+        attribution_confidence=base.attribution_confidence,
+        reason_codes=base.reason_codes,
+        component_ownership=base.component_ownership,
+        audit_join=different_window_join,
+        source_messages=base.source_messages,
+        extracted_facts=base.extracted_facts,
+        delayed_evidence=base.delayed_evidence,
+    )
+    assert logical_case_id_for_example(base) != logical_case_id_for_example(
+        different_window
+    )
+
 
 def test_request_deduplicates_content_and_bounds_unresolved_context() -> None:
     """Replicated evidence shares content without silently dropping units."""

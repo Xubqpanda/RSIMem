@@ -131,6 +131,20 @@ def _process_signal_paths(batch_dir: Path) -> tuple[Path, ...]:
     return tuple(sorted(batch_dir.rglob("process_signal_cases.jsonl")))
 
 
+def _process_signal_observation_window(batch_dir: Path) -> str:
+    """Return the frozen window identity for optimizer join provenance."""
+
+    windows = {
+        case.observation_window
+        for path in _process_signal_paths(batch_dir)
+        for case in JsonProcessSignalCaseStore(path).records()
+        if case.observation_window is not None
+    }
+    if len(windows) > 1:
+        raise ValueError("process-signal cases mix observation windows")
+    return next(iter(windows), "window.unbound")
+
+
 def _process_signal_gate(
     batch_dir: Path,
 ) -> tuple[str, str | None, str | None, int, int, str | None]:
@@ -343,6 +357,7 @@ def _build_optimizer_examples(
     }
     graph = _operation_graph(root)
     builder = ExtractionOptimizerCorpusBuilder()
+    observation_window = _process_signal_observation_window(root)
     examples = []
     for feedback_record in feedback:
         source = source_by_id.get(feedback_record.source_record_id)
@@ -365,6 +380,7 @@ def _build_optimizer_examples(
                 source_capture.captured_at,
                 feedback_capture.captured_at,
                 feedback_capture.current_input,
+                observation_window,
             ),
         ))
     return tuple(examples)

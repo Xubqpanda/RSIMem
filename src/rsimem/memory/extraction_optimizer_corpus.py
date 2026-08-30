@@ -20,8 +20,8 @@ from .evidence_planes import EvidencePlane, require_optimizer_plane
 from .prompt_components import content_digest
 
 
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 5
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v5"
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 6
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v6"
 PROCESS_SIGNAL_GATE_NOT_BOUND = "not_bound"
 PROCESS_SIGNAL_GATE_NO_SIGNAL = "no_signal"
 PROCESS_SIGNAL_GATE_READY = "ready"
@@ -364,6 +364,10 @@ class OptimizerAuditJoin:
     extraction_output_digest: str
     operation_ids: tuple[str, ...]
     artifacts: tuple[OptimizerArtifactLineage, ...]
+    # Frozen observation-window identity from the feedback dataset.  The
+    # default keeps older in-memory fixtures constructible; formal corpus
+    # builders always bind the dataset's window version explicitly.
+    observation_window: str = "window.unbound"
 
     def __post_init__(self) -> None:
         for value, name in (
@@ -385,6 +389,7 @@ class OptimizerAuditJoin:
             (self.feedback_session_id, "optimizer feedback session ID"),
             (self.feedback_task_id, "optimizer feedback task ID"),
             (self.extraction_artifact_id, "optimizer extraction artifact ID"),
+            (self.observation_window, "optimizer observation window"),
         ):
             _require_id(value, name)
         for value, name in (
@@ -424,6 +429,7 @@ class OptimizerAuditJoin:
             "extraction_artifact_id": self.extraction_artifact_id,
             "extraction_artifact_digest": self.extraction_artifact_digest,
             "extraction_output_digest": self.extraction_output_digest,
+            "observation_window": self.observation_window,
             "operation_ids": list(self.operation_ids),
             "artifacts": [value.payload() for value in self.artifacts],
         }
@@ -439,7 +445,7 @@ class OptimizerAuditJoin:
             "feedback_stage", "feedback_run_id", "feedback_trace_id",
             "feedback_episode_id", "feedback_session_id", "feedback_task_id",
             "extraction_artifact_id", "extraction_artifact_digest",
-            "extraction_output_digest", "operation_ids", "artifacts",
+            "extraction_output_digest", "observation_window", "operation_ids", "artifacts",
         }, "optimizer audit join")
         if not isinstance(payload["operation_ids"], list) or not isinstance(
             payload["artifacts"], list
@@ -447,33 +453,34 @@ class OptimizerAuditJoin:
             raise ValueError("malformed optimizer audit join")
         try:
             return cls(
-                payload["family_id"],
-                payload["source_record_id"],
-                payload["source_record_digest"],
-                payload["source_stage"],
-                payload["source_run_id"],
-                payload["source_episode_id"],
-                payload["source_session_id"],
-                payload["source_task_id"],
-                payload["source_projection_id"],
-                payload["source_projection_digest"],
-                payload["feedback_record_id"],
-                payload["feedback_dataset_id"],
-                payload["feedback_example_id"],
-                payload["feedback_stage"],
-                payload["feedback_run_id"],
-                payload["feedback_trace_id"],
-                payload["feedback_episode_id"],
-                payload["feedback_session_id"],
-                payload["feedback_task_id"],
-                payload["extraction_artifact_id"],
-                payload["extraction_artifact_digest"],
-                payload["extraction_output_digest"],
-                tuple(payload["operation_ids"]),
-                tuple(
+                family_id=payload["family_id"],
+                source_record_id=payload["source_record_id"],
+                source_record_digest=payload["source_record_digest"],
+                source_stage=payload["source_stage"],
+                source_run_id=payload["source_run_id"],
+                source_episode_id=payload["source_episode_id"],
+                source_session_id=payload["source_session_id"],
+                source_task_id=payload["source_task_id"],
+                source_projection_id=payload["source_projection_id"],
+                source_projection_digest=payload["source_projection_digest"],
+                feedback_record_id=payload["feedback_record_id"],
+                feedback_dataset_id=payload["feedback_dataset_id"],
+                feedback_example_id=payload["feedback_example_id"],
+                feedback_stage=payload["feedback_stage"],
+                feedback_run_id=payload["feedback_run_id"],
+                feedback_trace_id=payload["feedback_trace_id"],
+                feedback_episode_id=payload["feedback_episode_id"],
+                feedback_session_id=payload["feedback_session_id"],
+                feedback_task_id=payload["feedback_task_id"],
+                extraction_artifact_id=payload["extraction_artifact_id"],
+                extraction_artifact_digest=payload["extraction_artifact_digest"],
+                extraction_output_digest=payload["extraction_output_digest"],
+                operation_ids=tuple(payload["operation_ids"]),
+                artifacts=tuple(
                     OptimizerArtifactLineage.from_payload(item)
                     for item in payload["artifacts"]
                 ),
+                observation_window=payload["observation_window"],
             )
         except (TypeError, ValueError) as exc:
             raise ValueError("malformed optimizer audit join") from exc
