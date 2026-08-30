@@ -170,3 +170,22 @@ def test_optimizer_capture_rejects_broad_permissions(tmp_path: Path) -> None:
     path.chmod(0o644)
     with pytest.raises(PermissionError, match="permissions are too broad"):
         JsonExtractionOptimizerCaptureLog(path).records()
+
+
+def test_optimizer_capture_rejects_symlinked_paths(tmp_path: Path) -> None:
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "capture.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonExtractionOptimizerCaptureLog(path).records()
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_optimizer_capture_rejects_symlinked_lock(tmp_path: Path) -> None:
+    path = tmp_path / "capture.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_suffix(path.suffix + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonExtractionOptimizerCaptureLog(path).records()
