@@ -88,6 +88,10 @@ def test_decision_contract_rejects_unknown_layer_or_tampered_identity() -> None:
     payload["contract_id"] = "policy-decision-contract.trigger.v1"
     with pytest.raises(ValueError, match="ID mismatch|malformed"):
         PolicyDecisionContract.from_payload(payload)
+    payload = contract.payload()
+    payload["required_fields"] = ["schema_version"]
+    with pytest.raises(ValueError, match="canonical layer contract"):
+        PolicyDecisionContract.from_payload(payload)
 
 
 def test_decision_identity_includes_layer_specific_output() -> None:

@@ -175,6 +175,13 @@ class PolicyDecisionContract:
             raise ValueError("malformed policy decision contract") from exc
         if result.payload() != dict(value):
             raise ValueError("non-canonical policy decision contract")
+        # Contract IDs are stable layer names, so shape validation alone would
+        # allow a caller to reuse a valid ID while changing the required
+        # fields or action space.  Compare against the frozen registry before
+        # exposing a deserialized contract to replay/reporting code.
+        expected = decision_contract_for_layer(result.layer)
+        if result != expected:
+            raise ValueError("policy decision contract differs from canonical layer contract")
         return result
 
 
