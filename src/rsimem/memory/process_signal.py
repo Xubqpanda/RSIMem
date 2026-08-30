@@ -236,6 +236,26 @@ class ProcessSignalCase:
             raise ValueError(
                 "process signal projection requires pure_process runtime events"
             )
+        # A logical case may aggregate replicate observations, but one
+        # physical projection must never splice stages from different runtime
+        # executions.  ``build_process_signal_cases`` groups by task before
+        # reaching this method; keep the same invariant at the public
+        # constructor boundary for hand-built/replayed inputs.
+        contexts = {
+            (
+                event.run_id,
+                event.variant,
+                event.trace_id,
+                event.episode_id,
+                event.session_id,
+                event.task_id,
+            )
+            for event in values
+        }
+        if len(contexts) > 1:
+            raise ValueError(
+                "process signal projection cannot cross execution contexts"
+            )
         terminal = {
             ProcessEventStatus.SUCCESS,
             ProcessEventStatus.FAILED,

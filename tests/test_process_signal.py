@@ -493,6 +493,35 @@ def test_projection_from_process_events_never_infers_extraction_attribution() ->
     assert case.extraction_attributable is False
 
 
+def test_process_signal_projection_rejects_cross_execution_contexts() -> None:
+    def event(task_id: str, run_id: str, kind: ProcessEventKind) -> ProcessEvent:
+        return ProcessEvent.create(
+            kind=kind,
+            status=ProcessEventStatus.SUCCESS,
+            run_id=run_id,
+            variant="native",
+            trace_id=f"trace.{run_id}",
+            episode_id=f"episode.{run_id}",
+            session_id=f"session.{run_id}",
+            task_id=task_id,
+            host_event_id=f"event.{run_id}.{kind.value}",
+            source_revision=f"revision.{run_id}",
+            input_payload={"kind": kind.value},
+            output_payload={"ok": True},
+            execution_receipt_ids=(f"receipt.{run_id}.{kind.value}",),
+        )
+
+    with pytest.raises(ValueError, match="execution contexts"):
+        ProcessSignalCase.from_process_events(
+            logical_case_id="logical-case.cross-context",
+            physical_observation_ids=("physical-observation.cross-context",),
+            events=(
+                event("task.cross.one", "run.cross.one", ProcessEventKind.EXTRACTION),
+                event("task.cross.two", "run.cross.two", ProcessEventKind.TASK_OUTCOME),
+            ),
+        )
+
+
 def test_signal_projection_uses_pure_runtime_events_and_strips_benchmark_identity() -> None:
     common = dict(
         run_id="run.signal-plane.v1", variant="native", trace_id="trace.signal-plane.v1",
