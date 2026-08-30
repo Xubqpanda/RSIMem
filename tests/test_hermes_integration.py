@@ -571,6 +571,7 @@ def test_runtime_opportunity_provider_receives_scope_free_input(tmp_path: Path) 
                 "content": "visible request",
                 "metadata": {
                     "familyId": "nested-family",
+                    "FAMILY_ID": "nested-family-upper",
                     "benchmarkStage": "nested-stage",
                 },
             }],
