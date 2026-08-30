@@ -427,15 +427,34 @@ def test_analysis_reports_persisted_logical_process_signal_census(tmp_path: Path
         observation_window=protocol.observation_window,
     )
     JsonProcessSignalCaseStore(run / "process_signal_cases.jsonl").append(case)
+    replica = ProcessSignalCase.create(
+        logical_case_id=case.logical_case_id,
+        physical_observation_ids=("physical-observation.analysis.v2",),
+        source_observed=True,
+        extraction_observed=True,
+        persistence_observed=True,
+        retrieval_observed=True,
+        exposure_observed=False,
+        outcome_observed=False,
+        extraction_attributable=False,
+        abstract_hypothesis_digest=None,
+        observation_complete=True,
+        analysis_protocol_id=protocol.protocol_id,
+        # Same replicate, distinct physical observation: this models a
+        # repeated retrieval boundary rather than a new semantic case.
+        replicate_id=f"replicate.{completed['replicate']}",
+        observation_window=protocol.observation_window,
+    )
+    JsonProcessSignalCaseStore(run / "process_signal_cases.jsonl").append(replica)
     report = analyze_extraction_batch(root)
     assert report["processSignalCases"]["caseCount"] == 1
     assert report["processSignalCases"]["boundCaseCount"] == 1
     assert report["processSignalCases"]["replicateIds"] == [
-        f"replicate.{completed['replicate']}"
+        f"replicate.{completed['replicate']}",
     ]
     assert report["processSignalCases"]["protocolId"].startswith("signal-protocol.")
     assert report["processSignalCases"]["logicalCaseCount"] == 1
-    assert report["processSignalCases"]["physicalObservationCount"] == 1
+    assert report["processSignalCases"]["physicalObservationCount"] == 2
 
 
 def test_analysis_rejects_process_signal_cases_without_frozen_protocol(
