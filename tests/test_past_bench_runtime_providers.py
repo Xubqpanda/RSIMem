@@ -133,3 +133,30 @@ def test_past_artifact_set_provider_does_not_copy_source_key_to_unbound_facts() 
         source,
         provenance_id="pure-extraction-provenance.provider-unbound",
     ) == ()
+
+
+def test_past_artifact_set_provider_rejects_filtered_members() -> None:
+    source = ExtractionSourceEvidence(
+        "source.provider-filtered",
+        "a" * 64,
+        "extraction-set.provider-filtered",
+        ExtractionSetStatus.NONEMPTY,
+        ("application.notes.output.tsv",),
+        (
+            ExtractedFactEvidence(
+                "fact.provider-filtered.a",
+                ("application.notes.output.tsv",),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.provider-filtered.a",
+            ),
+            ExtractedFactEvidence(
+                "fact.provider-filtered.b",
+                ("application.notes.output.tsv",),
+                FactDisposition.FILTERED,
+            ),
+        ),
+    )
+    assert _past_bench_artifact_set_provider(
+        source,
+        provenance_id="pure-extraction-provenance.provider-filtered",
+    ) == ()
