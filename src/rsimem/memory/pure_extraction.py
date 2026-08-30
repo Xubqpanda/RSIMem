@@ -359,8 +359,18 @@ class PureExtractionFeedbackRecord:
         for join in self.tool_joins:
             if not isinstance(join, ToolCallResultJoin):
                 raise TypeError("pure extraction tool join has the wrong type")
-            if join.policy_lineage_id is not None and join.policy_lineage_id != self.provenance_id:
-                raise ValueError("tool join provenance does not match extraction feedback")
+            if (
+                join.memory_use_operation_id is not None
+                and self.memory_use is not None
+                and join.memory_use_operation_id
+                not in {
+                    self.memory_use.retrieval_operation_id,
+                    self.memory_use.injection_operation_id,
+                    self.memory_use.downstream_operation_id,
+                    self.memory_use.outcome_operation_id,
+                }
+            ):
+                raise ValueError("tool join operation does not match memory-use evidence")
         if type(self.observation_complete) is not bool:
             raise TypeError("pure extraction observation completeness must be bool")
         if not self.observation_complete and self.attribution is not PureExtractionAttribution.CENSORED:
