@@ -11,6 +11,7 @@ from rsimem.memory.tool_exact_join import (
     resolve_tool_call_result,
 )
 from rsimem.memory.pure_process import PureProcessCorpus
+from rsimem.memory.process_feedback import audit_process_events
 
 
 def _join(**overrides: object) -> ToolCallResultJoin:
@@ -133,6 +134,19 @@ def test_missing_receipt_identity_is_not_exact() -> None:
     result = resolve_tool_call_result(_join(result_receipt_id=None))
     assert result.status == ToolJoinResolutionStatus.MISSING
     assert result.reason_code == "missing_receipt_identity"
+
+
+def test_process_audit_rechecks_projected_tool_closure() -> None:
+    complete = _join().process_events()
+    assert audit_process_events(complete) == ()
+
+    missing = _join(result_present=False, result_id=None).process_events()
+    errors = audit_process_events(missing)
+    assert any("lacks matching result" in error for error in errors)
+
+    orphan = _join(call_present=False, call_id=None, orphan_result=True).process_events()
+    errors = audit_process_events(orphan)
+    assert any("orphan tool result" in error for error in errors)
 
 
 @pytest.mark.parametrize(

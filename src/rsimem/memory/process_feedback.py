@@ -633,6 +633,13 @@ def audit_process_events(
     known_decisions = set(policy_decision_ids)
     expected = dict(required_identity or {})
     seen: set[str] = set()
+    # Tool events are projected independently from the host-owned exact join.
+    # Re-check their closure at the public process boundary so a corpus cannot
+    # silently contain a missing, duplicate, orphaned or cross-task result.
+    tool_calls: dict[tuple[str, str, str, str, str, str, str, str], list[ProcessEvent]] = {}
+    tool_results: dict[tuple[str, str, str, str, str, str, str, str], list[ProcessEvent]] = {}
+    result_ids: dict[tuple[str, str, str, str, str], list[ProcessEvent]] = {}
+    tool_events: list[ProcessEvent] = []
     for event in items:
         if event.event_id in seen:
             errors.append(f"{event.event_id}: duplicate event")
@@ -679,6 +686,92 @@ def audit_process_events(
             errors.append(f"{event.event_id}: injection failure must be failed")
         if event.kind is ProcessEventKind.TASK_OUTCOME and "task_failure" in event.reason_codes and event.status is not ProcessEventStatus.FAILED:
             errors.append(f"{event.event_id}: task failure must be failed")
+        if event.kind in {ProcessEventKind.TOOL_CALL, ProcessEventKind.TOOL_RESULT}:
+            # Bare stage events are retained for backwards-compatible generic
+            # failure observations.  Only identity-bearing events participate
+            # in exact closure checks.
+            if event.tool_call_id is None and event.tool_result_id is None:
+                continue
+            if event.tool_call_id is None:
+                errors.append(f"{event.event_id}: tool result lacks call identity")
+                continue
+            tool_events.append(event)
+            scope = (
+                event.run_id,
+                event.variant,
+                event.trace_id,
+                event.episode_id,
+                event.session_id,
+                event.task_id,
+                event.tool_call_id,
+            )
+            key = (*scope, event.retry_identity or "")
+            if event.kind is ProcessEventKind.TOOL_CALL:
+                tool_calls.setdefault(key, []).append(event)
+            else:
+                tool_results.setdefault(key, []).append(event)
+                result_ids.setdefault(
+                    (event.run_id, event.variant, event.trace_id, event.task_id, event.tool_result_id or ""),
+                    [],
+                ).append(event)
+
+    for key, calls in tool_calls.items():
+        if len(calls) > 1:
+            for event in calls:
+                errors.append(f"{event.event_id}: duplicate tool call identity")
+        results = tool_results.get(key, [])
+        if not results:
+            for event in calls:
+                errors.append(f"{event.event_id}: tool call lacks matching result")
+        elif len(results) > 1:
+            for event in results:
+                errors.append(f"{event.event_id}: duplicate tool result identity")
+        if results:
+            call_names = {event.tool_name_digest for event in calls}
+            result_names = {event.tool_name_digest for event in results}
+            if call_names != result_names:
+                for event in (*calls, *results):
+                    errors.append(f"{event.event_id}: tool call/result type mismatch")
+
+    for key, results in tool_results.items():
+        if key not in tool_calls:
+            for event in results:
+                errors.append(f"{event.event_id}: orphan tool result")
+
+    # The same call/retry identity appearing under multiple task IDs cannot be
+    # joined safely.  This check deliberately ignores content and host stage.
+    by_call_identity: dict[tuple[str, str, str, str, str, str, str], set[str]] = {}
+    for event in tool_events:
+        if event.tool_call_id is None:
+            continue
+        identity = (
+            event.run_id,
+            event.variant,
+            event.trace_id,
+            event.episode_id,
+            event.session_id,
+            event.tool_call_id,
+            event.retry_identity or "",
+        )
+        by_call_identity.setdefault(identity, set()).add(event.task_id)
+    for identity, task_ids in by_call_identity.items():
+        if len(task_ids) > 1:
+            for event in tool_events:
+                if (
+                    event.run_id,
+                    event.variant,
+                    event.trace_id,
+                    event.episode_id,
+                    event.session_id,
+                    event.tool_call_id,
+                    event.retry_identity or "",
+                ) == identity:
+                    errors.append(f"{event.event_id}: tool call/result crosses task boundary")
+
+    for key, results in result_ids.items():
+        if len(results) > 1:
+            for event in results:
+                errors.append(f"{event.event_id}: duplicate tool result ID")
     return tuple(dict.fromkeys(errors))
 
 
