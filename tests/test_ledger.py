@@ -286,6 +286,39 @@ def test_auto_loads_content_free_episode_runtime_evidence(tmp_path: Path) -> Non
     assert MEMORY not in json.dumps(events)
 
 
+def test_memory_runtime_observer_rejects_symlinked_output_path(tmp_path: Path) -> None:
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "runtime.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        MemoryLedgerObserver(
+            run_id="run.symlink",
+            variant="native+ledger",
+            trace_id="trace.symlink",
+            episode_id="episode.symlink",
+            session_id="session.symlink",
+            task_id="task.symlink",
+            execution_mode="native+ledger",
+            output_path=path,
+        )
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_lifecycle_observer_rejects_symlinked_output_path(tmp_path: Path) -> None:
+    target = tmp_path / "target-lifecycle.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "lifecycle.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        LifecycleLedgerObserver(
+            variant="native+ledger",
+            trace_id="trace.lifecycle-symlink",
+            output_path=path,
+        )
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
 def test_auto_loads_content_free_static_mutation_identities(tmp_path: Path) -> None:
     comparison = _fixture(tmp_path)
     observer = MemoryLedgerObserver(

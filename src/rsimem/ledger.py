@@ -519,11 +519,21 @@ class LifecycleLedgerObserver:
         self.trace_id = trace_id
         self.family_id = family_id
         self.stage = stage
-        self.output_path = output_path.expanduser().resolve() if output_path else None
+        # Preserve the final path component so a runtime evidence path cannot
+        # redirect writes through a symlink.  The observer intentionally starts
+        # a fresh per-attempt file, but a symlink must still fail closed before
+        # any truncation occurs.
+        self.output_path = (
+            Path(os.path.abspath(os.path.expanduser(os.fspath(output_path))))
+            if output_path
+            else None
+        )
         self._events: list[dict[str, Any]] = []
         self._events_by_id: dict[str, str] = {}
         self._lock = threading.RLock()
         if self.output_path is not None:
+            if self.output_path.is_symlink():
+                raise ValueError("lifecycle ledger path cannot be a symlink")
             self.output_path.parent.mkdir(parents=True, exist_ok=True)
             self._load_existing()
 
@@ -880,11 +890,21 @@ class MemoryLedgerObserver:
         self.stage = stage
         self.snapshot_id = snapshot_id
         self.execution_mode = execution_mode
-        self.output_path = output_path.expanduser().resolve() if output_path else None
+        # Preserve the final path component so a runtime evidence path cannot
+        # redirect writes through a symlink.  The observer intentionally starts
+        # a fresh per-attempt file, but a symlink must still fail closed before
+        # any truncation occurs.
+        self.output_path = (
+            Path(os.path.abspath(os.path.expanduser(os.fspath(output_path))))
+            if output_path
+            else None
+        )
         self._events: list[dict[str, Any]] = []
         self._occurrences: dict[str, int] = {}
         self._lock = threading.Lock()
         if self.output_path is not None:
+            if self.output_path.is_symlink():
+                raise ValueError("memory runtime evidence path cannot be a symlink")
             self.output_path.parent.mkdir(parents=True, exist_ok=True)
             self.output_path.write_text("", encoding="utf-8")
 
