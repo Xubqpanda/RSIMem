@@ -247,6 +247,9 @@ def test_orphan_result_must_be_explicitly_marked() -> None:
 def test_unknown_result_success_is_not_reported_as_failure() -> None:
     events = _join(success=None).process_events()
     assert events[-1].status.value == "unknown"
+    resolution = resolve_tool_call_result(_join(success=None))
+    assert resolution.status == ToolJoinResolutionStatus.TYPE_MISMATCH
+    assert resolution.reason_code == "tool_success_unknown"
 
 
 def test_strict_success_flag() -> None:
