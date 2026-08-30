@@ -219,7 +219,15 @@ def _past_bench_artifact_set_provider(
         and fact.disposition.value == "persisted"
     )
     keys = tuple(source.available_semantic_keys)
-    if provenance_id is None or len(facts) < 2 or len(keys) != 1:
+    # A complete semantic unit cannot be claimed when the extraction set also
+    # contains filtered/failed facts.  Keep such sets unresolved until an
+    # owner-controlled matcher explicitly proves the intended subset.
+    if (
+        provenance_id is None
+        or len(facts) < 2
+        or len(facts) != len(source.facts)
+        or len(keys) != 1
+    ):
         return ()
     semantic_key = keys[0]
     # Every persisted member must explicitly claim the same semantic key.
