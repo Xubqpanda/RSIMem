@@ -1280,6 +1280,15 @@ class JsonPureExtractionFeedbackRecordStore(_JsonPureExtractionStore):
     record_type = PureExtractionFeedbackRecord
 
 
+# Verbose aliases make the evidence plane explicit at call sites while
+# retaining the shorter names used by the implementation.
+PureProcessExtractionSourceRecord = PureExtractionSourceRecord
+PureProcessExtractionFeedbackRecord = PureExtractionFeedbackRecord
+PureProcessExtractionOptimizerExample = PureExtractionOptimizerExample
+PureProcessExtractionOptimizerCorpus = PureExtractionOptimizerCorpus
+PureProcessExtractionSourceProjector = PureExtractionSourceProjector
+
+
 __all__ = [
     "PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION",
     "PURE_EXTRACTION_FEEDBACK_SCHEMA",
@@ -1299,4 +1308,9 @@ __all__ = [
     "PureExtractionOptimizerCorpus",
     "PureExtractionSourceRecord",
     "PureExtractionSourceProjector",
+    "PureProcessExtractionFeedbackRecord",
+    "PureProcessExtractionOptimizerCorpus",
+    "PureProcessExtractionOptimizerExample",
+    "PureProcessExtractionSourceProjector",
+    "PureProcessExtractionSourceRecord",
 ]
