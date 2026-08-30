@@ -134,6 +134,9 @@ def test_process_signal_gate_requires_two_logical_cases_for_one_hypothesis(
     assert protocol_id == "signal-protocol.fixture"
     assert isinstance(case_digest, str) and len(case_digest) == 64
     assert (case_count, optimization_count, hypothesis) == (1, 1, None)
+    audit = audit_extraction_feedback_batch(tmp_path, batch_id="batch.single-signal-v1")
+    assert audit.process_signal_gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
+    assert audit.process_signal_optimization_count == 1
     assert store.append(second) is True
     ready = _process_signal_gate(tmp_path)
     assert ready[0] == "ready"
