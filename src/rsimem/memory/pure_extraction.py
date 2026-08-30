@@ -399,12 +399,15 @@ class PureExtractionFeedbackRecord:
             expected_outcome = self.attribution is PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
             if self.memory_use.outcome_success is not expected_outcome:
                 raise ValueError("attributable extraction feedback outcome is inconsistent")
+        if not isinstance(self.tool_joins, tuple):
+            raise TypeError("pure extraction tool joins must be a tuple")
+        for join in self.tool_joins:
+            if not isinstance(join, ToolCallResultJoin):
+                raise TypeError("pure extraction tool join has the wrong type")
         join_ids = tuple(join.join_id for join in self.tool_joins)
         if len(join_ids) != len(set(join_ids)):
             raise ValueError("pure extraction tool joins must be unique")
         for join in self.tool_joins:
-            if not isinstance(join, ToolCallResultJoin):
-                raise TypeError("pure extraction tool join has the wrong type")
             if (
                 join.memory_use_operation_id is not None
                 and self.memory_use is not None
