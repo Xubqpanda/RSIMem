@@ -789,6 +789,19 @@ def test_bound_tool_closure_is_required_for_extraction_attribution() -> None:
     )
     assert complete.attribution is PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
 
+    with pytest.raises(ValueError, match="complete successful tool joins"):
+        PureExtractionFeedbackRecord.create(
+            source_record_id=pure_source.record_id,
+            source_projection_digest=pure_source.source_projection_digest,
+            extraction_set_id=pure_source.extraction_set_id,
+            opportunity=opportunity,
+            memory_use=memory_use,
+            tool_joins=(ToolCallResultJoin.create(**{**common_join, "success": False}),),
+            observation_window="window.completed-tool-gate-v1",
+            provenance_id=provenance,
+            attribution=PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
+        )
+
     failed_tool = ToolCallResultJoin.create(**{**common_join, "success": False})
     failed = PureExtractionFeedbackRecord.derive_from_evidence(
         source=pure_source,

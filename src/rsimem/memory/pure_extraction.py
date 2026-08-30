@@ -386,6 +386,8 @@ class PureExtractionFeedbackRecord:
                 raise ValueError("artifact-set binding does not match memory-use evidence")
             if self.memory_use.artifact_set_id is not None and self.artifact_set_binding is None:
                 raise ValueError("memory-use artifact set requires a trusted binding")
+        if type(self.observation_complete) is not bool:
+            raise TypeError("pure extraction observation completeness must be bool")
         if self.attribution in {
             PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
             PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
@@ -415,8 +417,49 @@ class PureExtractionFeedbackRecord:
                 }
             ):
                 raise ValueError("tool join operation does not match memory-use evidence")
-        if type(self.observation_complete) is not bool:
-            raise TypeError("pure extraction observation completeness must be bool")
+        if self.memory_use is not None and self.attribution in {
+            PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
+            PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
+        }:
+            memory_operation_ids = {
+                operation_id
+                for operation_id in (
+                    self.memory_use.downstream_operation_id,
+                    self.memory_use.outcome_operation_id,
+                )
+                if operation_id is not None
+            }
+            bound_joins = tuple(
+                join
+                for join in self.tool_joins
+                if join.memory_use_operation_id in memory_operation_ids
+            )
+            for join in bound_joins:
+                resolution = resolve_tool_call_result(join)
+                if (
+                    resolution.status is not ToolJoinResolutionStatus.COMPLETE
+                    or join.success is False
+                ):
+                    raise ValueError(
+                        "attributable extraction feedback requires complete successful tool joins"
+                    )
+        if self.memory_use is not None:
+            memory_operation_ids = {
+                operation_id
+                for operation_id in (
+                    self.memory_use.downstream_operation_id,
+                    self.memory_use.outcome_operation_id,
+                )
+                if operation_id is not None
+            }
+            if any(
+                resolve_tool_call_result(join).status is ToolJoinResolutionStatus.CENSORED
+                for join in self.tool_joins
+                if join.memory_use_operation_id in memory_operation_ids
+            ) and self.observation_complete:
+                raise ValueError(
+                    "censored tool join requires incomplete extraction observation"
+                )
         if not self.observation_complete and self.attribution is not PureExtractionAttribution.CENSORED:
             raise ValueError("incomplete pure extraction observation must be censored")
         if self.attribution is PureExtractionAttribution.CENSORED and self.observation_complete:
