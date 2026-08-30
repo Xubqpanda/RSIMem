@@ -288,11 +288,15 @@ class JsonExtractionOptimizerCaptureLog:
     """Persist raw optimizer-only evidence without exposing it to public logs."""
 
     def __init__(self, path: Path) -> None:
-        self.path = path.expanduser().resolve()
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
 
     @contextmanager
     def _locked(self) -> Iterator[None]:
+        if self.path.is_symlink():
+            raise ValueError("optimizer capture log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("optimizer capture lock cannot be a symlink")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         descriptor = os.open(
             self.lock_path,
@@ -344,6 +348,8 @@ class JsonExtractionOptimizerCaptureLog:
                 )
                 + "\n"
             ).encode("utf-8")
+            if self.path.is_symlink():
+                raise ValueError("optimizer capture log cannot be a symlink")
             descriptor = os.open(
                 self.path,
                 os.O_CREAT | os.O_APPEND | os.O_WRONLY,
@@ -360,6 +366,8 @@ class JsonExtractionOptimizerCaptureLog:
             return True
 
     def _read_unlocked(self) -> tuple[ExtractionOptimizerCapture, ...]:
+        if self.path.is_symlink():
+            raise ValueError("optimizer capture log cannot be a symlink")
         if not self.path.exists():
             return ()
         if self.path.is_symlink():
