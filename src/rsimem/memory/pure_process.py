@@ -349,8 +349,14 @@ class PureProcessCorpus:
 
 class JsonPureProcessCorpusStore:
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Keep the final path component unresolved so a symlink cannot
+        # redirect an owner-controlled corpus after the store is created.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
+
+    def _assert_not_symlink(self) -> None:
+        if self.path.is_symlink():
+            raise ValueError("pure-process corpus file cannot be a symlink")
 
     @contextmanager
     def _lock(self):
@@ -367,6 +373,7 @@ class JsonPureProcessCorpusStore:
             raise TypeError("pure-process corpus has the wrong type")
         serialized = json.dumps(corpus.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":")) + "\n"
         with self._lock():
+            self._assert_not_symlink()
             self.path.parent.mkdir(parents=True, exist_ok=True)
             if self.path.exists():
                 if self.path.read_text(encoding="utf-8") != serialized:
@@ -386,6 +393,7 @@ class JsonPureProcessCorpusStore:
 
     def get(self) -> PureProcessCorpus | None:
         with self._lock():
+            self._assert_not_symlink()
             if not self.path.exists():
                 return None
             try:
