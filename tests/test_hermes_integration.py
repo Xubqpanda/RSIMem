@@ -1631,6 +1631,8 @@ def test_live_bridge_compiles_completed_task_without_lifecycle_evaluator(
     ).records()
     assert len(pure_sources) == 1
     assert pure_sources[0].activation.compilation_id == bridge.static_results[0].compilation_id
+    assert bridge.unbound_process_signal_cases
+    assert bridge.unbound_process_signal_cases[0].analysis_protocol_id is None
     db.close()
 
 
