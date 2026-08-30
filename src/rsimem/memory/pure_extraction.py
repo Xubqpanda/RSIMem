@@ -974,6 +974,151 @@ class PureExtractionOptimizerCorpus:
         return result
 
 
+class PureExtractionSourceProjector:
+    """Project a live extraction trace without consulting a family contract.
+
+    The projector intentionally leaves fact semantic keys empty unless the
+    caller supplies an explicit deployment-visible mapping.  This prevents a
+    benchmark adapter's parser from becoming an implicit opportunity source.
+    """
+
+    def project_record(
+        self,
+        boundary: object,
+        policy: object,
+        runtime_binding: object,
+        *,
+        source_projection_id: str,
+        context_revision: str,
+        provenance_id: str,
+        visible_semantic_keys: tuple[str, ...] = (),
+        fact_semantic_keys: Mapping[str, tuple[str, ...]] | None = None,
+    ) -> PureExtractionSourceRecord:
+        from .extraction_projection import ExtractionActivationFingerprint
+        from .executor import MutationExecutionStatus
+        from .ingestion import InternalMemoryAction, MemoryIngestStatus
+        from .live_writeback import ExtractionRuntimeBinding, StaticSemanticBoundaryResult
+        from ..memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
+
+        if not isinstance(boundary, StaticSemanticBoundaryResult):
+            raise TypeError("pure extraction projector boundary has the wrong type")
+        if not isinstance(policy, Mem0FlatSemanticPolicy):
+            raise TypeError("pure extraction projector policy has the wrong type")
+        if not isinstance(runtime_binding, ExtractionRuntimeBinding):
+            raise TypeError("pure extraction projector runtime binding has the wrong type")
+        if boundary.duplicate or boundary.writeback is None:
+            raise ValueError("pure extraction projection requires an original writeback result")
+        ingestion = boundary.writeback.ingestion
+        if ingestion is None:
+            raise ValueError("pure extraction projection requires an ingestion result")
+        trace = policy.operation_trace(ingestion.idempotency_key)
+        if trace is None:
+            raise ValueError("pure extraction projection requires a Mem0-flat operation trace")
+        if not isinstance(visible_semantic_keys, tuple) or len(visible_semantic_keys) != len(set(visible_semantic_keys)):
+            raise ValueError("visible extraction semantic keys must be a unique tuple")
+        fact_semantic_keys = fact_semantic_keys or {}
+        operations = ingestion.operations
+        executions = boundary.writeback.executions
+        accepted_index = 0
+        facts: list[object] = []
+        for extraction in trace.fact_extractions:
+            fact = policy.fact_for_digest(extraction.content_digest)
+            if fact is None or fact.fact_id != extraction.fact_id:
+                raise ValueError("pure extraction fact owner disagrees with trace")
+            keys = tuple(fact_semantic_keys.get(extraction.fact_id, ()))
+            quality_issue = None
+            artifact_id = None
+            if not extraction.accepted:
+                disposition = FactDisposition.FILTERED
+            else:
+                operation = operations[accepted_index] if accepted_index < len(operations) else None
+                execution = executions[accepted_index] if accepted_index < len(executions) else None
+                accepted_index += 1
+                if operation is None or ingestion.status is not MemoryIngestStatus.SUCCESS:
+                    disposition = FactDisposition.MUTATION_FAILED
+                elif operation.action in {InternalMemoryAction.NONE, InternalMemoryAction.DELETE}:
+                    disposition = FactDisposition.NONE
+                elif (
+                    execution is not None
+                    and execution.status in {MutationExecutionStatus.COMMITTED, MutationExecutionStatus.DUPLICATE}
+                    and execution.artifact_id is not None
+                ):
+                    disposition = FactDisposition.PERSISTED
+                    artifact_id = execution.artifact_id
+                else:
+                    disposition = FactDisposition.MUTATION_FAILED
+            facts.append(ExtractedFactEvidence(
+                extraction.fact_id,
+                keys,
+                disposition,
+                artifact_id=artifact_id,
+                quality_issue=quality_issue,
+            ))
+        dispositions = {fact.disposition for fact in facts}
+        if not facts:
+            status = (
+                ExtractionSetStatus.EMPTY
+                if ingestion.status is MemoryIngestStatus.SUCCESS
+                and any(operation.action is InternalMemoryAction.NONE for operation in operations)
+                else ExtractionSetStatus.NONE
+            )
+        elif FactDisposition.MUTATION_FAILED in dispositions:
+            status = ExtractionSetStatus.MUTATION_FAILED
+        elif FactDisposition.PERSISTED in dispositions:
+            status = ExtractionSetStatus.NONEMPTY
+        elif dispositions == {FactDisposition.FILTERED}:
+            status = ExtractionSetStatus.FILTERED
+        else:
+            status = ExtractionSetStatus.NONE
+        source = ExtractionSourceEvidence(
+            trace.source_artifact_id,
+            ingestion.source_digest,
+            trace.extraction_operation_id,
+            status,
+            visible_semantic_keys,
+            tuple(facts),
+        )
+        invocation = policy.extraction_invocation(ingestion.idempotency_key)
+        if invocation is None:
+            raise ValueError("pure extraction projection requires invocation fingerprint")
+        extraction_output_digest = content_digest([
+            {
+                "fact_id": fact.fact_id,
+                "content_digest": fact.content_digest,
+                "accepted": fact.accepted,
+                "reason_code": fact.reason_code,
+            }
+            for fact in trace.fact_extractions
+        ])
+        activation = ExtractionActivationFingerprint.create(
+            compilation_id=boundary.compilation_id,
+            extraction_operation_id=trace.extraction_operation_id,
+            runtime_binding=runtime_binding,
+            semantic_policy=policy.semantic_manifest,
+            invocation=invocation,
+            parsed_output_digest=extraction_output_digest,
+            mutation_ids=tuple(dict.fromkeys(execution.mutation_id for execution in executions)),
+            persisted_artifact_ids=tuple(dict.fromkeys(
+                execution.artifact_id
+                for execution in executions
+                if execution.artifact_id is not None
+                and execution.status in {MutationExecutionStatus.COMMITTED, MutationExecutionStatus.DUPLICATE}
+            )),
+        )
+        return PureExtractionSourceRecord.create(
+            source_projection_id=source_projection_id,
+            source_projection_digest=ingestion.source_digest,
+            context_revision=context_revision,
+            extraction_set_id=trace.extraction_operation_id,
+            extraction_artifact_id=policy.semantic_manifest.extraction_component_id,
+            extraction_artifact_digest=policy.semantic_manifest.extraction_component_digest,
+            extraction_output_digest=extraction_output_digest,
+            source=source,
+            activation=activation,
+            provenance_id=provenance_id,
+        )
+
+
 class _JsonPureExtractionStore:
     record_type = PureExtractionSourceRecord
 
@@ -1138,4 +1283,5 @@ __all__ = [
     "PureExtractionOptimizerExample",
     "PureExtractionOptimizerCorpus",
     "PureExtractionSourceRecord",
+    "PureExtractionSourceProjector",
 ]

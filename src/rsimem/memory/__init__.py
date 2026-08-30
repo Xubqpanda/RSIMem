@@ -186,6 +186,7 @@ from .pure_extraction import (
     PureExtractionFeedbackRecord,
     PureExtractionOptimizerExample,
     PureExtractionOptimizerCorpus,
+    PureExtractionSourceProjector,
     PureExtractionSourceRecord,
 )
 from .logical_case import (
@@ -361,6 +362,7 @@ __all__ = [
     "PureExtractionFeedbackRecord",
     "PureExtractionOptimizerExample",
     "PureExtractionOptimizerCorpus",
+    "PureExtractionSourceProjector",
     "PureExtractionSourceRecord",
     "OpportunityResolution",
     "OpportunityResolutionStatus",
