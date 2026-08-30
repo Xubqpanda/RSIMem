@@ -428,10 +428,17 @@ class PureExtractionOptimizerHypothesisProjection:
             or result.request.corpus_digest != corpus.corpus_digest
         ):
             raise ValueError("pure optimizer projection corpus identity differs")
+        # The request builder emits one primary ID per logical case.  Bind
+        # citations to that frozen set rather than accepting any actionable
+        # physical replica from the corpus; otherwise a hand-built result
+        # could reintroduce replicate-weighted evidence at this projection
+        # boundary even though the provider request was deduplicated.
+        request_primary_ids = set(result.request.primary_example_ids)
         eligible = {
             value.example_id
             for value in corpus.examples
-            if value.attribution in _ACTIONABLE
+            if value.example_id in request_primary_ids
+            and value.attribution in _ACTIONABLE
         }
         cited = tuple(
             example_id
