@@ -1238,7 +1238,11 @@ class HermesPastBenchBridge:
             outcome_kind=outcome_kind,
             outcome_success=(
                 None
-                if not observation_complete or outcome_kind is OutcomeEvidenceKind.TOOL_FAILURE
+                if (
+                    not observation_complete
+                    or outcome_kind is None
+                    or outcome_kind is OutcomeEvidenceKind.TOOL_FAILURE
+                )
                 else completed
             ),
             observation_cutoff=self._observation_cutoff(result),
@@ -1268,12 +1272,14 @@ class HermesPastBenchBridge:
                     continue
                 content = message.get("content")
                 if not isinstance(content, str):
-                    continue
+                    return None
                 try:
                     payload = json.loads(content)
                 except json.JSONDecodeError:
-                    return OutcomeEvidenceKind.TOOL_FAILURE
-                if not isinstance(payload, Mapping) or payload.get("success") is not True:
+                    return None
+                if not isinstance(payload, Mapping) or type(payload.get("success")) is not bool:
+                    return None
+                if payload.get("success") is False:
                     return OutcomeEvidenceKind.TOOL_FAILURE
         return OutcomeEvidenceKind.TASK_COMPLETION
 
