@@ -146,15 +146,27 @@ def _process_signal_gate(
     cases = []
     for path in paths:
         cases.extend(JsonProcessSignalCaseStore(path).records())
-    optimization = sum(
-        case.status is ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL
+    optimization_cases = [
+        case
         for case in cases
-    )
+        if case.status is ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL
+    ]
+    optimization = len(optimization_cases)
     if not cases:
         return PROCESS_SIGNAL_GATE_NO_SIGNAL, 0, 0
+    by_hypothesis: dict[str, set[str]] = {}
+    for case in optimization_cases:
+        if case.abstract_hypothesis_digest is not None:
+            by_hypothesis.setdefault(case.abstract_hypothesis_digest, set()).add(
+                case.logical_case_id
+            )
+    supports_general_edit = any(
+        len(logical_case_ids) >= 2
+        for logical_case_ids in by_hypothesis.values()
+    )
     gate = (
         PROCESS_SIGNAL_GATE_READY
-        if optimization
+        if supports_general_edit
         else PROCESS_SIGNAL_GATE_NO_SIGNAL
     )
     return gate, len(cases), optimization
