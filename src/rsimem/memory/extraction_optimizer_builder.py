@@ -212,6 +212,19 @@ class ExtractionOptimizerCorpusBuilder:
             ))
         return tuple(examples)
 
+    def build_pure_process_example(
+        self,
+        *,
+        source: PureExtractionSourceRecord,
+        feedback: PureExtractionFeedbackRecord,
+    ) -> PureExtractionOptimizerExample:
+        """Explicit entry point for the deployment-only optimizer path."""
+
+        return PureExtractionOptimizerBuilder().build_example(
+            source=source,
+            feedback=feedback,
+        )
+
 
     @staticmethod
     def _validate_record_join(
