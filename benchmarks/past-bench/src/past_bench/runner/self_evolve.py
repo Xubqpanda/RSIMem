@@ -64,11 +64,37 @@ def build_past_bench_application_opportunity_schema(task: TaskDefinition) -> dic
                     "tool_name": name,
                     "required_parameter": "recipients",
                 })
+    if opportunities:
+        requirement_ids = sorted({
+            str(item["semantic_key"])
+            for item in opportunities
+            if isinstance(item.get("semantic_key"), str)
+        })
+        contract_identity = {
+            "schema_version": 2,
+            "schema_id": PAST_BENCH_APPLICATION_SCHEMA_ID,
+            "version": "v1",
+            "requirement_ids": requirement_ids,
+        }
+        contract = {
+            **contract_identity,
+            "schema_digest": hashlib.sha256(
+                json.dumps(
+                    contract_identity,
+                    ensure_ascii=True,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest(),
+        }
+    else:
+        contract = None
     return {
         "schema_id": PAST_BENCH_APPLICATION_SCHEMA_ID,
         "schema_version": PAST_BENCH_APPLICATION_SCHEMA_VERSION,
         "tools": tools,
         "opportunities": opportunities,
+        "application_contract": contract,
     }
 
 

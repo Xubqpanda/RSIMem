@@ -99,6 +99,8 @@ from .memory.extraction_optimizer_capture import (
     JsonExtractionOptimizerCaptureLog,
 )
 from .memory.opportunity import (
+    ApplicationOpportunitySchema,
+    JsonApplicationOpportunitySchemaRegistry,
     JsonOpportunityEvidenceLog,
     OpportunityEvidence,
     OpportunitySurface,
@@ -439,20 +441,33 @@ class HermesPastBenchBridge:
         self._stage = stage
         self._opportunity_evidence_provider = opportunity_evidence_provider
         self._last_runtime_opportunities: tuple[OpportunityEvidence, ...] = ()
+        self._application_opportunity_schema = (
+            dict(application_opportunity_schema)
+            if isinstance(application_opportunity_schema, Mapping)
+            else None
+        )
+        self._application_opportunity_schema_registry = (
+            JsonApplicationOpportunitySchemaRegistry(
+                Path(hermes_home) / ".rsimem" / "application_opportunity_schemas.jsonl"
+            )
+        )
+        if self._application_opportunity_schema is not None:
+            raw_contract = self._application_opportunity_schema.get(
+                "application_contract"
+            )
+            if raw_contract is not None:
+                schema = ApplicationOpportunitySchema.from_payload(raw_contract)
+                self._application_opportunity_schema_registry.register(schema)
         self._opportunity_evidence_log = JsonOpportunityEvidenceLog(
             opportunity_evidence_path
-            or self.evidence_path.with_name("rsimem_opportunities.jsonl")
+            or self.evidence_path.with_name("rsimem_opportunities.jsonl"),
+            schema_registry=self._application_opportunity_schema_registry,
         )
         self._memory_use_evidence_log = JsonMemoryUseEvidenceLog(
             memory_use_evidence_path
             or self.evidence_path.with_name("rsimem_memory_use_evidence.jsonl")
         )
         self._artifact_set_binding_provider = artifact_set_binding_provider
-        self._application_opportunity_schema = (
-            dict(application_opportunity_schema)
-            if isinstance(application_opportunity_schema, Mapping)
-            else None
-        )
         self._artifact_set_binding_log = JsonArtifactSetBindingLog(
             artifact_set_binding_path
             or Path(hermes_home) / ".rsimem" / "artifact_set_bindings.jsonl"
