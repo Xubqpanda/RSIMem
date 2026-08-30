@@ -73,6 +73,21 @@ def test_corrupt_or_conflicting_registry_fails_closed(tmp_path) -> None:
         )
 
 
+def test_blank_revocation_record_fails_closed(tmp_path) -> None:
+    path = tmp_path / "revocations.jsonl"
+    registry = JsonRevocationRegistry(path)
+    registry.initialize()
+    path.write_text("\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed revocation registry"):
+        registry.assert_active(
+            artifact_id="artifact.other.v1",
+            artifact_schema_version=1,
+            artifact_digest="b" * 64,
+            evidence_plane=EvidencePlane.BENCHMARK_AUDIT,
+            evidence_source=EvidenceSourceKind.BENCHMARK_CONTRACT,
+        )
+
+
 def test_symlinked_registry_fails_closed(tmp_path) -> None:
     target = tmp_path / "target.jsonl"
     target.write_text("", encoding="utf-8")
