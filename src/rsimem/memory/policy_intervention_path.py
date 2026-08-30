@@ -177,11 +177,15 @@ class JsonFeasibilityInterventionPathStore:
     """Crash-safe, idempotent JSONL store for future intervention paths."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
 
     @contextmanager
     def _lock(self):
+        if self.path.is_symlink():
+            raise ValueError("feasibility intervention path cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("feasibility intervention path lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -191,6 +195,8 @@ class JsonFeasibilityInterventionPathStore:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def _read(self) -> dict[str, str]:
+        if self.path.is_symlink():
+            raise ValueError("feasibility intervention path cannot be a symlink")
         if not self.path.exists():
             return {}
         records: dict[str, str] = {}

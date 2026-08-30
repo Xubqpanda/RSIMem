@@ -21,6 +21,7 @@ from rsimem.memory.policy_intervention_path import (
     FeasibilityInterventionPath,
     JsonFeasibilityInterventionPathStore,
 )
+import pytest
 from rsimem.memory_systems.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT,
     MEM0_FLAT_EXTRACTION_SLOT_ID,
@@ -228,3 +229,22 @@ def test_nplus1_rejection_no_proposal_and_rollback_paths_are_restart_safe(tmp_pa
         if record.artifact_id == proposal.candidate.artifact_id
     )
     assert rolled_back.state is ExtractionPolicyState.ROLLED_BACK
+
+
+def test_intervention_path_store_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "interventions.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonFeasibilityInterventionPathStore(path).records
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_intervention_path_store_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "interventions.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonFeasibilityInterventionPathStore(path).records
