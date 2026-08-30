@@ -622,14 +622,41 @@ def _logical_groups(
     corpus: PureExtractionOptimizerCorpus,
     captures: Mapping[str, PureExtractionOptimizerContentCapture],
 ) -> dict[str, list[PureExtractionOptimizerExample]]:
+    def fallback_logical_case_id(
+        example: PureExtractionOptimizerExample,
+    ) -> str:
+        """Derive a stable case identity for content-free diagnostics.
+
+        Unresolved/censored examples intentionally do not carry an owner
+        content capture, but they still need replicate-safe aggregation.  Do
+        not use ``example_id`` here: that identity includes request-level
+        evidence IDs and would count repeated retrieval boundaries as new
+        semantic cases.  The observation window is the caller's frozen
+        future-task boundary; operation IDs are deliberately excluded so
+        retries/retrieval boundaries collapse to one logical case.
+        """
+
+        identity = {
+            # Record/operation/provenance IDs identify a physical run and
+            # therefore must not split replicate observations.  The source
+            # projection and frozen policy digests are the stable semantic
+            # inputs available on a content-free example.
+            "source_projection_digest": example.source_projection_digest,
+            "extraction_artifact_digest": example.extraction_artifact_digest,
+            "observation_window": example.observation_window,
+        }
+        return "logical-case." + content_digest(identity)[:40]
+
     groups: dict[str, list[PureExtractionOptimizerExample]] = {}
     for example in corpus.examples:
         capture = captures.get(example.example_id)
         # Diagnostic unresolved/censored observations may intentionally have
         # no owner-controlled text.  Keep them as one physical unit; only
         # actionable examples need a content capture and replicate identity.
-        logical_id = capture.logical_case_id if capture is not None else (
-            "logical-case." + content_digest({"example_id": example.example_id})[:40]
+        logical_id = (
+            capture.logical_case_id
+            if capture is not None
+            else fallback_logical_case_id(example)
         )
         groups.setdefault(logical_id, []).append(example)
     return groups
