@@ -1021,6 +1021,46 @@ class PureExtractionOptimizerCorpus:
         )
 
     @classmethod
+    def create_from_process_signal_census(
+        cls,
+        *,
+        split: str,
+        observation_cutoff: str,
+        examples: tuple[PureExtractionOptimizerExample, ...],
+        process_signal_protocol_id: str,
+        process_signal_case_digest: str,
+        census: object,
+    ) -> "PureExtractionOptimizerCorpus":
+        """Bind corpus readiness to the existing process-signal census.
+
+        A conflict or zero optimization cases intentionally produces a
+        non-ready corpus.  The method accepts the census structurally to keep
+        this module independent from the process-signal implementation while
+        still requiring its canonical counters.
+        """
+
+        from .process_signal import ProcessSignalCaseCensus
+
+        if not isinstance(census, ProcessSignalCaseCensus):
+            raise TypeError("pure extraction corpus requires ProcessSignalCaseCensus")
+        optimization_count = int(census.status_counts.get("optimization_signal", 0))
+        ready = (
+            census.logical_case_count > 0
+            and census.conflict_case_count == 0
+            and optimization_count > 0
+        )
+        return cls.create(
+            split=split,
+            observation_cutoff=observation_cutoff,
+            examples=examples,
+            process_signal_gate="ready" if ready else "no_signal",
+            process_signal_protocol_id=process_signal_protocol_id,
+            process_signal_case_digest=process_signal_case_digest,
+            process_signal_case_count=census.logical_case_count,
+            process_signal_optimization_count=optimization_count,
+        )
+
+    @classmethod
     def from_payload(cls, value: object) -> "PureExtractionOptimizerCorpus":
         fields = {
             "schema", "corpus_id", "schema_version", "split", "observation_cutoff",

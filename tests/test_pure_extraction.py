@@ -22,6 +22,7 @@ from rsimem.memory.pure_extraction import (
 from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
 from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
 from rsimem.memory.use_attribution import MemoryUseEvidence, OutcomeEvidenceKind
+from rsimem.memory.process_signal import ProcessSignalCaseCensus
 from test_extraction_optimizer_builder import _fixture
 
 
@@ -221,6 +222,40 @@ def test_pure_optimizer_corpus_is_sorted_and_restart_safe(tmp_path) -> None:
             examples=(example,),
             process_signal_gate="ready",
         )
+
+
+def test_pure_corpus_factory_uses_census_conflicts_as_no_signal() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.census-v1",
+    )
+    feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.completed-census-v1",
+        provenance_id="provenance.census-v1",
+    )
+    example = PureExtractionOptimizerExample.from_records(pure_source, feedback)
+    census = ProcessSignalCaseCensus(
+        physical_observation_count=2,
+        logical_case_count=1,
+        status_counts={"optimization_signal": 1},
+        conflict_case_count=1,
+    )
+    corpus = PureExtractionOptimizerCorpus.create_from_process_signal_census(
+        split="train",
+        observation_cutoff="2026-08-24T00:00:00Z",
+        examples=(example,),
+        process_signal_protocol_id="protocol.census-v1",
+        process_signal_case_digest="b" * 64,
+        census=census,
+    )
+    assert corpus.process_signal_gate == "no_signal"
 
 
 def test_family_bound_optimizer_builder_does_not_accept_pure_projection() -> None:
