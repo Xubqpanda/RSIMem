@@ -519,10 +519,8 @@ class LifecycleLedgerObserver:
         self.trace_id = trace_id
         self.family_id = family_id
         self.stage = stage
-        # Preserve the final path component so a runtime evidence path cannot
-        # redirect writes through a symlink.  The observer intentionally starts
-        # a fresh per-attempt file, but a symlink must still fail closed before
-        # any truncation occurs.
+        # Preserve the final path component so a lifecycle evidence path cannot
+        # redirect reads or appends through a symlink.
         self.output_path = (
             Path(os.path.abspath(os.path.expanduser(os.fspath(output_path))))
             if output_path
