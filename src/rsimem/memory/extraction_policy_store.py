@@ -213,14 +213,20 @@ class JsonExtractionPolicyStore:
         if trusted_root.parent_artifact_id is not None:
             raise ValueError("extraction policy store root must be a root artifact")
         trusted_root.to_prompt_component(slot)
-        self.path = path.expanduser().resolve()
+        # Preserve the final component so ACTIVE policy state cannot be
+        # redirected by a symlink into an unrelated store.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.trusted_root = trusted_root
         self.slot = slot
 
     @contextmanager
     def _lock(self, operation: int):
+        if self.path.is_symlink():
+            raise ValueError("extraction policy store cannot be a symlink")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        if lock_path.is_symlink():
+            raise ValueError("extraction policy store lock cannot be a symlink")
         with lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), operation)
             try:
@@ -250,6 +256,8 @@ class JsonExtractionPolicyStore:
         }
 
     def _read_unlocked(self) -> dict[str, object]:
+        if self.path.is_symlink():
+            raise ValueError("extraction policy store cannot be a symlink")
         if not self.path.exists():
             return self._empty()
         try:
@@ -401,6 +409,8 @@ class JsonExtractionPolicyStore:
                 raise ValueError("extraction lifecycle record differs from history")
 
     def _write_unlocked(self, payload: Mapping[str, object]) -> None:
+        if self.path.is_symlink():
+            raise ValueError("extraction policy store cannot be a symlink")
         serialized = {
             "schema_version": EXTRACTION_POLICY_STORE_SCHEMA_VERSION,
             "store_schema": EXTRACTION_POLICY_STORE_SCHEMA,

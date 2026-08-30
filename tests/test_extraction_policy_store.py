@@ -185,3 +185,22 @@ def test_store_rejects_wrong_runtime_slot_before_writing(tmp_path) -> None:
             slot=_slot(wrapper="9" * 64),
         )
     assert not (tmp_path / "store.json").exists()
+
+
+def test_store_rejects_symlinked_policy_path_and_lock(tmp_path) -> None:
+    root = _root()
+    target = tmp_path / "target"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "store.json"
+    path.symlink_to(target)
+    store = JsonExtractionPolicyStore(path, trusted_root=root, slot=_slot())
+    with pytest.raises(ValueError, match="symlink"):
+        store.snapshot()
+
+    path.unlink()
+    lock = path.with_suffix(path.suffix + ".lock")
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    lock.symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        store.initialize()
