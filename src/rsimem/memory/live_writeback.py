@@ -295,14 +295,21 @@ class JsonSemanticCompilationReceiptStore:
     """Atomically reserve content-free completed-task compilation identities."""
 
     def __init__(self, path: Path) -> None:
-        self.path = path.expanduser().resolve()
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
+        self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        if self.path.is_symlink():
+            raise ValueError("semantic compilation receipt store cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("semantic compilation receipt store lock cannot be a symlink")
 
     @contextmanager
     def _lock(self, operation: int):
+        if self.path.is_symlink():
+            raise ValueError("semantic compilation receipt store cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("semantic compilation receipt store lock cannot be a symlink")
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.with_suffix(self.path.suffix + ".lock").open(
-            "w", encoding="utf-8"
-        ) as lock:
+        with self.lock_path.open("w", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), operation)
             try:
                 yield
@@ -310,6 +317,8 @@ class JsonSemanticCompilationReceiptStore:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
     def _read_unlocked(self) -> dict[str, SemanticCompilationReceipt]:
+        if self.path.is_symlink():
+            raise ValueError("semantic compilation receipt store cannot be a symlink")
         if not self.path.exists():
             return {}
         try:
@@ -342,6 +351,8 @@ class JsonSemanticCompilationReceiptStore:
         self,
         receipts: dict[str, SemanticCompilationReceipt],
     ) -> None:
+        if self.path.is_symlink():
+            raise ValueError("semantic compilation receipt store cannot be a symlink")
         payload = {
             "schema_version": SEMANTIC_COMPILATION_RECEIPT_SCHEMA_VERSION,
             "receipts": {
