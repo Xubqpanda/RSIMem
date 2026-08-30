@@ -643,6 +643,7 @@ def audit_process_events(
     # silently contain a missing, duplicate, orphaned or cross-task result.
     tool_calls: dict[tuple[str, str, str, str, str, str, str, str], list[ProcessEvent]] = {}
     tool_results: dict[tuple[str, str, str, str, str, str, str, str], list[ProcessEvent]] = {}
+    calls_by_id: dict[tuple[str, str, str, str, str, str, str], list[ProcessEvent]] = {}
     result_ids: dict[tuple[str, str, str, str, str], list[ProcessEvent]] = {}
     tool_events: list[ProcessEvent] = []
     for event in items:
@@ -713,6 +714,7 @@ def audit_process_events(
             key = (*scope, event.retry_identity or "")
             if event.kind is ProcessEventKind.TOOL_CALL:
                 tool_calls.setdefault(key, []).append(event)
+                calls_by_id.setdefault(scope, []).append(event)
             else:
                 tool_results.setdefault(key, []).append(event)
                 result_ids.setdefault(
@@ -737,6 +739,11 @@ def audit_process_events(
             if call_names != result_names:
                 for event in (*calls, *results):
                     errors.append(f"{event.event_id}: tool call/result type mismatch")
+
+    for scope, calls in calls_by_id.items():
+        if len(calls) > 1:
+            for event in calls:
+                errors.append(f"{event.event_id}: duplicate tool call ID")
 
     for key, results in tool_results.items():
         if key not in tool_calls:
