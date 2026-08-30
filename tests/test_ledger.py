@@ -319,6 +319,33 @@ def test_lifecycle_observer_rejects_symlinked_output_path(tmp_path: Path) -> Non
     assert target.read_text(encoding="utf-8") == "sentinel\n"
 
 
+def test_memory_runtime_observer_rechecks_symlink_before_append(tmp_path: Path) -> None:
+    path = tmp_path / "runtime.jsonl"
+    observer = MemoryLedgerObserver(
+        run_id="run.swap",
+        variant="native+ledger",
+        trace_id="trace.swap",
+        episode_id="episode.swap",
+        session_id="session.swap",
+        task_id="task.swap",
+        execution_mode="native+ledger",
+        output_path=path,
+    )
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path.unlink()
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        observer.record(
+            MemoryEvent(
+                MemoryEventKind.QUERY,
+                MemoryKind.SEMANTIC,
+                "backend.swap",
+            )
+        )
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
 def test_auto_loads_content_free_static_mutation_identities(tmp_path: Path) -> None:
     comparison = _fixture(tmp_path)
     observer = MemoryLedgerObserver(

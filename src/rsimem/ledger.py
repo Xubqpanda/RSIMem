@@ -636,6 +636,8 @@ class LifecycleLedgerObserver:
                     raise ValueError(f"conflicting lifecycle ledger event: {event_id}")
                 return
             if self.output_path is not None:
+                if self.output_path.is_symlink():
+                    raise ValueError("lifecycle ledger path cannot be a symlink")
                 with self.output_path.open("a", encoding="utf-8") as handle:
                     handle.write(json.dumps(event, ensure_ascii=True, sort_keys=True) + "\n")
                     handle.flush()
@@ -964,6 +966,8 @@ class MemoryLedgerObserver:
                 },
             }
             if self.output_path is not None:
+                if self.output_path.is_symlink():
+                    raise ValueError("memory runtime evidence path cannot be a symlink")
                 with self.output_path.open("a", encoding="utf-8") as handle:
                     handle.write(json.dumps(value, ensure_ascii=True, sort_keys=True) + "\n")
                     handle.flush()
