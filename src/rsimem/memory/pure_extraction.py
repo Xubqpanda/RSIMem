@@ -455,6 +455,79 @@ class PureExtractionFeedbackRecord:
         )
 
     @classmethod
+    def derive_from_evidence(
+        cls,
+        *,
+        source: PureExtractionSourceRecord,
+        opportunity: OpportunityEvidence | None,
+        memory_use: MemoryUseEvidence | None,
+        observation_window: str,
+        provenance_id: str,
+        artifact_set_binding: ArtifactSetSemanticBinding | None = None,
+        tool_joins: tuple[ToolCallResultJoin, ...] = (),
+        current_input_requirements: tuple[str, ...] = (),
+        operation_graph: object | None = None,
+        observation_complete: bool = True,
+    ) -> "PureExtractionFeedbackRecord":
+        """Derive attribution without trusting a caller-provided label.
+
+        Opportunity/use resolvers are deterministic and fail closed.  A
+        missing or partial join therefore remains ``UNRESOLVED`` rather than
+        becoming extraction credit or blame.
+        """
+
+        if not isinstance(source, PureExtractionSourceRecord):
+            raise TypeError("pure extraction feedback source has the wrong type")
+        from .opportunity import OpportunityResolutionStatus, resolve_opportunity
+        from .use_attribution import MemoryUseResolutionStatus, resolve_memory_use
+
+        opportunity_resolution = resolve_opportunity(
+            opportunity,
+            current_input_requirements=current_input_requirements,
+            observation_complete=observation_complete,
+        )
+        memory_resolution = None
+        if memory_use is not None:
+            memory_resolution = resolve_memory_use(
+                memory_use,
+                artifact_set_binding=artifact_set_binding,
+                operation_graph=operation_graph,
+            )
+        attribution = PureExtractionAttribution.UNRESOLVED
+        reasons: list[str] = []
+        if not observation_complete:
+            attribution = PureExtractionAttribution.CENSORED
+            reasons.append("observation_censored")
+        elif opportunity_resolution.status is not OpportunityResolutionStatus.OBSERVED:
+            reasons.append(opportunity_resolution.reason_code)
+        elif memory_resolution is None:
+            reasons.append("memory_use_missing")
+        elif memory_resolution.status is not MemoryUseResolutionStatus.ATTRIBUTABLE_USE:
+            reasons.append(memory_resolution.reason_code)
+        elif memory_use is None or memory_use.outcome_success is None:
+            reasons.append("outcome_unknown")
+        elif memory_use.outcome_success:
+            attribution = PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
+            reasons.append("attributable_success")
+        else:
+            attribution = PureExtractionAttribution.ATTRIBUTABLE_FAILURE
+            reasons.append("attributable_failure")
+        return cls.create(
+            source_record_id=source.record_id,
+            source_projection_digest=source.source_projection_digest,
+            extraction_set_id=source.extraction_set_id,
+            opportunity=opportunity,
+            memory_use=memory_use,
+            artifact_set_binding=artifact_set_binding,
+            tool_joins=tool_joins,
+            observation_window=observation_window,
+            provenance_id=provenance_id,
+            attribution=attribution,
+            reason_codes=tuple(dict.fromkeys(reasons)),
+            observation_complete=observation_complete,
+        )
+
+    @classmethod
     def from_payload(cls, value: object) -> "PureExtractionFeedbackRecord":
         fields = {
             "schema", "record_id", "schema_version", "attribution_schema_version",
