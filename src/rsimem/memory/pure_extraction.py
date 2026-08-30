@@ -27,7 +27,12 @@ from .evidence_planes import (
     validate_plane_source,
     validate_pure_process_payload,
 )
-from .extraction_feedback import ExtractionSourceEvidence
+from .extraction_feedback import (
+    ExtractionSourceEvidence,
+    ExtractionSetStatus,
+    ExtractedFactEvidence,
+    FactDisposition,
+)
 from .opportunity import OpportunityEvidence
 from .prompt_components import content_digest
 from .tool_exact_join import ToolCallResultJoin
