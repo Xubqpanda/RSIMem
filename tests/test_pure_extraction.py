@@ -216,6 +216,41 @@ def test_pure_source_and_feedback_logs_return_canonical_identity_order(tmp_path)
     assert store.records() == tuple(sorted((first, second), key=lambda value: value.record_id))
 
 
+def test_pure_source_store_atomic_append_survives_restart_and_clone(tmp_path) -> None:
+    """A copied runtime home must never inherit a half-written source line."""
+
+    projection, source, *_ = _fixture()
+    first = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.atomic-a",
+    )
+    second = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id="projection.atomic-b",
+        provenance_id="provenance.atomic-b",
+    )
+    path = tmp_path / "home" / ".rsimem" / "pure-sources.jsonl"
+    store = JsonPureExtractionSourceRecordStore(path)
+    assert store.append(first) is True
+
+    # A fresh coordinator can continue the append-only log and a runtime
+    # clone can read the result immediately, without relying on in-memory
+    # state or a shared file descriptor.
+    assert JsonPureExtractionSourceRecordStore(path).append(second) is True
+    clone = tmp_path / "clone" / ".rsimem" / "pure-sources.jsonl"
+    clone.parent.mkdir(parents=True)
+    clone.write_bytes(path.read_bytes())
+    assert JsonPureExtractionSourceRecordStore(clone).records() == tuple(
+        sorted((first, second), key=lambda value: value.record_id)
+    )
+
+    # Replaying either record remains idempotent after the restart/clone
+    # boundary and does not create duplicate lines.
+    assert JsonPureExtractionSourceRecordStore(path).append(first) is False
+    assert len(JsonPureExtractionSourceRecordStore(path).records()) == 2
+
+
 @pytest.mark.parametrize(
     "store_type",
     (
