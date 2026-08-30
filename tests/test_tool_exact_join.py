@@ -227,6 +227,41 @@ def test_process_audit_rejects_duplicate_call_id_across_retries() -> None:
     assert any("duplicate tool call ID" in error for error in errors)
 
 
+def test_process_audit_rejects_duplicate_result_id_across_tasks() -> None:
+    common = dict(
+        run_id="run.audit-result-duplicate.v1",
+        variant="native",
+        trace_id="trace.audit-result-duplicate.v1",
+        episode_id="episode.audit-result-duplicate.v1",
+        session_id="session.audit-result-duplicate.v1",
+        host_event_id="event.audit-result-duplicate.v1",
+        source_revision="revision.audit-result-duplicate.v1",
+        input_payload={},
+        output_payload={},
+        execution_receipt_ids=("receipt.audit-result-duplicate.v1",),
+        tool_name_digest="a" * 64,
+        tool_result_id="result.audit-result-duplicate.v1",
+        tool_success=True,
+        retry_identity="retry.audit-result-duplicate.v1",
+    )
+    first = ProcessEvent.create(
+        kind=ProcessEventKind.TOOL_RESULT,
+        status=ProcessEventStatus.SUCCESS,
+        task_id="task.audit-result-duplicate.one",
+        tool_call_id="call.audit-result-duplicate.one",
+        **common,
+    )
+    second = ProcessEvent.create(
+        kind=ProcessEventKind.TOOL_RESULT,
+        status=ProcessEventStatus.SUCCESS,
+        task_id="task.audit-result-duplicate.two",
+        tool_call_id="call.audit-result-duplicate.two",
+        **common,
+    )
+    errors = audit_process_events((first, second))
+    assert any("duplicate tool result ID across task boundary" in error for error in errors)
+
+
 @pytest.mark.parametrize(
     "overrides",
     (

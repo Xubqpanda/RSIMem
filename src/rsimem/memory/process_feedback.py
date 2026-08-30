@@ -646,6 +646,10 @@ def audit_process_events(
     calls_by_id: dict[tuple[str, ...], list[ProcessEvent]] = {}
     call_contexts: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
     result_ids: dict[tuple[str, str, str, str, str], list[ProcessEvent]] = {}
+    # Result IDs are host-assigned execution identities.  Keep a second,
+    # task-independent index so a reused result ID cannot evade duplicate
+    # detection merely by appearing under a different task boundary.
+    result_ids_by_execution: dict[tuple[str, str, str, str], list[ProcessEvent]] = {}
     tool_events: list[ProcessEvent] = []
     for event in items:
         if event.event_id in seen:
@@ -758,6 +762,15 @@ def audit_process_events(
                     (event.run_id, event.variant, event.trace_id, event.task_id, event.tool_result_id or ""),
                     [],
                 ).append(event)
+                result_ids_by_execution.setdefault(
+                    (
+                        event.run_id,
+                        event.variant,
+                        event.trace_id,
+                        event.tool_result_id or "",
+                    ),
+                    [],
+                ).append(event)
 
     for key, calls in tool_calls.items():
         if len(calls) > 1:
@@ -808,6 +821,12 @@ def audit_process_events(
         if len(results) > 1:
             for event in results:
                 errors.append(f"{event.event_id}: duplicate tool result ID")
+    for key, results in result_ids_by_execution.items():
+        if len(results) > 1:
+            for event in results:
+                errors.append(
+                    f"{event.event_id}: duplicate tool result ID across task boundary"
+                )
     return tuple(dict.fromkeys(errors))
 
 
