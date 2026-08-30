@@ -537,6 +537,24 @@ class PureExtractionFeedbackRecord:
             and artifact_set_binding.provenance_id != provenance_id
         ):
             raise ValueError("artifact-set provenance does not match extraction feedback")
+        foreign_binding_members = False
+        if artifact_set_binding is not None:
+            if artifact_set_binding.source_digest != source.source_projection_digest:
+                raise ValueError("artifact-set binding source digest mismatch")
+            source_artifacts = {
+                value.artifact_id
+                for value in source.source.facts
+                if value.artifact_id is not None
+            }
+            source_facts = {value.fact_id for value in source.source.facts}
+            foreign_binding_members = (
+                not set(artifact_set_binding.member_artifact_ids).issubset(
+                    source_artifacts
+                )
+                or not set(artifact_set_binding.member_fact_ids).issubset(
+                    source_facts
+                )
+            )
         from .opportunity import OpportunityResolutionStatus, resolve_opportunity
         from .use_attribution import MemoryUseResolutionStatus, resolve_memory_use
 
@@ -561,6 +579,11 @@ class PureExtractionFeedbackRecord:
             reasons.append(opportunity_resolution.reason_code)
         elif memory_resolution is None:
             reasons.append("memory_use_missing")
+        elif foreign_binding_members:
+            # A binding with the right provenance can still point at another
+            # extraction source.  Keep the evidence for diagnostics, but do
+            # not let it grant attribution to the current source.
+            reasons.append("artifact_set_member_foreign")
         elif memory_resolution.status is not MemoryUseResolutionStatus.ATTRIBUTABLE_USE:
             reasons.append(memory_resolution.reason_code)
         elif (

@@ -688,6 +688,76 @@ def test_complete_set_binding_can_attribute_once_but_partial_set_stays_unresolve
     assert unresolved.attribution is PureExtractionAttribution.UNRESOLVED
 
 
+def test_set_binding_must_belong_to_source_before_attribution() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.set-ownership-v1",
+        visible_semantic_keys=("preference.summary.tsv",),
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement="preference.summary.tsv",
+        observation_time="2026-08-22T00:00:00Z",
+        operation_id="op.opportunity.set-ownership-v1",
+        provenance_id="provenance.set-ownership-v1",
+        source_payload={"tool": "render_table", "schema": "tsv"},
+    )
+    foreign = ArtifactSetSemanticBinding.create(
+        semantic_unit_id="semantic.foreign-set.v1",
+        semantic_key="preference.summary.tsv",
+        member_artifact_ids=("artifact.foreign-set.v1",),
+        member_fact_ids=("fact.foreign-set.v1",),
+        complete=True,
+        source_digest=pure_source.source_projection_digest,
+        provenance_id="provenance.set-ownership-v1",
+    )
+    use = MemoryUseEvidence.create(
+        artifact_set_id=foreign.binding_id,
+        retrieval_operation_id="op.retrieval.set-ownership-v1",
+        retrieved_artifact_ids=foreign.member_artifact_ids,
+        injection_operation_id="op.injection.set-ownership-v1",
+        injected_artifact_ids=foreign.member_artifact_ids,
+        downstream_operation_id="op.use.set-ownership-v1",
+        used_artifact_ids=foreign.member_artifact_ids,
+        outcome_operation_id="op.outcome.set-ownership-v1",
+        outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+        outcome_success=True,
+        observation_cutoff="2026-08-23T00:00:00Z",
+        provenance_id="provenance.set-ownership-v1",
+    )
+    derived = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=use,
+        artifact_set_binding=foreign,
+        observation_window="window.completed-set-ownership-v1",
+        provenance_id="provenance.set-ownership-v1",
+    )
+    assert derived.attribution is PureExtractionAttribution.UNRESOLVED
+    assert "artifact_set_member_foreign" in derived.reason_codes
+
+    mismatched_digest = ArtifactSetSemanticBinding.create(
+        semantic_unit_id="semantic.mismatched-set.v1",
+        semantic_key="preference.summary.tsv",
+        member_artifact_ids=("artifact.memory-v1",),
+        member_fact_ids=("fact.preference-v1",),
+        complete=True,
+        source_digest="b" * 64,
+        provenance_id="provenance.set-ownership-v1",
+    )
+    with pytest.raises(ValueError, match="source digest mismatch"):
+        PureExtractionFeedbackRecord.derive_from_evidence(
+            source=pure_source,
+            opportunity=opportunity,
+            memory_use=None,
+            artifact_set_binding=mismatched_digest,
+            observation_window="window.completed-set-ownership-v1",
+            provenance_id="provenance.set-ownership-v1",
+        )
+
+
 def test_live_pure_projector_does_not_consult_family_parser(tmp_path) -> None:
     from test_extraction_projection import _compile
 
