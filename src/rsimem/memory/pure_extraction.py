@@ -938,13 +938,20 @@ class PureExtractionOptimizerCorpus:
         ):
             if type(value) is not int or value < 0:
                 raise ValueError(f"{name} must be a non-negative integer")
+        # A ready corpus must satisfy the same replicated-signal minimum as
+        # the shared extraction preparation gate.  A single optimization
+        # observation is diagnostic evidence, not a generalizable policy
+        # signal, even when the caller supplies a well-formed census.
         if self.process_signal_gate == "ready" and (
             self.process_signal_protocol_id is None
             or self.process_signal_case_digest is None
-            or self.process_signal_case_count < 1
-            or self.process_signal_optimization_count < 1
+            or self.process_signal_case_count < 2
+            or self.process_signal_optimization_count < 2
         ):
-            raise ValueError("ready pure extraction corpus requires a bound optimization signal")
+            raise ValueError(
+                "ready pure extraction corpus requires a bound optimization signal "
+                "with at least two replicated cases"
+            )
         try:
             datetime.fromisoformat(self.observation_cutoff.removesuffix("Z") + "+00:00")
         except ValueError as exc:
@@ -1054,9 +1061,9 @@ class PureExtractionOptimizerCorpus:
             raise ValueError("pure extraction process-signal case digest mismatch")
         optimization_count = int(census.status_counts.get("optimization_signal", 0))
         ready = (
-            census.logical_case_count > 0
+            census.logical_case_count >= 2
             and census.conflict_case_count == 0
-            and optimization_count > 0
+            and optimization_count >= 2
         )
         return cls.create(
             split=split,
