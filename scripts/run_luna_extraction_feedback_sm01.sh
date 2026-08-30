@@ -255,7 +255,12 @@ from rsimem.memory.process_signal import (
     JsonProcessSignalCaseStore,
     build_process_signal_cases,
 )
-from rsimem.memory.signal_protocol import PROCESS_SIGNAL_OBSERVATION_WINDOW
+from rsimem.memory.signal_protocol import (
+    PROCESS_SIGNAL_OBSERVATION_WINDOW,
+    PROCESS_SIGNAL_PROTOCOL_FILENAME,
+    JsonProcessSignalAnalysisProtocolStore,
+    validate_protocol_for_extraction_manifest,
+)
 run_dir = Path(sys.argv[1])
 audit = json.loads((run_dir / "audit.json").read_text(encoding="utf-8"))
 if audit.get("ok") is not True or audit.get("issues") != []:
@@ -275,6 +280,12 @@ events = tuple(
 if not events:
     raise ValueError("formal extraction run emitted no process feedback corpus")
 manifest = json.loads((run_dir.parent / "batch_manifest.json").read_text(encoding="utf-8"))
+protocol = JsonProcessSignalAnalysisProtocolStore(
+    run_dir.parent / PROCESS_SIGNAL_PROTOCOL_FILENAME
+).get()
+if protocol is None:
+    raise ValueError("formal extraction run has no frozen process signal protocol")
+protocol = validate_protocol_for_extraction_manifest(protocol, manifest)
 split = manifest["split"]
 corpus = ProcessCorpus.create(
     events,
@@ -306,6 +317,7 @@ cases = build_process_signal_cases(
     future_task_template_id="future." + split["taskTemplateGroupId"],
     observation_window=PROCESS_SIGNAL_OBSERVATION_WINDOW,
     replicate_id="replicate." + str(attempt["replicate"]),
+    analysis_protocol_id=protocol.protocol_id,
 )
 if not cases:
     raise ValueError("formal extraction run emitted no process signal cases")

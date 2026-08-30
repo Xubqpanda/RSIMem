@@ -208,13 +208,26 @@ def _pure_process_events(run_dir: Path) -> tuple[PureProcessEvent, ...]:
     return tuple(by_id[event_id] for event_id in sorted(by_id))
 
 
-def _process_signal_cases(run_dir: Path) -> tuple[ProcessSignalCase, ...]:
+def _process_signal_cases(
+    run_dir: Path,
+    *,
+    protocol: ProcessSignalAnalysisProtocol,
+    replicate: int,
+) -> tuple[ProcessSignalCase, ...]:
     """Read optional logical-case projections without using quality labels."""
 
     paths = tuple(sorted(run_dir.rglob("process_signal_cases.jsonl")))
     by_id: dict[str, ProcessSignalCase] = {}
     for path in paths:
         for case in JsonProcessSignalCaseStore(path).records():
+            if (
+                case.analysis_protocol_id != protocol.protocol_id
+                or case.replicate_id != f"replicate.{replicate}"
+                or case.observation_window != protocol.observation_window
+            ):
+                raise ValueError(
+                    "process-signal case does not match frozen protocol or replicate"
+                )
             previous = by_id.get(case.case_id)
             if previous is not None and previous != case:
                 raise ValueError(
@@ -593,6 +606,7 @@ def _run_evidence(
     batch_root: Path,
     manifest: dict[str, Any],
     attempt: dict[str, Any],
+    protocol: ProcessSignalAnalysisProtocol,
 ) -> dict[str, Any]:
     run_dir = (batch_root / attempt["outputDirectory"]).resolve()
     if not run_dir.is_relative_to(batch_root):
@@ -604,7 +618,11 @@ def _run_evidence(
     feedback = _feedback_records(run_dir)
     process_events = _process_events(run_dir)
     pure_process_events = _pure_process_events(run_dir)
-    process_signal_cases = _process_signal_cases(run_dir)
+    process_signal_cases = _process_signal_cases(
+        run_dir,
+        protocol=protocol,
+        replicate=attempt["replicate"],
+    )
     if process_events:
         process_errors = audit_process_events(process_events)
         if process_errors:
@@ -939,6 +957,7 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
     root = batch_root.expanduser().resolve()
     manifest = load_extraction_manifest(root / "batch_manifest.json")
     terminal_attempts = _terminal_attempts(manifest)
+    process_signal_protocol = _process_signal_protocol(root, manifest)
     attempts = tuple(
         attempt for attempt in terminal_attempts
         if attempt["status"] == "completed"
@@ -948,13 +967,12 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
         if attempt["status"] == "failed"
     )
     rows = tuple(
-        _run_evidence(root, manifest, attempt)
+        _run_evidence(root, manifest, attempt, process_signal_protocol)
         for attempt in sorted(
             attempts,
             key=lambda value: (value["replicate"], value["ordinal"]),
         )
     )
-    process_signal_protocol = _process_signal_protocol(root, manifest)
     by_method = {
         method: tuple(row for row in rows if row["method"] == method)
         for method in manifest["methods"]

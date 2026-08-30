@@ -167,6 +167,44 @@ def test_build_process_signal_cases_separates_logical_and_physical_identity() ->
     assert first[0].physical_observation_ids != second[0].physical_observation_ids
 
 
+def test_process_signal_case_protocol_binding_is_replay_stable() -> None:
+    case = _case()
+    bound = ProcessSignalCase.create(
+        logical_case_id=case.logical_case_id,
+        physical_observation_ids=("physical-observation.bound.v1",),
+        source_observed=True,
+        extraction_observed=True,
+        persistence_observed=True,
+        retrieval_observed=True,
+        exposure_observed=True,
+        outcome_observed=True,
+        extraction_attributable=False,
+        abstract_hypothesis_digest=None,
+        observation_complete=True,
+        analysis_protocol_id="signal-protocol.bound.v1",
+        replicate_id="replicate.1",
+        observation_window="completed-task.v1",
+    )
+    assert ProcessSignalCase.from_payload(bound.payload()) == bound
+    with pytest.raises(ValueError, match="metadata must be complete"):
+        ProcessSignalCase.create(
+            logical_case_id=case.logical_case_id,
+            physical_observation_ids=("physical-observation.bound.v2",),
+            source_observed=True,
+            extraction_observed=True,
+            persistence_observed=True,
+            retrieval_observed=True,
+            exposure_observed=True,
+            outcome_observed=True,
+            extraction_attributable=False,
+            abstract_hypothesis_digest=None,
+            observation_complete=True,
+            analysis_protocol_id="signal-protocol.bound.v1",
+            replicate_id="replicate.1",
+            observation_window=None,
+        )
+
+
 def test_projection_from_process_events_never_infers_extraction_attribution() -> None:
     common = dict(
         run_id="run.signal.v1", variant="native", trace_id="trace.signal.v1",

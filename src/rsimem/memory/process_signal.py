@@ -23,8 +23,8 @@ from .process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 from .logical_case import LogicalCaseIdentity
 
 
-PROCESS_SIGNAL_SCHEMA_VERSION = 1
-PROCESS_SIGNAL_SCHEMA = "rsimem-process-signal-case-v1"
+PROCESS_SIGNAL_SCHEMA_VERSION = 2
+PROCESS_SIGNAL_SCHEMA = "rsimem-process-signal-case-v2"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
@@ -74,6 +74,9 @@ class ProcessSignalCase:
     invalid_reason_code: str | None = None
     evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
     evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
+    analysis_protocol_id: str | None = None
+    replicate_id: str | None = None
+    observation_window: str | None = None
     schema_version: int = PROCESS_SIGNAL_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -114,6 +117,24 @@ class ProcessSignalCase:
             r"[a-z][a-z0-9_]{0,63}", self.invalid_reason_code
         ):
             raise ValueError("invalid process signal reason is malformed")
+        metadata = (
+            self.analysis_protocol_id,
+            self.replicate_id,
+            self.observation_window,
+        )
+        if (self.replicate_id is None) != (self.observation_window is None):
+            raise ValueError("process signal replicate/window metadata must be complete")
+        if self.analysis_protocol_id is not None and (
+            self.replicate_id is None or self.observation_window is None
+        ):
+            raise ValueError("process signal protocol metadata must be complete")
+        for value, name in (
+            (self.analysis_protocol_id, "analysis protocol ID"),
+            (self.replicate_id, "replicate ID"),
+            (self.observation_window, "observation window"),
+        ):
+            if value is not None:
+                _id(value, name)
         expected = f"process-signal-case.{_digest(self._identity_payload())[:40]}"
         if self.case_id != expected:
             raise ValueError("process signal case ID mismatch")
@@ -136,6 +157,9 @@ class ProcessSignalCase:
             "invalid_reason_code": self.invalid_reason_code,
             "evidence_plane": self.evidence_plane.value,
             "evidence_source": self.evidence_source.value,
+            "analysis_protocol_id": self.analysis_protocol_id,
+            "replicate_id": self.replicate_id,
+            "observation_window": self.observation_window,
         }
 
     @classmethod
@@ -155,6 +179,9 @@ class ProcessSignalCase:
         observation_complete: bool,
         stage_diagnosis_observed: bool = True,
         invalid_reason_code: str | None = None,
+        analysis_protocol_id: str | None = None,
+        replicate_id: str | None = None,
+        observation_window: str | None = None,
     ) -> "ProcessSignalCase":
         values = {
             "logical_case_id": logical_case_id,
@@ -170,6 +197,9 @@ class ProcessSignalCase:
             "observation_complete": observation_complete,
             "stage_diagnosis_observed": stage_diagnosis_observed,
             "invalid_reason_code": invalid_reason_code,
+            "analysis_protocol_id": analysis_protocol_id,
+            "replicate_id": replicate_id,
+            "observation_window": observation_window,
             "evidence_plane": EvidencePlane.PURE_PROCESS,
             "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION,
             "schema_version": PROCESS_SIGNAL_SCHEMA_VERSION,
@@ -185,6 +215,9 @@ class ProcessSignalCase:
         events: Iterable[ProcessEvent],
         extraction_attributable: bool = False,
         abstract_hypothesis_digest: str | None = None,
+        analysis_protocol_id: str | None = None,
+        replicate_id: str | None = None,
+        observation_window: str | None = None,
     ) -> "ProcessSignalCase":
         """Project stage coverage without inferring attribution from outcomes."""
 
@@ -237,6 +270,9 @@ class ProcessSignalCase:
                 diagnosis_reasons.intersection(event.reason_codes)
                 for event in values
             ),
+            analysis_protocol_id=analysis_protocol_id,
+            replicate_id=replicate_id,
+            observation_window=observation_window,
         )
 
     @property
@@ -280,6 +316,7 @@ class ProcessSignalCase:
             "outcome_observed", "extraction_attributable", "abstract_hypothesis_digest",
             "observation_complete", "stage_diagnosis_observed", "invalid_reason_code", "evidence_plane",
             "evidence_source", "status",
+            "analysis_protocol_id", "replicate_id", "observation_window",
         }
         if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != PROCESS_SIGNAL_SCHEMA:
             raise ValueError("malformed process signal case")
@@ -298,6 +335,9 @@ class ProcessSignalCase:
                 stage_diagnosis_observed=value["stage_diagnosis_observed"],
                 invalid_reason_code=value["invalid_reason_code"],
                 evidence_plane=value["evidence_plane"], evidence_source=value["evidence_source"],
+                analysis_protocol_id=value["analysis_protocol_id"],
+                replicate_id=value["replicate_id"],
+                observation_window=value["observation_window"],
                 schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -442,6 +482,7 @@ def build_process_signal_cases(
     future_task_template_id: str,
     observation_window: str,
     replicate_id: str,
+    analysis_protocol_id: str | None = None,
 ) -> tuple[ProcessSignalCase, ...]:
     """Project one physical run into replay-stable task-level signal cases.
 
@@ -484,6 +525,9 @@ def build_process_signal_cases(
             logical_case_id=identity.logical_case_id,
             physical_observation_ids=(physical_id,),
             events=task_events,
+            analysis_protocol_id=analysis_protocol_id,
+            replicate_id=replicate_id,
+            observation_window=observation_window,
         ))
     return tuple(cases)
 
