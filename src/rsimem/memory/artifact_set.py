@@ -202,7 +202,9 @@ class JsonArtifactSetBindingLog:
     """Crash-safe append-only storage for runtime set-level bindings."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Preserve the final component so an owner-controlled binding log
+        # cannot be redirected by a symlink.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
         self._records: dict[str, str] = {}
         self._load()
@@ -212,6 +214,8 @@ class JsonArtifactSetBindingLog:
         return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
     def _load(self) -> None:
+        if self.path.is_symlink():
+            raise ValueError("artifact-set binding log cannot be a symlink")
         if not self.path.exists():
             return
         for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
@@ -230,6 +234,10 @@ class JsonArtifactSetBindingLog:
             self._records[binding.binding_id] = canonical
 
     def records(self) -> tuple[ArtifactSetSemanticBinding, ...]:
+        if self.path.is_symlink():
+            raise ValueError("artifact-set binding log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("artifact-set binding lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
@@ -247,6 +255,10 @@ class JsonArtifactSetBindingLog:
         if not isinstance(binding, ArtifactSetSemanticBinding):
             raise TypeError("artifact-set log accepts ArtifactSetSemanticBinding only")
         serialized = self._canonical(binding.payload())
+        if self.path.is_symlink():
+            raise ValueError("artifact-set binding log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("artifact-set binding lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)

@@ -144,3 +144,21 @@ def test_incomplete_binding_and_duplicate_members_fail_closed() -> None:
             source_digest="b" * 64,
             provenance_id="provenance.bad.v1",
         )
+
+
+def test_artifact_set_log_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "bindings.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonArtifactSetBindingLog(path).records()
+
+
+def test_artifact_set_log_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "bindings.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonArtifactSetBindingLog(path).records()
