@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence, TypeVar
@@ -403,10 +404,6 @@ class ExtractionFeedbackBatchAudit:
         if self.process_signal_gate == PROCESS_SIGNAL_GATE_READY:
             if self.process_signal_optimization_count < 2 or self.process_signal_hypothesis_digest is None:
                 raise ValueError("ready process signal gate requires replicated hypothesis")
-        if self.process_signal_gate == PROCESS_SIGNAL_GATE_READY and not self.process_signal_optimization_count:
-            raise ValueError("ready process-signal gate requires an optimization case")
-        if self.process_signal_gate == PROCESS_SIGNAL_GATE_NO_SIGNAL and self.process_signal_optimization_count:
-            raise ValueError("no-signal gate cannot carry optimization cases")
         expected = f"extraction-preparation-audit.{content_digest(self.identity_payload())[:40]}"
         if self.audit_id != expected:
             raise ValueError("extraction preparation audit ID mismatch")
