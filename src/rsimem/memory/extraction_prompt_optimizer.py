@@ -21,6 +21,15 @@ from .extraction_optimizer_contracts import (
     build_extraction_optimizer_request,
     logical_primary_examples,
 )
+from .pure_extraction import (
+    PureExtractionAttribution,
+    PureExtractionOptimizerCorpus,
+)
+from .pure_extraction_optimizer import (
+    PureExtractionOptimizerContentCapture,
+    build_pure_extraction_optimizer_gate_request,
+    build_pure_extraction_optimizer_request,
+)
 from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
     ExtractionOptimizerCorpusExample,
@@ -420,10 +429,182 @@ class ExtractionPromptOptimizer:
             completion.usage,
         )
 
+    def propose_pure(
+        self,
+        parent: ExtractionPromptPolicyArtifact,
+        corpus: PureExtractionOptimizerCorpus,
+        *,
+        captures: tuple[PureExtractionOptimizerContentCapture, ...] = (),
+    ) -> ExtractionOptimizerResult:
+        """Run the optimizer against a pure-process extraction corpus.
+
+        This entry point deliberately remains separate from :meth:`propose`:
+        legacy benchmark-bound corpora continue to support audit tooling, but
+        a deployment-only proposal must use the pure content boundary and can
+        never be relabeled as benchmark evidence.
+        """
+
+        if not isinstance(corpus, PureExtractionOptimizerCorpus):
+            raise TypeError("pure optimizer requires a pure extraction corpus")
+        if not isinstance(parent, ExtractionPromptPolicyArtifact):
+            raise TypeError("pure optimizer requires a policy artifact")
+        capture_by_id = {
+            capture.example_id: capture for capture in captures
+        }
+        if len(capture_by_id) != len(captures):
+            raise ValueError("pure optimizer captures must have unique example IDs")
+        groups: dict[str, list[object]] = {}
+        for example in corpus.examples:
+            capture = capture_by_id.get(example.example_id)
+            logical_id = capture.logical_case_id if capture is not None else (
+                "logical-case." + content_digest({"example_id": example.example_id})[:40]
+            )
+            groups.setdefault(logical_id, []).append(example)
+        primary = tuple(
+            min(values, key=lambda value: value.example_id)
+            for values in groups.values()
+        )
+        actionable = tuple(
+            value for value in primary
+            if value.attribution in {
+                PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
+                PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
+            }
+        )
+
+        def gate(reason: str) -> ExtractionOptimizerResult:
+            request = build_pure_extraction_optimizer_gate_request(
+                parent,
+                corpus,
+                reason_codes=(reason,),
+                config=self.config,
+            )
+            return self._result(
+                ExtractionOptimizerDecision.NO_PROPOSAL,
+                (reason,),
+                request,
+                None,
+                (),
+                None,
+                RawResourceUsage(),
+            )
+
+        if corpus.process_signal_gate != "ready":
+            return gate("no_optimization_process_signal")
+        if len(actionable) < self.config.minimum_actionable_primary_examples:
+            return gate(
+                "no_actionable_extraction_signal"
+                if not actionable
+                else "insufficient_actionable_extraction_signal"
+            )
+        labels_by_logical = {
+            logical_id: {
+                value.attribution for value in values
+            }
+            for logical_id, values in groups.items()
+        }
+        if any(len(labels) > 1 for labels in labels_by_logical.values()):
+            return gate("conflicting_extraction_signal")
+        if (
+            getattr(self.client, "requires_revocation_registry", False)
+            and self.revocation_registry is None
+        ):
+            raise ValueError(
+                "optimizer provider proposal requires a revocation registry"
+            )
+        if self.revocation_registry is not None:
+            self.revocation_registry.assert_active(
+                artifact_id=corpus.corpus_id,
+                artifact_schema_version=corpus.schema_version,
+                artifact_digest=corpus.corpus_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
+            self.revocation_registry.assert_active(
+                artifact_id=parent.artifact_id,
+                artifact_schema_version=parent.schema_version,
+                artifact_digest=parent.artifact_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
+        request = build_pure_extraction_optimizer_request(
+            parent,
+            corpus,
+            captures=captures,
+            config=self.config,
+        )
+        completion = self.client.complete(request, self.config)
+        if completion.request_id != request.request_id:
+            raise ValueError("optimizer completion belongs to another request")
+        try:
+            decision, reasons, edits = self._parse_completion(
+                completion.output_text,
+                corpus,  # type: ignore[arg-type]
+                eligible_example_ids={value.example_id for value in actionable},
+            )
+        except ValueError as exc:
+            raise OptimizerCompletionValidationError(
+                str(exc),
+                reason_code="completion_contract_invalid",
+                request=request,
+                completion_id=completion.completion_id,
+                usage=completion.usage,
+            ) from exc
+        if decision is ExtractionOptimizerDecision.NO_PROPOSAL:
+            return self._result(
+                decision,
+                reasons,
+                request,
+                completion.completion_id,
+                (),
+                None,
+                completion.usage,
+            )
+        try:
+            self._validate_pure_candidate_content(
+                parent,
+                tuple(capture_by_id[value.example_id] for value in actionable),
+                edits,
+            )
+        except ValueError as exc:
+            raise CandidateValidationError(
+                str(exc),
+                reason_code=_candidate_validation_reason(str(exc)),
+                request=request,
+                completion_id=completion.completion_id,
+                usage=completion.usage,
+            ) from exc
+        provenance = ExtractionGenerationProvenance(
+            optimizer_model=self.config.model_id,
+            optimizer_config_digest=self.config.config_digest,
+            training_corpus_id=corpus.corpus_id,
+            training_cutoff=corpus.observation_cutoff,
+            proposal_request_digest=request.request_digest,
+            completion_digest=text_digest(completion.output_text),
+            usage=completion.usage,
+        )
+        candidate = ExtractionPromptPolicyArtifact.create_child(
+            parent=parent,
+            policy_version=f"candidate.{text_digest(completion.output_text)[:16]}",
+            edits=tuple(value.edit for value in edits),
+            generation_provenance=provenance,
+        )
+        return self._result(
+            decision,
+            reasons,
+            request,
+            completion.completion_id,
+            edits,
+            candidate,
+            completion.usage,
+        )
+
     def _parse_completion(
         self,
         raw: str,
         corpus: ExtractionOptimizerCorpus,
+        *,
+        eligible_example_ids: set[str] | None = None,
     ) -> tuple[
         ExtractionOptimizerDecision,
         tuple[str, ...],
@@ -453,11 +634,15 @@ class ExtractionPromptOptimizer:
             return decision, reasons, ()
         if not raw_edits or len(raw_edits) > self.config.maximum_rule_edits:
             raise ValueError("optimizer proposal edit count is invalid")
-        eligible = {
-            value.example_id: value
-            for value in corpus.examples
-            if value.primary and _is_actionable(value)
-        }
+        eligible = (
+            {value: value for value in eligible_example_ids}
+            if eligible_example_ids is not None
+            else {
+                value.example_id: value
+                for value in corpus.examples
+                if value.primary and _is_actionable(value)
+            }
+        )
         parsed = tuple(self._parse_edit(item, eligible) for item in raw_edits)
         if len({value.edit.edit_id for value in parsed}) != len(parsed):
             raise ValueError("optimizer proposal has duplicate edit IDs")
@@ -515,6 +700,91 @@ class ExtractionPromptOptimizer:
         except (TypeError, ValueError) as exc:
             raise ValueError("optimizer edit contract is invalid") from exc
         return EvidenceBoundRuleEdit(edit, evidence_ids, reasons)
+
+    def _validate_pure_candidate_content(
+        self,
+        parent: ExtractionPromptPolicyArtifact,
+        captures: tuple[PureExtractionOptimizerContentCapture, ...],
+        edits: tuple[EvidenceBoundRuleEdit, ...],
+    ) -> None:
+        """Apply the corpus-leakage safety gate to pure-process captures."""
+
+        candidate_texts = tuple(
+            value.edit.rule.text
+            for value in edits
+            if value.edit.rule is not None
+        )
+        if any(_FORBIDDEN_RULE.search(value) or "$" in value for value in candidate_texts):
+            raise ValueError("optimizer candidate contains forbidden instructions")
+        identifiers = {
+            identifier.casefold()
+            for capture in captures
+            for identifier in (
+                capture.example_id,
+                capture.logical_case_id,
+                *capture.physical_observation_ids,
+                *(message.source_message_id for message in capture.source_messages),
+                *(message.segment_id for message in capture.source_messages),
+                *(fact.fact_id for fact in capture.extracted_facts),
+                *(fact.persisted_artifact_id or "" for fact in capture.extracted_facts),
+            )
+            if identifier
+        }
+        for text in candidate_texts:
+            normalized = text.casefold()
+            if any(identifier in normalized for identifier in identifiers):
+                raise ValueError("optimizer candidate copies corpus identity")
+        source_text = tuple({
+            value
+            for capture in captures
+            for value in (
+                *(message.content.text for message in capture.source_messages),
+                *(fact.content.text for fact in capture.extracted_facts),
+                capture.delayed_evidence.opportunity.text,
+                capture.delayed_evidence.use.text,
+                capture.delayed_evidence.outcome.text,
+            )
+            if value
+        })
+        generic_tokens = {
+            token.casefold()
+            for token in _TOKEN.findall(
+                parent.compiled_body + " " + EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION
+            )
+        } | _GENERIC_ALLOWED_TOKENS
+        sensitive_values = set()
+        for value in source_text:
+            sensitive_values.update(
+                match.group(0).casefold() for match in _URL_OR_EMAIL.finditer(value)
+            )
+            sensitive_values.update(
+                match.group(1).strip().casefold()
+                for match in _QUOTED_VALUE.finditer(value)
+                if match.group(1).strip()
+            )
+            for token in _TOKEN.findall(value):
+                normalized = token.casefold()
+                if (
+                    len(token) >= 4
+                    and normalized not in generic_tokens
+                    and (
+                        token[0].isupper()
+                        or any(character.isdigit() for character in token)
+                        or "_" in token
+                    )
+                ):
+                    sensitive_values.add(normalized)
+        for text in candidate_texts:
+            normalized = text.casefold()
+            if any(value in normalized for value in sensitive_values):
+                raise ValueError("optimizer candidate copies a corpus-specific value")
+        parent_ngrams = _ngrams(parent.compiled_body, self.config.long_ngram_tokens)
+        forbidden_ngrams = set().union(*(
+            _ngrams(value, self.config.long_ngram_tokens) for value in source_text
+        )) - parent_ngrams
+        for text in candidate_texts:
+            if _ngrams(text, self.config.long_ngram_tokens) & forbidden_ngrams:
+                raise ValueError("optimizer candidate copies corpus content")
 
     def _validate_candidate_content(
         self,

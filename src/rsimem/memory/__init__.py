@@ -198,6 +198,7 @@ from .pure_extraction import (
 )
 from .pure_extraction_optimizer import (
     PureExtractionOptimizerContentCapture,
+    build_pure_extraction_optimizer_gate_request,
     build_pure_extraction_optimizer_request,
 )
 from .logical_case import (
@@ -383,6 +384,7 @@ __all__ = [
     "PureProcessExtractionSourceRecord",
     "prepare_pure_extraction_corpus",
     "PureExtractionOptimizerContentCapture",
+    "build_pure_extraction_optimizer_gate_request",
     "build_pure_extraction_optimizer_request",
     "OpportunityResolution",
     "OpportunityResolutionStatus",

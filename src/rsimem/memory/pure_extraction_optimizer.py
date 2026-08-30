@@ -390,7 +390,89 @@ def build_pure_extraction_optimizer_request(
     )
 
 
+def build_pure_extraction_optimizer_gate_request(
+    parent: ExtractionPromptPolicyArtifact,
+    corpus: PureExtractionOptimizerCorpus,
+    *,
+    reason_codes: Sequence[str],
+    config: ExtractionOptimizerConfig = FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+) -> ExtractionOptimizerRequest:
+    """Build a content-free NO_PROPOSAL request for a pure corpus.
+
+    The gate request is useful when a caller wants one replay-stable audit
+    record for an unresolved, censored, stale, or insufficient corpus.  It
+    never carries owner-controlled text and is never eligible for a provider
+    call.
+    """
+
+    if not isinstance(parent, ExtractionPromptPolicyArtifact):
+        raise TypeError("pure optimizer gate requires a policy artifact")
+    if not isinstance(corpus, PureExtractionOptimizerCorpus):
+        raise TypeError("pure optimizer gate requires a pure extraction corpus")
+    if corpus.split != "train":
+        raise ValueError("pure optimizer gate requires the training corpus")
+    reasons = tuple(reason_codes)
+    if not reasons or len(reasons) != len(set(reasons)):
+        raise ValueError("pure optimizer gate requires unique reason codes")
+    for reason in reasons:
+        _id(reason, "pure optimizer gate reason code")
+    if any(
+        example.extraction_artifact_digest != parent.body_digest
+        for example in corpus.examples
+    ):
+        raise ValueError("pure optimizer corpus was not produced by the parent policy")
+    primary_ids = tuple(sorted(value.example_id for value in corpus.examples))
+    input_payload = {
+        "schema_version": EXTRACTION_OPTIMIZER_SCHEMA_VERSION,
+        "request_mode": "deterministic_signal_gate",
+        "decision": "NO_PROPOSAL",
+        "reason_codes": list(reasons),
+        "parent_artifact_id": parent.artifact_id,
+        "parent_artifact_digest": parent.artifact_digest,
+        "corpus_id": corpus.corpus_id,
+        "corpus_digest": corpus.corpus_digest,
+        "process_signal_gate": corpus.process_signal_gate,
+        "primary_example_ids": list(primary_ids),
+    }
+    input_json = canonical_json(input_payload)
+    if len(input_json) > config.maximum_input_chars:
+        raise ValueError("pure optimizer gate request exceeds the input character budget")
+    values = {
+        "parent_artifact_id": parent.artifact_id,
+        "parent_artifact_digest": parent.artifact_digest,
+        "corpus_id": corpus.corpus_id,
+        "corpus_digest": corpus.corpus_digest,
+        "optimizer_config_digest": config.config_digest,
+        "primary_example_ids": primary_ids,
+        "system_instruction": EXTRACTION_OPTIMIZER_SYSTEM_INSTRUCTION,
+        "input_json": input_json,
+        "provider_eligible": False,
+        "request_schema": EXTRACTION_OPTIMIZER_REQUEST_SCHEMA,
+        "schema_version": EXTRACTION_OPTIMIZER_SCHEMA_VERSION,
+    }
+    identity = {
+        "schema_version": values["schema_version"],
+        "request_schema": values["request_schema"],
+        "parent_artifact_id": values["parent_artifact_id"],
+        "parent_artifact_digest": values["parent_artifact_digest"],
+        "corpus_id": values["corpus_id"],
+        "corpus_digest": values["corpus_digest"],
+        "optimizer_config_digest": values["optimizer_config_digest"],
+        "primary_example_ids": list(primary_ids),
+        "system_instruction_digest": text_digest(values["system_instruction"]),
+        "input_json_digest": text_digest(input_json),
+        "provider_eligible": False,
+    }
+    digest = content_digest(identity)
+    return ExtractionOptimizerRequest(
+        request_id=f"optimizer-request.{digest[:40]}",
+        request_digest=digest,
+        **values,
+    )
+
+
 __all__ = [
     "PureExtractionOptimizerContentCapture",
+    "build_pure_extraction_optimizer_gate_request",
     "build_pure_extraction_optimizer_request",
 ]

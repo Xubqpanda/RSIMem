@@ -29,7 +29,16 @@ from rsimem.memory.pure_extraction import (
 )
 from rsimem.memory.pure_extraction_optimizer import (
     PureExtractionOptimizerContentCapture,
+    build_pure_extraction_optimizer_gate_request,
     build_pure_extraction_optimizer_request,
+)
+from rsimem.memory.extraction_optimizer_contracts import (
+    ExtractionOptimizerConfig,
+)
+from rsimem.memory.extraction_prompt_optimizer import (
+    CapturedExtractionOptimizerClient,
+    ExtractionOptimizerDecision,
+    ExtractionPromptOptimizer,
 )
 from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
 from rsimem.memory.use_attribution import MemoryUseEvidence, OutcomeEvidenceKind
@@ -251,6 +260,54 @@ def test_pure_optimizer_request_fails_closed_without_ready_gate() -> None:
             blocked,
             captures=(capture,),
         )
+
+
+def test_pure_optimizer_gate_request_is_provider_ineligible() -> None:
+    parent, example, _ = _fixture()
+    corpus = PureExtractionOptimizerCorpus.create(
+        split="train",
+        observation_cutoff="2026-08-22T00:00:00Z",
+        examples=(example,),
+        process_signal_gate="no_signal",
+    )
+    request = build_pure_extraction_optimizer_gate_request(
+        parent,
+        corpus,
+        reason_codes=("no_optimization_process_signal",),
+    )
+    assert request.provider_eligible is False
+    assert json.loads(request.input_json)["request_mode"] == "deterministic_signal_gate"
+
+
+def test_pure_optimizer_propose_uses_pure_request_boundary() -> None:
+    parent, example, capture = _fixture()
+    corpus = _corpus(example)
+    config = ExtractionOptimizerConfig(minimum_actionable_primary_examples=1)
+    client = CapturedExtractionOptimizerClient(
+        json.dumps({
+            "decision": "PROPOSE",
+            "reason_codes": ["abstract_reusable_rule"],
+            "edits": [{
+                "edit_id": "edit.pure-request",
+                "action": "ADD_RULE",
+                "target_rule_id": None,
+                "rule_id": "rule.pure-request",
+                "rule_text": "Preserve durable reusable information.",
+                "after_rule_id": None,
+                "evidence_example_ids": [example.example_id],
+                "reason_codes": ["abstract_reusable_rule"],
+            }],
+        })
+    )
+    result = ExtractionPromptOptimizer(client, config=config).propose_pure(
+        parent,
+        corpus,
+        captures=(capture,),
+    )
+    assert result.decision is ExtractionOptimizerDecision.PROPOSE
+    assert result.candidate is not None
+    assert len(client.requests) == 1
+    assert json.loads(client.requests[0].input_json)["evidence_groups"]["useful"]
 
 
 def test_pure_optimizer_capture_rejects_evaluation_text() -> None:
