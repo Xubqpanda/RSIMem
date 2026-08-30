@@ -242,6 +242,29 @@ def test_store_rejects_legacy_v1_schema(tmp_path) -> None:
         ).snapshot()
 
 
+def test_store_rejects_symlinked_path_and_lock(tmp_path) -> None:
+    dataset, _ = _artifact(seed=42)
+    target = tmp_path / "target.json"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "policies.json"
+    path.symlink_to(target)
+    store = JsonAdaptivePolicyStore(
+        path,
+        trusted_root_policy_versions=(dataset.config.policy_version,),
+    )
+    with pytest.raises(ValueError, match="symlink"):
+        store.snapshot()
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+    path.unlink()
+    lock = path.with_suffix(path.suffix + ".lock")
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    lock.symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        store.snapshot()
+
+
 def test_store_rejects_missing_or_reordered_transition_history(tmp_path) -> None:
     dataset, artifact = _artifact(seed=50)
     path = tmp_path / "policies.json"

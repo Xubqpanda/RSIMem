@@ -309,7 +309,7 @@ class JsonAdaptivePolicyStore:
         *,
         trusted_root_policy_versions: tuple[str, ...],
     ) -> None:
-        self.path = path.expanduser().resolve()
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         if not trusted_root_policy_versions:
             raise ValueError("adaptive policy store requires a trusted root")
         for value in trusted_root_policy_versions:
@@ -320,8 +320,12 @@ class JsonAdaptivePolicyStore:
 
     @contextmanager
     def _lock(self, operation: int):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        if self.path.is_symlink():
+            raise ValueError("adaptive policy store cannot be a symlink")
+        if lock_path.is_symlink():
+            raise ValueError("adaptive policy store lock cannot be a symlink")
+        self.path.parent.mkdir(parents=True, exist_ok=True)
         with lock_path.open("w", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), operation)
             try:
@@ -340,6 +344,8 @@ class JsonAdaptivePolicyStore:
         }
 
     def _read_unlocked(self) -> dict[str, object]:
+        if self.path.is_symlink():
+            raise ValueError("adaptive policy store cannot be a symlink")
         if not self.path.exists():
             return self._empty()
         try:
@@ -450,6 +456,8 @@ class JsonAdaptivePolicyStore:
         }
 
     def _write_unlocked(self, payload: dict[str, object]) -> None:
+        if self.path.is_symlink():
+            raise ValueError("adaptive policy store cannot be a symlink")
         serialized = {
             "schema_version": ADAPTIVE_POLICY_STORE_SCHEMA_VERSION,
             "trusted_root_policy_versions": list(self.trusted_roots),
