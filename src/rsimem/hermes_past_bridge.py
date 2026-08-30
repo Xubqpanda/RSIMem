@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import re
 from dataclasses import replace
@@ -908,6 +909,9 @@ class HermesPastBenchBridge:
     def _record_runtime_opportunities(
         self,
         result: Mapping[str, Any],
+        *,
+        source_provenance_id: str | None = None,
+        persist: bool = True,
     ) -> tuple[OpportunityEvidence, ...]:
         provider = self._opportunity_evidence_provider
         if provider is None:
@@ -931,7 +935,11 @@ class HermesPastBenchBridge:
                     values.append(item)
                 else:
                     values.append(OpportunityEvidence.from_payload(item))
-            recorded = self.record_opportunity_evidence(tuple(values))
+            recorded = (
+                self.record_opportunity_evidence(tuple(values))
+                if persist
+                else tuple(values)
+            )
             self._last_runtime_opportunities = recorded
             return recorded
         # Keep benchmark scope out of the runtime opportunity surface.  The
@@ -943,12 +951,34 @@ class HermesPastBenchBridge:
         # produced the memory.  Do this conditionally to preserve the exact
         # scope-free payload shape for hosts with no prior sources.
         prior_sources = tuple(self.pure_extraction_source_store.records())
-        if prior_sources and isinstance(visible, Mapping):
+        if isinstance(visible, Mapping):
             visible = dict(visible)
-            visible["rsimem_source_provenance_ids"] = tuple(
-                source.provenance_id for source in prior_sources
-            )
-        recorded = self.record_opportunity_evidence(provider(visible))
+            if prior_sources:
+                # Keep the original compact identity list for existing host
+                # providers and add semantic-key/artifact descriptors for the
+                # built-in PAST provider.  All fields are content-free.
+                visible["rsimem_source_provenance_ids"] = tuple(
+                    source.provenance_id for source in prior_sources
+                )
+                visible["rsimem_source_records"] = tuple(
+                    {
+                        "provenance_id": source.provenance_id,
+                        "semantic_keys": tuple(source.source.available_semantic_keys),
+                        "artifact_ids": tuple(
+                            fact.artifact_id
+                            for fact in source.source.facts
+                            if fact.artifact_id is not None
+                        ),
+                    }
+                    for source in prior_sources
+                )
+            if source_provenance_id is not None:
+                visible["rsimem_source_provenance_id"] = source_provenance_id
+        values = provider(visible)
+        if isinstance(values, (str, bytes, Mapping)):
+            raise TypeError("opportunity provider must return an iterable")
+        values = tuple(values)
+        recorded = self.record_opportunity_evidence(values) if persist else values
         self._last_runtime_opportunities = recorded
         return recorded
 
@@ -1083,7 +1113,11 @@ class HermesPastBenchBridge:
                             for item in self._static_results
                         ):
                             self._static_results.append(compiled)
-                        self._record_pure_extraction_source(compiled, snapshot=snapshot)
+                        self._record_pure_extraction_source(
+                            compiled,
+                            snapshot=snapshot,
+                            result=result,
+                        )
                         self._record_extraction_source(compiled)
                         self._record_static_policy_evidence(compiled, snapshot, trigger_event)
                 except Exception as exc:
@@ -2079,6 +2113,7 @@ class HermesPastBenchBridge:
         boundary: StaticSemanticBoundaryResult,
         *,
         snapshot: ContextSnapshot,
+        result: Mapping[str, Any] | None = None,
     ) -> PureExtractionSourceRecord | None:
         """Persist a deployment-only source record for every live extraction.
 
@@ -2112,6 +2147,21 @@ class HermesPastBenchBridge:
             "pure-extraction-provenance."
             + hashlib.sha256(boundary.compilation_id.encode("utf-8")).hexdigest()[:40]
         )
+        visible_semantic_keys: tuple[str, ...] = ()
+        if result is not None and self._opportunity_evidence_provider is not None:
+            # Let an application-owned provider annotate the source from the
+            # same visible completion boundary.  Source-time opportunities
+            # are intentionally not persisted: they describe the current
+            # input and would otherwise be mistaken for a future opportunity
+            # during delayed attribution.
+            source_opportunities = self._record_runtime_opportunities(
+                result,
+                source_provenance_id=provenance_id,
+                persist=False,
+            )
+            visible_semantic_keys = tuple(dict.fromkeys(
+                value.semantic_requirement for value in source_opportunities
+            ))
         record = self.pure_extraction_source_projector.project_record(
             boundary,
             self.static_writeback.policy,
@@ -2119,15 +2169,47 @@ class HermesPastBenchBridge:
             source_projection_id=projection.projection_id,
             context_revision=snapshot.context_revision,
             provenance_id=provenance_id,
+            visible_semantic_keys=visible_semantic_keys,
         )
         self.pure_extraction_source_store.append(record)
+        self._record_artifact_set_bindings(
+            record.source,
+            provenance_id=record.provenance_id,
+        )
         return record
 
-    def _record_artifact_set_bindings(self, source: object) -> None:
+    def _record_artifact_set_bindings(
+        self,
+        source: object,
+        *,
+        provenance_id: str | None = None,
+    ) -> None:
         provider = self._artifact_set_binding_provider
         if provider is None:
             return
-        values = provider(source)
+        # New application providers may request the trusted source
+        # provenance explicitly.  Preserve the one-argument callback used by
+        # existing integrations and fixtures.
+        accepts_provenance = False
+        try:
+            parameters = inspect.signature(provider).parameters.values()
+            accepts_provenance = any(
+                parameter.kind
+                in {
+                    inspect.Parameter.VAR_KEYWORD,
+                }
+                or parameter.name == "provenance_id"
+                for parameter in parameters
+            )
+        except (TypeError, ValueError):
+            # Some extension callables do not expose a Python signature; use
+            # the legacy one-argument form for those providers.
+            accepts_provenance = False
+        values = (
+            provider(source, provenance_id=provenance_id)
+            if accepts_provenance
+            else provider(source)
+        )
         if isinstance(values, ArtifactSetSemanticBinding):
             values = (values,)
         if isinstance(values, (str, bytes, Mapping)):
