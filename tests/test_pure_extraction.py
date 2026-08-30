@@ -16,6 +16,8 @@ from rsimem.memory.pure_extraction import (
     PureExtractionOptimizerExample,
     PureExtractionSourceRecord,
 )
+from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
+from rsimem.memory.use_attribution import MemoryUseEvidence, OutcomeEvidenceKind
 from test_extraction_optimizer_builder import _fixture
 
 
@@ -156,3 +158,60 @@ def test_pure_optimizer_builder_joins_only_pure_records() -> None:
             source=source,  # type: ignore[arg-type]
             feedback=pure_feedback,
         )
+
+
+def test_pure_feedback_derivation_is_conservative_and_replay_stable() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.create(
+        source_projection_id=projection.projection_id,
+        source_projection_digest=projection.projection_digest,
+        context_revision=projection.context_revision,
+        extraction_set_id=source.source.extraction_set_id,
+        extraction_artifact_id=source.extraction_artifact_id,
+        extraction_artifact_digest=source.extraction_artifact_digest,
+        extraction_output_digest=source.extraction_output_digest,
+        source=source.source,
+        activation=source.activation,
+        provenance_id="provenance.pure-v3",
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement="preference.summary.tsv",
+        observation_time="2026-08-22T00:00:00Z",
+        operation_id="op.opportunity.pure-v3",
+        provenance_id="provenance.pure-v3",
+        source_payload={"tool": "render_table", "schema": "tsv"},
+    )
+    use = MemoryUseEvidence.create(
+        artifact_ids=("artifact.memory-v1",),
+        retrieval_operation_id="op.retrieval.pure-v3",
+        retrieved_artifact_ids=("artifact.memory-v1",),
+        injection_operation_id="op.injection.pure-v3",
+        injected_artifact_ids=("artifact.memory-v1",),
+        downstream_operation_id="op.use.pure-v3",
+        used_artifact_ids=("artifact.memory-v1",),
+        outcome_operation_id="op.outcome.pure-v3",
+        outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+        outcome_success=True,
+        observation_cutoff="2026-08-23T00:00:00Z",
+        provenance_id="provenance.pure-v3",
+    )
+    derived = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=use,
+        observation_window="window.completed-v3",
+        provenance_id="provenance.pure-v3",
+    )
+    assert derived.attribution is PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
+    assert PureExtractionFeedbackRecord.from_payload(derived.payload()) == derived
+
+    confounded = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=use,
+        observation_window="window.completed-v3",
+        provenance_id="provenance.pure-v3",
+        current_input_requirements=("preference.summary.tsv",),
+    )
+    assert confounded.attribution is PureExtractionAttribution.UNRESOLVED
