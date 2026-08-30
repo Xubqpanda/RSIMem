@@ -128,10 +128,11 @@ def build_hermes_extra_body(
             else "disabled"
         ),
     }
+    application_schema = None
     if rsimem_application_opportunity_schema is not None:
         # The schema is public application metadata, not benchmark evidence.
         # Keep a defensive JSON-compatible copy at the runtime boundary.
-        semantic_writeback["application_opportunity_schema"] = json.loads(
+        application_schema = json.loads(
             json.dumps(rsimem_application_opportunity_schema, ensure_ascii=True, sort_keys=True)
         )
     if semantic_writeback_mode in {"static", "static_utility", "adaptive_utility"}:
@@ -242,6 +243,7 @@ def build_hermes_extra_body(
                 "adapter_failure_policy": rsimem_adapter_failure_policy,
                 "verify_native_projection": rsimem_verify_native_projection,
                 "evidence_path": str(artifacts_dir / "rsimem_memory_events.jsonl"),
+                "application_opportunity_schema": application_schema,
                 "lifecycle": {
                     "evaluator_mode": rsimem_lifecycle_evaluator_mode,
                     "policy_version": rsimem_lifecycle_policy_version,
