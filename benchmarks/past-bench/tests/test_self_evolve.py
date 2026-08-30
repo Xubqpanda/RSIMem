@@ -255,6 +255,13 @@ def test_static_semantic_writeback_isolated_from_native_and_no_persistence(
 def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
     tmp_path: Path,
 ) -> None:
+    from rsimem.memory.opportunity import ApplicationOpportunitySchema
+
+    application_contract = ApplicationOpportunitySchema.create(
+        schema_id="fixture.application.v1",
+        version="v1",
+        requirement_ids=("application.fixture.policy",),
+    )
     common = {
         "home_dir": tmp_path / "home",
         "artifacts_dir": tmp_path / "artifacts",
@@ -270,6 +277,12 @@ def test_adaptive_semantic_writeback_transport_is_strict_and_fail_closed(
         "rsimem_lifecycle_evaluator_mode": "deterministic",
         "rsimem_semantic_writeback_mode": "adaptive_utility",
         "rsimem_semantic_feedback_contract": "sm01_tsv_v1",
+        "rsimem_application_opportunity_schema": {
+            "schema_id": "fixture.application.v1",
+            "schema_version": 1,
+            "application_contract": application_contract.payload(),
+            "opportunities": [],
+        },
     }
     source_store = tmp_path / "adaptive-policy-store.json"
     source_store.write_text('{"active": true}\n', encoding="utf-8")
