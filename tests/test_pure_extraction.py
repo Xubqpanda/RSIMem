@@ -95,6 +95,49 @@ def test_pure_feedback_requires_censored_status_for_incomplete_observation() -> 
     assert PureExtractionFeedbackRecord.from_payload(censored.payload()) == censored
 
 
+def test_pure_feedback_requires_one_provenance_across_evidence_joins() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.join-source-v1",
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.USER_REQUEST,
+        semantic_requirement="preference.summary.tsv",
+        observation_time="2026-08-22T00:00:00Z",
+        operation_id="op.opportunity.join-v1",
+        provenance_id="provenance.join-other-v1",
+        source_payload={"request": "summary"},
+    )
+    with pytest.raises(ValueError, match="source provenance"):
+        PureExtractionFeedbackRecord.derive_from_evidence(
+            source=pure_source,
+            opportunity=None,
+            memory_use=None,
+            observation_window="window.join-v1",
+            provenance_id="provenance.join-other-v1",
+        )
+    with pytest.raises(ValueError, match="opportunity provenance"):
+        PureExtractionFeedbackRecord.derive_from_evidence(
+            source=pure_source,
+            opportunity=opportunity,
+            memory_use=None,
+            observation_window="window.join-v1",
+            provenance_id=pure_source.provenance_id,
+        )
+    with pytest.raises(ValueError, match="opportunity provenance"):
+        PureExtractionFeedbackRecord.create(
+            source_record_id=pure_source.record_id,
+            source_projection_digest=pure_source.source_projection_digest,
+            extraction_set_id=pure_source.extraction_set_id,
+            opportunity=opportunity,
+            memory_use=None,
+            observation_window="window.join-v1",
+            provenance_id=pure_source.provenance_id,
+        )
+
+
 def test_pure_feedback_store_is_restart_safe_and_rejects_benchmark_fields(tmp_path) -> None:
     _, source, *_ = _fixture()
     record = PureExtractionFeedbackRecord.create(
