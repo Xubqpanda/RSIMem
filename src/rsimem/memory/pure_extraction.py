@@ -14,6 +14,7 @@ import json
 import os
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Iterator, Mapping
@@ -39,6 +40,8 @@ PURE_EXTRACTION_FEEDBACK_SCHEMA = "rsimem-pure-extraction-feedback-v1"
 PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION = 1
 PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION = 1
 PURE_EXTRACTION_OPTIMIZER_SCHEMA = "rsimem-pure-extraction-optimizer-v1"
+PURE_EXTRACTION_CORPUS_SCHEMA_VERSION = 1
+PURE_EXTRACTION_CORPUS_SCHEMA = "rsimem-pure-extraction-corpus-v1"
 _IDENTIFIER = r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$"
 
 
@@ -854,6 +857,105 @@ class PureExtractionOptimizerExample:
         return result
 
 
+@dataclass(frozen=True, slots=True)
+class PureExtractionOptimizerCorpus:
+    """Replay-stable collection of pure extraction optimizer identities."""
+
+    corpus_id: str
+    split: str
+    observation_cutoff: str
+    examples: tuple[PureExtractionOptimizerExample, ...]
+    schema_version: int = PURE_EXTRACTION_CORPUS_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != PURE_EXTRACTION_CORPUS_SCHEMA_VERSION:
+            raise ValueError("unsupported pure extraction corpus schema")
+        _id(self.corpus_id, "pure extraction corpus ID")
+        if self.split not in {"train", "validation", "future_test"}:
+            raise ValueError("pure extraction corpus split is invalid")
+        if not isinstance(self.observation_cutoff, str):
+            raise ValueError("pure extraction corpus cutoff is invalid")
+        try:
+            datetime.fromisoformat(self.observation_cutoff.removesuffix("Z") + "+00:00")
+        except ValueError as exc:
+            raise ValueError("pure extraction corpus cutoff is invalid") from exc
+        if not self.examples:
+            raise ValueError("pure extraction corpus requires examples")
+        if any(not isinstance(value, PureExtractionOptimizerExample) for value in self.examples):
+            raise TypeError("pure extraction corpus example has the wrong type")
+        ids = tuple(value.example_id for value in self.examples)
+        if len(ids) != len(set(ids)):
+            raise ValueError("pure extraction corpus examples must be unique")
+        if ids != tuple(sorted(ids)):
+            raise ValueError("pure extraction corpus examples must be canonically ordered")
+        expected = f"pure-extraction-corpus.{content_digest(self.identity_payload())[:40]}"
+        if self.corpus_id != expected:
+            raise ValueError("pure extraction corpus ID mismatch")
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "split": self.split,
+            "observation_cutoff": self.observation_cutoff,
+            "example_ids": [value.example_id for value in self.examples],
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema": PURE_EXTRACTION_CORPUS_SCHEMA,
+            "corpus_id": self.corpus_id,
+            **self.identity_payload(),
+            "examples": [value.payload() for value in self.examples],
+        }
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        split: str,
+        observation_cutoff: str,
+        examples: tuple[PureExtractionOptimizerExample, ...],
+    ) -> "PureExtractionOptimizerCorpus":
+        ordered = tuple(sorted(examples, key=lambda value: value.example_id))
+        identity = {
+            "schema_version": PURE_EXTRACTION_CORPUS_SCHEMA_VERSION,
+            "split": split,
+            "observation_cutoff": observation_cutoff,
+            "example_ids": [value.example_id for value in ordered],
+        }
+        return cls(
+            corpus_id=f"pure-extraction-corpus.{content_digest(identity)[:40]}",
+            split=split,
+            observation_cutoff=observation_cutoff,
+            examples=ordered,
+        )
+
+    @classmethod
+    def from_payload(cls, value: object) -> "PureExtractionOptimizerCorpus":
+        fields = {
+            "schema", "corpus_id", "schema_version", "split", "observation_cutoff",
+            "example_ids", "examples",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != PURE_EXTRACTION_CORPUS_SCHEMA:
+            raise ValueError("malformed pure extraction optimizer corpus")
+        if not isinstance(value["example_ids"], list) or not isinstance(value["examples"], list):
+            raise ValueError("malformed pure extraction corpus collections")
+        try:
+            examples = tuple(PureExtractionOptimizerExample.from_payload(item) for item in value["examples"])
+            result = cls(
+                corpus_id=value["corpus_id"],
+                split=value["split"],
+                observation_cutoff=value["observation_cutoff"],
+                examples=examples,
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed pure extraction optimizer corpus") from exc
+        if list(item.example_id for item in result.examples) != value["example_ids"] or result.payload() != dict(value):
+            raise ValueError("non-canonical pure extraction optimizer corpus")
+        return result
+
+
 class _JsonPureExtractionStore:
     record_type = PureExtractionSourceRecord
 
@@ -915,6 +1017,66 @@ class _JsonPureExtractionStore:
         return True
 
 
+class JsonPureExtractionOptimizerCorpusStore:
+    """Crash-safe persistence for the pure-process optimizer projection."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path).expanduser().resolve()
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+
+    @contextmanager
+    def _lock(self, operation: int) -> Iterator[None]:
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), operation)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+    def write(self, corpus: PureExtractionOptimizerCorpus) -> bool:
+        if not isinstance(corpus, PureExtractionOptimizerCorpus):
+            raise TypeError("pure extraction corpus store received the wrong type")
+        serialized = _canonical(corpus.payload()) + "\n"
+        with self._lock(fcntl.LOCK_EX):
+            if self.path.exists():
+                existing = self._read_unlocked()
+                if existing != corpus:
+                    raise ValueError("conflicting pure extraction optimizer corpus")
+                return False
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("w", encoding="utf-8") as handle:
+                handle.write(serialized)
+                handle.flush()
+                os.fsync(handle.fileno())
+        return True
+
+    def read(self) -> PureExtractionOptimizerCorpus:
+        with self._lock(fcntl.LOCK_SH):
+            result = self._read_unlocked()
+        if result is None:
+            raise FileNotFoundError("pure extraction optimizer corpus has not been persisted")
+        return result
+
+    def read_for_optimizer(self) -> PureExtractionOptimizerCorpus:
+        result = self.read()
+        if result.split != "train":
+            raise PermissionError("pure optimizer can read only the training corpus")
+        for example in result.examples:
+            if example.evidence_plane is not EvidencePlane.PURE_PROCESS:
+                raise ValueError("pure optimizer corpus contains non-pure evidence")
+        return result
+
+    def _read_unlocked(self) -> PureExtractionOptimizerCorpus | None:
+        if not self.path.exists():
+            return None
+        try:
+            value = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("malformed pure extraction optimizer corpus store") from exc
+        return PureExtractionOptimizerCorpus.from_payload(value)
+
+
 class JsonPureExtractionSourceRecordStore(_JsonPureExtractionStore):
     record_type = PureExtractionSourceRecord
 
@@ -927,14 +1089,18 @@ __all__ = [
     "PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION",
     "PURE_EXTRACTION_FEEDBACK_SCHEMA",
     "PURE_EXTRACTION_FEEDBACK_SCHEMA_VERSION",
+    "PURE_EXTRACTION_CORPUS_SCHEMA",
+    "PURE_EXTRACTION_CORPUS_SCHEMA_VERSION",
     "PURE_EXTRACTION_OPTIMIZER_SCHEMA",
     "PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION",
     "PURE_EXTRACTION_SOURCE_SCHEMA",
     "PURE_EXTRACTION_SOURCE_SCHEMA_VERSION",
     "JsonPureExtractionFeedbackRecordStore",
+    "JsonPureExtractionOptimizerCorpusStore",
     "JsonPureExtractionSourceRecordStore",
     "PureExtractionAttribution",
     "PureExtractionFeedbackRecord",
     "PureExtractionOptimizerExample",
+    "PureExtractionOptimizerCorpus",
     "PureExtractionSourceRecord",
 ]

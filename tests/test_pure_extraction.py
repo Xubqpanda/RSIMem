@@ -10,10 +10,12 @@ from rsimem.memory.extraction_optimizer_builder import (
 )
 from rsimem.memory.pure_extraction import (
     JsonPureExtractionFeedbackRecordStore,
+    JsonPureExtractionOptimizerCorpusStore,
     JsonPureExtractionSourceRecordStore,
     PureExtractionAttribution,
     PureExtractionFeedbackRecord,
     PureExtractionOptimizerExample,
+    PureExtractionOptimizerCorpus,
     PureExtractionSourceRecord,
 )
 from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
@@ -120,6 +122,50 @@ def test_pure_optimizer_rejects_unbound_observation_window() -> None:
     )
     with pytest.raises(ValueError, match="observation window is unbound"):
         PureExtractionOptimizerExample.from_records(pure_source, feedback)
+
+
+def test_pure_optimizer_corpus_is_sorted_and_restart_safe(tmp_path) -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.corpus-v1",
+    )
+    feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.completed-v1",
+        provenance_id="provenance.corpus-v1",
+    )
+    example = PureExtractionOptimizerExample.from_records(pure_source, feedback)
+    corpus = PureExtractionOptimizerCorpus.create(
+        split="train",
+        observation_cutoff="2026-08-24T00:00:00Z",
+        examples=(example,),
+    )
+    path = tmp_path / "pure-optimizer.json"
+    store = JsonPureExtractionOptimizerCorpusStore(path)
+    assert store.write(corpus) is True
+    assert store.write(corpus) is False
+    assert store.read_for_optimizer() == corpus
+
+    payload = corpus.payload()
+    payload["schema_version"] = 0
+    with pytest.raises(ValueError, match="malformed|unsupported"):
+        PureExtractionOptimizerCorpus.from_payload(payload)
+
+    validation = PureExtractionOptimizerCorpus.create(
+        split="validation",
+        observation_cutoff="2026-08-24T00:00:00Z",
+        examples=(example,),
+    )
+    validation_path = tmp_path / "pure-validation.json"
+    JsonPureExtractionOptimizerCorpusStore(validation_path).write(validation)
+    with pytest.raises(PermissionError, match="training"):
+        JsonPureExtractionOptimizerCorpusStore(validation_path).read_for_optimizer()
 
 
 def test_family_bound_optimizer_builder_does_not_accept_pure_projection() -> None:
