@@ -957,6 +957,7 @@ class PureExtractionOptimizerCorpus:
     process_signal_case_digest: str | None = None
     process_signal_case_count: int = 0
     process_signal_optimization_count: int = 0
+    process_signal_hypothesis_digest: str | None = None
     schema_version: int = PURE_EXTRACTION_CORPUS_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -973,6 +974,11 @@ class PureExtractionOptimizerCorpus:
             _id(self.process_signal_protocol_id, "pure process-signal protocol ID")
         if self.process_signal_case_digest is not None:
             _digest(self.process_signal_case_digest, "pure process-signal case digest")
+        if self.process_signal_hypothesis_digest is not None:
+            _digest(
+                self.process_signal_hypothesis_digest,
+                "pure process-signal hypothesis digest",
+            )
         for value, name in (
             (self.process_signal_case_count, "pure process-signal case count"),
             (self.process_signal_optimization_count, "pure process-signal optimization count"),
@@ -995,6 +1001,7 @@ class PureExtractionOptimizerCorpus:
             self.process_signal_case_digest is not None,
             self.process_signal_case_count,
             self.process_signal_optimization_count,
+            self.process_signal_hypothesis_digest is not None,
         )):
             raise ValueError("unbound pure process-signal corpus cannot carry evidence")
         # A ready corpus must satisfy the same replicated-signal minimum as
@@ -1039,6 +1046,7 @@ class PureExtractionOptimizerCorpus:
             "process_signal_case_digest": self.process_signal_case_digest,
             "process_signal_case_count": self.process_signal_case_count,
             "process_signal_optimization_count": self.process_signal_optimization_count,
+            "process_signal_hypothesis_digest": self.process_signal_hypothesis_digest,
         }
 
     def payload(self) -> dict[str, object]:
@@ -1067,6 +1075,7 @@ class PureExtractionOptimizerCorpus:
         process_signal_case_digest: str | None = None,
         process_signal_case_count: int = 0,
         process_signal_optimization_count: int = 0,
+        process_signal_hypothesis_digest: str | None = None,
     ) -> "PureExtractionOptimizerCorpus":
         ordered = tuple(sorted(examples, key=lambda value: value.example_id))
         identity = {
@@ -1079,6 +1088,7 @@ class PureExtractionOptimizerCorpus:
             "process_signal_case_digest": process_signal_case_digest,
             "process_signal_case_count": process_signal_case_count,
             "process_signal_optimization_count": process_signal_optimization_count,
+            "process_signal_hypothesis_digest": process_signal_hypothesis_digest,
         }
         return cls(
             corpus_id=f"pure-extraction-corpus.{content_digest(identity)[:40]}",
@@ -1090,6 +1100,7 @@ class PureExtractionOptimizerCorpus:
             process_signal_case_digest=process_signal_case_digest,
             process_signal_case_count=process_signal_case_count,
             process_signal_optimization_count=process_signal_optimization_count,
+            process_signal_hypothesis_digest=process_signal_hypothesis_digest,
         )
 
     @classmethod
@@ -1119,10 +1130,20 @@ class PureExtractionOptimizerCorpus:
         if process_signal_case_digest is not None and process_signal_case_digest != expected_case_digest:
             raise ValueError("pure extraction process-signal case digest mismatch")
         optimization_count = int(census.status_counts.get("optimization_signal", 0))
+        hypothesis_counts = getattr(census, "optimization_hypothesis_case_counts", {})
+        if not isinstance(hypothesis_counts, Mapping):
+            raise ValueError("pure extraction process-signal hypothesis counts are invalid")
+        supporting_hypotheses = {
+            digest
+            for digest, count in hypothesis_counts.items()
+            if type(count) is int and count >= 2
+        }
+        hypothesis_digest = next(iter(supporting_hypotheses), None) if len(supporting_hypotheses) == 1 else None
         ready = (
             census.logical_case_count >= 2
             and census.conflict_case_count == 0
             and optimization_count >= 2
+            and hypothesis_digest is not None
         )
         return cls.create(
             split=split,
@@ -1133,6 +1154,7 @@ class PureExtractionOptimizerCorpus:
             process_signal_case_digest=expected_case_digest,
             process_signal_case_count=census.logical_case_count,
             process_signal_optimization_count=optimization_count,
+            process_signal_hypothesis_digest=hypothesis_digest,
         )
 
     @classmethod
@@ -1142,6 +1164,7 @@ class PureExtractionOptimizerCorpus:
             "example_ids", "examples", "process_signal_gate",
             "process_signal_protocol_id", "process_signal_case_digest",
             "process_signal_case_count", "process_signal_optimization_count",
+            "process_signal_hypothesis_digest",
         }
         if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != PURE_EXTRACTION_CORPUS_SCHEMA:
             raise ValueError("malformed pure extraction optimizer corpus")
@@ -1159,6 +1182,7 @@ class PureExtractionOptimizerCorpus:
                 process_signal_case_digest=value["process_signal_case_digest"],
                 process_signal_case_count=value["process_signal_case_count"],
                 process_signal_optimization_count=value["process_signal_optimization_count"],
+                process_signal_hypothesis_digest=value["process_signal_hypothesis_digest"],
                 schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -1494,6 +1518,10 @@ class JsonPureExtractionOptimizerCorpusStore:
         if result.process_signal_gate != "ready":
             raise PermissionError(
                 "pure optimizer process-signal gate is not ready"
+            )
+        if result.process_signal_hypothesis_digest is None:
+            raise PermissionError(
+                "pure optimizer process-signal hypothesis is not bound"
             )
         if revocation_registry is not None:
             from .revocation import JsonRevocationRegistry

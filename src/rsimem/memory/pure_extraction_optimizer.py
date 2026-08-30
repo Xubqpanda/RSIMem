@@ -722,6 +722,10 @@ def build_pure_extraction_optimizer_request(
         raise ValueError("pure optimizer request requires the training corpus")
     if corpus.process_signal_gate != "ready":
         raise ValueError("pure optimizer request requires a ready process-signal gate")
+    if corpus.process_signal_hypothesis_digest is None:
+        raise ValueError(
+            "pure optimizer request requires a bound process-signal hypothesis"
+        )
     require_optimizer_plane(EvidencePlane.PURE_PROCESS)
     capture_by_id = _capture_for(captures)
     corpus_example_ids = {example.example_id for example in corpus.examples}

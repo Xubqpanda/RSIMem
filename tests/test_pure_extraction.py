@@ -268,6 +268,7 @@ def test_pure_optimizer_corpus_is_sorted_and_restart_safe(tmp_path) -> None:
         process_signal_case_digest="a" * 64,
         process_signal_case_count=2,
         process_signal_optimization_count=2,
+        process_signal_hypothesis_digest="b" * 64,
     )
     path = tmp_path / "pure-optimizer.json"
     store = JsonPureExtractionOptimizerCorpusStore(path)
@@ -388,6 +389,79 @@ def test_pure_corpus_factory_rejects_single_optimization_case() -> None:
     assert corpus.process_signal_gate == "no_signal"
 
 
+def test_pure_corpus_factory_requires_shared_hypothesis_across_logical_cases() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.census-shared-v1",
+    )
+    feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.completed-census-shared-v1",
+        provenance_id="provenance.census-shared-v1",
+    )
+    example = PureExtractionOptimizerExample.from_records(pure_source, feedback)
+    hypothesis = "a" * 64
+    census = ProcessSignalCaseCensus(
+        physical_observation_count=2,
+        logical_case_count=2,
+        status_counts={"optimization_signal": 2},
+        conflict_case_count=0,
+        optimization_hypothesis_case_counts={hypothesis: 2},
+    )
+    corpus = PureExtractionOptimizerCorpus.create_from_process_signal_census(
+        split="train",
+        observation_cutoff="2026-08-24T00:00:00Z",
+        examples=(example,),
+        process_signal_protocol_id="protocol.census-shared-v1",
+        process_signal_case_digest=None,
+        census=census,
+    )
+    assert corpus.process_signal_gate == "ready"
+    assert corpus.process_signal_hypothesis_digest == hypothesis
+
+
+def test_pure_corpus_factory_rejects_multiple_shared_hypotheses() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.census-multi-v1",
+    )
+    feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.completed-census-multi-v1",
+        provenance_id="provenance.census-multi-v1",
+    )
+    example = PureExtractionOptimizerExample.from_records(pure_source, feedback)
+    census = ProcessSignalCaseCensus(
+        physical_observation_count=4,
+        logical_case_count=4,
+        status_counts={"optimization_signal": 4},
+        conflict_case_count=0,
+        optimization_hypothesis_case_counts={"a" * 64: 2, "b" * 64: 2},
+    )
+    corpus = PureExtractionOptimizerCorpus.create_from_process_signal_census(
+        split="train",
+        observation_cutoff="2026-08-24T00:00:00Z",
+        examples=(example,),
+        process_signal_protocol_id="protocol.census-multi-v1",
+        process_signal_case_digest=None,
+        census=census,
+    )
+    assert corpus.process_signal_gate == "no_signal"
+    assert corpus.process_signal_hypothesis_digest is None
+
+
 def test_pure_corpus_rejects_inconsistent_process_signal_counts() -> None:
     projection, source, *_ = _fixture()
     pure_source = PureExtractionSourceRecord.from_family_record(
@@ -454,6 +528,7 @@ def test_pure_optimizer_store_honors_shared_revocation_registry(tmp_path) -> Non
         process_signal_case_digest="a" * 64,
         process_signal_case_count=2,
         process_signal_optimization_count=2,
+        process_signal_hypothesis_digest="b" * 64,
     )
     corpus_store = JsonPureExtractionOptimizerCorpusStore(tmp_path / "corpus.json")
     corpus_store.write(corpus)
