@@ -8,7 +8,7 @@
 
 ## Fixture
 
-Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable preference（TSV 输出偏好）和一个 temporary formatting request。`DeterministicPolicyReplay` 在相同 event、snapshot revision、backend descriptor 和 lineage 下生成 parent/candidate。candidate artifact 只声明一个目标 policy layer；replay audit 必须先通过，才允许构造 `LayerIntervention`。
+Fixture 使用一个 completed Hermes-style snapshot，包含一个 durable preference（TSV 输出偏好）和一个 temporary formatting request。`DeterministicPolicyReplay` 在相同 event、snapshot revision、backend descriptor 和 lineage 下生成 parent/candidate。candidate artifact 只声明一个目标 policy layer；replay audit 必须先通过，才允许构造 `LayerIntervention`。单层 intervention 还会比较 target 之前的所有 decision，任何上游 drift 都会被拒绝；target 之后的差异只有在目标层改变后作为派生结果保留。
 
 覆盖的 intervention：
 
