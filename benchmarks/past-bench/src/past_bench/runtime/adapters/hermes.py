@@ -107,8 +107,7 @@ def _past_semantic_keys(result: Mapping[str, Any]) -> tuple[str, ...]:
         "share" in text
         and any(token in text for token in (
             "recipient", "external", "employee", "roster", "never share",
-            "must not share", "do not share", "owners",
-            "people who should receive", "source note",
+            "must not share", "do not share",
         ))
     ):
         # A recipient boundary is an opportunity only when the application
