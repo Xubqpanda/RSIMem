@@ -429,6 +429,11 @@ def test_analysis_reports_persisted_logical_process_signal_census(tmp_path: Path
     JsonProcessSignalCaseStore(run / "process_signal_cases.jsonl").append(case)
     report = analyze_extraction_batch(root)
     assert report["processSignalCases"]["caseCount"] == 1
+    assert report["processSignalCases"]["boundCaseCount"] == 1
+    assert report["processSignalCases"]["replicateIds"] == [
+        f"replicate.{completed['replicate']}"
+    ]
+    assert report["processSignalCases"]["protocolId"].startswith("signal-protocol.")
     assert report["processSignalCases"]["logicalCaseCount"] == 1
     assert report["processSignalCases"]["physicalObservationCount"] == 1
 
