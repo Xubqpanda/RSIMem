@@ -121,3 +121,30 @@ def test_policy_evidence_ledger_rejects_symlinked_lock(tmp_path) -> None:
     path.with_name(path.name + ".lock").symlink_to(lock_target)
     with pytest.raises(ValueError, match="lock.*symlink"):
         JsonPolicyDecisionLedger(path)
+
+
+def test_policy_evidence_ledger_does_not_retain_deleted_file_cache(tmp_path) -> None:
+    path = tmp_path / "policy.jsonl"
+    ledger = JsonPolicyDecisionLedger(path, variant="native+ledger", trace_id="trace.fixture")
+    _record(ledger)
+    assert len(ledger.events) == 1
+    path.unlink()
+    ledger.record_decision(
+        TriggerDecision.create(
+            policy_version="fixed.trigger.parent.v1",
+            source_revision="snapshot.rev.1",
+            input_payload={"event": "event.fixture"},
+            output_payload={"action": "RUN"},
+            action="RUN",
+            execution_status="pending",
+            reason_codes=("task_completed_parent",),
+            lineage_id="lineage.fixture",
+            trigger_event_id="event.fixture",
+        ),
+        run_id="run.fixture",
+        episode_id="episode.fixture",
+        session_id="session.fixture",
+        task_id="task.fixture",
+        snapshot_id="snapshot.fixture",
+    )
+    assert len(ledger.events) == 1
