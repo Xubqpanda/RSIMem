@@ -244,6 +244,16 @@ def test_source_record_store_is_restart_safe_and_fails_closed(tmp_path) -> None:
         JsonExtractionSourceRecordStore(path).records()
 
 
+def test_extraction_source_store_rejects_symlinked_paths(tmp_path: Path) -> None:
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "sources.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonExtractionSourceRecordStore(path).records()
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
 def test_empty_source_record_remains_joinable_without_memory_artifact(tmp_path) -> None:
     runtime, boundary = _compile(tmp_path, facts=())
     try:

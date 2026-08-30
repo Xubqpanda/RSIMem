@@ -855,3 +855,18 @@ def test_feedback_dataset_log_is_idempotent_and_fails_closed(tmp_path) -> None:
     path.write_text('{"dataset_id":"partial"}\n', encoding="utf-8")
     with pytest.raises(ValueError, match="malformed extraction feedback"):
         JsonExtractionFeedbackDatasetLog(path).append(dataset)
+
+
+def test_feedback_dataset_log_rejects_symlinked_path(tmp_path) -> None:
+    dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+        _source((TSV_KEY,)),
+        _observation(SM01, (TSV_KEY,)),
+        _future((TSV_KEY,)),
+    )
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "feedback.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonExtractionFeedbackDatasetLog(path).append(dataset)
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
