@@ -83,6 +83,14 @@ class ExtractionOptimizerCorpusBuilder:
         delayed_content: DelayedEvidenceContent,
         forbidden_values: tuple[str, ...] = (),
     ) -> tuple[ExtractionOptimizerCorpusExample, ...]:
+        # This builder materializes the legacy family-bound audit path.  A
+        # deployment-only projection must use a dedicated pure-process
+        # builder; accepting it here would silently reintroduce family/stage
+        # labels into the optimizer corpus.
+        if not isinstance(source_record, ExtractionSourceRecord) or not isinstance(
+            feedback_record, LiveExtractionFeedbackRecord
+        ):
+            raise TypeError("family-bound optimizer builder requires family-bound source/feedback records")
         self._validate_record_join(projection, source_record, feedback_record)
         evidence_plane = self.evidence_plane or EvidencePlane(
             feedback_record.dataset.evidence_plane
