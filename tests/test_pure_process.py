@@ -128,6 +128,20 @@ def test_previous_pure_process_schema_is_not_silently_migrated() -> None:
         PureProcessCorpus.from_payload(payload)
 
 
+def test_pure_process_store_rejects_symlink_on_read_and_write(tmp_path) -> None:
+    corpus = PureProcessCorpus.create((_event(),))
+    target = tmp_path / "target.json"
+    target.write_text(json.dumps(corpus.payload()) + "\n", encoding="utf-8")
+    path = tmp_path / "pure-process.json"
+    path.symlink_to(target)
+    store = JsonPureProcessCorpusStore(path)
+    with pytest.raises(ValueError, match="symlink"):
+        store.get()
+    with pytest.raises(ValueError, match="symlink"):
+        store.put(corpus)
+    assert target.read_text(encoding="utf-8").endswith("\n")
+
+
 def test_evidence_plane_source_identity_is_least_privilege() -> None:
     assert validate_plane_source(
         EvidencePlane.PURE_PROCESS,
