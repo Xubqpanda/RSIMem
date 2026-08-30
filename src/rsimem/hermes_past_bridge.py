@@ -116,6 +116,9 @@ from .memory.artifact_set import (
     JsonArtifactSetBindingLog,
 )
 from .memory.pure_extraction import (
+    JsonPureExtractionFeedbackRecordStore,
+    JsonPureExtractionSourceRecordStore,
+    PureExtractionFeedbackRecord,
     PureExtractionSourceProjector,
     PureExtractionSourceRecord,
 )
@@ -412,6 +415,8 @@ class HermesPastBenchBridge:
         artifact_set_binding_provider: Callable[
             [object], Iterable[ArtifactSetSemanticBinding]
         ] | None = None,
+        pure_extraction_source_path: Path | None = None,
+        pure_extraction_feedback_path: Path | None = None,
     ) -> None:
         if config.mode == HermesExecutionMode.NATIVE:
             raise ValueError("native mode must not construct an RSIMem bridge")
@@ -425,6 +430,7 @@ class HermesPastBenchBridge:
         self._family_id = family_id
         self._stage = stage
         self._opportunity_evidence_provider = opportunity_evidence_provider
+        self._last_runtime_opportunities: tuple[OpportunityEvidence, ...] = ()
         self._opportunity_evidence_log = JsonOpportunityEvidenceLog(
             opportunity_evidence_path
             or self.evidence_path.with_name("rsimem_opportunities.jsonl")
@@ -437,6 +443,21 @@ class HermesPastBenchBridge:
         self._artifact_set_binding_log = JsonArtifactSetBindingLog(
             artifact_set_binding_path
             or self.evidence_path.with_name("rsimem_artifact_set_bindings.jsonl")
+        )
+        # Pure-process source/feedback stores are host-neutral and must be
+        # available even when the benchmark-audit feedback contract is
+        # disabled.  Sources live under the shared Hermes home so a later
+        # future task can join them; feedback is scoped to this run's
+        # evidence directory.  Both paths are overridable for isolated
+        # fixtures and external runners.
+        self.pure_extraction_source_projector = PureExtractionSourceProjector()
+        self.pure_extraction_source_store = JsonPureExtractionSourceRecordStore(
+            pure_extraction_source_path
+            or Path(hermes_home) / ".rsimem" / "pure_extraction_sources.jsonl"
+        )
+        self.pure_extraction_feedback_store = JsonPureExtractionFeedbackRecordStore(
+            pure_extraction_feedback_path
+            or self.evidence_path.with_name("rsimem_pure_extraction_feedback.jsonl")
         )
         self._snapshot_collector = HermesStateSnapshotCollector()
         self.ledger = MemoryLedgerObserver(
@@ -806,6 +827,18 @@ class HermesPastBenchBridge:
     def artifact_set_bindings(self) -> tuple[ArtifactSetSemanticBinding, ...]:
         return self._artifact_set_binding_log.records()
 
+    @property
+    def pure_extraction_sources(self) -> tuple[PureExtractionSourceRecord, ...]:
+        """Deployment-only extraction sources captured by this Hermes home."""
+
+        return tuple(self.pure_extraction_source_store.records())
+
+    @property
+    def pure_extraction_feedback(self) -> tuple[PureExtractionFeedbackRecord, ...]:
+        """Deployment-only feedback records emitted for this run."""
+
+        return tuple(self.pure_extraction_feedback_store.records())
+
     def project_pure_extraction_source(
         self,
         boundary: StaticSemanticBoundaryResult,
@@ -849,7 +882,9 @@ class HermesPastBenchBridge:
         # bridge may itself be running a PAST-Bench case, but family/stage are
         # audit metadata and must not influence a deployment-visible provider.
         visible = self._strip_benchmark_scope(result)
-        return self.record_opportunity_evidence(provider(visible))
+        recorded = self.record_opportunity_evidence(provider(visible))
+        self._last_runtime_opportunities = recorded
+        return recorded
 
     @staticmethod
     def _strip_benchmark_scope(value: object) -> object:
@@ -982,6 +1017,7 @@ class HermesPastBenchBridge:
                             for item in self._static_results
                         ):
                             self._static_results.append(compiled)
+                        self._record_pure_extraction_source(compiled, snapshot=snapshot)
                         self._record_extraction_source(compiled)
                         self._record_static_policy_evidence(compiled, snapshot, trigger_event)
                 except Exception as exc:
@@ -1254,6 +1290,7 @@ class HermesPastBenchBridge:
                 else None
             ),
         )
+        self._record_pure_extraction_feedback(result)
         completed = result.get("completed") is True
         outcome_digest = hashlib.sha256(
             json.dumps(
@@ -1278,6 +1315,135 @@ class HermesPastBenchBridge:
             execution_receipt_ids=(f"receipt.task-outcome.{outcome_digest[:24]}",),
         )
         self._semantic_outcomes_recorded = True
+
+    def _record_pure_extraction_feedback(
+        self,
+        result: Mapping[str, Any],
+    ) -> None:
+        """Materialize host-neutral feedback for previously captured sources.
+
+        The bridge emits one deterministic feedback record per source and
+        observation window.  Only opportunity/use evidence carrying the same
+        provenance and exact operation joins is attached; otherwise the
+        record remains ``unresolved``.  This makes the pure-process dataflow
+        automatic while preserving the fail-closed rule that benchmark
+        family metadata or an unbound final response cannot create a label.
+        """
+
+        if self.static_writeback is None:
+            return
+        current_compilations = {
+            item.compilation_id for item in self._static_results
+        }
+        sources = tuple(
+            source
+            for source in self.pure_extraction_source_store.records()
+            if source.activation.compilation_id not in current_compilations
+        )
+        if not sources:
+            return
+        opportunities = tuple(self._opportunity_evidence_log.records())
+        memory_uses = tuple(self._memory_use_evidence_log.records())
+        bindings = tuple(self._artifact_set_binding_log.records())
+        graph = (
+            materialize_operation_graph(self.static_writeback.operation_log.events)
+            if self.static_writeback is not None
+            else None
+        )
+        # Runtime opportunity providers are useful even when no benchmark
+        # feedback contract is enabled.  Avoid constructing the
+        # family-bound DeploymentObservation in that mode; collect only the
+        # deployment-visible current-input requirements needed by the pure
+        # resolver.
+        runtime_opportunities = self._last_runtime_opportunities
+        if not runtime_opportunities and self._opportunity_evidence_provider is not None:
+            runtime_opportunities = self._record_runtime_opportunities(result)
+        current_input_requirements = tuple(dict.fromkeys(
+            value.semantic_requirement
+            for value in runtime_opportunities
+            if value.source_surface is OpportunitySurface.CURRENT_INPUT
+        ))
+        current_input = self._current_input(result)
+        observation_window = (
+            "window."
+            + hashlib.sha256(
+                json.dumps(
+                    {
+                        "task_id": self._task_id,
+                        "current_input_digest": hashlib.sha256(
+                            current_input.encode("utf-8")
+                        ).hexdigest(),
+                        "runtime_opportunity_ids": [
+                            value.evidence_id for value in runtime_opportunities
+                        ],
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()[:40]
+        )
+        for source in sources:
+            # A source is only eligible for a feedback join after its own
+            # extraction completed.  Future evidence from another source or
+            # another provenance remains diagnostic and is not attached.
+            opportunity = next(
+                (
+                    value
+                    for value in opportunities
+                    if value.provenance_id == source.provenance_id
+                ),
+                None,
+            )
+            memory_use = next(
+                (
+                    value
+                    for value in memory_uses
+                    if value.provenance_id == source.provenance_id
+                ),
+                None,
+            )
+            binding = next(
+                (
+                    value
+                    for value in bindings
+                    if value.provenance_id == source.provenance_id
+                    and value.source_digest == source.source_projection_digest
+                ),
+                None,
+            )
+            joins: tuple[ToolCallResultJoin, ...] = ()
+            if memory_use is not None:
+                operation_ids = {
+                    operation_id
+                    for operation_id in (
+                        memory_use.retrieval_operation_id,
+                        memory_use.injection_operation_id,
+                        memory_use.downstream_operation_id,
+                        memory_use.outcome_operation_id,
+                    )
+                    if operation_id is not None
+                }
+                joins = tuple(
+                    join
+                    for join in self._tool_call_result_joins.values()
+                    if join.memory_use_operation_id in operation_ids
+                )
+            feedback = PureExtractionFeedbackRecord.derive_from_evidence(
+                source=source,
+                opportunity=opportunity,
+                memory_use=memory_use,
+                artifact_set_binding=binding,
+                tool_joins=joins,
+                observation_window=observation_window,
+                provenance_id=source.provenance_id,
+                current_input_requirements=current_input_requirements,
+                operation_graph=graph,
+                observation_complete=(
+                    result.get("partial") is not True
+                    and result.get("interrupted") is not True
+                ),
+            )
+            self.pure_extraction_feedback_store.append(feedback)
 
     def _record_memory_use_evidence(
         self,
@@ -1707,6 +1873,55 @@ class HermesPastBenchBridge:
             projection=projection,
             fact_contents=tuple(fact_contents),
         ))
+
+    def _record_pure_extraction_source(
+        self,
+        boundary: StaticSemanticBoundaryResult,
+        *,
+        snapshot: ContextSnapshot,
+    ) -> PureExtractionSourceRecord | None:
+        """Persist a deployment-only source record for every live extraction.
+
+        This path intentionally does not require a benchmark family/stage or
+        a semantic feedback contract.  It records the source projection,
+        extraction output and activation fingerprint as content-free identity;
+        optional semantic keys can be supplied later by an application-owned
+        provider.  Duplicate compilations are idempotent and fail closed when
+        their prior source record is missing.
+        """
+
+        if self.static_writeback is None:
+            return None
+        if boundary.duplicate:
+            existing = tuple(
+                record
+                for record in self.pure_extraction_source_store.records()
+                if record.activation.compilation_id == boundary.compilation_id
+            )
+            if not existing:
+                raise ValueError(
+                    "duplicate semantic compilation has no pure source evidence"
+                )
+            return existing[0]
+        projection = self.static_writeback.source_projection_for(
+            boundary.compilation_id
+        )
+        if projection is None:
+            raise ValueError("pure extraction source projection is unavailable")
+        provenance_id = (
+            "pure-extraction-provenance."
+            + hashlib.sha256(boundary.compilation_id.encode("utf-8")).hexdigest()[:40]
+        )
+        record = self.pure_extraction_source_projector.project_record(
+            boundary,
+            self.static_writeback.policy,
+            self.static_writeback.extraction_runtime_binding,
+            source_projection_id=projection.projection_id,
+            context_revision=snapshot.context_revision,
+            provenance_id=provenance_id,
+        )
+        self.pure_extraction_source_store.append(record)
+        return record
 
     def _record_artifact_set_bindings(self, source: object) -> None:
         provider = self._artifact_set_binding_provider
