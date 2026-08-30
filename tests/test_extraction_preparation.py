@@ -28,7 +28,11 @@ from rsimem.memory.extraction_projection import (
     JsonExtractionSourceRecordStore,
     JsonLiveExtractionFeedbackRecordLog,
 )
-from rsimem.memory.process_signal import JsonProcessSignalCaseStore, ProcessSignalCase
+from rsimem.memory.process_signal import (
+    JsonProcessSignalCaseStore,
+    ProcessSignalCase,
+    ProcessSignalCaseStatus,
+)
 from test_extraction_optimizer_builder import _fixture
 
 
@@ -246,6 +250,50 @@ def test_process_signal_gate_does_not_vote_over_conflicting_replicates(
     )
     assert gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
     assert protocol_id == "signal-protocol.conflict"
+    assert isinstance(case_digest, str) and len(case_digest) == 64
+    assert case_count == 2
+    assert optimization_count == 0
+    assert hypothesis is None
+
+
+def test_process_signal_gate_rejects_hypothesis_conflict_within_logical_case(
+    tmp_path: Path,
+) -> None:
+    store = JsonProcessSignalCaseStore(
+        tmp_path / "hypothesis-conflict" / "process_signal_cases.jsonl"
+    )
+
+    def case(physical_id: str, hypothesis: str) -> ProcessSignalCase:
+        return ProcessSignalCase.create(
+            logical_case_id="logical-case.hypothesis-conflict",
+            physical_observation_ids=(physical_id,),
+            source_observed=True,
+            extraction_observed=True,
+            persistence_observed=True,
+            retrieval_observed=True,
+            exposure_observed=True,
+            outcome_observed=True,
+            extraction_attributable=True,
+            abstract_hypothesis_digest=hypothesis,
+            observation_complete=True,
+            analysis_protocol_id="signal-protocol.hypothesis-conflict",
+            replicate_id=physical_id.replace(
+                "physical-observation", "replicate"
+            ),
+            observation_window="window.hypothesis-conflict",
+        )
+
+    first = case("physical-observation.hypothesis.1", "a" * 64)
+    second = case("physical-observation.hypothesis.2", "b" * 64)
+    assert store.append(first)
+    assert store.append(second)
+    assert second.status is ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL
+
+    gate, protocol_id, case_digest, case_count, optimization_count, hypothesis = (
+        _process_signal_gate(tmp_path / "hypothesis-conflict")
+    )
+    assert gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
+    assert protocol_id == "signal-protocol.hypothesis-conflict"
     assert isinstance(case_digest, str) and len(case_digest) == 64
     assert case_count == 2
     assert optimization_count == 0
