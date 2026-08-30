@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from rsimem.hermes_past_bridge import HermesPastBenchBridge
 from rsimem.hermes_integration import HermesExecutionMode, HermesExperimentConfig
 from rsimem.lifecycle import HermesLifecycleConfig, TaskLifecycleState
@@ -130,6 +132,44 @@ def test_task_result_projects_every_tool_call_and_result_without_content(tmp_pat
     serialized = json.dumps([event.payload() for event in events], ensure_ascii=True)
     assert "private" not in serialized
     assert "secret" not in serialized
+
+
+@pytest.mark.parametrize("content", ("not-json", '{"success": "false"}'))
+def test_malformed_tool_result_is_type_mismatch_not_tool_failure(
+    tmp_path,
+    content,
+) -> None:
+    bridge = _bridge(tmp_path, [])
+    result = {
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [{
+                    "id": "call-malformed-result",
+                    "function": {"name": "inspect", "arguments": "{}"},
+                }],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-malformed-result",
+                "content": content,
+            },
+        ],
+    }
+    try:
+        bridge._record_tool_call_results(result)
+        join = bridge.tool_call_result_joins[-1]
+        events = bridge.process_feedback
+    finally:
+        bridge.close()
+
+    assert join.type_mismatch is True
+    assert join.success is None
+    assert resolve_tool_call_result(join).status is ToolJoinResolutionStatus.TYPE_MISMATCH
+    tool_results = [event for event in events if event.kind.value == "tool_result"]
+    assert len(tool_results) == 1
+    assert tool_results[0].status.value == "unknown"
+    assert "tool_failure" not in tool_results[0].reason_codes
 
 
 def test_duplicate_tool_call_id_is_marked_duplicate_and_fails_closed(tmp_path) -> None:
