@@ -788,6 +788,7 @@ def build_pure_extraction_optimizer_request(
             "case_digest": corpus.process_signal_case_digest,
             "case_count": corpus.process_signal_case_count,
             "optimization_count": corpus.process_signal_optimization_count,
+            "hypothesis_digest": corpus.process_signal_hypothesis_digest,
         },
         "evidence_groups": {
             label: [unit for unit in units if unit["label"] == label]

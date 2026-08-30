@@ -237,6 +237,7 @@ def test_pure_optimizer_request_is_content_bound_and_replay_stable() -> None:
     payload = json.loads(first.input_json)
     assert payload["evidence_groups"]["useful"][0]["replica_count"] == 1
     assert payload["process_signal"]["optimization_count"] == 2
+    assert payload["process_signal"]["hypothesis_digest"] == corpus.process_signal_hypothesis_digest
     serialized = json.dumps(payload, ensure_ascii=True)
     assert "family_id" not in serialized
     assert "stage" not in serialized
