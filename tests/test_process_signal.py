@@ -83,6 +83,40 @@ def test_hypothesis_conflict_is_ambiguous_even_when_statuses_match() -> None:
     assert census.payload()["conflictRate"] == 1.0
 
 
+def test_census_tracks_hypothesis_support_across_distinct_logical_cases() -> None:
+    hypothesis = "a" * 64
+    first = _case(
+        logical="logical-case.hypothesis-a",
+        physical="physical-observation.hypothesis-a",
+        hypothesis=hypothesis,
+    )
+    second = _case(
+        logical="logical-case.hypothesis-b",
+        physical="physical-observation.hypothesis-b",
+        hypothesis=hypothesis,
+    )
+    census = census_process_signal_cases((first, second))
+    assert census.optimization_hypothesis_case_counts == {hypothesis: 2}
+    assert census.payload()["optimizationHypothesisCaseCounts"] == {hypothesis: 2}
+
+
+def test_census_does_not_count_conflicting_or_replicated_cases_as_support() -> None:
+    hypothesis = "a" * 64
+    replica = _case(
+        logical="logical-case.replicated",
+        physical="physical-observation.replicated",
+        hypothesis=hypothesis,
+    )
+    conflict = _case(
+        logical="logical-case.replicated",
+        physical="physical-observation.replicated-conflict",
+        hypothesis=None,
+    )
+    census = census_process_signal_cases((replica, conflict))
+    assert census.optimization_hypothesis_case_counts == {}
+    assert census.conflict_case_count == 1
+
+
 def test_non_pure_plane_and_duplicate_physical_ids_fail_closed() -> None:
     with pytest.raises(ValueError, match="plane and source identity"):
         replace(_case(), evidence_plane="benchmark_audit")

@@ -13,7 +13,7 @@ import fcntl
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -365,6 +365,13 @@ class ProcessSignalCaseCensus:
     logical_case_count: int
     status_counts: Mapping[str, int]
     conflict_case_count: int
+    # Number of distinct, non-conflicting logical cases supporting each
+    # abstract extraction hypothesis.  This is intentionally derived from
+    # pure-process cases; it prevents a pair of replicates for one case from
+    # being mistaken for two independent cases.
+    optimization_hypothesis_case_counts: Mapping[str, int] = field(
+        default_factory=dict
+    )
 
     def __post_init__(self) -> None:
         for value, name in (
@@ -388,6 +395,16 @@ class ProcessSignalCaseCensus:
             )
         if self.conflict_case_count > self.logical_case_count:
             raise ValueError("process signal conflict count is invalid")
+        if not isinstance(self.optimization_hypothesis_case_counts, Mapping):
+            raise ValueError("process signal hypothesis counts are invalid")
+        hypothesis_counts: dict[str, int] = {}
+        for hypothesis, count in self.optimization_hypothesis_case_counts.items():
+            _sha(hypothesis, "process signal hypothesis digest")
+            if type(count) is not int or count < 1:
+                raise ValueError("process signal hypothesis counts are invalid")
+            hypothesis_counts[hypothesis] = count
+        if sum(hypothesis_counts.values()) > self.logical_case_count:
+            raise ValueError("process signal hypothesis counts exceed logical cases")
         values = dict(self.status_counts)
         allowed_statuses = {status.value for status in ProcessSignalCaseStatus}
         if any(key not in allowed_statuses for key in values):
@@ -402,6 +419,11 @@ class ProcessSignalCaseCensus:
         if sum(values.values()) != self.logical_case_count:
             raise ValueError("process signal status counts do not cover cases")
         object.__setattr__(self, "status_counts", dict(sorted(values.items())))
+        object.__setattr__(
+            self,
+            "optimization_hypothesis_case_counts",
+            dict(sorted(hypothesis_counts.items())),
+        )
 
     def payload(self) -> dict[str, object]:
         consistent = self.logical_case_count - self.conflict_case_count
@@ -410,6 +432,9 @@ class ProcessSignalCaseCensus:
             "logicalCaseCount": self.logical_case_count,
             "statusCounts": dict(self.status_counts),
             "conflictCaseCount": self.conflict_case_count,
+            "optimizationHypothesisCaseCounts": dict(
+                self.optimization_hypothesis_case_counts
+            ),
             "conflictRate": (
                 self.conflict_case_count / self.logical_case_count
                 if self.logical_case_count else None
@@ -515,6 +540,7 @@ def census_process_signal_cases(cases: Iterable[ProcessSignalCase]) -> ProcessSi
         by_logical.setdefault(case.logical_case_id, []).append(case)
     statuses: dict[str, int] = {}
     conflicts = 0
+    hypothesis_counts: dict[str, int] = {}
     for logical_case_id, group in by_logical.items():
         labels = {case.status for case in group}
         hypotheses = {
@@ -531,11 +557,16 @@ def census_process_signal_cases(cases: Iterable[ProcessSignalCase]) -> ProcessSi
         statuses[status.value] = statuses.get(status.value, 0) + 1
         if conflict:
             conflicts += 1
+        elif status is ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL:
+            hypothesis = next(iter(hypotheses), None)
+            if hypothesis is not None:
+                hypothesis_counts[hypothesis] = hypothesis_counts.get(hypothesis, 0) + 1
     return ProcessSignalCaseCensus(
         physical_observation_count=len(physical_seen),
         logical_case_count=len(by_logical),
         status_counts=statuses,
         conflict_case_count=conflicts,
+        optimization_hypothesis_case_counts=hypothesis_counts,
     )
 
 
