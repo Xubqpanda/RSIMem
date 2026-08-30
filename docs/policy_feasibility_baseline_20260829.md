@@ -37,6 +37,13 @@ case。missed chain 使用独立的 logical absence ID，避免与 outcome opera
 
 每个有 process signal 的 case 还会生成 `PolicyHypothesis`：它把 past feedback IDs、parent artifact、candidate artifact 和唯一 target layer 固定成稳定的 N+1 proposal identity。hypothesis 不能引用 intervention 外部的 feedback，也不能跨层或复用相同 artifact。
 
+每个 layer intervention 现在还携带显式的 `LayerBenefitExplanation`。它只说明
+该层 action variation 可能影响的机制（例如 source scope、candidate fact set 或
+future exposure），并标记 outcome 是 `resolved` 还是 `unresolved`；它不把 fixture
+结果宣称为真实收益。`harmful` 与 useful/missed 一样必须具备完整的
+opportunity/use/outcome 证据链，否则自动降级为 `unresolved`，避免无证据的负反馈
+进入 census 或后续 optimizer。
+
 为避免 opaque fixture ID 被误接入正式训练，`feedback_chain_from_extraction_example()` 只接受真实 `ExtractionFeedbackExample` 的 primary extraction-set useful/missed 记录，并要求其 operation identity 完整；fact-level、harmful、unresolved 和 censored 记录返回空链，继续留在诊断桶。
 
 `LayerIntervention.from_extraction_feedback()` 将同一规则用于构造 extraction intervention：只有 primary extraction-set example 可以进入，fact-level example 会被拒绝；不完整 useful/missed 链会自动降级为 unresolved。
