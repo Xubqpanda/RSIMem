@@ -5,6 +5,7 @@ from dataclasses import replace
 
 import pytest
 
+from rsimem.memory.evidence_planes import EvidencePlane
 from rsimem.memory.process_signal import (
     JsonProcessSignalCaseStore,
     ProcessSignalCase,
@@ -13,6 +14,7 @@ from rsimem.memory.process_signal import (
     census_process_signal_cases,
 )
 from rsimem.memory.process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
+from rsimem.memory.pure_process import PureProcessCorpus
 
 
 def _case(*, logical: str = "logical-case.fixture.v1", complete: bool = True, attribution: bool = True, hypothesis: str | None = "a" * 64, physical: str = "physical-observation.1", stage_diagnosis_observed: bool = True) -> ProcessSignalCase:
@@ -332,3 +334,35 @@ def test_projection_from_process_events_never_infers_extraction_attribution() ->
     )
     assert case.status == ProcessSignalCaseStatus.OBSERVABLE_ONLY
     assert case.extraction_attributable is False
+
+
+def test_signal_projection_uses_pure_runtime_events_and_strips_benchmark_identity() -> None:
+    common = dict(
+        run_id="run.signal-plane.v1", variant="native", trace_id="trace.signal-plane.v1",
+        episode_id="episode.signal-plane.v1", session_id="session.signal-plane.v1",
+        task_id="task.signal-plane.v1", host_event_id="event.signal-plane.v1",
+        source_revision="revision.signal-plane.v1", execution_receipt_ids=("receipt.signal-plane.v1",),
+    )
+    audit_event = ProcessEvent.create(
+        kind=ProcessEventKind.EXTRACTION,
+        status=ProcessEventStatus.SUCCESS,
+        input_payload={"kind": "extraction"},
+        output_payload={"ok": True},
+        family_id="SM02_constraint_retention",
+        stage="eval_near",
+        **common,
+    )
+    pure_events = PureProcessCorpus.create((audit_event,)).events
+    case = ProcessSignalCase.from_process_events(
+        logical_case_id="logical-case.signal-plane.v1",
+        physical_observation_ids=("physical-observation.signal-plane.v1",),
+        events=pure_events,
+    )
+    assert case.status is ProcessSignalCaseStatus.OBSERVABLE_ONLY
+    assert all(event.evidence_plane is EvidencePlane.PURE_PROCESS for event in pure_events)
+    with pytest.raises(ValueError, match="pure_process runtime events"):
+        ProcessSignalCase.from_process_events(
+            logical_case_id="logical-case.signal-plane-audit.v1",
+            physical_observation_ids=("physical-observation.signal-plane-audit.v1",),
+            events=(audit_event,),
+        )

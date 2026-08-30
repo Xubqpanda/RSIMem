@@ -21,6 +21,7 @@ from typing import Iterable, Mapping
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 from .process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 from .logical_case import LogicalCaseIdentity
+from .pure_process import PureProcessEvent
 
 
 PROCESS_SIGNAL_SCHEMA_VERSION = 2
@@ -210,7 +211,7 @@ class ProcessSignalCase:
         *,
         logical_case_id: str,
         physical_observation_ids: tuple[str, ...],
-        events: Iterable[ProcessEvent],
+        events: Iterable[ProcessEvent | PureProcessEvent],
         extraction_attributable: bool = False,
         abstract_hypothesis_digest: str | None = None,
         analysis_protocol_id: str | None = None,
@@ -220,8 +221,21 @@ class ProcessSignalCase:
         """Project stage coverage without inferring attribution from outcomes."""
 
         values = tuple(events)
-        if any(not isinstance(event, ProcessEvent) for event in values):
-            raise TypeError("process signal projection requires ProcessEvent values")
+        if any(
+            not isinstance(event, (ProcessEvent, PureProcessEvent))
+            for event in values
+        ):
+            raise TypeError(
+                "process signal projection requires runtime process events"
+            )
+        if any(
+            event.evidence_plane is not EvidencePlane.PURE_PROCESS
+            or event.evidence_source is not EvidenceSourceKind.RUNTIME_OBSERVATION
+            for event in values
+        ):
+            raise ValueError(
+                "process signal projection requires pure_process runtime events"
+            )
         terminal = {
             ProcessEventStatus.SUCCESS,
             ProcessEventStatus.FAILED,
@@ -526,7 +540,7 @@ def census_process_signal_cases(cases: Iterable[ProcessSignalCase]) -> ProcessSi
 
 
 def build_process_signal_cases(
-    events: Iterable[ProcessEvent],
+    events: Iterable[ProcessEvent | PureProcessEvent],
     *,
     frozen_policy_digest: str,
     source_task_template_id: str,
@@ -545,8 +559,21 @@ def build_process_signal_cases(
 
     values = tuple(events)
     _id(replicate_id, "replicate ID")
-    if any(not isinstance(event, ProcessEvent) for event in values):
-        raise TypeError("process signal projection requires ProcessEvent values")
+    if any(
+        not isinstance(event, (ProcessEvent, PureProcessEvent))
+        for event in values
+    ):
+        raise TypeError(
+            "process signal projection requires runtime process events"
+        )
+    if any(
+        event.evidence_plane is not EvidencePlane.PURE_PROCESS
+        or event.evidence_source is not EvidenceSourceKind.RUNTIME_OBSERVATION
+        for event in values
+    ):
+        raise ValueError(
+            "process signal projection requires pure_process runtime events"
+        )
     if not values:
         return ()
     grouped: dict[str, list[ProcessEvent]] = {}

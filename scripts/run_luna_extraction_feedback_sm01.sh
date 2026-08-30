@@ -311,7 +311,7 @@ attempt = next(
 method = attempt["method"]
 policy_digest = manifest["semanticPolicy"]["activeArtifactByMethod"][method]["artifactDigest"]
 cases = build_process_signal_cases(
-    corpus.events,
+    pure_corpus.events,
     frozen_policy_digest=policy_digest,
     source_task_template_id="source." + split["taskTemplateGroupId"],
     future_task_template_id="future." + split["taskTemplateGroupId"],
