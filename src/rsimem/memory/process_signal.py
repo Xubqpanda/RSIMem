@@ -353,12 +353,37 @@ class ProcessSignalCaseCensus:
     conflict_case_count: int
 
     def __post_init__(self) -> None:
-        if self.physical_observation_count < 0 or self.logical_case_count < 0:
-            raise ValueError("process signal counts must be non-negative")
-        if self.conflict_case_count < 0 or self.conflict_case_count > self.logical_case_count:
+        for value, name in (
+            (self.physical_observation_count, "physical observation count"),
+            (self.logical_case_count, "logical case count"),
+            (self.conflict_case_count, "conflict case count"),
+        ):
+            if type(value) is not int:
+                raise TypeError(f"{name} must be an integer")
+            if value < 0:
+                raise ValueError(f"{name} must be non-negative")
+        if self.physical_observation_count < self.logical_case_count:
+            raise ValueError(
+                "physical observation count cannot be less than logical case count"
+            )
+        if self.logical_case_count == 0 and self.physical_observation_count:
+            # A census with no logical cases cannot claim unattached physical
+            # observations; callers must retain them under a case first.
+            raise ValueError(
+                "physical observations require at least one logical case"
+            )
+        if self.conflict_case_count > self.logical_case_count:
             raise ValueError("process signal conflict count is invalid")
         values = dict(self.status_counts)
-        if any(not isinstance(key, str) or type(value) is not int or value < 0 for key, value in values.items()):
+        allowed_statuses = {status.value for status in ProcessSignalCaseStatus}
+        if any(key not in allowed_statuses for key in values):
+            raise ValueError("process signal status key is invalid")
+        if any(
+            not isinstance(key, str)
+            or type(value) is not int
+            or value < 0
+            for key, value in values.items()
+        ):
             raise ValueError("process signal status counts are invalid")
         if sum(values.values()) != self.logical_case_count:
             raise ValueError("process signal status counts do not cover cases")

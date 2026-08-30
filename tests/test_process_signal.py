@@ -116,6 +116,54 @@ def test_census_counts_all_physical_observations_inside_one_case() -> None:
     assert census_process_signal_cases((case,)).payload()["replicateConsistency"] == 1.0
 
 
+@pytest.mark.parametrize(
+    ("kwargs", "error"),
+    (
+        (
+            {
+                "physical_observation_count": 1,
+                "logical_case_count": 1,
+                "status_counts": {"future_status": 1},
+                "conflict_case_count": 0,
+            },
+            "status key",
+        ),
+        (
+            {
+                "physical_observation_count": 0,
+                "logical_case_count": 1,
+                "status_counts": {"observable_only": 1},
+                "conflict_case_count": 0,
+            },
+            "less than logical",
+        ),
+        (
+            {
+                "physical_observation_count": 1,
+                "logical_case_count": 0,
+                "status_counts": {},
+                "conflict_case_count": 0,
+            },
+            "require at least one logical",
+        ),
+        (
+            {
+                "physical_observation_count": True,
+                "logical_case_count": 1,
+                "status_counts": {"observable_only": 1},
+                "conflict_case_count": 0,
+            },
+            "integer",
+        ),
+    ),
+)
+def test_census_contract_rejects_untrusted_statistics(kwargs, error: str) -> None:
+    from rsimem.memory.process_signal import ProcessSignalCaseCensus
+
+    with pytest.raises((TypeError, ValueError), match=error):
+        ProcessSignalCaseCensus(**kwargs)
+
+
 def test_process_signal_case_store_replays_logical_census(tmp_path) -> None:
     path = tmp_path / "process-signal.jsonl"
     first = _case(physical="physical-observation.store.1")
