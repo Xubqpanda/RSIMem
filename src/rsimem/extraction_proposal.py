@@ -13,6 +13,10 @@ from .memory.extraction_optimizer_contracts import (
 )
 from .memory.extraction_optimizer_provider import OpenAICompatibleExtractionOptimizerClient
 from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStore
+from .memory.pure_extraction import JsonPureExtractionOptimizerCorpusStore
+from .memory.pure_extraction_optimizer import (
+    JsonPureExtractionOptimizerContentCaptureStore,
+)
 from .memory.extraction_policy_artifact import (
     EXTRACTION_POLICY_SCHEMA_VERSION,
     ExtractionPromptPolicyArtifact,
@@ -190,6 +194,98 @@ def prepare_extraction_proposal(
         parent_artifact_id=parent.artifact_id,
     )
     _write_immutable(output / "feasibility-hypothesis.json", projection.payload())
+    if result.decision == ExtractionOptimizerDecision.PROPOSE:
+        assert result.candidate is not None
+        _write_immutable(
+            output / "candidate-artifact.json",
+            result.candidate.payload(),
+        )
+    return result
+
+
+def prepare_pure_extraction_proposal(
+    *,
+    corpus_store: JsonPureExtractionOptimizerCorpusStore,
+    capture_store: JsonPureExtractionOptimizerContentCaptureStore,
+    output_root: Path,
+    client,
+    revocation_registry: JsonRevocationRegistry | None = None,
+) -> ExtractionOptimizerResult:
+    """Prepare one proposal using the deployment-only pure-process corpus."""
+
+    if not isinstance(corpus_store, JsonPureExtractionOptimizerCorpusStore):
+        raise TypeError("pure proposal requires a pure optimizer corpus store")
+    if not isinstance(
+        capture_store,
+        JsonPureExtractionOptimizerContentCaptureStore,
+    ):
+        raise TypeError("pure proposal requires a pure content capture store")
+    corpus = corpus_store.read_for_optimizer(
+        revocation_registry=revocation_registry,
+    )
+    parent = Mem0FlatPromptAdapter().export_root_policy_artifact(
+        MEM0_FLAT_EXTRACTION_SLOT_ID
+    )
+    try:
+        result = ExtractionPromptOptimizer(
+            client,
+            config=FROZEN_EXTRACTION_OPTIMIZER_CONFIG,
+            revocation_registry=revocation_registry,
+        ).propose_pure(
+            parent,
+            corpus,
+            captures=capture_store.records(),
+        )
+    except OptimizerCompletionValidationError as exc:
+        result = ExtractionPromptOptimizer._result(
+            ExtractionOptimizerDecision.NO_PROPOSAL,
+            (exc.reason_code,),
+            exc.request,
+            exc.completion_id,
+            (),
+            None,
+            exc.usage,
+        )
+    output = output_root.expanduser().resolve()
+    _write_immutable(output / "optimizer-result.json", result_payload(result))
+    _write_immutable(
+        output / "optimizer-request.json",
+        {
+            "requestId": result.request.request_id,
+            "requestDigest": result.request.request_digest,
+            "parentArtifactId": result.request.parent_artifact_id,
+            "parentArtifactDigest": result.request.parent_artifact_digest,
+            "corpusId": result.request.corpus_id,
+            "corpusDigest": result.request.corpus_digest,
+            "optimizerConfigDigest": result.request.optimizer_config_digest,
+            "providerEligible": result.request.provider_eligible,
+            "primaryExampleIds": list(result.request.primary_example_ids),
+        },
+    )
+    cited = tuple(
+        example_id
+        for edit in result.edits
+        for example_id in edit.evidence_example_ids
+    )
+    _write_immutable(
+        output / "feasibility-hypothesis.json",
+        {
+            "schemaVersion": 1,
+            "projectionSchema": "pure-extraction-optimizer-hypothesis-v1",
+            "resultId": result.result_id,
+            "requestId": result.request.request_id,
+            "decision": result.decision.value,
+            "parentArtifactId": parent.artifact_id,
+            "candidateArtifactId": (
+                result.candidate.artifact_id
+                if result.candidate is not None else None
+            ),
+            "corpusId": corpus.corpus_id,
+            "corpusDigest": corpus.corpus_digest,
+            "evidenceExampleIds": list(cited),
+            "reasonCodes": list(result.reason_codes),
+        },
+    )
     if result.decision == ExtractionOptimizerDecision.PROPOSE:
         assert result.candidate is not None
         _write_immutable(
