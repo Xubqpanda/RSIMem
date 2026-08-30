@@ -124,3 +124,9 @@ def test_protocol_manifest_binding_is_deterministic_and_result_independent() -> 
     drifted_manifest["split"]["taskManifestDigest"] = "b" * 64
     with pytest.raises(ValueError, match="does not match extraction manifest"):
         validate_protocol_for_extraction_manifest(protocol, drifted_manifest)
+
+    incomplete_manifest = dict(manifest)
+    incomplete_manifest["split"] = dict(manifest["split"])
+    incomplete_manifest["split"].pop("taskManifestDigest")
+    with pytest.raises(ValueError, match="manifest process-signal identity is incomplete"):
+        protocol_for_extraction_manifest(incomplete_manifest)
