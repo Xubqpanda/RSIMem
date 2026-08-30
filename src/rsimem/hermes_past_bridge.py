@@ -460,7 +460,7 @@ class HermesPastBenchBridge:
         self._tool_call_result_joins: dict[str, ToolCallResultJoin] = {}
         self._tool_call_ids_seen: set[str] = set()
         self._tool_result_ids_seen: set[str] = set()
-        self._skill_invocation_counts: dict[tuple[str, str], int] = {}
+        self._skill_invocation_counts: dict[tuple[str, str, str], int] = {}
         self._agent: object | None = None
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
@@ -482,18 +482,40 @@ class HermesPastBenchBridge:
             process_feedback_path
             or self.evidence_path.with_name("rsimem_process_feedback.jsonl")
         )
+        existing_process_events = self._process_feedback.events
         self._tool_call_ids_seen.update(
             event.tool_call_id
-            for event in self._process_feedback.events
+            for event in existing_process_events
             if event.kind is ProcessEventKind.TOOL_CALL
             and event.tool_call_id is not None
         )
         self._tool_result_ids_seen.update(
             event.tool_result_id
-            for event in self._process_feedback.events
+            for event in existing_process_events
             if event.kind is ProcessEventKind.TOOL_RESULT
             and event.tool_result_id is not None
         )
+        # Recover synthetic skill invocation ordinals from the persisted
+        # content-free call IDs.  This prevents a restarted bridge from
+        # treating a second identical skill invocation as the first one and
+        # silently collapsing its process evidence into a prior retry.
+        for event in existing_process_events:
+            call_id = event.tool_call_id
+            if event.kind is not ProcessEventKind.TOOL_CALL or call_id is None:
+                continue
+            parts = call_id.split(".")
+            if len(parts) != 6 or parts[:2] != ["call", "skill"]:
+                continue
+            try:
+                ordinal = int(parts[5])
+            except ValueError:
+                continue
+            if ordinal < 0:
+                continue
+            key = (parts[3], parts[2], parts[4])
+            self._skill_invocation_counts[key] = max(
+                self._skill_invocation_counts.get(key, 0), ordinal + 1
+            )
         self._admission_policy = DeterministicAdmissionPolicy()
         self._exposure_policy = DeterministicExposurePolicy()
         self._policy_decision_ids: set[str] = {
@@ -2653,6 +2675,7 @@ class HermesPastBenchBridge:
         )
         type_mismatch = success is None
         query_digest = hashlib.sha256(query.encode("utf-8")).hexdigest()
+        tool_digest = hashlib.sha256(tool_name.encode("utf-8")).hexdigest()
         source_revision = (
             self._last_host_source_revision or self._exposure_context_revision()
         )
@@ -2661,7 +2684,8 @@ class HermesPastBenchBridge:
                 f"{tool_name}:{query_digest}:{source_revision}".encode("utf-8")
             ).hexdigest()[:40]
         )
-        invocation_key = (tool_name, query_digest)
+        host_digest = hashlib.sha256(host_event_id.encode("utf-8")).hexdigest()[:8]
+        invocation_key = (tool_digest[:8], query_digest[:16], host_digest)
         ordinal = self._skill_invocation_counts.get(invocation_key, 0)
         self._skill_invocation_counts[invocation_key] = ordinal + 1
         invocation_digest = hashlib.sha256(json.dumps(
@@ -2676,15 +2700,21 @@ class HermesPastBenchBridge:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")).hexdigest()
-        call_id = "call.skill." + invocation_digest[:32]
-        result_id = "result.skill." + invocation_digest[:32]
+        call_id = (
+            f"call.skill.{query_digest[:16]}.{tool_digest[:8]}."
+            f"{host_digest}.{ordinal}"
+        )
+        result_id = (
+            f"result.skill.{query_digest[:16]}.{tool_digest[:8]}."
+            f"{host_digest}.{ordinal}"
+        )
         retry_identity = "retry.skill." + invocation_digest[:24]
         call_receipt_id = "receipt.skill-call." + invocation_digest[:24]
         result_receipt_id = "receipt.skill-result." + invocation_digest[:24]
         join = ToolCallResultJoin.create(
             call_id=call_id,
             result_id=result_id,
-            tool_name_digest=hashlib.sha256(tool_name.encode("utf-8")).hexdigest(),
+            tool_name_digest=tool_digest,
             success=success,
             retry_identity=retry_identity,
             run_id=self._run_id,

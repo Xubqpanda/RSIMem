@@ -181,6 +181,44 @@ def test_skill_tool_wrapper_keeps_malformed_result_censored(tmp_path) -> None:
     assert result.reason_codes == ("schema_failure",)
 
 
+def test_skill_tool_wrapper_recovers_invocation_ordinal_after_restart(tmp_path) -> None:
+    home = _home(tmp_path / "home")
+    evidence_path = tmp_path / "artifacts" / "memory.jsonl"
+
+    def bridge() -> HermesPastBenchBridge:
+        return HermesPastBenchBridge(
+            home,
+            HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+            evidence_path=evidence_path,
+            run_id="run-skill-restart",
+            trace_id="trace-skill-restart",
+            episode_id="episode-skill-restart",
+            session_id="session-skill-restart",
+            task_id="task-skill-restart",
+            experiment_variant="native+ledger",
+        )
+
+    first = bridge()
+    try:
+        first._record_skill_process("skills_list", "same-query", '{"success": true}')
+        first_call_id = first.tool_call_result_joins[0].call_id
+    finally:
+        first.close()
+
+    restarted = bridge()
+    try:
+        restarted._record_skill_process(
+            "skills_list", "same-query", '{"success": true}'
+        )
+        joins = restarted.tool_call_result_joins
+    finally:
+        restarted.close()
+
+    assert len(joins) == 1
+    assert joins[0].call_id != first_call_id
+    assert len(restarted.process_feedback) == 4
+
+
 @pytest.mark.parametrize("content", ("not-json", '{"success": "false"}'))
 def test_malformed_tool_result_is_type_mismatch_not_tool_failure(
     tmp_path,
