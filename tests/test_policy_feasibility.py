@@ -27,6 +27,7 @@ from rsimem.memory.policy_feasibility import (
     FeasibilityStatus,
     LayerBenefitExplanation,
     LayerIntervention,
+    LayerFeasibilityCensus,
     JsonFeasibilityEvidenceLedger,
     PolicyHypothesis,
     OptimizerHypothesisDecision,
@@ -516,6 +517,38 @@ def test_report_rejects_duplicate_case_identity() -> None:
     )
     with pytest.raises(ValueError, match="case IDs must be unique"):
         build_feasibility_report((case, case))
+
+
+def test_layer_census_requires_complete_bounded_outcome_counts() -> None:
+    with pytest.raises(ValueError, match="outcome counts"):
+        LayerFeasibilityCensus(
+            layer=PolicyLayer.EXTRACTION,
+            case_count=1,
+            signal_count=1,
+            action_variation_count=1,
+            outcome_variation_count=0,
+            outcome_counts={},
+            unknown_count=0,
+            complete_feedback_count=0,
+            ambiguous_count=0,
+            status=FeasibilityStatus.VALIDATION_ONLY,
+            reason_codes=("no_outcome_variation",),
+        )
+
+    with pytest.raises(ValueError, match="outcome counts"):
+        LayerFeasibilityCensus(
+            layer=PolicyLayer.EXTRACTION,
+            case_count=1,
+            signal_count=1,
+            action_variation_count=1,
+            outcome_variation_count=0,
+            outcome_counts={"not-a-feasibility-outcome": 1},
+            unknown_count=0,
+            complete_feedback_count=0,
+            ambiguous_count=0,
+            status=FeasibilityStatus.VALIDATION_ONLY,
+            reason_codes=("no_outcome_variation",),
+        )
 
 
 def test_feasibility_evidence_ledger_is_idempotent_across_restart(tmp_path) -> None:

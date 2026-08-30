@@ -1390,6 +1390,7 @@ class LayerFeasibilityCensus:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "layer", PolicyLayer(self.layer))
+        object.__setattr__(self, "status", FeasibilityStatus(self.status))
         for value, name in (
             (self.case_count, "case count"),
             (self.signal_count, "signal count"),
@@ -1410,7 +1411,21 @@ class LayerFeasibilityCensus:
             self.ambiguous_count,
         )):
             raise ValueError("census counts cannot exceed case count")
-        object.__setattr__(self, "outcome_counts", MappingProxyType(dict(self.outcome_counts)))
+        if not isinstance(self.outcome_counts, Mapping):
+            raise ValueError("outcome counts must be a mapping")
+        allowed_outcomes = {outcome.value for outcome in FeasibilityOutcome}
+        normalized_outcomes = dict(self.outcome_counts)
+        if any(
+            not isinstance(key, str)
+            or key not in allowed_outcomes
+            or type(value) is not int
+            or value < 0
+            for key, value in normalized_outcomes.items()
+        ):
+            raise ValueError("outcome counts are invalid")
+        if sum(normalized_outcomes.values()) != self.case_count:
+            raise ValueError("outcome counts do not cover case count")
+        object.__setattr__(self, "outcome_counts", MappingProxyType(normalized_outcomes))
         try:
             reasons = _normalize_strings(
                 self.reason_codes,
