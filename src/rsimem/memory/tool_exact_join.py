@@ -133,6 +133,8 @@ class ToolCallResultJoin:
             raise ValueError("present tool call requires call ID")
         if not self.call_present and self.call_id is not None and not self.orphan_result:
             raise ValueError("absent tool call cannot carry a call ID")
+        if not self.call_present and self.result_present and not self.orphan_result:
+            raise ValueError("absent tool call with a result must be marked orphan")
         if self.result_present and self.result_id is None:
             raise ValueError("present tool result requires result ID")
         if not self.result_present and self.result_id is not None:

@@ -239,6 +239,11 @@ def test_presence_flags_cannot_disagree_with_tool_ids(overrides) -> None:
         _join(**overrides)
 
 
+def test_orphan_result_must_be_explicitly_marked() -> None:
+    with pytest.raises(ValueError, match="marked orphan"):
+        _join(call_present=False, call_id=None)
+
+
 def test_unknown_result_success_is_not_reported_as_failure() -> None:
     events = _join(success=None).process_events()
     assert events[-1].status.value == "unknown"
