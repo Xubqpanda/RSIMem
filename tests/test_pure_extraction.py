@@ -801,6 +801,21 @@ def test_bound_tool_closure_is_required_for_extraction_attribution() -> None:
     assert failed.attribution is PureExtractionAttribution.UNRESOLVED
     assert "tool_join_tool_failure" in failed.reason_codes
 
+    censored_tool = ToolCallResultJoin.create(
+        **{**common_join, "observation_complete": False}
+    )
+    censored = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=memory_use,
+        tool_joins=(censored_tool,),
+        observation_window="window.completed-tool-gate-v1",
+        provenance_id=provenance,
+    )
+    assert censored.attribution is PureExtractionAttribution.CENSORED
+    assert censored.observation_complete is False
+    assert censored.reason_codes == ("observation_censored",)
+
     malformed = (
         {"result_present": False, "result_id": None, "result_receipt_id": None},
         {"orphan_result": True},
