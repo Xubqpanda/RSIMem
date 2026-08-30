@@ -84,6 +84,14 @@ reports are [`extraction_stage2_sm02_process_signal_final_20260830.md`](extracti
 layer to open only after a signal-ready case; the other five layers stay
 shadow/validation-only.
 
+Process-signal analysis is now bound at both batch and case boundaries: each
+formal batch freezes a result-independent protocol, every emitted case carries
+the protocol ID, replicate ID, and observation window, and the analyzer rejects
+missing, drifted, or cross-replicate cases before census. The deterministic
+six-layer fixture also emits explicit content-free mechanism explanations for
+each intervention; useful/missed/harmful outcomes without a complete evidence
+chain remain unresolved rather than entering a negative denominator.
+
 The follow-up SM02 process-signal pilot exercised the generalized family
 launcher and both configured endpoints. Two primary-provider replicates passed
 audit, while one primary and one backup attempt failed with HTTP 503/capacity
