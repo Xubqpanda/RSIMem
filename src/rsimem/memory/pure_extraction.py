@@ -547,6 +547,18 @@ class PureExtractionFeedbackRecord:
             reasons.append("memory_use_missing")
         elif memory_resolution.status is not MemoryUseResolutionStatus.ATTRIBUTABLE_USE:
             reasons.append(memory_resolution.reason_code)
+        elif (
+            artifact_set_binding is not None
+            and opportunity is not None
+            and (
+                artifact_set_binding.semantic_key is None
+                or artifact_set_binding.semantic_key != opportunity.semantic_requirement
+            )
+        ):
+            # A complete member set proves closure, not semantic equivalence
+            # by itself.  Without an explicit visible semantic key, keep the
+            # attribution unresolved rather than copying a rule to every fact.
+            reasons.append("artifact_set_semantics_unresolved")
         elif memory_use is None or memory_use.outcome_success is None:
             reasons.append("outcome_unknown")
         elif memory_use.outcome_success:

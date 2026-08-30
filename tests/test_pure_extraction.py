@@ -20,6 +20,7 @@ from rsimem.memory.pure_extraction import (
     PureExtractionSourceRecord,
 )
 from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
+from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
 from rsimem.memory.use_attribution import MemoryUseEvidence, OutcomeEvidenceKind
 from test_extraction_optimizer_builder import _fixture
 
@@ -350,6 +351,89 @@ def test_pure_feedback_derivation_is_conservative_and_replay_stable() -> None:
         current_input_requirements=("preference.summary.tsv",),
     )
     assert confounded.attribution is PureExtractionAttribution.UNRESOLVED
+
+
+def test_complete_set_binding_can_attribute_once_but_partial_set_stays_unresolved() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.set-v1",
+        visible_semantic_keys=("preference.summary.tsv",),
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement="preference.summary.tsv",
+        observation_time="2026-08-22T00:00:00Z",
+        operation_id="op.opportunity.set-v1",
+        provenance_id="provenance.set-v1",
+        source_payload={"tool": "render_table", "schema": "tsv"},
+    )
+    binding = ArtifactSetSemanticBinding.create(
+        semantic_unit_id="semantic-unit.preference.tsv.v1",
+        semantic_key="preference.summary.tsv",
+        member_artifact_ids=("artifact.memory-v1",),
+        member_fact_ids=("fact.preference-v1",),
+        complete=True,
+        source_digest=pure_source.source_projection_digest,
+        provenance_id="provenance.set-v1",
+    )
+    use = MemoryUseEvidence.create(
+        artifact_set_id=binding.binding_id,
+        retrieved_artifact_ids=("artifact.memory-v1",),
+        injection_operation_id="op.injection.set-v1",
+        injected_artifact_ids=("artifact.memory-v1",),
+        retrieval_operation_id="op.retrieval.set-v1",
+        downstream_operation_id="op.use.set-v1",
+        used_artifact_ids=("artifact.memory-v1",),
+        outcome_operation_id="op.outcome.set-v1",
+        outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+        outcome_success=True,
+        observation_cutoff="2026-08-23T00:00:00Z",
+        provenance_id="provenance.set-v1",
+    )
+    complete = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=use,
+        artifact_set_binding=binding,
+        observation_window="window.completed-set-v1",
+        provenance_id="provenance.set-v1",
+    )
+    assert complete.attribution is PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
+
+    partial_binding = ArtifactSetSemanticBinding.create(
+        semantic_unit_id="semantic-unit.preference.tsv.partial.v1",
+        semantic_key="preference.summary.tsv",
+        member_artifact_ids=("artifact.memory-v1",),
+        member_fact_ids=("fact.preference-v1",),
+        complete=False,
+        source_digest=pure_source.source_projection_digest,
+        provenance_id="provenance.set-v1",
+    )
+    partial_use = MemoryUseEvidence.create(
+        artifact_set_id=partial_binding.binding_id,
+        retrieved_artifact_ids=("artifact.memory-v1",),
+        injection_operation_id="op.injection.set-v1",
+        injected_artifact_ids=("artifact.memory-v1",),
+        retrieval_operation_id="op.retrieval.set-v1",
+        downstream_operation_id="op.use.set-v1",
+        used_artifact_ids=("artifact.memory-v1",),
+        outcome_operation_id="op.outcome.set-v1",
+        outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+        outcome_success=True,
+        observation_cutoff="2026-08-23T00:00:00Z",
+        provenance_id="provenance.set-v1",
+    )
+    unresolved = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=partial_use,
+        artifact_set_binding=partial_binding,
+        observation_window="window.completed-set-v1",
+        provenance_id="provenance.set-v1",
+    )
+    assert unresolved.attribution is PureExtractionAttribution.UNRESOLVED
 
 
 def test_live_pure_projector_does_not_consult_family_parser(tmp_path) -> None:
