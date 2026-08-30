@@ -536,6 +536,10 @@ def build_pure_extraction_optimizer_request(
         raise ValueError("pure optimizer request requires a ready process-signal gate")
     require_optimizer_plane(EvidencePlane.PURE_PROCESS)
     capture_by_id = _capture_for(captures)
+    corpus_example_ids = {example.example_id for example in corpus.examples}
+    extra_capture_ids = set(capture_by_id).difference(corpus_example_ids)
+    if extra_capture_ids:
+        raise ValueError("pure optimizer capture is not present in the corpus")
     groups = _logical_groups(corpus, capture_by_id)
     units: list[dict[str, object]] = []
     source_catalog: dict[str, object] = {}
