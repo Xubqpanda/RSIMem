@@ -99,6 +99,156 @@ class DecisionAction(StrEnum):
     DEFER = "DEFER"
 
 
+POLICY_DECISION_CONTRACT_SCHEMA_VERSION = 1
+
+
+@dataclass(frozen=True, slots=True)
+class PolicyDecisionContract:
+    """Host-neutral schema declaration for one policy-layer decision.
+
+    The concrete decision dataclasses below enforce these fields at runtime;
+    this small, content-free declaration makes the contract inspectable by
+    feasibility reports and replay tooling without importing a host adapter.
+    """
+
+    contract_id: str
+    layer: PolicyLayer
+    decision_type: str
+    required_fields: tuple[str, ...]
+    allowed_actions: tuple[DecisionAction, ...] = (
+        DecisionAction.RUN,
+        DecisionAction.SKIP,
+        DecisionAction.DEFER,
+    )
+    schema_version: int = POLICY_DECISION_CONTRACT_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != POLICY_DECISION_CONTRACT_SCHEMA_VERSION:
+            raise ValueError("unsupported policy decision contract schema")
+        _require_identifier(self.contract_id, "policy decision contract ID")
+        object.__setattr__(self, "layer", PolicyLayer(self.layer))
+        _require_identifier(self.decision_type, "policy decision type")
+        fields = _tuple_strings(self.required_fields, "policy decision fields")
+        if not fields:
+            raise ValueError("policy decision contract requires fields")
+        object.__setattr__(self, "required_fields", fields)
+        actions = tuple(DecisionAction(value) for value in self.allowed_actions)
+        if not actions or len(actions) != len(set(actions)):
+            raise ValueError("policy decision contract actions must be unique")
+        object.__setattr__(self, "allowed_actions", actions)
+        expected = f"policy-decision-contract.{self.layer.value}.v1"
+        if self.contract_id != expected:
+            raise ValueError("policy decision contract ID mismatch")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "contract_id": self.contract_id,
+            "layer": self.layer.value,
+            "decision_type": self.decision_type,
+            "required_fields": list(self.required_fields),
+            "allowed_actions": [value.value for value in self.allowed_actions],
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "PolicyDecisionContract":
+        fields = {
+            "schema_version", "contract_id", "layer", "decision_type",
+            "required_fields", "allowed_actions",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed policy decision contract")
+        if not isinstance(value["required_fields"], list) or not isinstance(
+            value["allowed_actions"], list
+        ):
+            raise ValueError("malformed policy decision contract collections")
+        try:
+            result = cls(
+                contract_id=value["contract_id"],
+                layer=value["layer"],
+                decision_type=value["decision_type"],
+                required_fields=tuple(value["required_fields"]),
+                allowed_actions=tuple(value["allowed_actions"]),
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed policy decision contract") from exc
+        if result.payload() != dict(value):
+            raise ValueError("non-canonical policy decision contract")
+        return result
+
+
+_COMMON_DECISION_FIELDS = (
+    "decision_id", "policy_version", "source_revision", "input_digest",
+    "output_digest", "action", "execution_status", "reason_codes",
+    "lineage_id",
+)
+
+
+_DECISION_CONTRACTS: Mapping[PolicyLayer, PolicyDecisionContract] = {
+    PolicyLayer.TRIGGER: PolicyDecisionContract(
+        "policy-decision-contract.trigger.v1",
+        PolicyLayer.TRIGGER,
+        "TriggerDecision",
+        _COMMON_DECISION_FIELDS + ("next_eligible_boundary", "duplicate_suppressed"),
+    ),
+    PolicyLayer.SOURCE_SELECTION: PolicyDecisionContract(
+        "policy-decision-contract.source_selection.v1",
+        PolicyLayer.SOURCE_SELECTION,
+        "SourceSelectionDecision",
+        _COMMON_DECISION_FIELDS + (
+            "projection_mode", "selected_segment_ids", "skipped_segment_ids",
+            "rejected_segment_ids", "source_digest", "truncation", "safety",
+        ),
+    ),
+    PolicyLayer.EXTRACTION: PolicyDecisionContract(
+        "policy-decision-contract.extraction.v1",
+        PolicyLayer.EXTRACTION,
+        "ExtractionDecision",
+        _COMMON_DECISION_FIELDS + ("candidate_fact_ids", "source_digest", "request_id"),
+    ),
+    PolicyLayer.ADMISSION: PolicyDecisionContract(
+        "policy-decision-contract.admission.v1",
+        PolicyLayer.ADMISSION,
+        "AdmissionDecision",
+        _COMMON_DECISION_FIELDS + (
+            "mutation_kind", "candidate_fact_ids", "accepted_fact_ids",
+            "filtered_fact_ids", "backend_revision", "target_artifact_ids",
+            "update_supported", "safety",
+        ),
+    ),
+    PolicyLayer.COMMIT: PolicyDecisionContract(
+        "policy-decision-contract.commit.v1",
+        PolicyLayer.COMMIT,
+        "CommitDecision",
+        _COMMON_DECISION_FIELDS + (
+            "commit_mode", "mutation_ids", "expected_revision",
+            "execution_boundary", "final_receipt_id", "safety",
+        ),
+    ),
+    PolicyLayer.EXPOSURE: PolicyDecisionContract(
+        "policy-decision-contract.exposure.v1",
+        PolicyLayer.EXPOSURE,
+        "ExposureDecision",
+        _COMMON_DECISION_FIELDS + (
+            "exposure_mode", "selected_artifact_ids", "ordering",
+            "injection_position", "budget_tokens", "injection_receipt_id",
+        ),
+    ),
+}
+
+
+def decision_contract_for_layer(
+    layer: PolicyLayer | str,
+) -> PolicyDecisionContract:
+    """Return the immutable decision contract for one policy layer."""
+
+    try:
+        return _DECISION_CONTRACTS[PolicyLayer(layer)]
+    except (KeyError, ValueError) as exc:
+        raise ValueError("unknown policy decision layer") from exc
+
+
 class ExecutionStatus(StrEnum):
     PENDING = "pending"
     EXECUTED = "executed"

@@ -19,7 +19,13 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Iterable, Mapping, Sequence
 
-from .policy_contracts import PolicyArtifactIdentity, PolicyLayer, PolicyDecision, content_digest
+from .policy_contracts import (
+    PolicyArtifactIdentity,
+    PolicyLayer,
+    PolicyDecision,
+    content_digest,
+    decision_contract_for_layer,
+)
 from .policy_replay import PolicyReplayResult
 from .extraction_feedback import (
     ExtractionFeedbackExample,
@@ -1468,6 +1474,7 @@ class LayerFeasibilityCensus:
     def payload(self) -> dict[str, object]:
         return {
             "layer": self.layer.value,
+            "decisionContract": decision_contract_for_layer(self.layer).payload(),
             "caseCount": self.case_count,
             "signalCount": self.signal_count,
             "signalCoverage": self.signal_coverage,
