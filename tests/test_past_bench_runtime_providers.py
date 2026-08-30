@@ -102,3 +102,34 @@ def test_past_artifact_set_provider_requires_complete_multi_fact_source() -> Non
     assert len(values) == 1
     assert values[0].complete is True
     assert values[0].provenance_id == "pure-extraction-provenance.provider-set"
+
+
+def test_past_artifact_set_provider_does_not_copy_source_key_to_unbound_facts() -> None:
+    source = ExtractionSourceEvidence(
+        "source.provider-unbound",
+        "a" * 64,
+        "extraction-set.provider-unbound",
+        ExtractionSetStatus.NONEMPTY,
+        ("application.notes.output.tsv",),
+        (
+            ExtractedFactEvidence(
+                "fact.provider-unbound.a",
+                ("application.notes.output.tsv",),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.provider-unbound.a",
+            ),
+            # The source advertises one key, but this member has no explicit
+            # per-fact binding.  A provider must remain unresolved rather than
+            # copying the source key to the unbound fact.
+            ExtractedFactEvidence(
+                "fact.provider-unbound.b",
+                (),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.provider-unbound.b",
+            ),
+        ),
+    )
+    assert _past_bench_artifact_set_provider(
+        source,
+        provenance_id="pure-extraction-provenance.provider-unbound",
+    ) == ()

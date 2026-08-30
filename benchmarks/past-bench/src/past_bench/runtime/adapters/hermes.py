@@ -198,7 +198,15 @@ def _past_bench_artifact_set_provider(
     *,
     provenance_id: str | None = None,
 ) -> tuple[Any, ...]:
-    """Bind a complete multi-fact extraction set to one visible key."""
+    """Bind a complete multi-fact extraction set to one visible key.
+
+    A source-level key is not sufficient evidence that every persisted fact
+    belongs to the same semantic unit.  In particular, copying
+    ``source.available_semantic_keys`` onto all facts would turn a benchmark
+    family hint into a false set-level binding.  Require an explicit
+    per-fact semantic binding instead; when the runtime cannot provide one we
+    return no binding and the downstream resolver remains unresolved.
+    """
 
     from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
     from rsimem.memory.extraction_feedback import ExtractionSourceEvidence
@@ -213,6 +221,12 @@ def _past_bench_artifact_set_provider(
     keys = tuple(source.available_semantic_keys)
     if provenance_id is None or len(facts) < 2 or len(keys) != 1:
         return ()
+    semantic_key = keys[0]
+    # Every persisted member must explicitly claim the same semantic key.
+    # ``available_semantic_keys`` describes the source boundary only and is
+    # deliberately not used as an implicit per-fact matcher.
+    if any(semantic_key not in fact.semantic_keys for fact in facts):
+        return ()
     return (ArtifactSetSemanticBinding.create(
         semantic_unit_id=(
             "notes.semantic-unit."
@@ -220,7 +234,7 @@ def _past_bench_artifact_set_provider(
                 f"{source.source_projection_digest}|{keys[0]}".encode("utf-8")
             ).hexdigest()[:32]
         ),
-        semantic_key=keys[0],
+        semantic_key=semantic_key,
         member_artifact_ids=tuple(fact.artifact_id for fact in facts),
         member_fact_ids=tuple(fact.fact_id for fact in facts),
         complete=True,
