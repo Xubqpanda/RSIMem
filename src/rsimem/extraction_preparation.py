@@ -204,7 +204,7 @@ def _process_signal_gate(
         for case in cases
         if case.status is ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL
     ]
-    optimization = len(optimization_cases)
+    optimization = len({case.logical_case_id for case in optimization_cases})
     by_hypothesis: dict[str, set[str]] = {}
     for case in optimization_cases:
         if case.abstract_hypothesis_digest is not None:
