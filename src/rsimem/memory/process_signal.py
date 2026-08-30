@@ -416,7 +416,7 @@ class JsonProcessSignalCaseStore:
                 records = self._read_unlocked()
                 return tuple(
                     ProcessSignalCase.from_payload(json.loads(value))
-                    for value in records.values()
+                    for _, value in sorted(records.items())
                 )
             finally:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
