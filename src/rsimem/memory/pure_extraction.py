@@ -817,8 +817,18 @@ class PureExtractionOptimizerExample:
             "evidence_plane": EvidencePlane.PURE_PROCESS,
             "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION,
         }
+        identity = {
+            **values,
+            "fact_ids": list(fact_ids),
+            "semantic_keys": list(semantic_keys),
+            "tool_join_ids": list(values["tool_join_ids"]),
+            "reason_codes": list(feedback.reason_codes),
+            "attribution": feedback.attribution.value,
+            "evidence_plane": EvidencePlane.PURE_PROCESS.value,
+            "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION.value,
+        }
         return cls(
-            example_id=f"pure-extraction-example.{content_digest({**values, 'attribution': feedback.attribution.value, 'fact_ids': list(fact_ids), 'semantic_keys': list(semantic_keys), 'tool_join_ids': list(values['tool_join_ids']), 'reason_codes': list(feedback.reason_codes), 'evidence_plane': EvidencePlane.PURE_PROCESS.value, 'evidence_source': EvidenceSourceKind.RUNTIME_OBSERVATION.value})[:40]}",
+            example_id=f"pure-extraction-example.{content_digest(identity)[:40]}",
             **values,
         )
 
