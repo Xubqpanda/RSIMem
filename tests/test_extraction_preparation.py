@@ -138,6 +138,54 @@ def test_build_pure_extraction_corpus_from_captured_batch_is_gate_bound(
     assert len(corpus.examples) == 1
 
 
+def test_build_pure_extraction_corpus_rejects_protocol_mismatch(
+    tmp_path: Path,
+) -> None:
+    projection, family_source, *_ = _fixture()
+    source = PureExtractionSourceRecord.from_family_record(
+        family_source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.batch-pure-mismatch-v1",
+    )
+    feedback = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=source,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.batch-pure-mismatch-v1",
+        provenance_id=source.provenance_id,
+    )
+    JsonPureExtractionSourceRecordStore(
+        tmp_path / "run" / "pure_extraction_sources.jsonl"
+    ).append(source)
+    JsonPureExtractionFeedbackRecordStore(
+        tmp_path / "run" / "rsimem_pure_extraction_feedback.jsonl"
+    ).append(feedback)
+    JsonProcessSignalCaseStore(
+        tmp_path / "run" / "process_signal_cases.jsonl"
+    ).append(ProcessSignalCase.create(
+        logical_case_id="logical-case.batch-pure-mismatch-v1",
+        physical_observation_ids=("physical-observation.batch-pure-mismatch-v1",),
+        source_observed=True,
+        extraction_observed=True,
+        persistence_observed=True,
+        retrieval_observed=False,
+        exposure_observed=False,
+        outcome_observed=False,
+        extraction_attributable=False,
+        abstract_hypothesis_digest=None,
+        observation_complete=True,
+        analysis_protocol_id="signal-protocol.actual-v1",
+        replicate_id="replicate.batch-pure-mismatch-v1",
+        observation_window="window.batch-pure-mismatch-v1",
+    ))
+    with pytest.raises(ValueError, match="not bound to the requested protocol"):
+        build_pure_extraction_corpus_from_batch(
+            tmp_path,
+            observation_cutoff="2026-08-30T00:00:00Z",
+            process_signal_protocol_id="signal-protocol.requested-v1",
+        )
+
+
 def _write_graph(path: Path, graph) -> None:
     log = AppendOnlyOperationEvidenceLog(path)
     ordinal = 0
