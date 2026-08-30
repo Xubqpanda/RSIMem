@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import sys
+from types import SimpleNamespace
 from pathlib import Path
+
+import pytest
 
 _PAST_BENCH_SRC = Path(__file__).parents[1] / "benchmarks" / "past-bench" / "src"
 if str(_PAST_BENCH_SRC) not in sys.path:
@@ -179,6 +182,33 @@ def test_past_opportunity_provider_supports_non_notes_schema_tools() -> None:
     assert len(values) == 1
     assert values[0].semantic_requirement == "application.calendar.read.policy"
     assert values[0].source_surface.value == "application_schema"
+
+
+def test_formal_feedback_runtime_rejects_missing_application_schema(tmp_path: Path) -> None:
+    """A feedback contract cannot silently fall back to benchmark text parsing."""
+
+    from past_bench.runtime.adapters.hermes import HermesAdapter
+
+    adapter = object.__new__(HermesAdapter)
+    adapter.request = SimpleNamespace(
+        runtime_config=SimpleNamespace(metadata={"experiment_variant": "with_persistence"}),
+        model=SimpleNamespace(model_id="fixture", base_url=None, api_key=None),
+    )
+    with pytest.raises(ValueError, match="frozen application opportunity schema"):
+        adapter._activate_rsimem_bridge(
+            object(),
+            {
+                "capture_artifacts_dir": str(tmp_path / "artifacts"),
+                "rsimem": {
+                    "mode": "native+ledger",
+                    "semantic_writeback": {
+                        "mode": "static",
+                        "feedback_contract": "sm01_tsv_v1",
+                    },
+                },
+            },
+            tmp_path / "home",
+        )
 
 
 def test_application_schema_is_derived_from_visible_tool_contract() -> None:
