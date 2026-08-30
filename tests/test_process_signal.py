@@ -119,6 +119,23 @@ def test_process_signal_case_store_replays_logical_census(tmp_path) -> None:
     assert census.conflict_case_count == 1
 
 
+def test_process_signal_case_store_replay_order_is_canonical(tmp_path) -> None:
+    first = _case(physical="physical-observation.order.1")
+    second = _case(hypothesis=None, physical="physical-observation.order.2")
+    path = tmp_path / "process-signal-order.jsonl"
+    path.write_text(
+        "\n".join(
+            json.dumps(item.payload(), sort_keys=True)
+            for item in (second, first)
+        ) + "\n",
+        encoding="utf-8",
+    )
+    records = JsonProcessSignalCaseStore(path).records()
+    assert tuple(item.case_id for item in records) == tuple(
+        sorted((first.case_id, second.case_id))
+    )
+
+
 def test_process_signal_case_store_fails_closed_on_symlink(tmp_path) -> None:
     target = tmp_path / "target.jsonl"
     target.write_text("", encoding="utf-8")
