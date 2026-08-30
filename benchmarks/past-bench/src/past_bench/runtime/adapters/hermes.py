@@ -39,6 +39,8 @@ _MISSING = object()
 _PAST_OUTPUT_TSV_KEY = "application.notes.output.tsv"
 _PAST_SHARE_POLICY_KEY = "application.notes.share.recipient_policy"
 _PAST_OBSERVATION_TIME = "2000-01-01T00:00:00Z"
+_PAST_APPLICATION_SCHEMA_ID = "past-bench.notes.application.v1"
+_PAST_APPLICATION_SCHEMA_VERSION = 1
 
 
 def _past_visible_messages(result: Mapping[str, Any]) -> tuple[str, ...]:
@@ -114,6 +116,31 @@ def _past_semantic_keys(result: Mapping[str, Any]) -> tuple[str, ...]:
         # request itself states one.  Merely invoking notes_share is not
         # evidence that a particular recipient policy was required.
         keys.append(_PAST_SHARE_POLICY_KEY)
+    # A generic future request may not repeat the source policy in prose.  A
+    # notes_share call still exposes the application's public recipient field;
+    # use the frozen task-local schema to record that opportunity without
+    # consulting family IDs, graders, or expected recipients.
+    schema = result.get("rsimem_application_schema")
+    if isinstance(schema, Mapping):
+        if (
+            schema.get("schema_id") == _PAST_APPLICATION_SCHEMA_ID
+            and schema.get("schema_version") == _PAST_APPLICATION_SCHEMA_VERSION
+            and _PAST_SHARE_POLICY_KEY not in keys
+        ):
+            opportunities = schema.get("opportunities")
+            tool_names = set(_past_notes_tool_names(result))
+            if isinstance(opportunities, (list, tuple)):
+                for opportunity in opportunities:
+                    if not isinstance(opportunity, Mapping):
+                        continue
+                    if (
+                        opportunity.get("semantic_key") == _PAST_SHARE_POLICY_KEY
+                        and opportunity.get("surface") == "tool_schema"
+                        and isinstance(opportunity.get("tool_name"), str)
+                        and opportunity["tool_name"] in tool_names
+                    ):
+                        keys.append(_PAST_SHARE_POLICY_KEY)
+                        break
     return tuple(dict.fromkeys(keys))
 
 
@@ -557,6 +584,15 @@ class HermesAdapter(RuntimeAdapter):
                 conversation_history=[],
                 task_id=self.request.session_id,
             )
+        # Carry the frozen application-owned schema to the bridge's
+        # post-task boundary.  Hermes' result intentionally contains only
+        # conversation/tool observations; schema metadata is injected by the
+        # host runtime and is never model-visible.
+        if isinstance(result, Mapping):
+            result = dict(result)
+            application_schema = rsimem_cfg.get("application_opportunity_schema")
+            if isinstance(application_schema, Mapping):
+                result["rsimem_application_schema"] = dict(application_schema)
         if self._rsimem_bridge is not None:
             self._rsimem_bridge.on_task_completed(result)
         self._set_session_title_if_missing(agent)
@@ -822,6 +858,11 @@ class HermesAdapter(RuntimeAdapter):
             artifact_set_binding_provider=(
                 _past_bench_artifact_set_provider
                 if rsimem_writeback_enabled
+                else None
+            ),
+            application_opportunity_schema=(
+                rsimem_cfg.get("application_opportunity_schema")
+                if isinstance(rsimem_cfg.get("application_opportunity_schema"), Mapping)
                 else None
             ),
         )

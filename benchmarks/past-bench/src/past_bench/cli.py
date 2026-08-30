@@ -2137,6 +2137,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     from .models.task import TaskDefinition
     from .runner.self_evolve import (
         build_hermes_extra_body,
+        build_past_bench_application_opportunity_schema,
         build_nanobot_extra_body,
         build_zeroclaw_extra_body,
         build_reflection_prompt,
@@ -2310,6 +2311,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     skills_enabled=sequence.hermes.skills_enabled,
                     session_search_enabled=sequence.hermes.session_search_enabled,
                 )
+                tool_config["application_opportunity_schema"] = (
+                    build_past_bench_application_opportunity_schema(task)
+                )
                 review_wait_s = (
                     args.background_review_wait_s
                     if args.background_review_wait_s is not None
@@ -2384,6 +2388,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     ),
                     rsimem_extraction_offline_source_path=(
                         sequence.hermes.rsimem_extraction_offline_source_path
+                    ),
+                    rsimem_application_opportunity_schema=(
+                        tool_config.get("application_opportunity_schema")
                     ),
                 )
 
@@ -2753,6 +2760,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 skills_enabled=sequence.hermes.skills_enabled,
                 session_search_enabled=sequence.hermes.session_search_enabled,
             )
+            _sc_tool_config["application_opportunity_schema"] = (
+                build_past_bench_application_opportunity_schema(_sc_task)
+            )
             _sc_preseed_dir = materialize_task_hermes_seed(
                 task=_sc_task,
                 target_dir=_sc_episode_dir / "preseed",
@@ -2950,6 +2960,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     skills_enabled=sequence.hermes.skills_enabled,
                     session_search_enabled=sequence.hermes.session_search_enabled,
                 )
+                tool_config["application_opportunity_schema"] = (
+                    build_past_bench_application_opportunity_schema(task)
+                )
                 review_wait_s = (
                     args.background_review_wait_s
                     if args.background_review_wait_s is not None
@@ -3130,6 +3143,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     user_profile_enabled=sequence.hermes.user_profile_enabled,
                     skills_enabled=sequence.hermes.skills_enabled,
                     session_search_enabled=sequence.hermes.session_search_enabled,
+                )
+                reflection_tool_config["application_opportunity_schema"] = (
+                    build_past_bench_application_opportunity_schema(task)
                 )
                 reflection_preseed_dir = materialize_task_hermes_seed(
                     task=task,
