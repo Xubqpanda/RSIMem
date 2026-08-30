@@ -1032,3 +1032,45 @@ def test_identical_lifecycle_event_is_idempotent_but_payload_conflict_fails(
     conflicting["eventId"] = same["eventId"]
     with pytest.raises(ValueError, match="conflicting ledger eventId"):
         build_events(comparison, lifecycle_events=(same, conflicting))
+
+
+def test_lifecycle_event_identity_excludes_mutable_status_and_reasons(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    observer = LifecycleLedgerObserver(
+        variant="with_persistence",
+        trace_id="trace-1",
+        family_id="family-1",
+        stage="learn",
+    )
+    snapshot = HermesSnapshotCollector().collect(
+        (HermesMessage("message-1", "user", MEMORY, "turn-1", 10, completed=True),),
+        run_id=comparison.parent.name,
+        episode_id="episode-1",
+        session_id="session-1",
+        task_id="task-1",
+        current_turn_id=None,
+        task_state=TaskLifecycleState.COMPLETED,
+        lifecycle_state="task_completed",
+        source_ref="fixture:lifecycle-identity",
+    )
+    observer.record_evaluation(
+        snapshot,
+        evaluation_id="evaluation-1",
+        trigger="task_completed",
+        evaluator="deterministic",
+        policy_version="policy-v1",
+        status="accepted",
+        reason_codes=("decision_observed",),
+    )
+    first = observer.events[-1]
+    with pytest.raises(ValueError, match="conflicting lifecycle ledger event"):
+        observer.record_evaluation(
+            snapshot,
+            evaluation_id="evaluation-1",
+            trigger="task_completed",
+            evaluator="deterministic",
+            policy_version="policy-v1",
+            status="accepted",
+            reason_codes=("absence",),
+        )
+    assert observer.events[-1] == first
