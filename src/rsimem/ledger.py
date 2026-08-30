@@ -1046,13 +1046,73 @@ def _event(
     source: dict[str, Any],
     data: dict[str, Any],
 ) -> dict[str, Any]:
+    """Create a content-free ledger event with a stable logical identity.
+
+    ``ordinal`` is only a last-resort disambiguator for legacy evidence that
+    carries no event-level identity.  Events which expose a durable identity
+    (model call, tool message, memory record, snapshot/plan/mutation, etc.) use
+    that identity instead, so replaying or reordering evidence does not change
+    their event IDs.
+    """
+
     identity = {
         "runId": run_id,
         "variant": variant,
         "traceId": episode.get("trace_id"),
         "kind": kind,
-        "ordinal": ordinal,
     }
+    # Keep the owning episode identity in every generated event.  Trace IDs
+    # are expected to be unique, but these fields make the contract robust to
+    # fixtures which replay a trace under a different lifecycle identity.
+    for field in ("episode_id", "task_id", "family_id", "stage"):
+        value = episode.get(field)
+        if value is not None:
+            identity[field] = value
+
+    # Prefer stable logical IDs over position in an evidence file.  Payload
+    # fields which are mutable accounting evidence are intentionally excluded:
+    # if they change for the same logical event, the existing event-id conflict
+    # checks can detect the conflicting canonical payload.
+    logical_fields: tuple[str, ...]
+    if kind == "model_call_usage":
+        logical_fields = ("callId", "sequence", "attempt")
+    elif kind in {"tool_call", "memory_operation"}:
+        logical_fields = ("callId", "operationId")
+    elif kind == "memory_injection":
+        logical_fields = ("recordId",)
+    else:
+        logical_fields = (
+            "snapshotId",
+            "evaluationId",
+            "planId",
+            "mutationId",
+            "executionId",
+            "operationId",
+        )
+
+    found = False
+    for field in logical_fields:
+        value = data.get(field)
+        if value is not None and value != "":
+            identity[field] = value
+            found = True
+
+    # Tool evidence historically stores its durable message identity in the
+    # source envelope.  Keep it separate from data so the public event payload
+    # remains unchanged.
+    if kind in {"tool_call", "memory_operation"}:
+        message_index = source.get("messageIndex")
+        if message_index is not None:
+            identity["messageIndex"] = message_index
+            found = True
+
+    if not found and kind == "model_call_usage":
+        # A malformed/legacy usage record can lack call_id and sequence.  The
+        # ordinal fallback is deterministic but deliberately not preferred.
+        identity["ordinal"] = ordinal
+    elif not found and kind in {"tool_call", "memory_operation"}:
+        identity["ordinal"] = ordinal
+
     return {
         "schemaVersion": SCHEMA_VERSION,
         "eventId": f"evt_{_json_hash(identity)}",
