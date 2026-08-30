@@ -130,7 +130,7 @@ def audit_policy_evidence(
         }
         for index, event in enumerate(lifecycle):
             for field, expected_value in lifecycle_identity.items():
-                if expected_value is not None and event.get(field) != expected_value:
+                if field not in event or event.get(field) != expected_value:
                     errors.append(
                         f"lifecycle event {field} does not match policy evidence "
                         f"at index {index}"
