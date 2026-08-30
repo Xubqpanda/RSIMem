@@ -520,6 +520,8 @@ class PureExtractionFeedbackRecord:
         reason_codes: tuple[str, ...] = (),
         observation_complete: bool = True,
     ) -> "PureExtractionFeedbackRecord":
+        if not isinstance(tool_joins, tuple):
+            raise TypeError("pure extraction tool joins must be a tuple")
         values = {
             "source_record_id": source_record_id,
             "source_projection_digest": source_projection_digest,
@@ -578,6 +580,8 @@ class PureExtractionFeedbackRecord:
 
         if not isinstance(source, PureExtractionSourceRecord):
             raise TypeError("pure extraction feedback source has the wrong type")
+        if not isinstance(tool_joins, tuple):
+            raise TypeError("pure extraction tool joins must be a tuple")
         if source.provenance_id != provenance_id:
             raise ValueError("source provenance does not match extraction feedback")
         if opportunity is not None and opportunity.provenance_id != provenance_id:
