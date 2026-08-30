@@ -35,7 +35,11 @@ from .extraction_feedback import (
 )
 from .opportunity import OpportunityEvidence
 from .prompt_components import content_digest
-from .tool_exact_join import ToolCallResultJoin
+from .tool_exact_join import (
+    ToolCallResultJoin,
+    ToolJoinResolutionStatus,
+    resolve_tool_call_result,
+)
 from .use_attribution import MemoryUseEvidence
 
 
@@ -558,6 +562,35 @@ class PureExtractionFeedbackRecord:
         from .opportunity import OpportunityResolutionStatus, resolve_opportunity
         from .use_attribution import MemoryUseResolutionStatus, resolve_memory_use
 
+        # A tool closure is only relevant to attribution when the host has
+        # explicitly bound it to the memory-use downstream or outcome
+        # operation.  Unrelated tool activity is retained as diagnostics but
+        # must not gate an otherwise independent memory observation.  For a
+        # bound join, however, the exact call/result resolver is authoritative
+        # and every such join must be complete before extraction can receive
+        # credit or blame.
+        memory_operation_ids = {
+            operation_id
+            for operation_id in (
+                memory_use.downstream_operation_id if memory_use is not None else None,
+                memory_use.outcome_operation_id if memory_use is not None else None,
+            )
+            if operation_id is not None
+        }
+        bound_tool_join_resolutions = tuple(
+            resolve_tool_call_result(join)
+            for join in tool_joins
+            if join.memory_use_operation_id in memory_operation_ids
+        )
+        incomplete_tool_join = next(
+            (
+                resolution
+                for resolution in bound_tool_join_resolutions
+                if resolution.status is not ToolJoinResolutionStatus.COMPLETE
+            ),
+            None,
+        )
+
         opportunity_resolution = resolve_opportunity(
             opportunity,
             current_input_requirements=current_input_requirements,
@@ -584,6 +617,12 @@ class PureExtractionFeedbackRecord:
             # extraction source.  Keep the evidence for diagnostics, but do
             # not let it grant attribution to the current source.
             reasons.append("artifact_set_member_foreign")
+        elif incomplete_tool_join is not None:
+            # Do not reinterpret a failed or partial tool closure as either a
+            # successful or harmful extraction outcome.  Keep the resolver's
+            # deterministic reason in the pure-process record for audit and
+            # replay while leaving attribution unresolved.
+            reasons.append(f"tool_join_{incomplete_tool_join.reason_code}")
         elif memory_resolution.status is not MemoryUseResolutionStatus.ATTRIBUTABLE_USE:
             reasons.append(memory_resolution.reason_code)
         elif (

@@ -23,9 +23,13 @@ from rsimem.memory.pure_extraction import (
 from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
 from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
 from rsimem.memory.use_attribution import MemoryUseEvidence, OutcomeEvidenceKind
+from rsimem.memory.tool_exact_join import ToolCallResultJoin
 from rsimem.memory.process_signal import ProcessSignalCaseCensus
 from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
 from test_extraction_optimizer_builder import _fixture
+
+
+TSV_KEY = "preference.summary.tsv"
 
 
 def test_family_projection_strips_benchmark_scope_and_replays() -> None:
@@ -720,6 +724,152 @@ def test_pure_feedback_derivation_is_conservative_and_replay_stable() -> None:
         current_input_requirements=("preference.summary.tsv",),
     )
     assert confounded.attribution is PureExtractionAttribution.UNRESOLVED
+
+
+def test_bound_tool_closure_is_required_for_extraction_attribution() -> None:
+    """A memory-use claim cannot receive credit without an exact tool closure."""
+
+    projection, source, *_ = _fixture()
+    provenance = "provenance.tool-gate-v1"
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id=provenance,
+        visible_semantic_keys=(TSV_KEY,),
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement=TSV_KEY,
+        observation_time="2026-08-22T00:00:00Z",
+        operation_id="op.opportunity.tool-gate-v1",
+        provenance_id=provenance,
+        source_payload={"tool": "render_table", "schema": "tsv"},
+    )
+    memory_use = MemoryUseEvidence.create(
+        artifact_ids=("artifact.memory-v1",),
+        retrieved_artifact_ids=("artifact.memory-v1",),
+        retrieval_operation_id="op.retrieval.tool-gate-v1",
+        injected_artifact_ids=("artifact.memory-v1",),
+        injection_operation_id="op.injection.tool-gate-v1",
+        used_artifact_ids=("artifact.memory-v1",),
+        downstream_operation_id="op.use.tool-gate-v1",
+        outcome_operation_id="op.outcome.tool-gate-v1",
+        outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+        outcome_success=True,
+        observation_cutoff="2026-08-23T00:00:00Z",
+        provenance_id=provenance,
+    )
+
+    common_join = {
+        "call_id": "call.tool-gate-v1",
+        "result_id": "result.tool-gate-v1",
+        "tool_name_digest": "a" * 64,
+        "success": True,
+        "retry_identity": "retry.tool-gate-v1",
+        "run_id": "run.tool-gate-v1",
+        "variant": "native",
+        "trace_id": "trace.tool-gate-v1",
+        "episode_id": "episode.tool-gate-v1",
+        "session_id": "session.tool-gate-v1",
+        "task_id": "task.tool-gate-v1",
+        "source_revision": "revision.tool-gate-v1",
+        "host_event_id": "event.tool-gate-v1",
+        "memory_use_operation_id": memory_use.downstream_operation_id,
+        "call_receipt_id": "receipt.call.tool-gate-v1",
+        "result_receipt_id": "receipt.result.tool-gate-v1",
+    }
+    complete_join = ToolCallResultJoin.create(**common_join)
+    complete = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=memory_use,
+        tool_joins=(complete_join,),
+        observation_window="window.completed-tool-gate-v1",
+        provenance_id=provenance,
+    )
+    assert complete.attribution is PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
+
+    malformed = (
+        {"result_present": False, "result_id": None, "result_receipt_id": None},
+        {"orphan_result": True},
+        {"duplicate_call": True},
+        {"duplicate_result": True},
+        {"type_mismatch": True},
+        {"cross_task": True},
+    )
+    for overrides in malformed:
+        values = dict(common_join)
+        values.update(overrides)
+        join = ToolCallResultJoin.create(**values)
+        derived = PureExtractionFeedbackRecord.derive_from_evidence(
+            source=pure_source,
+            opportunity=opportunity,
+            memory_use=memory_use,
+            tool_joins=(join,),
+            observation_window="window.completed-tool-gate-v1",
+            provenance_id=provenance,
+        )
+        assert derived.attribution is PureExtractionAttribution.UNRESOLVED
+        assert any(reason.startswith("tool_join_") for reason in derived.reason_codes)
+
+
+def test_unrelated_tool_closure_does_not_gate_extraction_attribution() -> None:
+    projection, source, *_ = _fixture()
+    provenance = "provenance.tool-unrelated-v1"
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id=provenance,
+        visible_semantic_keys=(TSV_KEY,),
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement=TSV_KEY,
+        observation_time="2026-08-22T00:00:00Z",
+        operation_id="op.opportunity.tool-unrelated-v1",
+        provenance_id=provenance,
+        source_payload={"tool": "render_table", "schema": "tsv"},
+    )
+    memory_use = MemoryUseEvidence.create(
+        artifact_ids=("artifact.memory-v1",),
+        retrieved_artifact_ids=("artifact.memory-v1",),
+        retrieval_operation_id="op.retrieval.tool-unrelated-v1",
+        injected_artifact_ids=("artifact.memory-v1",),
+        injection_operation_id="op.injection.tool-unrelated-v1",
+        used_artifact_ids=("artifact.memory-v1",),
+        downstream_operation_id="op.use.tool-unrelated-v1",
+        outcome_operation_id="op.outcome.tool-unrelated-v1",
+        outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+        outcome_success=True,
+        observation_cutoff="2026-08-23T00:00:00Z",
+        provenance_id=provenance,
+    )
+    unrelated = ToolCallResultJoin.create(
+        call_id="call.tool-unrelated-v1",
+        result_id=None,
+        tool_name_digest="a" * 64,
+        success=None,
+        retry_identity="retry.tool-unrelated-v1",
+        run_id="run.tool-unrelated-v1",
+        variant="native",
+        trace_id="trace.tool-unrelated-v1",
+        episode_id="episode.tool-unrelated-v1",
+        session_id="session.tool-unrelated-v1",
+        task_id="task.tool-unrelated-v1",
+        source_revision="revision.tool-unrelated-v1",
+        host_event_id="event.tool-unrelated-v1",
+        call_receipt_id="receipt.call.tool-unrelated-v1",
+        result_present=False,
+    )
+    derived = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=memory_use,
+        tool_joins=(unrelated,),
+        observation_window="window.completed-tool-unrelated-v1",
+        provenance_id=provenance,
+    )
+    assert derived.attribution is PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
 
 
 def test_complete_set_binding_can_attribute_once_but_partial_set_stays_unresolved() -> None:
