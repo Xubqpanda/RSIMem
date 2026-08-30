@@ -115,6 +115,25 @@ def test_pure_feedback_store_is_restart_safe_and_rejects_benchmark_fields(tmp_pa
         JsonPureExtractionFeedbackRecordStore(path).records()
 
 
+def test_pure_source_and_feedback_logs_return_canonical_identity_order(tmp_path) -> None:
+    projection, source, *_ = _fixture()
+    first = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.order-a",
+    )
+    second = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id="projection.order-b",
+        provenance_id="provenance.order-b",
+    )
+    path = tmp_path / "pure-sources.jsonl"
+    store = JsonPureExtractionSourceRecordStore(path)
+    store.append(second)
+    store.append(first)
+    assert store.records() == tuple(sorted((first, second), key=lambda value: value.record_id))
+
+
 def test_pure_optimizer_rejects_unbound_observation_window() -> None:
     projection, source, *_ = _fixture()
     pure_source = PureExtractionSourceRecord.from_family_record(

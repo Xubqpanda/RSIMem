@@ -1170,7 +1170,7 @@ class _JsonPureExtractionStore:
             if previous is None:
                 canonical_by_id[record.record_id] = canonical
                 records.append(record)
-        return tuple(records)
+        return tuple(sorted(records, key=lambda value: value.record_id))
 
     def records(self) -> tuple[object, ...]:
         with self._lock(fcntl.LOCK_SH):
