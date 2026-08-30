@@ -488,6 +488,16 @@ def test_append_only_conflict_fails_closed() -> None:
         log.append(conflict)
 
 
+def test_append_only_operation_log_rejects_symlinked_path(tmp_path: Path) -> None:
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "operations.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        AppendOnlyOperationEvidenceLog(path)
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
 class _FailingSink:
     def append(self, event):
         raise OSError("SENTINEL_PRIVATE_WRITER_FAILURE")
