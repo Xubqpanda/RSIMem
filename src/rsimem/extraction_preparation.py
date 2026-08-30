@@ -41,6 +41,7 @@ from .memory.process_signal import (
     census_process_signal_cases,
 )
 from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStore
+from .memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from .memory.extraction_projection import (
     EXTRACTION_SOURCE_RECORD_SCHEMA_VERSION,
     LIVE_EXTRACTION_FEEDBACK_SCHEMA_VERSION,
@@ -325,9 +326,16 @@ def _optimizer_signal_is_ready(
     corpus_ready: bool,
     actionable_primary_count: int,
     process_signal_gate: str,
+    evidence_plane: EvidencePlane | str | None = None,
 ) -> bool:
     """Require a bound pure-process signal before optimizer readiness."""
 
+    if evidence_plane is not None:
+        try:
+            if EvidencePlane(evidence_plane) is not EvidencePlane.PURE_PROCESS:
+                return False
+        except (TypeError, ValueError):
+            return False
     return (
         corpus_ready
         and actionable_primary_count
@@ -593,6 +601,33 @@ def audit_extraction_feedback_batch(
         corpus_ready=corpus_ready,
         actionable_primary_count=actionable,
         process_signal_gate=process_signal_gate,
+        # This preparation module consumes the legacy family-bound source and
+        # feedback records.  Their labels are benchmark-audit evidence and
+        # must never unlock the generic optimizer, even when a separate pure
+        # process census happens to report a ready hypothesis.  The explicit
+        # plane check keeps the readiness bit honest; deployment-only pure
+        # evidence uses the dedicated ``pure_extraction`` preparation path.
+        evidence_plane=(
+            EvidencePlane.PURE_PROCESS
+            if raw_sources
+            and feedback_payloads
+            and all(
+                value.get("evidence_plane") == EvidencePlane.PURE_PROCESS.value
+                and value.get("evidence_source") == EvidenceSourceKind.RUNTIME_OBSERVATION.value
+                for value in (
+                    *raw_sources,
+                    *(
+                        dataset
+                        for record in feedback_payloads
+                        for dataset in (
+                            record.get("dataset"),
+                        )
+                        if isinstance(dataset, Mapping)
+                    ),
+                )
+            )
+            else EvidencePlane.BENCHMARK_AUDIT
+        ),
     )
     if corpus_ready and not optimizer_signal_ready:
         if actionable < FROZEN_EXTRACTION_OPTIMIZER_CONFIG.minimum_actionable_primary_examples:

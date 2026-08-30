@@ -14,6 +14,7 @@ from rsimem.extraction_preparation import (
     build_extraction_optimizer_corpus,
 )
 from rsimem.memory.extraction_optimizer_corpus import PROCESS_SIGNAL_GATE_NO_SIGNAL
+from rsimem.memory.evidence_planes import EvidencePlane
 
 
 def test_optimizer_signal_requires_ready_pure_process_gate() -> None:
@@ -21,6 +22,12 @@ def test_optimizer_signal_requires_ready_pure_process_gate() -> None:
         corpus_ready=True,
         actionable_primary_count=99,
         process_signal_gate="not_bound",
+    )
+    assert not _optimizer_signal_is_ready(
+        corpus_ready=True,
+        actionable_primary_count=99,
+        process_signal_gate="ready",
+        evidence_plane=EvidencePlane.BENCHMARK_AUDIT,
     )
 
 
