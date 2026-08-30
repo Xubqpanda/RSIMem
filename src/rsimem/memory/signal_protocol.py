@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Mapping
 
 
-SIGNAL_PROTOCOL_SCHEMA_VERSION = 1
-SIGNAL_PROTOCOL_SCHEMA = "rsimem-process-signal-protocol-v1"
+SIGNAL_PROTOCOL_SCHEMA_VERSION = 2
+SIGNAL_PROTOCOL_SCHEMA = "rsimem-process-signal-protocol-v2"
 PROCESS_SIGNAL_PROTOCOL_FILENAME = "process_signal_protocol.json"
 PROCESS_SIGNAL_OBSERVATION_WINDOW = "completed-task.v1"
 PROCESS_SIGNAL_CASE_DEDUP_RULE = "logical_case_v1"
@@ -49,6 +49,7 @@ class ProcessSignalAnalysisProtocol:
     protocol_id: str
     training_family_ids: tuple[str, ...]
     task_template_group_ids: tuple[str, ...]
+    task_manifest_digest: str
     provider_model: str
     replicate_count: int
     observation_window: str
@@ -62,6 +63,8 @@ class ProcessSignalAnalysisProtocol:
         _id(self.protocol_id, "process signal protocol ID")
         _ids(self.training_family_ids, "training family IDs")
         _ids(self.task_template_group_ids, "task template group IDs")
+        if not isinstance(self.task_manifest_digest, str) or _DIGEST.fullmatch(self.task_manifest_digest) is None:
+            raise ValueError("task manifest digest must be a sha256 hex digest")
         if not isinstance(self.provider_model, str) or _PROVIDER_MODEL.fullmatch(self.provider_model) is None:
             raise ValueError("provider/model identity must be stable")
         _id(self.observation_window, "observation window")
@@ -78,6 +81,7 @@ class ProcessSignalAnalysisProtocol:
             "schema_version": self.schema_version,
             "training_family_ids": list(self.training_family_ids),
             "task_template_group_ids": list(self.task_template_group_ids),
+            "task_manifest_digest": self.task_manifest_digest,
             "provider_model": self.provider_model,
             "replicate_count": self.replicate_count,
             "observation_window": self.observation_window,
@@ -91,6 +95,7 @@ class ProcessSignalAnalysisProtocol:
         *,
         training_family_ids: tuple[str, ...],
         task_template_group_ids: tuple[str, ...],
+        task_manifest_digest: str,
         provider_model: str,
         replicate_count: int,
         observation_window: str,
@@ -100,6 +105,7 @@ class ProcessSignalAnalysisProtocol:
         values = {
             "training_family_ids": tuple(training_family_ids),
             "task_template_group_ids": tuple(task_template_group_ids),
+            "task_manifest_digest": task_manifest_digest,
             "provider_model": provider_model,
             "replicate_count": replicate_count,
             "observation_window": observation_window,
@@ -116,7 +122,7 @@ class ProcessSignalAnalysisProtocol:
     def from_payload(cls, value: object) -> "ProcessSignalAnalysisProtocol":
         fields = {
             "schema", "protocol_id", "schema_version", "training_family_ids",
-            "task_template_group_ids", "provider_model", "replicate_count",
+            "task_template_group_ids", "task_manifest_digest", "provider_model", "replicate_count",
             "observation_window", "case_dedup_rule", "no_signal_case_id",
         }
         if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != SIGNAL_PROTOCOL_SCHEMA:
@@ -128,6 +134,7 @@ class ProcessSignalAnalysisProtocol:
                 protocol_id=value["protocol_id"],
                 training_family_ids=tuple(value["training_family_ids"]),
                 task_template_group_ids=tuple(value["task_template_group_ids"]),
+                task_manifest_digest=value["task_manifest_digest"],
                 provider_model=value["provider_model"],
                 replicate_count=value["replicate_count"],
                 observation_window=value["observation_window"],
@@ -170,10 +177,13 @@ def protocol_for_extraction_manifest(
         raise ValueError("manifest split identity is missing")
     family_id = split.get("familyId")
     template_id = split.get("taskTemplateGroupId")
+    task_manifest_digest = split.get("taskManifestDigest")
     replicates = manifest.get("replicates")
     if (
         not isinstance(family_id, str)
         or not isinstance(template_id, str)
+        or not isinstance(task_manifest_digest, str)
+        or _DIGEST.fullmatch(task_manifest_digest) is None
         or type(replicates) is not int
         or replicates < 1
     ):
@@ -181,6 +191,7 @@ def protocol_for_extraction_manifest(
     return ProcessSignalAnalysisProtocol.create(
         training_family_ids=(family_id,),
         task_template_group_ids=(template_id,),
+        task_manifest_digest=task_manifest_digest,
         provider_model=_manifest_provider_model(manifest),
         replicate_count=replicates,
         observation_window=PROCESS_SIGNAL_OBSERVATION_WINDOW,
