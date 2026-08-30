@@ -264,13 +264,29 @@ class PureExtractionSourceRecord:
         if not isinstance(visible_semantic_keys, tuple):
             raise TypeError("visible semantic keys must be a tuple")
         source_evidence = record.source
+        # The legacy family record may carry parser-derived semantic keys on
+        # each fact.  Those keys are benchmark/audit knowledge unless the
+        # caller explicitly projects them from a deployment-visible source.
+        # Filter fact bindings to that allow-list instead of copying the
+        # family parser's complete labels into the pure-process plane.
+        visible_keys = set(visible_semantic_keys)
+        sanitized_facts = tuple(
+            ExtractedFactEvidence(
+                fact.fact_id,
+                tuple(key for key in fact.semantic_keys if key in visible_keys),
+                fact.disposition,
+                artifact_id=fact.artifact_id,
+                quality_issue=fact.quality_issue,
+            )
+            for fact in source_evidence.facts
+        )
         sanitized_source = ExtractionSourceEvidence(
             source_evidence.source_id,
             source_evidence.source_projection_digest,
             source_evidence.extraction_set_id,
             source_evidence.status,
             visible_semantic_keys,
-            source_evidence.facts,
+            sanitized_facts,
         )
         return cls.create(
             source_projection_id=projection_id,
