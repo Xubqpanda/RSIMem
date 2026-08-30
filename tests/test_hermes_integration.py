@@ -1180,6 +1180,20 @@ def test_lifecycle_ledger_appends_incrementally_and_resumes(tmp_path: Path) -> N
         )
 
 
+def test_lifecycle_ledger_restart_rejects_schema_invalid_object(tmp_path: Path) -> None:
+    output = tmp_path / "lifecycle.jsonl"
+    output.write_text(
+        json.dumps({"eventId": "evt.invalid", "kind": "context_snapshot"}) + "\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="malformed lifecycle ledger event"):
+        LifecycleLedgerObserver(
+            variant="native+adapter+ledger",
+            trace_id="trace-invalid",
+            output_path=output,
+        )
+
+
 def test_lifecycle_ledger_records_content_free_pre_snapshot_rejection(tmp_path: Path) -> None:
     output = tmp_path / "lifecycle.jsonl"
     observer = LifecycleLedgerObserver(

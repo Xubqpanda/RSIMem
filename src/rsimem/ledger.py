@@ -558,6 +558,12 @@ class LifecycleLedgerObserver:
                 raise ValueError(
                     f"malformed lifecycle ledger event at line {line_number}"
                 )
+            try:
+                _validate_lifecycle_contract_event(event, self.output_path)
+            except ValueError as exc:
+                raise ValueError(
+                    f"malformed lifecycle ledger event at line {line_number}"
+                ) from exc
             event_id = event.get("eventId")
             if not isinstance(event_id, str) or not event_id.strip():
                 raise ValueError(
