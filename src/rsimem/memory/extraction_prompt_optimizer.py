@@ -232,6 +232,13 @@ class ExtractionPromptOptimizer:
         require_optimizer_plane(next(iter(planes)))
         if self.revocation_registry is not None:
             self.revocation_registry.assert_active(
+                artifact_id=corpus.corpus_id,
+                artifact_schema_version=corpus.schema_version,
+                artifact_digest=corpus.corpus_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
+            self.revocation_registry.assert_active(
                 artifact_id=parent.artifact_id,
                 artifact_schema_version=parent.schema_version,
                 artifact_digest=parent.artifact_digest,

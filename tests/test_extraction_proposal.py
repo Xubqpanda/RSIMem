@@ -16,6 +16,7 @@ from rsimem.memory.extraction_optimizer_contracts import (
     build_extraction_optimizer_request,
 )
 from rsimem.memory.extraction_optimizer_corpus import (
+    EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
     OptimizerCorpusRetention,
     OptimizerCorpusSplit,
 )
@@ -182,6 +183,33 @@ def test_proposal_revocation_registry_rejects_parent_before_provider_call(
         prepare_extraction_proposal(
             corpus_store=store,
             output_root=owner / "proposal-revoked",
+            client=client,
+            revocation_registry=registry,
+        )
+    assert client.requests == []
+
+
+def test_proposal_revocation_registry_rejects_corpus_before_provider_call(
+    tmp_path: Path,
+) -> None:
+    corpus = _multi_corpus(("useful", "useful"))
+    store, owner = _store(tmp_path, corpus)
+    registry = JsonRevocationRegistry(tmp_path / "revocations-corpus.jsonl")
+    registry.initialize()
+    registry.append(RevocationEntry.create(
+        artifact_id=corpus.corpus_id,
+        artifact_schema_version=EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
+        artifact_digest=corpus.corpus_digest,
+        evidence_plane=EvidencePlane.PURE_PROCESS,
+        evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        revoked_at="2026-08-30T01:02:03Z",
+        reason_code="stale_corpus",
+    ))
+    client = CapturedExtractionOptimizerClient(_proposal_output)
+    with pytest.raises(ValueError, match="artifact is revoked"):
+        prepare_extraction_proposal(
+            corpus_store=store,
+            output_root=owner / "proposal-revoked-corpus",
             client=client,
             revocation_registry=registry,
         )
