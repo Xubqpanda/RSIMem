@@ -57,7 +57,7 @@ opportunity/use/outcome 证据链，否则自动降级为 `unresolved`，避免�
 | trigger | 1 | 1/1 | 1/1 | 0 | 0 | 0 | 1 | 0 | 0 | validation-only |
 | source_selection | 1 | 1/1 | 1/1 | 0 | 0 | 1 | 0 | 0 | 1 | validation-only |
 | extraction | 2 | 2/2 | 2/2 | 1 | 0 | 1 | 0 | 0 | 2 | optimization-ready |
-| admission | 1 | 1/1 | 1/1 | 0 | 1 | 0 | 0 | 0 | 0 | validation-only |
+| admission | 1 | 1/1 | 1/1 | 0 | 1 | 0 | 0 | 0 | 1 | validation-only |
 | commit | 1 | 1/1 | 1/1 | 1 | 0 | 0 | 0 | 0 | 1 | validation-only |
 | exposure | 1 | 1/1 | 1/1 | 1 | 0 | 0 | 0 | 0 | 1 | validation-only |
 
