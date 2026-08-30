@@ -70,7 +70,14 @@ def _past_visible_messages(result: Mapping[str, Any]) -> tuple[str, ...]:
     return tuple(values)
 
 
-def _past_notes_tool_names(result: Mapping[str, Any]) -> tuple[str, ...]:
+def _past_tool_names(result: Mapping[str, Any]) -> tuple[str, ...]:
+    """Return all tool names exposed by the visible conversation.
+
+    Application-schema opportunities are not limited to the notes service.
+    Keep this helper independent of the benchmark's current tool prefix so a
+    frozen public schema can describe any application-owned tool contract.
+    """
+
     names: list[str] = []
     messages = result.get("messages")
     if not isinstance(messages, (list, tuple)):
@@ -90,9 +97,17 @@ def _past_notes_tool_names(result: Mapping[str, Any]) -> tuple[str, ...]:
                 if isinstance(function, Mapping)
                 else call.get("name")
             )
-            if isinstance(name, str) and name.startswith("notes_"):
+            if isinstance(name, str) and name.strip():
                 names.append(name)
     return tuple(dict.fromkeys(names))
+
+
+def _past_notes_tool_names(result: Mapping[str, Any]) -> tuple[str, ...]:
+    """Compatibility view used only by the legacy notes audit parser."""
+
+    return tuple(
+        name for name in _past_tool_names(result) if name.startswith("notes_")
+    )
 
 
 def _past_semantic_keys(result: Mapping[str, Any]) -> tuple[str, ...]:
@@ -163,7 +178,52 @@ def _past_bench_opportunity_provider(
 
     if not isinstance(result, Mapping):
         return ()
-    observed_keys = _past_semantic_keys(result)
+    raw_schema = result.get("rsimem_application_schema")
+    schema_present = isinstance(raw_schema, Mapping)
+    application_schema = None
+    if isinstance(raw_schema, Mapping):
+        raw_contract = raw_schema.get("application_contract")
+        if raw_contract is not None:
+            try:
+                application_schema = ApplicationOpportunitySchema.from_payload(
+                    raw_contract
+                )
+            except (TypeError, ValueError):
+                # The bridge validates and registers the frozen contract.  A
+                # malformed copy is not allowed to fall back to benchmark
+                # text parsing in the production path.
+                application_schema = None
+
+    # A formal runtime always carries the frozen application schema.  In that
+    # case derive observations from the declared public tool contract only;
+    # the old notes text detector is retained for direct audit fixtures that
+    # intentionally omit a schema.
+    if application_schema is not None:
+        declared = raw_schema.get("opportunities") if isinstance(raw_schema, Mapping) else None
+        observed_tool_names = set(_past_tool_names(result))
+        observed_keys: tuple[str, ...] = tuple(
+            dict.fromkeys(
+                str(item.get("semantic_key"))
+                for item in declared
+                if isinstance(item, Mapping)
+                and isinstance(item.get("semantic_key"), str)
+                and item.get("semantic_key") in application_schema.requirement_ids
+                and (
+                    item.get("surface") != "tool_schema"
+                    or (
+                        isinstance(item.get("tool_name"), str)
+                        and item["tool_name"] in observed_tool_names
+                    )
+                )
+            )
+        ) if isinstance(declared, (list, tuple)) else ()
+    elif not schema_present:
+        observed_keys = _past_semantic_keys(result)
+    else:
+        # A supplied schema is authoritative, including a valid schema with
+        # no opportunities or a malformed contract.  Never revive the
+        # benchmark text detector as a fallback for a formal run.
+        observed_keys = ()
     if not observed_keys:
         return ()
     source_provenance = result.get("rsimem_source_provenance_id")
@@ -191,27 +251,13 @@ def _past_bench_opportunity_provider(
         json.dumps(
             {
                 "messages": _past_visible_messages(result),
-                "tools": _past_notes_tool_names(result),
+                "tools": _past_tool_names(result),
             },
             ensure_ascii=True,
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()
-    application_schema = None
-    raw_contract = (
-        result.get("rsimem_application_schema", {}).get("application_contract")
-        if isinstance(result.get("rsimem_application_schema"), Mapping)
-        else None
-    )
-    if raw_contract is not None:
-        try:
-            application_schema = ApplicationOpportunitySchema.from_payload(raw_contract)
-        except (TypeError, ValueError):
-            # The bridge validates the frozen contract before invoking this
-            # provider; malformed metadata is ignored here rather than
-            # turning a diagnostic opportunity into a benchmark label.
-            application_schema = None
     values = []
     for provenance_id, keys, surface_name in candidates:
         if not isinstance(provenance_id, str) or not keys:
@@ -242,7 +288,7 @@ def _past_bench_opportunity_provider(
                 provenance_id=provenance_id,
                 source_payload={
                     "visible_digest": visible_digest,
-                    "tool_names": _past_notes_tool_names(result),
+                    "tool_names": _past_tool_names(result),
                     "application_schema_id": (
                         application_schema.schema_id
                         if use_application_surface and application_schema is not None
