@@ -900,6 +900,10 @@ class PureExtractionOptimizerCorpus:
     observation_cutoff: str
     examples: tuple[PureExtractionOptimizerExample, ...]
     process_signal_gate: str = "not_bound"
+    process_signal_protocol_id: str | None = None
+    process_signal_case_digest: str | None = None
+    process_signal_case_count: int = 0
+    process_signal_optimization_count: int = 0
     schema_version: int = PURE_EXTRACTION_CORPUS_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -912,6 +916,23 @@ class PureExtractionOptimizerCorpus:
             raise ValueError("pure extraction corpus cutoff is invalid")
         if self.process_signal_gate not in PURE_PROCESS_SIGNAL_GATES:
             raise ValueError("pure extraction process-signal gate is invalid")
+        if self.process_signal_protocol_id is not None:
+            _id(self.process_signal_protocol_id, "pure process-signal protocol ID")
+        if self.process_signal_case_digest is not None:
+            _digest(self.process_signal_case_digest, "pure process-signal case digest")
+        for value, name in (
+            (self.process_signal_case_count, "pure process-signal case count"),
+            (self.process_signal_optimization_count, "pure process-signal optimization count"),
+        ):
+            if type(value) is not int or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+        if self.process_signal_gate == "ready" and (
+            self.process_signal_protocol_id is None
+            or self.process_signal_case_digest is None
+            or self.process_signal_case_count < 1
+            or self.process_signal_optimization_count < 1
+        ):
+            raise ValueError("ready pure extraction corpus requires a bound optimization signal")
         try:
             datetime.fromisoformat(self.observation_cutoff.removesuffix("Z") + "+00:00")
         except ValueError as exc:
@@ -936,6 +957,10 @@ class PureExtractionOptimizerCorpus:
             "observation_cutoff": self.observation_cutoff,
             "example_ids": [value.example_id for value in self.examples],
             "process_signal_gate": self.process_signal_gate,
+            "process_signal_protocol_id": self.process_signal_protocol_id,
+            "process_signal_case_digest": self.process_signal_case_digest,
+            "process_signal_case_count": self.process_signal_case_count,
+            "process_signal_optimization_count": self.process_signal_optimization_count,
         }
 
     def payload(self) -> dict[str, object]:
@@ -954,6 +979,10 @@ class PureExtractionOptimizerCorpus:
         observation_cutoff: str,
         examples: tuple[PureExtractionOptimizerExample, ...],
         process_signal_gate: str = "not_bound",
+        process_signal_protocol_id: str | None = None,
+        process_signal_case_digest: str | None = None,
+        process_signal_case_count: int = 0,
+        process_signal_optimization_count: int = 0,
     ) -> "PureExtractionOptimizerCorpus":
         ordered = tuple(sorted(examples, key=lambda value: value.example_id))
         identity = {
@@ -962,6 +991,10 @@ class PureExtractionOptimizerCorpus:
             "observation_cutoff": observation_cutoff,
             "example_ids": [value.example_id for value in ordered],
             "process_signal_gate": process_signal_gate,
+            "process_signal_protocol_id": process_signal_protocol_id,
+            "process_signal_case_digest": process_signal_case_digest,
+            "process_signal_case_count": process_signal_case_count,
+            "process_signal_optimization_count": process_signal_optimization_count,
         }
         return cls(
             corpus_id=f"pure-extraction-corpus.{content_digest(identity)[:40]}",
@@ -969,6 +1002,10 @@ class PureExtractionOptimizerCorpus:
             observation_cutoff=observation_cutoff,
             examples=ordered,
             process_signal_gate=process_signal_gate,
+            process_signal_protocol_id=process_signal_protocol_id,
+            process_signal_case_digest=process_signal_case_digest,
+            process_signal_case_count=process_signal_case_count,
+            process_signal_optimization_count=process_signal_optimization_count,
         )
 
     @classmethod
@@ -976,6 +1013,8 @@ class PureExtractionOptimizerCorpus:
         fields = {
             "schema", "corpus_id", "schema_version", "split", "observation_cutoff",
             "example_ids", "examples", "process_signal_gate",
+            "process_signal_protocol_id", "process_signal_case_digest",
+            "process_signal_case_count", "process_signal_optimization_count",
         }
         if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != PURE_EXTRACTION_CORPUS_SCHEMA:
             raise ValueError("malformed pure extraction optimizer corpus")
@@ -989,6 +1028,10 @@ class PureExtractionOptimizerCorpus:
                 observation_cutoff=value["observation_cutoff"],
                 examples=examples,
                 process_signal_gate=value["process_signal_gate"],
+                process_signal_protocol_id=value["process_signal_protocol_id"],
+                process_signal_case_digest=value["process_signal_case_digest"],
+                process_signal_case_count=value["process_signal_case_count"],
+                process_signal_optimization_count=value["process_signal_optimization_count"],
                 schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
