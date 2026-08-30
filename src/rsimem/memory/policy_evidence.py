@@ -341,6 +341,9 @@ class JsonPolicyDecisionLedger:
             raise ValueError("policy evidence ledger cannot be a symlink")
         if self.lock_path.is_symlink():
             raise ValueError("policy evidence ledger lock cannot be a symlink")
+        # Never retain records from a previous file incarnation.  A deleted
+        # or replaced evidence file must be authoritative on the next read.
+        self._events = {}
         if not self.path.exists():
             return
         for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
