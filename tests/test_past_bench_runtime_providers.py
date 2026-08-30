@@ -24,7 +24,7 @@ def test_past_opportunity_provider_uses_source_provenance_and_visible_surface() 
         "messages": [
             {
                 "role": "user",
-                "content": "Save a durable default: use TSV with owner, priority, task, due_date.",
+                    "content": "Save a durable default: use TSV with owner, priority, task, due_date. Share only with approved recipients.",
             },
             {
                 "role": "assistant",
@@ -47,7 +47,10 @@ def test_past_opportunity_provider_uses_source_provenance_and_visible_surface() 
 def test_past_opportunity_provider_binds_only_retrieved_source_keys() -> None:
     values = _past_bench_opportunity_provider({
         "messages": [
-            {"role": "user", "content": "Extract action items."},
+            {
+                "role": "user",
+                "content": "Extract action items and do not share with external recipients.",
+            },
             {
                 "role": "assistant",
                 "tool_calls": [{"function": {"name": "notes_share"}}],
