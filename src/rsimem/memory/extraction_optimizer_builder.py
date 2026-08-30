@@ -491,3 +491,7 @@ class PureExtractionOptimizerBuilder:
                 raise ValueError("pure optimizer source/feedback join is incomplete")
             result.append(self.build_example(source=source, feedback=record))
         return tuple(result)
+
+
+# Descriptive alias for callers that name the evidence plane in APIs.
+PureProcessExtractionOptimizerBuilder = PureExtractionOptimizerBuilder
