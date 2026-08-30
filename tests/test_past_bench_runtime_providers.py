@@ -11,6 +11,9 @@ from past_bench.runtime.adapters.hermes import (
     _past_bench_artifact_set_provider,
     _past_bench_opportunity_provider,
 )
+from past_bench.models.task import TaskDefinition
+from past_bench.runner.self_evolve import build_past_bench_application_opportunity_schema
+from past_bench.runner.self_evolve import build_hermes_extra_body
 from rsimem.memory.extraction_feedback import (
     ExtractedFactEvidence,
     ExtractionSetStatus,
@@ -71,6 +74,90 @@ def test_past_opportunity_provider_binds_only_retrieved_source_keys() -> None:
         "pure-extraction-provenance.one"
     ]
     assert values[0].source_surface.value == "tool_schema"
+
+
+def test_past_opportunity_provider_uses_frozen_public_schema_for_generic_future_request() -> None:
+    schema = {
+        "schema_id": "past-bench.notes.application.v1",
+        "schema_version": 1,
+        "opportunities": [{
+            "semantic_key": "application.notes.share.recipient_policy",
+            "surface": "tool_schema",
+            "tool_name": "notes_share",
+            "required_parameter": "recipients",
+        }],
+    }
+    values = _past_bench_opportunity_provider({
+        "messages": [{
+            "role": "user",
+            "content": "Review today's note and share it with the people who should receive it.",
+        }, {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "notes_share"}}],
+        }],
+        "rsimem_application_schema": schema,
+        "rsimem_source_records": [{
+            "provenance_id": "pure-extraction-provenance.future",
+            "semantic_keys": ["application.notes.share.recipient_policy"],
+        }],
+    })
+    assert len(values) == 1
+    assert values[0].semantic_requirement == "application.notes.share.recipient_policy"
+    assert values[0].source_surface.value == "tool_schema"
+
+
+def test_application_schema_is_derived_from_visible_tool_contract() -> None:
+    task = TaskDefinition.model_validate({
+        "task_id": "schema-fixture",
+        "task_name": "schema fixture",
+        "prompt": {"text": "share a note", "language": "en"},
+        "tools": [{
+            "name": "notes_share",
+            "description": "Share a meeting note",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "note_id": {"type": "string"},
+                    "recipients": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["note_id", "recipients"],
+            },
+        }],
+    })
+    schema = build_past_bench_application_opportunity_schema(task)
+    assert schema["schema_id"] == "past-bench.notes.application.v1"
+    assert schema["schema_version"] == 1
+    assert schema["opportunities"] == [{
+        "semantic_key": "application.notes.share.recipient_policy",
+        "surface": "tool_schema",
+        "tool_name": "notes_share",
+        "required_parameter": "recipients",
+    }]
+
+
+def test_hermes_extra_body_carries_application_schema_to_runtime() -> None:
+    schema = {
+        "schema_id": "past-bench.notes.application.v1",
+        "schema_version": 1,
+        "opportunities": [],
+    }
+    body = build_hermes_extra_body(
+        home_dir=Path("/tmp/hermes-schema-home"),
+        artifacts_dir=Path("/tmp/hermes-schema-artifacts"),
+        persistence_enabled=True,
+        memory_enabled=False,
+        user_profile_enabled=False,
+        skills_enabled=False,
+        session_search_enabled=False,
+        memory_nudge_interval=0,
+        memory_flush_min_turns=0,
+        skill_creation_nudge_interval=0,
+        background_review_wait_s=0,
+        rsimem_mode="native+ledger",
+        rsimem_semantic_writeback_mode="static",
+        rsimem_application_opportunity_schema=schema,
+    )
+    assert body["hermes"]["rsimem"]["semantic_writeback"]["application_opportunity_schema"] == schema
 
 
 def test_past_artifact_set_provider_requires_complete_multi_fact_source() -> None:

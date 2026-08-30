@@ -13,7 +13,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean
-from typing import Any
+from typing import Any, Mapping
 
 from ..models.content import TextBlock
 from ..models.scoring import compute_task_score, is_pass
@@ -25,6 +25,51 @@ from ..models.self_evolve import (
 from ..models.task import Prompt, TaskDefinition
 from ..models.trace import TraceMessage
 from ..trace.reader import load_trace
+
+
+PAST_BENCH_APPLICATION_SCHEMA_ID = "past-bench.notes.application.v1"
+PAST_BENCH_APPLICATION_SCHEMA_VERSION = 1
+
+
+def build_past_bench_application_opportunity_schema(task: TaskDefinition) -> dict[str, Any]:
+    """Build the public, task-local opportunity schema for RSIMem.
+
+    This schema is derived only from the tool contract visible to the agent.
+    It is deliberately independent of family/stage labels, graders, fixtures,
+    and reference answers.  The schema is copied into each Hermes runtime
+    request and therefore remains frozen for the lifetime of an episode.
+    """
+
+    if not isinstance(task, TaskDefinition):
+        raise TypeError("application opportunity schema requires a TaskDefinition")
+    tools: list[dict[str, Any]] = []
+    opportunities: list[dict[str, Any]] = []
+    for tool in task.tools:
+        name = str(getattr(tool, "name", "") or "")
+        if not name:
+            continue
+        schema = getattr(tool, "input_schema", None)
+        schema = schema if isinstance(schema, Mapping) else {}
+        tools.append({
+            "name": name,
+            "input_schema": dict(schema),
+        })
+        if name == "notes_share":
+            properties = schema.get("properties")
+            recipients = properties.get("recipients") if isinstance(properties, Mapping) else None
+            if isinstance(recipients, Mapping) and recipients.get("type") == "array":
+                opportunities.append({
+                    "semantic_key": "application.notes.share.recipient_policy",
+                    "surface": "tool_schema",
+                    "tool_name": name,
+                    "required_parameter": "recipients",
+                })
+    return {
+        "schema_id": PAST_BENCH_APPLICATION_SCHEMA_ID,
+        "schema_version": PAST_BENCH_APPLICATION_SCHEMA_VERSION,
+        "tools": tools,
+        "opportunities": opportunities,
+    }
 
 
 def build_hermes_extra_body(
@@ -60,6 +105,7 @@ def build_hermes_extra_body(
     rsimem_extraction_trial_source_path: str = "",
     rsimem_extraction_offline_profile: RSIMemExtractionOfflineValidationProfile | dict | None = None,
     rsimem_extraction_offline_source_path: str = "",
+    rsimem_application_opportunity_schema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
 
@@ -82,6 +128,12 @@ def build_hermes_extra_body(
             else "disabled"
         ),
     }
+    if rsimem_application_opportunity_schema is not None:
+        # The schema is public application metadata, not benchmark evidence.
+        # Keep a defensive JSON-compatible copy at the runtime boundary.
+        semantic_writeback["application_opportunity_schema"] = json.loads(
+            json.dumps(rsimem_application_opportunity_schema, ensure_ascii=True, sort_keys=True)
+        )
     if semantic_writeback_mode in {"static", "static_utility", "adaptive_utility"}:
         if rsimem_mode != "native+ledger":
             raise ValueError("static semantic writeback requires native+ledger mode")
@@ -629,7 +681,7 @@ class PersistenceBackend:
         sequence: Any,
         family_id: str,
         review_wait_s: float,
-        tool_config: dict[str, bool],
+        tool_config: dict[str, Any],
     ) -> dict[str, Any]:
         raise NotImplementedError
 
@@ -672,7 +724,7 @@ class HermesPersistenceBackend(PersistenceBackend):
         sequence: Any,
         family_id: str,
         review_wait_s: float,
-        tool_config: dict[str, bool],
+        tool_config: dict[str, Any],
     ) -> dict[str, Any]:
         return build_hermes_extra_body(
             home_dir=state_root,
@@ -735,6 +787,9 @@ class HermesPersistenceBackend(PersistenceBackend):
             ),
             rsimem_extraction_offline_source_path=(
                 sequence.hermes.rsimem_extraction_offline_source_path
+            ),
+            rsimem_application_opportunity_schema=(
+                tool_config.get("application_opportunity_schema")
             ),
         )
 

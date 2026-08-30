@@ -422,6 +422,7 @@ class HermesPastBenchBridge:
         artifact_set_binding_provider: Callable[
             [object], Iterable[ArtifactSetSemanticBinding]
         ] | None = None,
+        application_opportunity_schema: Mapping[str, Any] | None = None,
         pure_extraction_source_path: Path | None = None,
         pure_extraction_feedback_path: Path | None = None,
     ) -> None:
@@ -447,6 +448,11 @@ class HermesPastBenchBridge:
             or self.evidence_path.with_name("rsimem_memory_use_evidence.jsonl")
         )
         self._artifact_set_binding_provider = artifact_set_binding_provider
+        self._application_opportunity_schema = (
+            dict(application_opportunity_schema)
+            if isinstance(application_opportunity_schema, Mapping)
+            else None
+        )
         self._artifact_set_binding_log = JsonArtifactSetBindingLog(
             artifact_set_binding_path
             or Path(hermes_home) / ".rsimem" / "artifact_set_bindings.jsonl"
@@ -974,6 +980,11 @@ class HermesPastBenchBridge:
                 )
             if source_provenance_id is not None:
                 visible["rsimem_source_provenance_id"] = source_provenance_id
+            if self._application_opportunity_schema is not None:
+                # Explicitly pass the frozen application-owned schema.  This
+                # is metadata about the visible tool contract, not evidence
+                # inferred from benchmark family/stage.
+                visible["rsimem_application_schema"] = self._application_opportunity_schema
         values = provider(visible)
         if isinstance(values, (str, bytes, Mapping)):
             raise TypeError("opportunity provider must return an iterable")
