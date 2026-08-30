@@ -38,6 +38,15 @@ def test_score_read_before_freeze_or_completion_is_rejected(field: str) -> None:
         _record(**{field: "2026-08-30T04:00:00Z"})
 
 
+def test_run_completion_before_candidate_freeze_is_rejected() -> None:
+    with pytest.raises(ValueError, match="complete after candidate freeze"):
+        _record(
+            candidate_frozen_at="2026-08-30T02:00:00Z",
+            run_completed_at="2026-08-30T01:00:00Z",
+            score_read_at="2026-08-30T03:00:00Z",
+        )
+
+
 def test_final_evaluation_rejects_wrong_plane_and_non_numeric_score() -> None:
     with pytest.raises(ValueError, match="plane and source identity"):
         replace(_record(), evidence_plane="pure_process")
@@ -68,3 +77,21 @@ def test_final_evaluation_store_is_isolated_restart_safe_and_idempotent(tmp_path
 def test_final_evaluation_store_rejects_non_reporter_values(tmp_path) -> None:
     with pytest.raises(TypeError, match="FinalEvaluationRecord"):
         JsonFinalEvaluationStore(tmp_path / "final.jsonl").append({})
+
+
+def test_final_evaluation_store_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "final.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonFinalEvaluationStore(path).records()
+
+
+def test_final_evaluation_store_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "final.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonFinalEvaluationStore(path).records()

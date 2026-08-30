@@ -87,6 +87,11 @@ class FinalEvaluationRecord:
             _time(value, name)
         if _time(self.score_read_at, "score read timestamp") <= _time(self.candidate_frozen_at, "candidate freeze timestamp"):
             raise ValueError("final score must be read after candidate freeze")
+        if _time(self.run_completed_at, "run completion timestamp") <= _time(
+            self.candidate_frozen_at,
+            "candidate freeze timestamp",
+        ):
+            raise ValueError("evaluation run must complete after candidate freeze")
         if _time(self.score_read_at, "score read timestamp") <= _time(self.run_completed_at, "run completion timestamp"):
             raise ValueError("final score must be read after run completion")
         _sha(self.score_digest, "final score digest")
@@ -175,7 +180,9 @@ class JsonFinalEvaluationStore:
     """
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Preserve the final component so final-evaluation state cannot be
+        # redirected through a symlink to a learner-owned file.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
         self._records: dict[str, str] = {}
         self._load()
@@ -185,6 +192,8 @@ class JsonFinalEvaluationStore:
         return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
     def _load(self) -> None:
+        if self.path.is_symlink():
+            raise ValueError("final evaluation store cannot be a symlink")
         if not self.path.exists():
             return
         for line_number, line in enumerate(
@@ -207,6 +216,10 @@ class JsonFinalEvaluationStore:
     def records(self) -> tuple[FinalEvaluationRecord, ...]:
         """Reload and return records in stable report-ID order."""
 
+        if self.path.is_symlink():
+            raise ValueError("final evaluation store cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("final evaluation store lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
@@ -226,6 +239,10 @@ class JsonFinalEvaluationStore:
         if not isinstance(record, FinalEvaluationRecord):
             raise TypeError("final evaluation store accepts FinalEvaluationRecord only")
         serialized = self._canonical(record.payload())
+        if self.path.is_symlink():
+            raise ValueError("final evaluation store cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("final evaluation store lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
