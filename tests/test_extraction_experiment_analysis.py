@@ -581,6 +581,10 @@ def test_analysis_does_not_report_complete_usage_without_completed_runs(
     assert report["runs"] == []
     assert report["qualityReady"] is False
     assert report["usageComplete"] is False
+    assert report["processSignalCases"]["caseCount"] == 0
+    assert report["processSignalCases"]["protocolId"].startswith(
+        "signal-protocol."
+    )
 
 
 def test_analysis_rejects_feedback_joined_to_an_unrelated_existing_source(
