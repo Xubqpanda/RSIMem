@@ -798,10 +798,15 @@ def project_optimizer_result(
         raise ValueError("optimizer result parent artifact differs")
     if request.corpus_id != corpus.corpus_id or request.corpus_digest != corpus.corpus_digest:
         raise ValueError("optimizer result corpus identity differs")
+    # The optimizer request freezes one primary example per logical case.
+    # Projection must use the same identity set; otherwise a crafted result
+    # could cite a secondary physical replica and silently re-weight evidence.
+    request_primary_ids = set(request.primary_example_ids)
     actionable = {
         example.example_id
         for example in corpus.examples
-        if example.primary
+        if example.example_id in request_primary_ids
+        and example.primary
         and example.label in {
             ExtractionFeedbackLabel.USEFUL,
             ExtractionFeedbackLabel.HARMFUL,
