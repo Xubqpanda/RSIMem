@@ -1386,7 +1386,15 @@ class HermesPastBenchBridge:
                     parsed = json.loads(content)
                 except json.JSONDecodeError:
                     parsed = None
-            success = isinstance(parsed, Mapping) and parsed.get("success") is True
+            # A malformed result (or a non-boolean success field) is not a
+            # tool failure.  Preserve the call/result identity, but mark the
+            # payload as a type mismatch so downstream attribution remains
+            # fail-closed instead of manufacturing a negative signal.
+            valid_result = (
+                isinstance(parsed, Mapping)
+                and type(parsed.get("success")) is bool
+            )
+            success = parsed.get("success") if valid_result else None
             result_seed = json.dumps(
                 {"call_id": raw_call_id, "content_digest": hashlib.sha256(
                     str(content or "").encode("utf-8")
@@ -1456,6 +1464,7 @@ class HermesPastBenchBridge:
                 + hashlib.sha256(result_id.encode("utf-8")).hexdigest()[:24],
                 duplicate_call=raw_call_id in duplicate_call_ids,
                 duplicate_result=duplicate_result,
+                type_mismatch=not valid_result,
             ))
         represented_calls = {
             (join.call_id, join.retry_identity)
