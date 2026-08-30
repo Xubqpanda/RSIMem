@@ -157,7 +157,7 @@ def test_hermes_extra_body_carries_application_schema_to_runtime() -> None:
         rsimem_semantic_writeback_mode="static",
         rsimem_application_opportunity_schema=schema,
     )
-    assert body["hermes"]["rsimem"]["semantic_writeback"]["application_opportunity_schema"] == schema
+    assert body["hermes"]["rsimem"]["application_opportunity_schema"] == schema
 
 
 def test_past_artifact_set_provider_requires_complete_multi_fact_source() -> None:
