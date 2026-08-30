@@ -427,3 +427,21 @@ def test_pure_optimizer_capture_store_is_restart_safe_and_conflict_checked(tmp_p
     path.chmod(0o644)
     with pytest.raises(PermissionError, match="permissions"):
         JsonPureExtractionOptimizerContentCaptureStore(path).records()
+
+
+def test_pure_optimizer_capture_store_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "captures.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonPureExtractionOptimizerContentCaptureStore(path).records()
+
+
+def test_pure_optimizer_capture_store_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "captures.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonPureExtractionOptimizerContentCaptureStore(path).records()
