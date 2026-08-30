@@ -32,7 +32,7 @@ from rsimem.memory.extraction_optimizer_store import JsonExtractionOptimizerCorp
 from rsimem.memory.prompt_components import content_digest, text_digest
 
 
-def _join() -> OptimizerAuditJoin:
+def _join(*, observation_window: str = "window.fixture.v1") -> OptimizerAuditJoin:
     return OptimizerAuditJoin(
         family_id="family.fixture-v1",
         source_record_id="compilation.source-v1",
@@ -63,6 +63,7 @@ def _join() -> OptimizerAuditJoin:
             ("op.mutate-v1",),
             ("mutation.persist-v1",),
         ),),
+        observation_window=observation_window,
     )
 
 
@@ -117,6 +118,7 @@ def _example(
     label: ExtractionFeedbackLabel = ExtractionFeedbackLabel.USEFUL,
     ownership: OptimizerComponentOwnership = OptimizerComponentOwnership.EXTRACTION,
     evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS,
+    observation_window: str = "window.fixture.v1",
 ) -> ExtractionOptimizerCorpusExample:
     boundary = OptimizerSecretBoundary()
     return ExtractionOptimizerCorpusExample.create(
@@ -131,7 +133,7 @@ def _example(
         attribution_confidence=AttributionConfidence.HIGH,
         reason_codes=("explicit_memory_use", "successful_outcome"),
         component_ownership=ownership,
-        audit_join=_join(),
+        audit_join=_join(observation_window=observation_window),
         source_messages=_source(boundary),
         extracted_facts=_facts(boundary),
         delayed_evidence=delayed or _delayed(boundary),
@@ -218,6 +220,31 @@ def test_process_signal_gate_is_part_of_corpus_identity() -> None:
     assert ExtractionOptimizerCorpus.from_payload(
         json.loads(json.dumps(no_signal.payload()))
     ) == no_signal
+
+    unbound_baseline = ExtractionOptimizerCorpus.create(
+        batch_id="batch.signal-gate-unbound-v1",
+        attempt_id="attempt.signal-gate-unbound-v1",
+        split=OptimizerCorpusSplit.TRAIN,
+        observation_cutoff="2026-08-21T00:00:00Z",
+        retention=OptimizerCorpusRetention.DELETE_AFTER_POLICY_DECISION,
+        examples=(_example(observation_window="window.unbound"),),
+    )
+    unbound_ready = unbound_baseline.payload()
+    unbound_ready["process_signal_gate"] = PROCESS_SIGNAL_GATE_READY
+    unbound_ready["process_signal_protocol_id"] = "signal-protocol.fixture"
+    unbound_ready["process_signal_case_digest"] = "c" * 64
+    unbound_ready["process_signal_case_count"] = 2
+    unbound_ready["process_signal_optimization_count"] = 2
+    unbound_ready["process_signal_hypothesis_digest"] = "a" * 64
+    unbound_ready["corpus_digest"] = content_digest({
+        key: unbound_ready[key]
+        for key in unbound_ready
+        if key not in {"corpus_id", "corpus_digest"}
+    })
+    unbound_ready["corpus_id"] = "optimizer-corpus." + unbound_ready["corpus_digest"][:40]
+    with pytest.raises(ValueError, match="malformed extraction optimizer corpus"):
+        ExtractionOptimizerCorpus.from_payload(unbound_ready)
+
     malformed = no_signal.payload()
     malformed["process_signal_gate"] = "invalid"
     with pytest.raises(ValueError, match="malformed extraction optimizer corpus"):
