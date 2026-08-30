@@ -246,6 +246,8 @@ class JsonProcessSignalAnalysisProtocolStore:
 
     def get(self) -> ProcessSignalAnalysisProtocol | None:
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.lock_path.is_symlink():
+            raise ValueError("process signal protocol lock cannot be a symlink")
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
             try:
@@ -260,6 +262,8 @@ class JsonProcessSignalAnalysisProtocolStore:
             raise TypeError("protocol store accepts ProcessSignalAnalysisProtocol only")
         serialized = self._canonical(protocol.payload()) + "\n"
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.lock_path.is_symlink():
+            raise ValueError("process signal protocol lock cannot be a symlink")
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
             try:
