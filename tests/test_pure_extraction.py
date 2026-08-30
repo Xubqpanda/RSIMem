@@ -174,6 +174,7 @@ def test_pure_optimizer_corpus_is_sorted_and_restart_safe(tmp_path) -> None:
         split="train",
         observation_cutoff="2026-08-24T00:00:00Z",
         examples=(example,),
+        process_signal_gate="ready",
     )
     path = tmp_path / "pure-optimizer.json"
     store = JsonPureExtractionOptimizerCorpusStore(path)
@@ -190,11 +191,23 @@ def test_pure_optimizer_corpus_is_sorted_and_restart_safe(tmp_path) -> None:
         split="validation",
         observation_cutoff="2026-08-24T00:00:00Z",
         examples=(example,),
+        process_signal_gate="no_signal",
     )
     validation_path = tmp_path / "pure-validation.json"
     JsonPureExtractionOptimizerCorpusStore(validation_path).write(validation)
     with pytest.raises(PermissionError, match="training"):
         JsonPureExtractionOptimizerCorpusStore(validation_path).read_for_optimizer()
+
+    blocked = PureExtractionOptimizerCorpus.create(
+        split="train",
+        observation_cutoff="2026-08-24T00:00:00Z",
+        examples=(example,),
+        process_signal_gate="no_signal",
+    )
+    blocked_path = tmp_path / "pure-blocked.json"
+    JsonPureExtractionOptimizerCorpusStore(blocked_path).write(blocked)
+    with pytest.raises(PermissionError, match="process-signal gate"):
+        JsonPureExtractionOptimizerCorpusStore(blocked_path).read_for_optimizer()
 
 
 def test_family_bound_optimizer_builder_does_not_accept_pure_projection() -> None:
