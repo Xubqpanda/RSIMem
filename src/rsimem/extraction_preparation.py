@@ -320,6 +320,22 @@ def _primary_feedback_counts(
     return counts, actionable
 
 
+def _optimizer_signal_is_ready(
+    *,
+    corpus_ready: bool,
+    actionable_primary_count: int,
+    process_signal_gate: str,
+) -> bool:
+    """Require a bound pure-process signal before optimizer readiness."""
+
+    return (
+        corpus_ready
+        and actionable_primary_count
+        >= FROZEN_EXTRACTION_OPTIMIZER_CONFIG.minimum_actionable_primary_examples
+        and process_signal_gate == PROCESS_SIGNAL_GATE_READY
+    )
+
+
 def _build_optimizer_examples(
     root: Path,
     *,
@@ -569,15 +585,16 @@ def audit_extraction_feedback_batch(
         except (TypeError, ValueError):
             reasons.append("optimizer_corpus_join_invalid")
     corpus_ready = not reasons
-    optimizer_signal_ready = (
-        corpus_ready
-        and actionable
-        >= FROZEN_EXTRACTION_OPTIMIZER_CONFIG.minimum_actionable_primary_examples
-        and process_signal_gate
-        in {PROCESS_SIGNAL_GATE_NOT_BOUND, PROCESS_SIGNAL_GATE_READY}
+    optimizer_signal_ready = _optimizer_signal_is_ready(
+        corpus_ready=corpus_ready,
+        actionable_primary_count=actionable,
+        process_signal_gate=process_signal_gate,
     )
     if corpus_ready and not optimizer_signal_ready:
-        reasons.append("insufficient_actionable_extraction_signal")
+        if actionable < FROZEN_EXTRACTION_OPTIMIZER_CONFIG.minimum_actionable_primary_examples:
+            reasons.append("insufficient_actionable_extraction_signal")
+        elif process_signal_gate != PROCESS_SIGNAL_GATE_READY:
+            reasons.append("process_signal_gate_not_ready")
     if not reasons:
         reasons.append("optimizer_signal_ready")
     values = {
