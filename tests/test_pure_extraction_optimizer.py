@@ -327,6 +327,20 @@ def test_pure_optimizer_capture_rejects_evaluation_text() -> None:
         )
 
 
+def test_pure_optimizer_capture_binds_source_structure() -> None:
+    parent, example, capture = _fixture()
+    tampered = replace(
+        capture,
+        source_messages=(replace(capture.source_messages[0], role="assistant"),),
+    )
+    with pytest.raises(ValueError, match="source structure"):
+        build_pure_extraction_optimizer_request(
+            parent,
+            _corpus(example),
+            captures=(tampered,),
+        )
+
+
 def test_pure_optimizer_capture_store_is_restart_safe_and_conflict_checked(tmp_path) -> None:
     _, example, capture = _fixture()
     path = tmp_path / "owner" / "pure-captures.jsonl"

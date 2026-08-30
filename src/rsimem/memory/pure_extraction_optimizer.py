@@ -336,10 +336,22 @@ def _validate_capture(
     projected_ids = tuple(value.source_message_id for value in capture.source_messages)
     if projected_ids != capture.source_projection.source_message_ids:
         raise ValueError("pure optimizer capture source message identity mismatch")
+    projected_segment_ids = tuple(value.segment_id for value in capture.source_messages)
+    if projected_segment_ids != capture.source_projection.source_segment_ids:
+        raise ValueError("pure optimizer capture source segment identity mismatch")
     for projected, original in zip(
         capture.source_messages,
         capture.source_projection.messages,
     ):
+        if (
+            projected.segment_id != original.segment_id
+            or projected.source_message_id != original.source_message_id
+            or projected.role != original.role
+            or projected.segment_kind != original.segment_kind.value
+            or projected.tool_call_id != original.tool_call_id
+            or projected.content_truncated != original.content_truncated
+        ):
+            raise ValueError("pure optimizer capture source structure mismatch")
         if projected.content.source_digest != text_digest(original.content):
             raise ValueError("pure optimizer capture source content digest mismatch")
     delayed = capture.delayed_evidence
