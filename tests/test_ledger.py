@@ -760,6 +760,100 @@ def test_ledger_is_deterministic_and_marks_unmatched_injection(tmp_path: Path) -
     }
 
 
+def test_generated_event_ids_follow_logical_ids_when_evidence_is_reordered(
+    tmp_path: Path,
+) -> None:
+    """Replaying a trace in a different order must not rename its events."""
+
+    comparison = _fixture(tmp_path)
+    payload = json.loads(comparison.read_text(encoding="utf-8"))
+    episode = payload["with_persistence"]["episodes"][0]
+    trace_path = Path(episode["trace"])
+    trace_events = [
+        json.loads(line)
+        for line in trace_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    second_call = dict(
+        next(item for item in trace_events if item.get("type") == "model_call_usage")
+    )
+    second_call.update({"call_id": "model-call-0002", "sequence": 2, "attempt": 1})
+    trace_events.insert(
+        next(
+            index
+            for index, item in enumerate(trace_events)
+            if item.get("type") == "trace_end"
+        ),
+        second_call,
+    )
+    trace_path.write_text(
+        "".join(json.dumps(item) + "\n" for item in trace_events),
+        encoding="utf-8",
+    )
+
+    first = build_events(comparison)
+    model_ids_first = {
+        event["data"]["callId"]: event["eventId"]
+        for event in first
+        if event["kind"] == "model_call_usage"
+    }
+
+    model_calls = [
+        item for item in trace_events if item.get("type") == "model_call_usage"
+    ]
+    remaining = [
+        item for item in trace_events if item.get("type") != "model_call_usage"
+    ]
+    reordered = remaining[:1] + list(reversed(model_calls)) + remaining[1:]
+    trace_path.write_text(
+        "".join(json.dumps(item) + "\n" for item in reordered),
+        encoding="utf-8",
+    )
+    second = build_events(comparison)
+    model_ids_second = {
+        event["data"]["callId"]: event["eventId"]
+        for event in second
+        if event["kind"] == "model_call_usage"
+    }
+
+    assert model_ids_first == model_ids_second
+
+    # Tool calls use their Hermes message index as the logical identity, not
+    # their position in the calls array.
+    episode["internal_tools"]["calls"] = [
+        {
+            "name": "memory",
+            "args": {"action": "add", "target": "memory", "content": MEMORY},
+            "message_index": 1,
+        },
+        {
+            "name": "memory",
+            "args": {
+                "action": "update",
+                "target": "memory",
+                "new_content": "updated",
+            },
+            "message_index": 2,
+        },
+    ]
+    comparison.write_text(json.dumps(payload), encoding="utf-8")
+    first = build_events(comparison)
+    tool_ids_first = {
+        (event["kind"], event["source"]["messageIndex"]): event["eventId"]
+        for event in first
+        if event["kind"] in {"tool_call", "memory_operation"}
+    }
+    episode["internal_tools"]["calls"].reverse()
+    comparison.write_text(json.dumps(payload), encoding="utf-8")
+    second = build_events(comparison)
+    tool_ids_second = {
+        (event["kind"], event["source"]["messageIndex"]): event["eventId"]
+        for event in second
+        if event["kind"] in {"tool_call", "memory_operation"}
+    }
+    assert tool_ids_first == tool_ids_second
+
+
 def test_user_profile_injection_matches_and_is_privacy_audited(tmp_path: Path) -> None:
     comparison = _fixture(tmp_path)
     data = json.loads(comparison.read_text(encoding="utf-8"))
