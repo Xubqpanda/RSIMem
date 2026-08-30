@@ -239,6 +239,7 @@ from .final_evaluation import (
     FINAL_EVALUATION_SCHEMA,
     FINAL_EVALUATION_SCHEMA_VERSION,
     FinalEvaluationRecord,
+    FinalEvaluationReporter,
     JsonFinalEvaluationStore,
 )
 from .signal_protocol import (
@@ -443,6 +444,7 @@ __all__ = [
     "FINAL_EVALUATION_SCHEMA",
     "FINAL_EVALUATION_SCHEMA_VERSION",
     "FinalEvaluationRecord",
+    "FinalEvaluationReporter",
     "JsonFinalEvaluationStore",
     "SIGNAL_PROTOCOL_SCHEMA",
     "SIGNAL_PROTOCOL_SCHEMA_VERSION",

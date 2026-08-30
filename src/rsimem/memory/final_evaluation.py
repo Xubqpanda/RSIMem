@@ -10,6 +10,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from collections.abc import Callable
 from typing import Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
@@ -265,9 +266,85 @@ class JsonFinalEvaluationStore:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
+class FinalEvaluationReporter:
+    """Read official scores only after a frozen candidate run completes.
+
+    The reporter is intentionally the only convenience API that accepts a
+    score reader.  It validates the chronology before invoking that callback,
+    then persists the resulting record into the isolated final-evaluation
+    store.  Learner/process-corpus code has no path through this class.
+    """
+
+    def __init__(self, store: JsonFinalEvaluationStore) -> None:
+        if not isinstance(store, JsonFinalEvaluationStore):
+            raise TypeError("final reporter requires a final evaluation store")
+        self.store = store
+
+    def read_after_completion(
+        self,
+        *,
+        candidate_artifact_id: str,
+        run_id: str,
+        candidate_frozen_at: str,
+        run_completed_at: str,
+        score_read_at: str,
+        metric_name: str,
+        score_reader: Callable[[], object],
+    ) -> FinalEvaluationRecord:
+        """Invoke ``score_reader`` only after chronology checks pass.
+
+        ``score_reader`` may return a numeric metric directly.  For reporters
+        that have a canonical score payload, it may instead return a mapping
+        with exactly ``metric_value`` and ``score_digest``; the latter digest
+        is retained without exposing the payload to process evidence.
+        """
+
+        if not callable(score_reader):
+            raise TypeError("final score reader must be callable")
+        frozen = _time(candidate_frozen_at, "candidate freeze timestamp")
+        completed = _time(run_completed_at, "run completion timestamp")
+        read_at = _time(score_read_at, "score read timestamp")
+        if completed <= frozen:
+            raise ValueError("evaluation run must complete after candidate freeze")
+        if read_at <= completed:
+            raise ValueError("final score must be read after run completion")
+
+        # Do not move this callback above the chronology checks: reading an
+        # official score is the externally visible final-evaluation boundary.
+        raw_score = score_reader()
+        score_digest: str | None = None
+        metric_value: object = raw_score
+        if isinstance(raw_score, Mapping):
+            if set(raw_score) != {"metric_value", "score_digest"}:
+                raise ValueError("final score payload must contain metric value and digest")
+            metric_value = raw_score["metric_value"]
+            score_digest = raw_score["score_digest"]
+        if isinstance(metric_value, bool) or not isinstance(metric_value, (int, float)):
+            raise TypeError("final score reader must return a numeric metric")
+        if score_digest is None:
+            score_digest = _digest({
+                "metric_name": metric_name,
+                "metric_value": float(metric_value),
+            })
+        _sha(score_digest, "final score digest")
+        record = FinalEvaluationRecord.create(
+            candidate_artifact_id=candidate_artifact_id,
+            run_id=run_id,
+            candidate_frozen_at=candidate_frozen_at,
+            run_completed_at=run_completed_at,
+            score_read_at=score_read_at,
+            score_digest=score_digest,
+            metric_name=metric_name,
+            metric_value=float(metric_value),
+        )
+        self.store.append(record)
+        return record
+
+
 __all__ = [
     "FINAL_EVALUATION_SCHEMA",
     "FINAL_EVALUATION_SCHEMA_VERSION",
     "FinalEvaluationRecord",
+    "FinalEvaluationReporter",
     "JsonFinalEvaluationStore",
 ]
