@@ -1356,11 +1356,17 @@ class _JsonPureExtractionStore:
     record_type = PureExtractionSourceRecord
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Preserve the final path component.  Resolving here would silently
+        # follow a symlink and make the fail-closed checks below ineffective.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
 
     @contextmanager
     def _lock(self, operation: int) -> Iterator[None]:
+        if self.path.is_symlink():
+            raise ValueError("pure extraction record file cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("pure extraction record lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), operation)
@@ -1399,6 +1405,8 @@ class _JsonPureExtractionStore:
             raise TypeError("pure extraction store received the wrong record type")
         serialized = _canonical(record.payload())
         with self._lock(fcntl.LOCK_EX):
+            if self.path.is_symlink():
+                raise ValueError("pure extraction record file cannot be a symlink")
             existing = self._read_unlocked()
             prior = next((value for value in existing if value.record_id == record.record_id), None)
             if prior is not None:
@@ -1417,11 +1425,17 @@ class JsonPureExtractionOptimizerCorpusStore:
     """Crash-safe persistence for the pure-process optimizer projection."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Do not resolve the final component: a symlinked corpus must be
+        # rejected rather than transparently redirecting writes/reads.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
 
     @contextmanager
     def _lock(self, operation: int) -> Iterator[None]:
+        if self.path.is_symlink():
+            raise ValueError("pure extraction optimizer corpus cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("pure extraction optimizer corpus lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), operation)
@@ -1435,9 +1449,9 @@ class JsonPureExtractionOptimizerCorpusStore:
             raise TypeError("pure extraction corpus store received the wrong type")
         serialized = _canonical(corpus.payload()) + "\n"
         with self._lock(fcntl.LOCK_EX):
+            if self.path.is_symlink():
+                raise ValueError("pure extraction optimizer corpus cannot be a symlink")
             if self.path.exists():
-                if self.path.is_symlink():
-                    raise ValueError("pure extraction optimizer corpus cannot be a symlink")
                 existing = self._read_unlocked()
                 if existing != corpus:
                     raise ValueError("conflicting pure extraction optimizer corpus")

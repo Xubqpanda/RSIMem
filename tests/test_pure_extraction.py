@@ -181,6 +181,48 @@ def test_pure_source_and_feedback_logs_return_canonical_identity_order(tmp_path)
     assert store.records() == tuple(sorted((first, second), key=lambda value: value.record_id))
 
 
+@pytest.mark.parametrize(
+    "store_type",
+    (
+        JsonPureExtractionSourceRecordStore,
+        JsonPureExtractionFeedbackRecordStore,
+        JsonPureExtractionOptimizerCorpusStore,
+    ),
+)
+def test_pure_stores_reject_symlinked_final_paths(tmp_path, store_type) -> None:
+    target = tmp_path / "target"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "store"
+    path.symlink_to(target)
+    store = store_type(path)
+    with pytest.raises(ValueError, match="symlink"):
+        if store_type is JsonPureExtractionOptimizerCorpusStore:
+            store.read()
+        else:
+            store.records()
+
+
+@pytest.mark.parametrize(
+    "store_type",
+    (
+        JsonPureExtractionSourceRecordStore,
+        JsonPureExtractionFeedbackRecordStore,
+        JsonPureExtractionOptimizerCorpusStore,
+    ),
+)
+def test_pure_stores_reject_symlinked_lock_paths(tmp_path, store_type) -> None:
+    path = tmp_path / "store"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    store = store_type(path)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        if store_type is JsonPureExtractionOptimizerCorpusStore:
+            store.read()
+        else:
+            store.records()
+
+
 def test_pure_optimizer_rejects_unbound_observation_window() -> None:
     projection, source, *_ = _fixture()
     pure_source = PureExtractionSourceRecord.from_family_record(
