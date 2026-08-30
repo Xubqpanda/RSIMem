@@ -743,6 +743,14 @@ def build_extraction_optimizer_gate_request(
         "corpus_id": corpus.corpus_id,
         "corpus_digest": corpus.corpus_digest,
         "primary_label_counts": label_counts,
+        "process_signal": {
+            "gate": corpus.process_signal_gate,
+            "protocol_id": corpus.process_signal_protocol_id,
+            "case_digest": corpus.process_signal_case_digest,
+            "case_count": corpus.process_signal_case_count,
+            "optimization_count": corpus.process_signal_optimization_count,
+            "hypothesis_digest": corpus.process_signal_hypothesis_digest,
+        },
     })
     if len(input_json) > config.maximum_input_chars:
         raise ValueError("optimizer gate request exceeds the input character budget")

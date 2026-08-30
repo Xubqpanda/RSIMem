@@ -880,6 +880,14 @@ def build_pure_extraction_optimizer_gate_request(
         "corpus_id": corpus.corpus_id,
         "corpus_digest": corpus.corpus_digest,
         "process_signal_gate": corpus.process_signal_gate,
+        "process_signal": {
+            "gate": corpus.process_signal_gate,
+            "protocol_id": corpus.process_signal_protocol_id,
+            "case_digest": corpus.process_signal_case_digest,
+            "case_count": corpus.process_signal_case_count,
+            "optimization_count": corpus.process_signal_optimization_count,
+            "hypothesis_digest": corpus.process_signal_hypothesis_digest,
+        },
         "primary_example_ids": list(primary_ids),
     }
     input_json = canonical_json(input_payload)
