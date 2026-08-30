@@ -1395,15 +1395,28 @@ def build_events(
                     "stateDbBytes": _directory_bytes(artifact_dir / "state.db"),
                 },
             ))
-    events_by_id = {
-        event["eventId"]: json.dumps(
+    # Validate the generated portion with the same idempotency/conflict
+    # semantics used for persisted evidence.  A plain dict comprehension here
+    # would silently overwrite a conflicting payload when two physical rows
+    # derive the same logical event identity.
+    events_by_id: dict[str, str] = {}
+    unique_events: list[dict[str, Any]] = []
+    for event in events:
+        event_id = event.get("eventId")
+        canonical = json.dumps(
             event,
             ensure_ascii=True,
             sort_keys=True,
             separators=(",", ":"),
         )
-        for event in events
-    }
+        existing = events_by_id.get(event_id)
+        if existing is not None:
+            if existing != canonical:
+                raise ValueError(f"conflicting ledger eventId: {event_id}")
+            continue
+        events_by_id[event_id] = canonical
+        unique_events.append(event)
+    events = unique_events
     joined_events = (*load_episode_lifecycle_events(comparison_path), *lifecycle_events)
     for event in joined_events:
         value = dict(event)
