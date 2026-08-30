@@ -65,6 +65,11 @@ opportunity/use/outcome 证据链，否则自动降级为 `unresolved`，避免�
 
 每层报告同时保留 U/H/M、unresolved、censored 原始计数以及 `resolvedUsefulRate`；resolved denominator 为 U+H，分母为零时输出 unknown（JSON `null`）。
 
+真实 batch 的 process-signal protocol 也在 case 边界闭合：frozen protocol ID、
+replicate ID 和 observation window 会写入每个 case。Analyzer 在 census 前校验
+这些字段与 batch manifest 的一致性，因此不能仅凭一个外部 protocol 文件把任意
+case 拼接进结果。
+
 `LayerFeasibilityCensus` 还记录 process-signal、action/outcome variation、
 ambiguity 和失败 reason。coverage、empty、missed 等 extraction-specific
 指标不从 policy fixture 猜测，而由 offline validation 的
