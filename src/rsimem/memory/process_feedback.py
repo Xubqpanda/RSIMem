@@ -641,9 +641,10 @@ def audit_process_events(
     # Tool events are projected independently from the host-owned exact join.
     # Re-check their closure at the public process boundary so a corpus cannot
     # silently contain a missing, duplicate, orphaned or cross-task result.
-    tool_calls: dict[tuple[str, str, str, str, str, str, str, str], list[ProcessEvent]] = {}
-    tool_results: dict[tuple[str, str, str, str, str, str, str, str], list[ProcessEvent]] = {}
-    calls_by_id: dict[tuple[str, str, str, str, str, str, str], list[ProcessEvent]] = {}
+    tool_calls: dict[tuple[str, ...], list[ProcessEvent]] = {}
+    tool_results: dict[tuple[str, ...], list[ProcessEvent]] = {}
+    calls_by_id: dict[tuple[str, ...], list[ProcessEvent]] = {}
+    call_contexts: dict[tuple[str, ...], set[tuple[str, ...]]] = {}
     result_ids: dict[tuple[str, str, str, str, str], list[ProcessEvent]] = {}
     tool_events: list[ProcessEvent] = []
     for event in items:
@@ -702,6 +703,9 @@ def audit_process_events(
                 errors.append(f"{event.event_id}: tool result lacks call identity")
                 continue
             tool_events.append(event)
+            # Include every execution boundary in the exact matching key.
+            # Family/stage are optional on runtime events, but when present
+            # they are part of the audit identity and must not be crossed.
             scope = (
                 event.run_id,
                 event.variant,
@@ -709,12 +713,45 @@ def audit_process_events(
                 event.episode_id,
                 event.session_id,
                 event.task_id,
+                event.family_id or "",
+                event.stage or "",
+                event.source_revision,
+                event.host_event_id,
+                event.tool_call_id,
+            )
+            call_id_scope = (
+                event.run_id,
+                event.variant,
+                event.trace_id,
+                event.episode_id,
+                event.session_id,
+                event.task_id,
+                event.family_id or "",
+                event.stage or "",
+                event.source_revision,
                 event.tool_call_id,
             )
             key = (*scope, event.retry_identity or "")
+            call_identity = (
+                event.run_id,
+                event.variant,
+                event.trace_id,
+                event.episode_id,
+                event.session_id,
+                event.tool_call_id,
+                event.retry_identity or "",
+            )
+            call_context = (
+                event.task_id,
+                event.family_id or "",
+                event.stage or "",
+                event.source_revision,
+                event.host_event_id,
+            )
+            call_contexts.setdefault(call_identity, set()).add(call_context)
             if event.kind is ProcessEventKind.TOOL_CALL:
                 tool_calls.setdefault(key, []).append(event)
-                calls_by_id.setdefault(scope, []).append(event)
+                calls_by_id.setdefault(call_id_scope, []).append(event)
             else:
                 tool_results.setdefault(key, []).append(event)
                 result_ids.setdefault(
@@ -750,24 +787,11 @@ def audit_process_events(
             for event in results:
                 errors.append(f"{event.event_id}: orphan tool result")
 
-    # The same call/retry identity appearing under multiple task IDs cannot be
-    # joined safely.  This check deliberately ignores content and host stage.
-    by_call_identity: dict[tuple[str, str, str, str, str, str, str], set[str]] = {}
-    for event in tool_events:
-        if event.tool_call_id is None:
-            continue
-        identity = (
-            event.run_id,
-            event.variant,
-            event.trace_id,
-            event.episode_id,
-            event.session_id,
-            event.tool_call_id,
-            event.retry_identity or "",
-        )
-        by_call_identity.setdefault(identity, set()).add(event.task_id)
-    for identity, task_ids in by_call_identity.items():
-        if len(task_ids) > 1:
+    # The same call/retry identity appearing under multiple execution
+    # contexts cannot be joined safely.  This deliberately checks task,
+    # family, stage, source revision and host boundary, not just task ID.
+    for identity, contexts in call_contexts.items():
+        if len(contexts) > 1:
             for event in tool_events:
                 if (
                     event.run_id,
