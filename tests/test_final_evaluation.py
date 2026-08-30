@@ -5,7 +5,11 @@ from dataclasses import replace
 
 import pytest
 
-from rsimem.memory.final_evaluation import FinalEvaluationRecord, JsonFinalEvaluationStore
+from rsimem.memory.final_evaluation import (
+    FinalEvaluationRecord,
+    FinalEvaluationReporter,
+    JsonFinalEvaluationStore,
+)
 
 
 def _record(**overrides: object) -> FinalEvaluationRecord:
@@ -95,3 +99,65 @@ def test_final_evaluation_store_rejects_symlinked_lock(tmp_path) -> None:
     path.with_name(path.name + ".lock").symlink_to(lock_target)
     with pytest.raises(ValueError, match="lock.*symlink"):
         JsonFinalEvaluationStore(path).records()
+
+
+def test_final_reporter_reads_score_only_after_completed_run(tmp_path) -> None:
+    store = JsonFinalEvaluationStore(tmp_path / "final.jsonl")
+    reporter = FinalEvaluationReporter(store)
+    calls: list[str] = []
+
+    record = reporter.read_after_completion(
+        candidate_artifact_id="candidate.reporter.v1",
+        run_id="run.reporter.v1",
+        candidate_frozen_at="2026-08-30T01:00:00Z",
+        run_completed_at="2026-08-30T02:00:00Z",
+        score_read_at="2026-08-30T03:00:00Z",
+        metric_name="task.pass_rate",
+        score_reader=lambda: calls.append("read") or 0.75,
+    )
+    assert calls == ["read"]
+    assert record.metric_value == 0.75
+    assert JsonFinalEvaluationStore(tmp_path / "final.jsonl").records() == (record,)
+
+
+@pytest.mark.parametrize(
+    ("run_completed_at", "score_read_at", "message"),
+    (
+        ("2026-08-30T00:00:00Z", "2026-08-30T03:00:00Z", "complete after candidate freeze"),
+        ("2026-08-30T02:00:00Z", "2026-08-30T02:00:00Z", "read after run completion"),
+    ),
+)
+def test_final_reporter_does_not_read_score_before_chronology(
+    tmp_path,
+    run_completed_at: str,
+    score_read_at: str,
+    message: str,
+) -> None:
+    reporter = FinalEvaluationReporter(JsonFinalEvaluationStore(tmp_path / "final.jsonl"))
+    calls: list[str] = []
+    with pytest.raises(ValueError, match=message):
+        reporter.read_after_completion(
+            candidate_artifact_id="candidate.reporter.invalid",
+            run_id="run.reporter.invalid",
+            candidate_frozen_at="2026-08-30T01:00:00Z",
+            run_completed_at=run_completed_at,
+            score_read_at=score_read_at,
+            metric_name="task.pass_rate",
+            score_reader=lambda: calls.append("read") or 0.5,
+        )
+    assert calls == []
+
+
+def test_final_reporter_accepts_canonical_score_digest_payload(tmp_path) -> None:
+    reporter = FinalEvaluationReporter(JsonFinalEvaluationStore(tmp_path / "final.jsonl"))
+    digest = "a" * 64
+    record = reporter.read_after_completion(
+        candidate_artifact_id="candidate.reporter.payload",
+        run_id="run.reporter.payload",
+        candidate_frozen_at="2026-08-30T01:00:00Z",
+        run_completed_at="2026-08-30T02:00:00Z",
+        score_read_at="2026-08-30T03:00:00Z",
+        metric_name="task.pass_rate",
+        score_reader=lambda: {"metric_value": 0.5, "score_digest": digest},
+    )
+    assert record.score_digest == digest
