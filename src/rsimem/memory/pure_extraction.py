@@ -399,6 +399,26 @@ class PureExtractionFeedbackRecord:
             expected_outcome = self.attribution is PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
             if self.memory_use.outcome_success is not expected_outcome:
                 raise ValueError("attributable extraction feedback outcome is inconsistent")
+            # ``create`` is a public contract entry point and can be called
+            # directly during replay.  Do not let a caller manufacture an
+            # attributable label by supplying only ``used_artifact_ids`` and
+            # a successful outcome: the deterministic resolver must observe
+            # the complete retrieval -> injection -> downstream use ->
+            # application outcome chain (including a trusted set binding
+            # when one is referenced).
+            from .use_attribution import (
+                MemoryUseResolutionStatus,
+                resolve_memory_use,
+            )
+
+            resolution = resolve_memory_use(
+                self.memory_use,
+                artifact_set_binding=self.artifact_set_binding,
+            )
+            if resolution.status is not MemoryUseResolutionStatus.ATTRIBUTABLE_USE:
+                raise ValueError(
+                    "attributable extraction feedback requires a complete memory-use join"
+                )
         if not isinstance(self.tool_joins, tuple):
             raise TypeError("pure extraction tool joins must be a tuple")
         for join in self.tool_joins:
