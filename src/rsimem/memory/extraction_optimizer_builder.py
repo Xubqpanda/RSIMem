@@ -55,6 +55,7 @@ class DelayedEvidenceContent:
     source_completed_at: str
     observed_at: str
     current_input: str
+    observation_window: str = "window.unbound"
 
 
 class ExtractionOptimizerCorpusBuilder:
@@ -176,6 +177,7 @@ class ExtractionOptimizerCorpusBuilder:
                 source_record.extraction_output_digest,
                 operations,
                 lineages,
+                observation_window=delayed_content.observation_window,
             )
             examples.append(ExtractionOptimizerCorpusExample.create(
                 primary_unit_id=feedback.primary_unit_id,
