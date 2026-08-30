@@ -1028,7 +1028,7 @@ class PureExtractionOptimizerCorpus:
         observation_cutoff: str,
         examples: tuple[PureExtractionOptimizerExample, ...],
         process_signal_protocol_id: str,
-        process_signal_case_digest: str,
+        process_signal_case_digest: str | None,
         census: object,
     ) -> "PureExtractionOptimizerCorpus":
         """Bind corpus readiness to the existing process-signal census.
@@ -1043,6 +1043,9 @@ class PureExtractionOptimizerCorpus:
 
         if not isinstance(census, ProcessSignalCaseCensus):
             raise TypeError("pure extraction corpus requires ProcessSignalCaseCensus")
+        expected_case_digest = content_digest(census.payload())
+        if process_signal_case_digest is not None and process_signal_case_digest != expected_case_digest:
+            raise ValueError("pure extraction process-signal case digest mismatch")
         optimization_count = int(census.status_counts.get("optimization_signal", 0))
         ready = (
             census.logical_case_count > 0
@@ -1055,7 +1058,7 @@ class PureExtractionOptimizerCorpus:
             examples=examples,
             process_signal_gate="ready" if ready else "no_signal",
             process_signal_protocol_id=process_signal_protocol_id,
-            process_signal_case_digest=process_signal_case_digest,
+            process_signal_case_digest=expected_case_digest,
             process_signal_case_count=census.logical_case_count,
             process_signal_optimization_count=optimization_count,
         )
