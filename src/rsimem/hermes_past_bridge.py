@@ -1264,7 +1264,9 @@ class HermesPastBenchBridge:
         self._memory_use_evidence_log.append(evidence)
 
     @staticmethod
-    def _outcome_kind(result: Mapping[str, Any]) -> OutcomeEvidenceKind:
+    def _outcome_kind(
+        result: Mapping[str, Any],
+    ) -> OutcomeEvidenceKind | None:
         raw_messages = result.get("messages")
         if isinstance(raw_messages, (list, tuple)):
             for message in raw_messages:
