@@ -377,7 +377,9 @@ class JsonProcessSignalCaseStore:
     """Atomic, restart-safe storage for logical process-signal cases."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Preserve the final path component so a symlink cannot redirect the
+        # case store after a batch protocol has been frozen.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
 
     @staticmethod
@@ -385,6 +387,8 @@ class JsonProcessSignalCaseStore:
         return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
     def _read_unlocked(self) -> dict[str, str]:
+        if self.path.is_symlink():
+            raise ValueError("process-signal case file cannot be a symlink")
         if not self.path.exists():
             return {}
         records: dict[str, str] = {}
