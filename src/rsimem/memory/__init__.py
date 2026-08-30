@@ -196,6 +196,10 @@ from .pure_extraction import (
     PureProcessExtractionSourceRecord,
     prepare_pure_extraction_corpus,
 )
+from .pure_extraction_optimizer import (
+    PureExtractionOptimizerContentCapture,
+    build_pure_extraction_optimizer_request,
+)
 from .logical_case import (
     LOGICAL_CASE_SCHEMA,
     LOGICAL_CASE_SCHEMA_VERSION,
@@ -378,6 +382,8 @@ __all__ = [
     "PureProcessExtractionSourceProjector",
     "PureProcessExtractionSourceRecord",
     "prepare_pure_extraction_corpus",
+    "PureExtractionOptimizerContentCapture",
+    "build_pure_extraction_optimizer_request",
     "OpportunityResolution",
     "OpportunityResolutionStatus",
     "OpportunitySurface",
