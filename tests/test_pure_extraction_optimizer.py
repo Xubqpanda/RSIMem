@@ -251,6 +251,57 @@ def test_pure_optimizer_request_requires_actionable_content_capture() -> None:
         build_pure_extraction_optimizer_request(parent, _corpus(example))
 
 
+def test_pure_optimizer_groups_content_free_replicates_by_stable_case_inputs() -> None:
+    """Repeated unresolved observations must not inflate logical case count."""
+
+    parent, _, _ = _fixture()
+    # Build two diagnostic records for the same source/window.  Their reason
+    # codes (and therefore example IDs) differ, while the semantic source and
+    # frozen policy remain identical as they would across retrieval retries.
+    from rsimem.memory.pure_extraction import PureExtractionFeedbackRecord
+
+    _, _, capture = _fixture()
+    pure_source = capture.source_record
+    first_feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.pure-request",
+        provenance_id=pure_source.provenance_id,
+        reason_codes=("retrieval_miss",),
+    )
+    second_feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.pure-request",
+        provenance_id=pure_source.provenance_id,
+        reason_codes=("injected_not_used",),
+    )
+    first = PureExtractionOptimizerExample.from_records(pure_source, first_feedback)
+    second = PureExtractionOptimizerExample.from_records(pure_source, second_feedback)
+    corpus = PureExtractionOptimizerCorpus.create(
+        split="train",
+        observation_cutoff="2026-08-22T00:00:00Z",
+        examples=(first, second),
+        process_signal_gate="ready",
+        process_signal_protocol_id="protocol.pure-replicates",
+        process_signal_case_digest="a" * 64,
+        process_signal_case_count=2,
+        process_signal_optimization_count=2,
+        process_signal_hypothesis_digest="b" * 64,
+    )
+    request = build_pure_extraction_optimizer_request(parent, corpus)
+    payload = json.loads(request.input_json)
+    unresolved = payload["evidence_groups"]["unresolved"]
+    assert len(unresolved) == 1
+    assert unresolved[0]["replica_count"] == 2
+
+
 def test_pure_optimizer_request_rejects_capture_outside_corpus() -> None:
     parent, example, capture = _fixture()
     extra = replace(
