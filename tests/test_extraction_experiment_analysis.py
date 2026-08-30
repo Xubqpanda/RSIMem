@@ -513,6 +513,37 @@ def test_analysis_rejects_process_signal_protocol_manifest_drift(
         analyze_extraction_batch(root)
 
 
+def test_analysis_rejects_process_signal_case_replicate_or_window_drift(
+    tmp_path: Path,
+) -> None:
+    root = _batch(tmp_path, changed=False)
+    manifest = json.loads((root / "batch_manifest.json").read_text(encoding="utf-8"))
+    protocol = protocol_for_extraction_manifest(manifest)
+    completed = next(
+        event for event in manifest["attemptHistory"] if event["status"] == "completed"
+    )
+    run = root / completed["outputDirectory"]
+    case = ProcessSignalCase.create(
+        logical_case_id="logical-case.case-metadata-drift.v1",
+        physical_observation_ids=("physical-observation.case-metadata-drift.v1",),
+        source_observed=True,
+        extraction_observed=True,
+        persistence_observed=True,
+        retrieval_observed=True,
+        exposure_observed=False,
+        outcome_observed=False,
+        extraction_attributable=False,
+        abstract_hypothesis_digest=None,
+        observation_complete=True,
+        analysis_protocol_id=protocol.protocol_id,
+        replicate_id="replicate.99",
+        observation_window=protocol.observation_window,
+    )
+    JsonProcessSignalCaseStore(run / "process_signal_cases.jsonl").append(case)
+    with pytest.raises(ValueError, match="does not match frozen protocol or replicate"):
+        analyze_extraction_batch(root)
+
+
 def test_analysis_rejects_adaptation_claim_without_changed_extraction(
     tmp_path: Path,
 ) -> None:
