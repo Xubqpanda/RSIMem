@@ -132,6 +132,24 @@ def test_process_ledger_is_restart_safe_and_conflict_checked(tmp_path) -> None:
         JsonProcessFeedbackLedger(path).events
 
 
+def test_process_ledger_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "ledger"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonProcessFeedbackLedger(path).events
+
+
+def test_process_ledger_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "ledger"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonProcessFeedbackLedger(path).events
+
+
 def test_process_ledger_reserves_one_concurrent_writer(tmp_path) -> None:
     _, _, replay = _replay()
     path = tmp_path / "process-concurrent.jsonl"
