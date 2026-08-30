@@ -696,6 +696,22 @@ def test_each_fixture_layer_has_explicit_benefit_explanation() -> None:
     assert all("benefitExplanation" in item for item in report["cases"])
 
 
+def test_feasibility_report_exposes_decision_contract_for_every_layer() -> None:
+    report = run_default_feasibility_census().payload()
+    contracts = {
+        item["layer"]: item["decisionContract"]
+        for item in report["layers"]
+    }
+    assert set(contracts) == {layer.value for layer in PolicyLayer}
+    for layer, contract in contracts.items():
+        assert contract["layer"] == layer
+        assert contract["contract_id"].startswith(
+            "policy-decision-contract."
+        )
+        assert contract["required_fields"]
+        assert set(contract["allowed_actions"]) == {"RUN", "SKIP", "DEFER"}
+
+
 def test_every_layer_case_has_matched_process_intervention_identity() -> None:
     cases = build_default_feasibility_cases()
     assert {case.target_layer for case in cases} == set(PolicyLayer)

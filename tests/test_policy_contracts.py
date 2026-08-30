@@ -16,6 +16,7 @@ from rsimem.memory.policy_contracts import (
     PolicyArtifactKind,
     PolicyLayer,
     PolicyLineage,
+    PolicyDecisionContract,
     ProjectionMode,
     SafetyBoundary,
     SourceSelectionDecision,
@@ -23,6 +24,7 @@ from rsimem.memory.policy_contracts import (
     TriggerEvent,
     validate_policy_episode,
     validate_policy_lineage,
+    decision_contract_for_layer,
 )
 
 
@@ -62,6 +64,29 @@ def test_trigger_event_and_decision_replay_are_stable() -> None:
     replay_decision = TriggerDecision.create(**_base_kwargs())
     assert first_decision == replay_decision
     assert first_decision.is_canonical
+
+
+def test_each_policy_layer_exposes_a_typed_decision_contract() -> None:
+    for layer in PolicyLayer:
+        contract = decision_contract_for_layer(layer)
+        assert isinstance(contract, PolicyDecisionContract)
+        assert contract.layer is layer
+        assert contract.decision_type.endswith("Decision")
+        assert set(contract.allowed_actions) == set(DecisionAction)
+        assert {"decision_id", "action", "input_digest", "output_digest"}.issubset(
+            contract.required_fields
+        )
+        assert PolicyDecisionContract.from_payload(contract.payload()) == contract
+
+
+def test_decision_contract_rejects_unknown_layer_or_tampered_identity() -> None:
+    with pytest.raises(ValueError, match="unknown policy decision layer"):
+        decision_contract_for_layer("not-a-layer")
+    contract = decision_contract_for_layer(PolicyLayer.EXTRACTION)
+    payload = contract.payload()
+    payload["contract_id"] = "policy-decision-contract.trigger.v1"
+    with pytest.raises(ValueError, match="ID mismatch|malformed"):
+        PolicyDecisionContract.from_payload(payload)
 
 
 def test_decision_identity_includes_layer_specific_output() -> None:
