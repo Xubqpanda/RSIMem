@@ -195,7 +195,7 @@ def _process_signal_gate(
             PROCESS_SIGNAL_GATE_NO_SIGNAL,
             protocol_id,
             case_digest,
-            len(cases),
+            census.logical_case_count,
             0,
             None,
         )
@@ -227,7 +227,7 @@ def _process_signal_gate(
         gate,
         protocol_id,
         case_digest,
-        len(cases),
+        census.logical_case_count,
         optimization,
         hypothesis_digest,
     )

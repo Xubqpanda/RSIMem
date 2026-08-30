@@ -214,7 +214,7 @@ def test_process_signal_gate_deduplicates_replicates_by_logical_case(
         tmp_path
     )
     assert gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
-    assert (case_count, optimization_count, hypothesis) == (3, 1, None)
+    assert (case_count, optimization_count, hypothesis) == (1, 1, None)
 
 
 def test_process_signal_gate_rejects_unbound_or_mixed_protocol_cases(
@@ -314,7 +314,7 @@ def test_process_signal_gate_does_not_vote_over_conflicting_replicates(
     assert gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
     assert protocol_id == "signal-protocol.conflict"
     assert isinstance(case_digest, str) and len(case_digest) == 64
-    assert case_count == 2
+    assert case_count == 1
     assert optimization_count == 0
     assert hypothesis is None
 
@@ -358,7 +358,7 @@ def test_process_signal_gate_rejects_hypothesis_conflict_within_logical_case(
     assert gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
     assert protocol_id == "signal-protocol.hypothesis-conflict"
     assert isinstance(case_digest, str) and len(case_digest) == 64
-    assert case_count == 2
+    assert case_count == 1
     assert optimization_count == 0
     assert hypothesis is None
 
