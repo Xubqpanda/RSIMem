@@ -173,6 +173,38 @@ def test_malformed_tool_result_is_type_mismatch_not_tool_failure(
     assert "tool_failure" not in tool_results[0].reason_codes
 
 
+def test_cross_task_tool_closure_is_not_attributed_to_current_task(tmp_path) -> None:
+    bridge = _bridge(tmp_path, [])
+    result = {
+        "messages": [
+            {
+                "role": "assistant",
+                "task_id": "task.other",
+                "tool_calls": [{
+                    "id": "call-cross-task",
+                    "function": {"name": "inspect", "arguments": "{}"},
+                }],
+            },
+            {
+                "role": "tool",
+                "task_id": "task.other",
+                "tool_call_id": "call-cross-task",
+                "content": '{"success": true}',
+            },
+        ],
+    }
+    try:
+        bridge._record_tool_call_results(result)
+        join = bridge.tool_call_result_joins[-1]
+    finally:
+        bridge.close()
+
+    assert join.cross_task is True
+    resolution = resolve_tool_call_result(join)
+    assert resolution.status is ToolJoinResolutionStatus.CROSS_TASK
+    assert resolution.exact is False
+
+
 def test_duplicate_tool_call_id_is_marked_duplicate_and_fails_closed(tmp_path) -> None:
     bridge = _bridge(tmp_path, [])
     result = {
