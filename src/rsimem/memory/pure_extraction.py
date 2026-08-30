@@ -578,15 +578,16 @@ class PureExtractionFeedbackRecord:
             if operation_id is not None
         }
         bound_tool_join_resolutions = tuple(
-            resolve_tool_call_result(join)
+            (join, resolve_tool_call_result(join))
             for join in tool_joins
             if join.memory_use_operation_id in memory_operation_ids
         )
-        incomplete_tool_join = next(
+        blocked_tool_join = next(
             (
-                resolution
-                for resolution in bound_tool_join_resolutions
+                (join, resolution)
+                for join, resolution in bound_tool_join_resolutions
                 if resolution.status is not ToolJoinResolutionStatus.COMPLETE
+                or join.success is False
             ),
             None,
         )
@@ -617,12 +618,19 @@ class PureExtractionFeedbackRecord:
             # extraction source.  Keep the evidence for diagnostics, but do
             # not let it grant attribution to the current source.
             reasons.append("artifact_set_member_foreign")
-        elif incomplete_tool_join is not None:
+        elif blocked_tool_join is not None:
             # Do not reinterpret a failed or partial tool closure as either a
             # successful or harmful extraction outcome.  Keep the resolver's
             # deterministic reason in the pure-process record for audit and
             # replay while leaving attribution unresolved.
-            reasons.append(f"tool_join_{incomplete_tool_join.reason_code}")
+            join, resolution = blocked_tool_join
+            reason = (
+                "tool_failure"
+                if join.success is False
+                and resolution.status is ToolJoinResolutionStatus.COMPLETE
+                else resolution.reason_code
+            )
+            reasons.append(f"tool_join_{reason}")
         elif memory_resolution.status is not MemoryUseResolutionStatus.ATTRIBUTABLE_USE:
             reasons.append(memory_resolution.reason_code)
         elif (
