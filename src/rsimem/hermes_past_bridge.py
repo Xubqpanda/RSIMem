@@ -449,7 +449,7 @@ class HermesPastBenchBridge:
         self._artifact_set_binding_provider = artifact_set_binding_provider
         self._artifact_set_binding_log = JsonArtifactSetBindingLog(
             artifact_set_binding_path
-            or self.evidence_path.with_name("rsimem_artifact_set_bindings.jsonl")
+            or Path(hermes_home) / ".rsimem" / "artifact_set_bindings.jsonl"
         )
         # Pure-process source/feedback stores are host-neutral and must be
         # available even when the benchmark-audit feedback contract is
