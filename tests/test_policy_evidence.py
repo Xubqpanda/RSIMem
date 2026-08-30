@@ -102,3 +102,22 @@ def test_policy_evidence_ledger_reserves_one_concurrent_writer(tmp_path) -> None
         records = tuple(executor.map(lambda _: record_once(), range(8)))
     assert len({item.event_id for item in records}) == 1
     assert len(JsonPolicyDecisionLedger(path).events) == 1
+
+
+def test_policy_evidence_ledger_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "policy.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonPolicyDecisionLedger(path)
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_policy_evidence_ledger_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "policy.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonPolicyDecisionLedger(path)
