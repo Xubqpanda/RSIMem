@@ -320,6 +320,7 @@ def test_builder_exactly_joins_content_and_content_free_evidence() -> None:
     }
     assert examples[0].audit_join.source_record_digest == source.content_digest
     assert examples[0].audit_join.source_projection_id == projection.projection_id
+    assert examples[0].audit_join.observation_window == "window.unbound"
     assert examples[0].extracted_facts[0].content.text == FACT_TEXT
     assert examples[0].audit_join.artifacts[0].mutation_ids == (
         "mutation.persist-v1",
@@ -331,6 +332,23 @@ def test_builder_exactly_joins_content_and_content_free_evidence() -> None:
     assert fact_example.feedback_fact_id == "fact.preference-v1"
     assert fact_example.feedback_semantic_key == TSV_KEY
     assert fact_example.feedback_artifact_ids == ("artifact.memory-v1",)
+
+
+def test_builder_persists_frozen_observation_window_identity() -> None:
+    projection, source, feedback, observation, graph, facts, delayed = _fixture()
+    delayed = replace(delayed, observation_window="completed-task.v1")
+    examples = ExtractionOptimizerCorpusBuilder().build_examples(
+        projection=projection,
+        source_record=source,
+        feedback_record=feedback,
+        observation=observation,
+        operation_graph=graph,
+        fact_contents=facts,
+        delayed_content=delayed,
+    )
+    assert {item.audit_join.observation_window for item in examples} == {
+        "completed-task.v1"
+    }
     replay = ExtractionOptimizerCorpusBuilder().build_examples(
         projection=projection,
         source_record=source,

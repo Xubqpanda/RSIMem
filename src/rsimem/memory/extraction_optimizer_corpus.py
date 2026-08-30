@@ -851,6 +851,18 @@ class ExtractionOptimizerCorpus:
             raise ValueError("process signal hypothesis requires optimization cases")
         if not self.examples:
             raise ValueError("optimizer corpus requires examples")
+        observation_windows = {
+            example.audit_join.observation_window
+            for example in self.examples
+            if example.primary
+        }
+        if self.process_signal_gate == PROCESS_SIGNAL_GATE_READY and (
+            len(observation_windows) != 1
+            or observation_windows == {"window.unbound"}
+        ):
+            raise ValueError(
+                "ready process signal gate requires one bound observation window"
+            )
         if self.examples != tuple(sorted(self.examples, key=_example_sort_key)):
             raise ValueError("optimizer corpus examples must be canonically ordered")
         example_ids = tuple(value.example_id for value in self.examples)
