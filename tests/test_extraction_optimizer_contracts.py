@@ -217,6 +217,32 @@ def test_request_groups_one_primary_unit_with_source_set_fact_annotations() -> N
     assert build_extraction_optimizer_request(_parent(), _corpus()) == request
 
 
+def test_bound_process_signal_provenance_is_carried_into_optimizer_input() -> None:
+    baseline = _corpus()
+    corpus = ExtractionOptimizerCorpus.create(
+        batch_id=baseline.batch_id,
+        attempt_id=baseline.attempt_id,
+        split=baseline.split,
+        observation_cutoff=baseline.observation_cutoff,
+        retention=baseline.retention,
+        examples=baseline.examples,
+        process_signal_gate=PROCESS_SIGNAL_GATE_NO_SIGNAL,
+        process_signal_protocol_id="signal-protocol.bound-v1",
+        process_signal_case_digest="a" * 64,
+        process_signal_case_count=1,
+        process_signal_optimization_count=0,
+    )
+    payload = json.loads(build_extraction_optimizer_request(_parent(), corpus).input_json)
+    assert payload["process_signal"] == {
+        "gate": PROCESS_SIGNAL_GATE_NO_SIGNAL,
+        "protocol_id": "signal-protocol.bound-v1",
+        "case_digest": "a" * 64,
+        "case_count": 1,
+        "optimization_count": 0,
+        "hypothesis_digest": None,
+    }
+
+
 def test_process_signal_no_signal_gate_blocks_actionable_provider_request() -> None:
     baseline = _corpus()
     gated = ExtractionOptimizerCorpus.create(

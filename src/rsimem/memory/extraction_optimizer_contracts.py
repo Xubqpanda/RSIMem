@@ -14,6 +14,7 @@ from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
     ExtractionOptimizerCorpusExample,
     OptimizerCorpusSplit,
+    PROCESS_SIGNAL_GATE_NOT_BOUND,
 )
 from .extraction_policy_artifact import ExtractionPromptPolicyArtifact
 from .prompt_components import canonical_json, content_digest, text_digest
@@ -637,6 +638,18 @@ def build_extraction_optimizer_request(
             "delayed_evidence": dict(sorted(delayed_catalog.items())),
         },
     }
+    # Preserve the frozen process-signal gate provenance when a formal batch
+    # has bound it.  Family/stage labels remain excluded; only the protocol,
+    # census identity and shared abstract hypothesis digest are exposed.
+    if corpus.process_signal_gate != PROCESS_SIGNAL_GATE_NOT_BOUND:
+        input_payload["process_signal"] = {
+            "gate": corpus.process_signal_gate,
+            "protocol_id": corpus.process_signal_protocol_id,
+            "case_digest": corpus.process_signal_case_digest,
+            "case_count": corpus.process_signal_case_count,
+            "optimization_count": corpus.process_signal_optimization_count,
+            "hypothesis_digest": corpus.process_signal_hypothesis_digest,
+        }
     input_json = canonical_json(input_payload)
     if len(input_json) > config.maximum_input_chars:
         # Replicated runs can carry byte-for-byte identical source/fact/
