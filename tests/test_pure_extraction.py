@@ -343,3 +343,14 @@ def test_live_pure_projector_does_not_consult_family_parser(tmp_path) -> None:
     assert projected.source.available_semantic_keys == ()
     assert projected.source.facts[0].semantic_keys == ()
     assert projected.source.facts[0].artifact_id is not None
+
+    with pytest.raises(TypeError, match="mapping"):
+        PureExtractionSourceProjector().project_record(
+            boundary,
+            runtime.policy,
+            runtime.extraction_runtime_binding,
+            source_projection_id="projection.runtime-pure-v1",
+            context_revision="revision.runtime-pure-v1",
+            provenance_id="provenance.runtime-pure-v1",
+            fact_semantic_keys="not-a-map",  # type: ignore[arg-type]
+        )

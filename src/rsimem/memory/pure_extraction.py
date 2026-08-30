@@ -1031,7 +1031,10 @@ class PureExtractionSourceProjector:
             raise ValueError("pure extraction projection requires a Mem0-flat operation trace")
         if not isinstance(visible_semantic_keys, tuple) or len(visible_semantic_keys) != len(set(visible_semantic_keys)):
             raise ValueError("visible extraction semantic keys must be a unique tuple")
-        fact_semantic_keys = fact_semantic_keys or {}
+        if fact_semantic_keys is None:
+            fact_semantic_keys = {}
+        elif not isinstance(fact_semantic_keys, Mapping):
+            raise TypeError("fact semantic keys must be a mapping")
         operations = ingestion.operations
         executions = boundary.writeback.executions
         accepted_index = 0
