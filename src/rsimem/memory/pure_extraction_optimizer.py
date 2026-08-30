@@ -109,12 +109,34 @@ class PureExtractionOptimizerContentCapture:
             raise TypeError("pure optimizer capture source record has the wrong type")
         if not isinstance(self.source_projection, ExtractionSourceProjection):
             raise TypeError("pure optimizer capture source projection has the wrong type")
+        if (
+            self.source_record.source_projection_id
+            != self.source_projection.projection_id
+            or self.source_record.source_projection_digest
+            != self.source_projection.projection_digest
+        ):
+            raise ValueError("pure optimizer capture source projection join mismatch")
+        if self.source_record.extraction_artifact_digest != self.source_record.activation.runtime_binding.component_body_digest:
+            raise ValueError("pure optimizer capture source artifact binding mismatch")
         if not self.source_messages:
             raise ValueError("pure optimizer capture requires source messages")
         if any(not isinstance(value, OptimizerSourceMessage) for value in self.source_messages):
             raise TypeError("pure optimizer capture source message has the wrong type")
         if any(not isinstance(value, OptimizerExtractedFact) for value in self.extracted_facts):
             raise TypeError("pure optimizer capture fact has the wrong type")
+        source_facts = self.source_record.source.facts
+        captured_facts = self.extracted_facts
+        if tuple(value.fact_id for value in source_facts) != tuple(
+            value.fact_id for value in captured_facts
+        ):
+            raise ValueError("pure optimizer capture source fact join mismatch")
+        for captured, source_fact in zip(captured_facts, source_facts):
+            if (
+                captured.semantic_keys != source_fact.semantic_keys
+                or captured.persisted_artifact_id != source_fact.artifact_id
+                or captured.disposition != source_fact.disposition
+            ):
+                raise ValueError("pure optimizer capture fact lineage mismatch")
         if not isinstance(self.delayed_evidence, OptimizerDelayedEvidence):
             raise TypeError("pure optimizer capture delayed evidence has the wrong type")
 

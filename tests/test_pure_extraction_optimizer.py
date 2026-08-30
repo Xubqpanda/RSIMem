@@ -343,19 +343,14 @@ def test_pure_optimizer_capture_binds_source_structure() -> None:
 
 
 def test_pure_optimizer_capture_binds_fact_lineage() -> None:
-    parent, example, capture = _fixture()
-    tampered = replace(
-        capture,
-        extracted_facts=(replace(
-            capture.extracted_facts[0],
-            persisted_artifact_id="artifact.foreign",
-        ),),
-    )
+    _, _, capture = _fixture()
     with pytest.raises(ValueError, match="fact lineage"):
-        build_pure_extraction_optimizer_request(
-            parent,
-            _corpus(example),
-            captures=(tampered,),
+        replace(
+            capture,
+            extracted_facts=(replace(
+                capture.extracted_facts[0],
+                persisted_artifact_id="artifact.foreign",
+            ),),
         )
 
 
