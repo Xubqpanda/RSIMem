@@ -404,13 +404,13 @@ def resolve_tool_call_result(join: ToolCallResultJoin) -> ToolJoinResolution:
         (join.duplicate_call or join.duplicate_result, ToolJoinResolutionStatus.DUPLICATE, "duplicate_tool_identity"),
         (join.cross_task, ToolJoinResolutionStatus.CROSS_TASK, "cross_task_join"),
         (join.type_mismatch, ToolJoinResolutionStatus.TYPE_MISMATCH, "tool_type_mismatch"),
+        (join.orphan_result, ToolJoinResolutionStatus.ORPHANED, "orphan_result"),
+        (not join.call_present or not join.result_present, ToolJoinResolutionStatus.MISSING, "missing_call_or_result"),
         # A complete result must carry a typed boolean outcome.  ``None`` is
         # reserved for censored/missing observations; accepting it as a
         # complete closure would allow malformed public contracts to bypass
         # extraction attribution safety.
         (join.result_present and join.success is None, ToolJoinResolutionStatus.TYPE_MISMATCH, "tool_success_unknown"),
-        (join.orphan_result, ToolJoinResolutionStatus.ORPHANED, "orphan_result"),
-        (not join.call_present or not join.result_present, ToolJoinResolutionStatus.MISSING, "missing_call_or_result"),
     )
     for condition, status, reason in checks:
         if condition:
