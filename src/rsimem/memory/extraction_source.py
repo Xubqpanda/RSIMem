@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import TYPE_CHECKING, Mapping, Sequence
 
-from ..lifecycle import ContextSnapshot, SegmentKind, TaskLifecycleState
+if TYPE_CHECKING:
+    from ..lifecycle import ContextSnapshot, SegmentKind, TaskLifecycleState
 from .contracts import MemoryExperience, MemoryMessage
 
 
@@ -42,7 +43,9 @@ class ExtractionSourceMessage:
     content_truncated: bool = False
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "segment_kind", SegmentKind(self.segment_kind))
+        from ..lifecycle import SegmentKind as _SegmentKind
+
+        object.__setattr__(self, "segment_kind", _SegmentKind(self.segment_kind))
         if any(not value.strip() for value in (
             self.segment_id,
             self.source_message_id,
@@ -55,8 +58,8 @@ class ExtractionSourceMessage:
         if type(self.content_truncated) is not bool:
             raise TypeError("content_truncated must be bool")
         tool_kind = self.segment_kind in {
-            SegmentKind.TOOL_CALL,
-            SegmentKind.TOOL_RESULT,
+            _SegmentKind.TOOL_CALL,
+            _SegmentKind.TOOL_RESULT,
         }
         if tool_kind != bool(self.tool_call_id):
             raise ValueError("extraction tool message identity is inconsistent")
@@ -86,12 +89,14 @@ class ExtractionSourceMessage:
         if not isinstance(value, Mapping) or set(value) != fields:
             raise ValueError("malformed extraction source message")
         try:
+            from ..lifecycle import SegmentKind as _SegmentKind
+
             return cls(
                 segment_id=value["segment_id"],
                 source_message_id=value["source_message_id"],
                 role=value["role"],
                 content=value["content"],
-                segment_kind=SegmentKind(value["segment_kind"]),
+                segment_kind=_SegmentKind(value["segment_kind"]),
                 tool_call_id=value["tool_call_id"],
                 content_truncated=value["content_truncated"],
             )
@@ -274,7 +279,9 @@ class ExtractionSourceProjector:
         *,
         selected_segment_ids: Sequence[str] | None = None,
     ) -> ExtractionSourceProjection:
-        if snapshot.task_state != TaskLifecycleState.COMPLETED:
+        from ..lifecycle import TaskLifecycleState as _TaskLifecycleState
+
+        if snapshot.task_state != _TaskLifecycleState.COMPLETED:
             raise ValueError("extraction source requires completed task")
         if snapshot.current_turn_id is not None or snapshot.active_segment_ids:
             raise ValueError("active/current context cannot enter extraction source")
