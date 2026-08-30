@@ -143,8 +143,14 @@ class JsonRevocationRegistry:
     """Append-only registry; missing/corrupt state is never treated as empty."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Keep the final component unresolved so a symlink cannot redirect
+        # revocation state into an unrelated trusted-looking file.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
+
+    def _reject_symlink(self) -> None:
+        if self.path.is_symlink():
+            raise ValueError("revocation registry cannot be a symlink")
 
     @contextmanager
     def _lock(self):
@@ -157,6 +163,7 @@ class JsonRevocationRegistry:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def _read(self) -> dict[str, str]:
+        self._reject_symlink()
         if not self.path.exists():
             raise ValueError("revocation registry is missing")
         records: dict[str, str] = {}
@@ -178,6 +185,7 @@ class JsonRevocationRegistry:
         """Create an explicitly empty registry before it is required."""
 
         with self._lock():
+            self._reject_symlink()
             if self.path.exists():
                 self._read()
                 return
