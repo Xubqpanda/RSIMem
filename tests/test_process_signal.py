@@ -117,6 +117,19 @@ def test_census_does_not_count_conflicting_or_replicated_cases_as_support() -> N
     assert census.conflict_case_count == 1
 
 
+def test_census_rejects_hypothesis_support_without_optimization_cases() -> None:
+    with pytest.raises(ValueError, match="exceed optimization cases"):
+        from rsimem.memory.process_signal import ProcessSignalCaseCensus
+
+        ProcessSignalCaseCensus(
+            physical_observation_count=2,
+            logical_case_count=2,
+            status_counts={"observable_only": 2},
+            conflict_case_count=0,
+            optimization_hypothesis_case_counts={"a" * 64: 1},
+        )
+
+
 def test_non_pure_plane_and_duplicate_physical_ids_fail_closed() -> None:
     with pytest.raises(ValueError, match="plane and source identity"):
         replace(_case(), evidence_plane="benchmark_audit")
