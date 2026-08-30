@@ -96,6 +96,10 @@ class ExtractionOptimizerCorpusBuilder:
             feedback_record, LiveExtractionFeedbackRecord
         ):
             raise TypeError("family-bound optimizer builder requires family-bound source/feedback records")
+        if self.evidence_plane is EvidencePlane.PURE_PROCESS:
+            raise ValueError(
+                "family-bound benchmark evidence cannot be relabeled as pure_process"
+            )
         self._validate_record_join(projection, source_record, feedback_record)
         evidence_plane = self.evidence_plane or EvidencePlane(
             feedback_record.dataset.evidence_plane
