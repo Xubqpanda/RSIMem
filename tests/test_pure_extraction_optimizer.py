@@ -348,6 +348,18 @@ def test_pure_optimizer_capture_store_is_restart_safe_and_conflict_checked(tmp_p
     with pytest.raises(ValueError, match="conflicting"):
         store.append(conflicting)
 
+    duplicate_observation = PureExtractionOptimizerContentCapture(
+        "pure-extraction-example.other",
+        "logical-case.other",
+        capture.physical_observation_ids,
+        capture.source_projection,
+        capture.source_messages,
+        capture.extracted_facts,
+        capture.delayed_evidence,
+    )
+    with pytest.raises(ValueError, match="physical observation"):
+        store.append(duplicate_observation)
+
     payload = capture.payload()
     payload["family_id"] = "SM02_forbidden"
     path.write_text(json.dumps(payload) + "\n", encoding="utf-8")

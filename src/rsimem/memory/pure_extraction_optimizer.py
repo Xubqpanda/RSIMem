@@ -214,6 +214,7 @@ class JsonPureExtractionOptimizerContentCaptureStore:
         if stat.S_IMODE(self.path.stat().st_mode) & 0o077:
             raise PermissionError("pure optimizer capture file permissions are too broad")
         records: dict[str, PureExtractionOptimizerContentCapture] = {}
+        physical_owner: dict[str, str] = {}
         for line_number, line in enumerate(
             self.path.read_text(encoding="utf-8").splitlines(), start=1
         ):
@@ -232,6 +233,11 @@ class JsonPureExtractionOptimizerContentCaptureStore:
             previous = records.get(capture.example_id)
             if previous is not None and previous.payload() != capture.payload():
                 raise ValueError("conflicting pure optimizer content capture")
+            for observation_id in capture.physical_observation_ids:
+                owner = physical_owner.get(observation_id)
+                if owner is not None and owner != capture.example_id:
+                    raise ValueError("duplicate pure optimizer physical observation identity")
+                physical_owner[observation_id] = capture.example_id
             records[capture.example_id] = capture
         return records
 
@@ -253,6 +259,13 @@ class JsonPureExtractionOptimizerContentCaptureStore:
                 if previous.payload() != capture.payload():
                     raise ValueError("conflicting pure optimizer content capture")
                 return False
+            for existing in records.values():
+                if set(existing.physical_observation_ids).intersection(
+                    capture.physical_observation_ids
+                ):
+                    raise ValueError(
+                        "duplicate pure optimizer physical observation identity"
+                    )
             descriptor = os.open(
                 self.path,
                 os.O_CREAT | os.O_APPEND | os.O_WRONLY,
@@ -274,12 +287,20 @@ def _capture_for(
     captures: Sequence[PureExtractionOptimizerContentCapture],
 ) -> dict[str, PureExtractionOptimizerContentCapture]:
     result: dict[str, PureExtractionOptimizerContentCapture] = {}
+    physical_owner: dict[str, str] = {}
     for capture in captures:
         if not isinstance(capture, PureExtractionOptimizerContentCapture):
             raise TypeError("pure optimizer content captures have the wrong type")
         previous = result.get(capture.example_id)
         if previous is not None and previous != capture:
             raise ValueError("conflicting pure optimizer content capture")
+        for observation_id in capture.physical_observation_ids:
+            owner = physical_owner.get(observation_id)
+            if owner is not None and owner != capture.example_id:
+                raise ValueError(
+                    "duplicate pure optimizer physical observation identity"
+                )
+            physical_owner[observation_id] = capture.example_id
         result[capture.example_id] = capture
     return result
 
