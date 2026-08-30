@@ -254,6 +254,15 @@ def test_extraction_source_store_rejects_symlinked_paths(tmp_path: Path) -> None
     assert target.read_text(encoding="utf-8") == "sentinel\n"
 
 
+def test_extraction_source_store_rejects_symlinked_lock(tmp_path: Path) -> None:
+    path = tmp_path / "sources.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_suffix(path.suffix + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonExtractionSourceRecordStore(path).records()
+
+
 def test_empty_source_record_remains_joinable_without_memory_artifact(tmp_path) -> None:
     runtime, boundary = _compile(tmp_path, facts=())
     try:

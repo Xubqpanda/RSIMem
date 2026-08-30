@@ -25,7 +25,10 @@ from rsimem.memory.extraction_feedback import (
     default_feedback_contract_registry,
     detect_user_source_semantic_keys,
 )
-from rsimem.memory.extraction_projection import JsonExtractionFeedbackDatasetLog
+from rsimem.memory.extraction_projection import (
+    JsonExtractionFeedbackDatasetLog,
+    JsonLiveExtractionFeedbackRecordLog,
+)
 from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 
 
@@ -870,3 +873,31 @@ def test_feedback_dataset_log_rejects_symlinked_path(tmp_path) -> None:
     with pytest.raises(ValueError, match="symlink"):
         JsonExtractionFeedbackDatasetLog(path).append(dataset)
     assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_feedback_dataset_and_live_feedback_logs_reject_symlinked_paths(tmp_path) -> None:
+    dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+        _source((TSV_KEY,)),
+        _observation(SM01, (TSV_KEY,)),
+        _future((TSV_KEY,)),
+    )
+    target = tmp_path / "target.jsonl"
+    target.write_text("sentinel\n", encoding="utf-8")
+    dataset_path = tmp_path / "dataset.jsonl"
+    dataset_path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonExtractionFeedbackDatasetLog(dataset_path).append(dataset)
+    live_path = tmp_path / "live.jsonl"
+    live_path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonLiveExtractionFeedbackRecordLog(live_path).records()
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_live_feedback_log_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "live.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_suffix(path.suffix + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonLiveExtractionFeedbackRecordLog(path).records()
