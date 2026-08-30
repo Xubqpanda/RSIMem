@@ -1096,6 +1096,42 @@ class PureExtractionOptimizerCorpus:
         return result
 
 
+def prepare_pure_extraction_corpus(
+    *,
+    sources: tuple[PureExtractionSourceRecord, ...],
+    feedback: tuple[PureExtractionFeedbackRecord, ...],
+    split: str,
+    observation_cutoff: str,
+    process_signal_protocol_id: str,
+    process_signal_case_digest: str | None,
+    process_signal_census: object,
+) -> PureExtractionOptimizerCorpus:
+    """Join pure source/feedback records and bind the process-signal gate.
+
+    This is the single preparation entry point for deployment-only extraction
+    evidence.  It deliberately does not accept family-bound records or an
+    externally supplied label; attribution is already derived by
+    :meth:`PureExtractionFeedbackRecord.derive_from_evidence`.
+    """
+
+    from .extraction_optimizer_builder import PureExtractionOptimizerBuilder
+
+    if not isinstance(sources, tuple) or not isinstance(feedback, tuple):
+        raise TypeError("pure extraction preparation requires tuple records")
+    examples = PureExtractionOptimizerBuilder().build_examples(
+        sources=sources,
+        feedback=feedback,
+    )
+    return PureExtractionOptimizerCorpus.create_from_process_signal_census(
+        split=split,
+        observation_cutoff=observation_cutoff,
+        examples=examples,
+        process_signal_protocol_id=process_signal_protocol_id,
+        process_signal_case_digest=process_signal_case_digest,
+        census=process_signal_census,
+    )
+
+
 class PureExtractionSourceProjector:
     """Project a live extraction trace without consulting a family contract.
 
@@ -1428,4 +1464,5 @@ __all__ = [
     "PureProcessExtractionOptimizerExample",
     "PureProcessExtractionSourceProjector",
     "PureProcessExtractionSourceRecord",
+    "prepare_pure_extraction_corpus",
 ]

@@ -17,6 +17,7 @@ from rsimem.memory.pure_extraction import (
     PureExtractionOptimizerExample,
     PureExtractionOptimizerCorpus,
     PureExtractionSourceProjector,
+    prepare_pure_extraction_corpus,
     PureExtractionSourceRecord,
 )
 from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
@@ -264,6 +265,50 @@ def test_pure_corpus_factory_uses_census_conflicts_as_no_signal() -> None:
             process_signal_protocol_id="protocol.census-v1",
             process_signal_case_digest="f" * 64,
             census=census,
+        )
+
+
+def test_prepare_pure_extraction_corpus_is_single_join_entrypoint() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.prepare-v1",
+    )
+    feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.completed-prepare-v1",
+        provenance_id="provenance.prepare-v1",
+    )
+    census = ProcessSignalCaseCensus(
+        physical_observation_count=1,
+        logical_case_count=1,
+        status_counts={"observable_only": 1},
+        conflict_case_count=0,
+    )
+    corpus = prepare_pure_extraction_corpus(
+        sources=(pure_source,),
+        feedback=(feedback,),
+        split="train",
+        observation_cutoff="2026-08-24T00:00:00Z",
+        process_signal_protocol_id="protocol.prepare-v1",
+        process_signal_case_digest=None,
+        process_signal_census=census,
+    )
+    assert corpus.process_signal_gate == "no_signal"
+    with pytest.raises(TypeError, match="tuple"):
+        prepare_pure_extraction_corpus(
+            sources=[pure_source],  # type: ignore[arg-type]
+            feedback=(feedback,),
+            split="train",
+            observation_cutoff="2026-08-24T00:00:00Z",
+            process_signal_protocol_id="protocol.prepare-v1",
+            process_signal_case_digest=None,
+            process_signal_census=census,
         )
 
 
