@@ -825,13 +825,24 @@ def _process_corpus_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
     }
 
 
-def _process_signal_case_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, Any]:
+def _process_signal_case_summary(
+    rows: tuple[dict[str, Any], ...],
+    protocol: ProcessSignalAnalysisProtocol,
+) -> dict[str, Any]:
     cases: list[ProcessSignalCase] = []
     for row in rows:
         cases.extend(row.get("processSignalCases", ()))
     if not cases:
         return {
+            "protocolId": protocol.protocol_id,
+            "trainingFamilyIds": list(protocol.training_family_ids),
+            "taskTemplateGroupIds": list(protocol.task_template_group_ids),
+            "replicateCount": protocol.replicate_count,
+            "observationWindow": protocol.observation_window,
+            "caseDedupRule": protocol.case_dedup_rule,
             "caseCount": 0,
+            "boundCaseCount": 0,
+            "replicateIds": [],
             "physicalObservationCount": 0,
             "logicalCaseCount": 0,
             "conflictCaseCount": 0,
@@ -839,7 +850,22 @@ def _process_signal_case_summary(rows: tuple[dict[str, Any], ...]) -> dict[str, 
         }
     census = census_process_signal_cases(cases)
     return {
+        "protocolId": protocol.protocol_id,
+        "trainingFamilyIds": list(protocol.training_family_ids),
+        "taskTemplateGroupIds": list(protocol.task_template_group_ids),
+        "replicateCount": protocol.replicate_count,
+        "observationWindow": protocol.observation_window,
+        "caseDedupRule": protocol.case_dedup_rule,
         "caseCount": len(cases),
+        "boundCaseCount": sum(
+            case.analysis_protocol_id == protocol.protocol_id
+            for case in cases
+        ),
+        "replicateIds": sorted({
+            case.replicate_id
+            for case in cases
+            if case.replicate_id is not None
+        }),
         **census.payload(),
     }
 
@@ -1041,7 +1067,10 @@ def analyze_extraction_batch(batch_root: Path) -> dict[str, Any]:
         "summaryByMethod": quality_summaries,
         "activationFunnel": funnel,
         "processCorpus": _process_corpus_summary(rows),
-        "processSignalCases": _process_signal_case_summary(rows),
+        "processSignalCases": _process_signal_case_summary(
+            rows,
+            process_signal_protocol,
+        ),
         "processSignalProtocol": (
             process_signal_protocol.payload()
             if process_signal_protocol is not None else None
