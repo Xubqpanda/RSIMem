@@ -7,6 +7,7 @@ import fcntl
 import json
 import os
 import re
+import argparse
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -341,6 +342,57 @@ class FinalEvaluationReporter:
         return record
 
 
+def _score_file_reader(path: Path) -> Callable[[], object]:
+    """Return a lazy score reader for the final-reporter CLI.
+
+    The file is intentionally opened inside the callback.  The reporter has
+    already checked candidate/run chronology before this callback executes.
+    """
+
+    resolved = path.expanduser().resolve()
+
+    def read() -> object:
+        try:
+            value = json.loads(resolved.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("final score file cannot be read") from exc
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return value
+        if isinstance(value, Mapping):
+            return dict(value)
+        raise ValueError("final score file must contain a number or score payload")
+
+    return read
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Record one final score without exposing it to process/optimizer stores."""
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--store", type=Path, required=True)
+    parser.add_argument("--score-file", type=Path, required=True)
+    parser.add_argument("--candidate-artifact-id", required=True)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--candidate-frozen-at", required=True)
+    parser.add_argument("--run-completed-at", required=True)
+    parser.add_argument("--score-read-at", required=True)
+    parser.add_argument("--metric-name", required=True)
+    args = parser.parse_args(argv)
+    record = FinalEvaluationReporter(
+        JsonFinalEvaluationStore(args.store)
+    ).read_after_completion(
+        candidate_artifact_id=args.candidate_artifact_id,
+        run_id=args.run_id,
+        candidate_frozen_at=args.candidate_frozen_at,
+        run_completed_at=args.run_completed_at,
+        score_read_at=args.score_read_at,
+        metric_name=args.metric_name,
+        score_reader=_score_file_reader(args.score_file),
+    )
+    print(json.dumps(record.payload(), ensure_ascii=True, sort_keys=True))
+    return 0
+
+
 __all__ = [
     "FINAL_EVALUATION_SCHEMA",
     "FINAL_EVALUATION_SCHEMA_VERSION",
@@ -348,3 +400,7 @@ __all__ = [
     "FinalEvaluationReporter",
     "JsonFinalEvaluationStore",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -9,6 +9,7 @@ from rsimem.memory.final_evaluation import (
     FinalEvaluationRecord,
     FinalEvaluationReporter,
     JsonFinalEvaluationStore,
+    main,
 )
 
 
@@ -161,3 +162,22 @@ def test_final_reporter_accepts_canonical_score_digest_payload(tmp_path) -> None
         score_reader=lambda: {"metric_value": 0.5, "score_digest": digest},
     )
     assert record.score_digest == digest
+
+
+def test_final_reporter_cli_uses_isolated_store(tmp_path, capsys) -> None:
+    score_file = tmp_path / "official-score.json"
+    score_file.write_text(json.dumps(0.625), encoding="utf-8")
+    store_path = tmp_path / "final-evaluation.jsonl"
+    assert main([
+        "--store", str(store_path),
+        "--score-file", str(score_file),
+        "--candidate-artifact-id", "candidate.reporter.cli",
+        "--run-id", "run.reporter.cli",
+        "--candidate-frozen-at", "2026-08-30T01:00:00Z",
+        "--run-completed-at", "2026-08-30T02:00:00Z",
+        "--score-read-at", "2026-08-30T03:00:00Z",
+        "--metric-name", "task.pass_rate",
+    ]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["evidence_plane"] == "final_evaluation"
+    assert JsonFinalEvaluationStore(store_path).records()[0].metric_value == 0.625

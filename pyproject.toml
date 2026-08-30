@@ -24,6 +24,7 @@ rsimem-prepare-extraction = "rsimem.extraction_preparation:main"
 rsimem-propose-extraction = "rsimem.extraction_proposal:main"
 rsimem-preflight-extraction-matched = "rsimem.extraction_matched_preflight:main"
 rsimem-policy-feasibility = "rsimem.memory.policy_feasibility_fixture:main"
+rsimem-final-report = "rsimem.memory.final_evaluation:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
