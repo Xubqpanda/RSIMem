@@ -8,16 +8,30 @@ import pytest
 
 from rsimem.extraction_preparation import (
     _process_signal_gate,
+    _optimizer_signal_is_ready,
     audit_extraction_feedback_batch,
     build_extraction_optimizer_corpus,
 )
+from rsimem.memory.extraction_optimizer_corpus import PROCESS_SIGNAL_GATE_NO_SIGNAL
+
+
+def test_optimizer_signal_requires_ready_pure_process_gate() -> None:
+    assert not _optimizer_signal_is_ready(
+        corpus_ready=True,
+        actionable_primary_count=99,
+        process_signal_gate="not_bound",
+    )
+    assert not _optimizer_signal_is_ready(
+        corpus_ready=True,
+        actionable_primary_count=99,
+        process_signal_gate=PROCESS_SIGNAL_GATE_NO_SIGNAL,
+    )
 from rsimem.memory.extraction_optimizer_capture import (
     ExtractionOptimizerFeedbackCapture,
     ExtractionOptimizerSourceCapture,
     JsonExtractionOptimizerCaptureLog,
 )
 from rsimem.memory.extraction_optimizer_corpus import OptimizerCorpusSplit
-from rsimem.memory.extraction_optimizer_corpus import PROCESS_SIGNAL_GATE_NO_SIGNAL
 from rsimem.memory.operation_graph import (
     AppendOnlyOperationEvidenceLog,
     EvidenceKind,
