@@ -58,6 +58,10 @@ PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA_VERSION = 1
 PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA = (
     "rsimem-pure-extraction-optimizer-capture-v1"
 )
+PURE_EXTRACTION_OPTIMIZER_HYPOTHESIS_SCHEMA_VERSION = 1
+PURE_EXTRACTION_OPTIMIZER_HYPOTHESIS_SCHEMA = (
+    "rsimem-pure-extraction-optimizer-hypothesis-v1"
+)
 
 
 def _id(value: object, name: str) -> None:
@@ -76,6 +80,13 @@ def _utc(value: object, name: str) -> None:
         datetime.fromisoformat(value.removesuffix("Z") + "+00:00")
     except ValueError as exc:
         raise ValueError(f"{name} must be an ISO UTC timestamp") from exc
+
+
+def _digest(value: object, name: str) -> None:
+    import re
+
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise ValueError(f"{name} must be sha256")
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,6 +323,183 @@ class JsonPureExtractionOptimizerContentCaptureStore:
             finally:
                 os.close(descriptor)
             return True
+
+
+@dataclass(frozen=True, slots=True)
+class PureExtractionOptimizerHypothesisProjection:
+    """Content-free, replayable projection of a pure optimizer result."""
+
+    projection_id: str
+    result_id: str
+    request_id: str
+    decision: str
+    parent_artifact_id: str
+    candidate_artifact_id: str | None
+    corpus_id: str
+    corpus_digest: str
+    evidence_example_ids: tuple[str, ...]
+    reason_codes: tuple[str, ...]
+    schema_version: int = PURE_EXTRACTION_OPTIMIZER_HYPOTHESIS_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != PURE_EXTRACTION_OPTIMIZER_HYPOTHESIS_SCHEMA_VERSION:
+            raise ValueError("unsupported pure optimizer hypothesis schema")
+        for value, name in (
+            (self.projection_id, "pure optimizer projection ID"),
+            (self.result_id, "pure optimizer result ID"),
+            (self.request_id, "pure optimizer request ID"),
+            (self.parent_artifact_id, "pure optimizer parent artifact ID"),
+            (self.corpus_id, "pure optimizer corpus ID"),
+        ):
+            _id(value, name)
+        if self.candidate_artifact_id is not None:
+            _id(self.candidate_artifact_id, "pure optimizer candidate artifact ID")
+        _digest(self.corpus_digest, "pure optimizer corpus digest")
+        if self.decision not in {"NO_PROPOSAL", "PROPOSE"}:
+            raise ValueError("pure optimizer projection decision is invalid")
+        for values, name in (
+            (self.evidence_example_ids, "pure optimizer projection evidence IDs"),
+            (self.reason_codes, "pure optimizer projection reason codes"),
+        ):
+            if len(values) != len(set(values)):
+                raise ValueError(f"{name} must be unique")
+            for value in values:
+                _id(value, name)
+        if self.decision == "NO_PROPOSAL" and self.candidate_artifact_id is not None:
+            raise ValueError("NO_PROPOSAL projection cannot carry a candidate")
+        if self.decision == "PROPOSE" and self.candidate_artifact_id is None:
+            raise ValueError("PROPOSE projection requires a candidate")
+        if self.candidate_artifact_id == self.parent_artifact_id:
+            raise ValueError("pure optimizer candidate must differ from parent")
+        expected = "pure-optimizer-hypothesis." + content_digest(
+            self.identity_payload()
+        )[:40]
+        if self.projection_id != expected:
+            raise ValueError("pure optimizer projection ID mismatch")
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "result_id": self.result_id,
+            "request_id": self.request_id,
+            "decision": self.decision,
+            "parent_artifact_id": self.parent_artifact_id,
+            "candidate_artifact_id": self.candidate_artifact_id,
+            "corpus_id": self.corpus_id,
+            "corpus_digest": self.corpus_digest,
+            "evidence_example_ids": list(self.evidence_example_ids),
+            "reason_codes": list(self.reason_codes),
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema": PURE_EXTRACTION_OPTIMIZER_HYPOTHESIS_SCHEMA,
+            "projection_id": self.projection_id,
+            **self.identity_payload(),
+        }
+
+    @classmethod
+    def from_result(
+        cls,
+        result: object,
+        corpus: PureExtractionOptimizerCorpus,
+        *,
+        parent_artifact_id: str,
+    ) -> "PureExtractionOptimizerHypothesisProjection":
+        from .extraction_prompt_optimizer import (
+            ExtractionOptimizerDecision,
+            ExtractionOptimizerResult,
+        )
+
+        if not isinstance(result, ExtractionOptimizerResult):
+            raise TypeError("pure optimizer projection result has the wrong type")
+        if not isinstance(corpus, PureExtractionOptimizerCorpus):
+            raise TypeError("pure optimizer projection corpus has the wrong type")
+        if result.request.parent_artifact_id != parent_artifact_id:
+            raise ValueError("pure optimizer projection parent artifact differs")
+        if (
+            result.request.corpus_id != corpus.corpus_id
+            or result.request.corpus_digest != corpus.corpus_digest
+        ):
+            raise ValueError("pure optimizer projection corpus identity differs")
+        eligible = {
+            value.example_id
+            for value in corpus.examples
+            if value.attribution in _ACTIONABLE
+        }
+        cited = tuple(
+            example_id
+            for edit in result.edits
+            for example_id in edit.evidence_example_ids
+        )
+        if len(cited) != len(set(cited)):
+            raise ValueError("pure optimizer projection cites duplicate evidence IDs")
+        if not set(cited).issubset(eligible):
+            raise ValueError("pure optimizer projection cites ineligible evidence")
+        decision = ExtractionOptimizerDecision(result.decision).value
+        candidate_id = result.candidate.artifact_id if result.candidate else None
+        if decision == "PROPOSE":
+            if result.candidate is None:
+                raise ValueError("pure optimizer proposal has no candidate")
+            if result.candidate.parent_artifact_id != parent_artifact_id:
+                raise ValueError("pure optimizer candidate parent differs")
+        elif result.candidate is not None or result.edits:
+            raise ValueError("pure optimizer NO_PROPOSAL carries candidate data")
+        values = {
+            "result_id": result.result_id,
+            "request_id": result.request.request_id,
+            "decision": decision,
+            "parent_artifact_id": parent_artifact_id,
+            "candidate_artifact_id": candidate_id,
+            "corpus_id": corpus.corpus_id,
+            "corpus_digest": corpus.corpus_digest,
+            "evidence_example_ids": tuple(cited),
+            "reason_codes": result.reason_codes,
+        }
+        projection_id = "pure-optimizer-hypothesis." + content_digest({
+            "schema_version": PURE_EXTRACTION_OPTIMIZER_HYPOTHESIS_SCHEMA_VERSION,
+            **values,
+            "evidence_example_ids": list(cited),
+            "reason_codes": list(result.reason_codes),
+        })[:40]
+        return cls(projection_id=projection_id, **values)
+
+    @classmethod
+    def from_payload(cls, value: object) -> "PureExtractionOptimizerHypothesisProjection":
+        fields = {
+            "schema", "projection_id", "schema_version", "result_id", "request_id",
+            "decision", "parent_artifact_id", "candidate_artifact_id", "corpus_id",
+            "corpus_digest", "evidence_example_ids", "reason_codes",
+        }
+        if (
+            not isinstance(value, Mapping)
+            or set(value) != fields
+            or value.get("schema") != PURE_EXTRACTION_OPTIMIZER_HYPOTHESIS_SCHEMA
+        ):
+            raise ValueError("malformed pure optimizer hypothesis projection")
+        if not isinstance(value["evidence_example_ids"], list) or not isinstance(
+            value["reason_codes"], list
+        ):
+            raise ValueError("malformed pure optimizer hypothesis collections")
+        try:
+            result = cls(
+                projection_id=value["projection_id"],
+                result_id=value["result_id"],
+                request_id=value["request_id"],
+                decision=value["decision"],
+                parent_artifact_id=value["parent_artifact_id"],
+                candidate_artifact_id=value["candidate_artifact_id"],
+                corpus_id=value["corpus_id"],
+                corpus_digest=value["corpus_digest"],
+                evidence_example_ids=tuple(value["evidence_example_ids"]),
+                reason_codes=tuple(value["reason_codes"]),
+                schema_version=value["schema_version"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed pure optimizer hypothesis projection") from exc
+        if result.payload() != dict(value):
+            raise ValueError("non-canonical pure optimizer hypothesis projection")
+        return result
 
 
 def _capture_for(
@@ -723,8 +911,11 @@ def build_pure_extraction_optimizer_gate_request(
 __all__ = [
     "PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA",
     "PURE_EXTRACTION_OPTIMIZER_CAPTURE_SCHEMA_VERSION",
+    "PURE_EXTRACTION_OPTIMIZER_HYPOTHESIS_SCHEMA",
+    "PURE_EXTRACTION_OPTIMIZER_HYPOTHESIS_SCHEMA_VERSION",
     "JsonPureExtractionOptimizerContentCaptureStore",
     "PureExtractionOptimizerContentCapture",
+    "PureExtractionOptimizerHypothesisProjection",
     "build_pure_extraction_optimizer_gate_request",
     "build_pure_extraction_optimizer_request",
 ]

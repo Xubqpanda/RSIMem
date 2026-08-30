@@ -16,6 +16,7 @@ from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStor
 from .memory.pure_extraction import JsonPureExtractionOptimizerCorpusStore
 from .memory.pure_extraction_optimizer import (
     JsonPureExtractionOptimizerContentCaptureStore,
+    PureExtractionOptimizerHypothesisProjection,
 )
 from .memory.extraction_policy_artifact import (
     EXTRACTION_POLICY_SCHEMA_VERSION,
@@ -262,29 +263,14 @@ def prepare_pure_extraction_proposal(
             "primaryExampleIds": list(result.request.primary_example_ids),
         },
     )
-    cited = tuple(
-        example_id
-        for edit in result.edits
-        for example_id in edit.evidence_example_ids
+    projection = PureExtractionOptimizerHypothesisProjection.from_result(
+        result,
+        corpus,
+        parent_artifact_id=parent.artifact_id,
     )
     _write_immutable(
         output / "feasibility-hypothesis.json",
-        {
-            "schemaVersion": 1,
-            "projectionSchema": "pure-extraction-optimizer-hypothesis-v1",
-            "resultId": result.result_id,
-            "requestId": result.request.request_id,
-            "decision": result.decision.value,
-            "parentArtifactId": parent.artifact_id,
-            "candidateArtifactId": (
-                result.candidate.artifact_id
-                if result.candidate is not None else None
-            ),
-            "corpusId": corpus.corpus_id,
-            "corpusDigest": corpus.corpus_digest,
-            "evidenceExampleIds": list(cited),
-            "reasonCodes": list(result.reason_codes),
-        },
+        projection.payload(),
     )
     if result.decision == ExtractionOptimizerDecision.PROPOSE:
         assert result.candidate is not None
