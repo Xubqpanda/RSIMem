@@ -119,6 +119,15 @@ def test_process_signal_case_store_replays_logical_census(tmp_path) -> None:
     assert census.conflict_case_count == 1
 
 
+def test_process_signal_case_store_fails_closed_on_symlink(tmp_path) -> None:
+    target = tmp_path / "target.jsonl"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "process-signal.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonProcessSignalCaseStore(path).records()
+
+
 def test_build_process_signal_cases_separates_logical_and_physical_identity() -> None:
     common = dict(
         run_id="run.builder.v1",
