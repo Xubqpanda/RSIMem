@@ -1224,17 +1224,33 @@ def _tool_events(
     if not isinstance(calls, list):
         return
     trace_path = resolve_comparison_evidence_path(episode.get("trace", ""), root)
+    # A Hermes message may contain several tool calls.  Message index alone is
+    # therefore not a complete logical identity; keep a deterministic
+    # per-message/name occurrence in the content-free event payload so two
+    # calls at one index cannot collide in the ledger.
+    call_occurrences: dict[tuple[object, str], int] = {}
     for index, call in enumerate(calls):
         if not isinstance(call, dict):
             continue
         name = str(call.get("name") or "unknown")
         args = call.get("args") if isinstance(call.get("args"), dict) else {}
+        message_index = call.get("message_index")
+        occurrence_key = (message_index, name)
+        occurrence = call_occurrences.get(occurrence_key, 0)
+        call_occurrences[occurrence_key] = occurrence + 1
+        call_id = "tool-call." + _json_hash({
+            "traceId": episode.get("trace_id"),
+            "messageIndex": message_index,
+            "name": name,
+            "occurrence": occurrence,
+        })[:40]
         source = {
             "type": "hermes_session_tool_call",
             "path": _relative(trace_path.parent / "artifacts" / "session_current.json", root),
             "messageIndex": call.get("message_index"),
         }
         tool_data: dict[str, Any] = {
+            "callId": call_id,
             "name": name,
             "argumentKeys": sorted(args),
             "durationAvailable": False,
@@ -1256,6 +1272,7 @@ def _tool_events(
             continue
         content = str(args.get("content") or args.get("new_content") or "")
         memory_data: dict[str, Any] = {
+            "callId": call_id,
             "action": args.get("action"),
             "target": args.get("target"),
             "contentChars": len(content),
