@@ -40,6 +40,7 @@ from .pure_extraction import (
     PureExtractionAttribution,
     PureExtractionOptimizerCorpus,
     PureExtractionOptimizerExample,
+    PureExtractionSourceRecord,
 )
 
 
@@ -89,6 +90,7 @@ class PureExtractionOptimizerContentCapture:
     example_id: str
     logical_case_id: str
     physical_observation_ids: tuple[str, ...]
+    source_record: PureExtractionSourceRecord
     source_projection: ExtractionSourceProjection
     source_messages: tuple[OptimizerSourceMessage, ...]
     extracted_facts: tuple[OptimizerExtractedFact, ...]
@@ -103,6 +105,8 @@ class PureExtractionOptimizerContentCapture:
             raise ValueError("pure optimizer capture observations must be unique")
         for value in self.physical_observation_ids:
             _id(value, "pure optimizer capture physical observation ID")
+        if not isinstance(self.source_record, PureExtractionSourceRecord):
+            raise TypeError("pure optimizer capture source record has the wrong type")
         if not isinstance(self.source_projection, ExtractionSourceProjection):
             raise TypeError("pure optimizer capture source projection has the wrong type")
         if not self.source_messages:
@@ -124,6 +128,7 @@ class PureExtractionOptimizerContentCapture:
             "example_id": self.example_id,
             "logical_case_id": self.logical_case_id,
             "physical_observation_ids": list(self.physical_observation_ids),
+            "source_record": self.source_record.payload(),
             "source_projection": self.source_projection.payload(),
             "source_messages": [value.payload() for value in self.source_messages],
             "extracted_facts": [value.payload() for value in self.extracted_facts],
@@ -141,7 +146,8 @@ class PureExtractionOptimizerContentCapture:
     def from_payload(cls, value: object) -> "PureExtractionOptimizerContentCapture":
         fields = {
             "schema", "capture_id", "schema_version", "example_id",
-            "logical_case_id", "physical_observation_ids", "source_projection",
+            "logical_case_id", "physical_observation_ids", "source_record",
+            "source_projection",
             "source_messages", "extracted_facts", "delayed_evidence",
         }
         if (
@@ -161,6 +167,9 @@ class PureExtractionOptimizerContentCapture:
                 example_id=value["example_id"],
                 logical_case_id=value["logical_case_id"],
                 physical_observation_ids=tuple(value["physical_observation_ids"]),
+                source_record=PureExtractionSourceRecord.from_payload(
+                    value["source_record"]
+                ),
                 source_projection=ExtractionSourceProjection.from_payload(
                     value["source_projection"]
                 ),
@@ -317,11 +326,27 @@ def _validate_capture(
         raise ValueError("pure optimizer capture source projection identity mismatch")
     if capture.source_projection.projection_digest != example.source_projection_digest:
         raise ValueError("pure optimizer capture source projection digest mismatch")
+    if capture.source_record.record_id != example.source_record_id:
+        raise ValueError("pure optimizer capture source record identity mismatch")
+    if capture.source_record.source_projection_digest != example.source_projection_digest:
+        raise ValueError("pure optimizer capture source record projection mismatch")
+    if capture.source_record.extraction_set_id != example.extraction_set_id:
+        raise ValueError("pure optimizer capture source record extraction mismatch")
     if example.extraction_artifact_digest != parent.body_digest:
         raise ValueError("pure optimizer example was not produced by the parent policy")
     fact_ids = tuple(value.fact_id for value in capture.extracted_facts)
     if fact_ids != example.fact_ids:
         raise ValueError("pure optimizer capture fact identity mismatch")
+    source_facts = capture.source_record.source.facts
+    if tuple(value.fact_id for value in source_facts) != fact_ids:
+        raise ValueError("pure optimizer capture source fact identity mismatch")
+    for captured, source_fact in zip(capture.extracted_facts, source_facts):
+        if (
+            captured.semantic_keys != source_fact.semantic_keys
+            or captured.persisted_artifact_id != source_fact.artifact_id
+            or captured.disposition != source_fact.disposition
+        ):
+            raise ValueError("pure optimizer capture fact lineage mismatch")
     if content_digest([
         value.trace_payload() for value in capture.extracted_facts
     ]) != example.extraction_output_digest:
