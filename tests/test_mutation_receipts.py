@@ -247,6 +247,25 @@ def test_receipt_payload_corruption_and_schema_mismatch_fail_closed(tmp_path) ->
         replace(receipt, attempt=True)
 
 
+def test_mutation_receipt_store_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target.json"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "receipts.json"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonMutationReceiptStore(path).all()
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_mutation_receipt_store_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "receipts.json"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_suffix(path.suffix + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonMutationReceiptStore(path).all()
+
+
 def test_terminal_receipt_is_idempotent_and_cannot_transition(tmp_path) -> None:
     store = JsonMutationReceiptStore(tmp_path / "receipts.json")
     pending, _ = store.reserve_pending(_receipt())
