@@ -1553,7 +1553,10 @@ class _JsonPureExtractionStore:
             try:
                 record = self.record_type.from_payload(json.loads(line))
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
-                raise ValueError(f"malformed pure extraction store at line {line_number}") from exc
+                raise ValueError(
+                    "malformed pure extraction store at "
+                    f"{self.path} line {line_number}: {exc}"
+                ) from exc
             canonical = _canonical(record.payload())
             previous = canonical_by_id.get(record.record_id)
             if previous is not None and previous != canonical:
