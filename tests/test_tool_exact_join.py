@@ -11,7 +11,12 @@ from rsimem.memory.tool_exact_join import (
     resolve_tool_call_result,
 )
 from rsimem.memory.pure_process import PureProcessCorpus
-from rsimem.memory.process_feedback import audit_process_events
+from rsimem.memory.process_feedback import (
+    ProcessEvent,
+    ProcessEventKind,
+    ProcessEventStatus,
+    audit_process_events,
+)
 
 
 def _join(**overrides: object) -> ToolCallResultJoin:
@@ -147,6 +152,53 @@ def test_process_audit_rechecks_projected_tool_closure() -> None:
     orphan = _join(call_present=False, call_id=None, orphan_result=True).process_events()
     errors = audit_process_events(orphan)
     assert any("orphan tool result" in error for error in errors)
+
+
+def test_process_audit_rejects_tool_type_mismatch_and_cross_task_join() -> None:
+    common = dict(
+        run_id="run.audit-tool.v1",
+        variant="native",
+        trace_id="trace.audit-tool.v1",
+        episode_id="episode.audit-tool.v1",
+        session_id="session.audit-tool.v1",
+        host_event_id="event.audit-tool.v1",
+        source_revision="revision.audit-tool.v1",
+        input_payload={},
+        output_payload={},
+        execution_receipt_ids=("receipt.audit-tool.v1",),
+        tool_call_id="call.audit-tool.v1",
+        retry_identity="retry.audit-tool.v1",
+    )
+    call = ProcessEvent.create(
+        kind=ProcessEventKind.TOOL_CALL,
+        status=ProcessEventStatus.EXECUTED,
+        task_id="task.audit-tool.v1",
+        tool_name_digest="a" * 64,
+        **common,
+    )
+    mismatched_result = ProcessEvent.create(
+        kind=ProcessEventKind.TOOL_RESULT,
+        status=ProcessEventStatus.SUCCESS,
+        task_id="task.audit-tool.v1",
+        tool_result_id="result.audit-tool.v1",
+        tool_name_digest="b" * 64,
+        tool_success=True,
+        **common,
+    )
+    errors = audit_process_events((call, mismatched_result))
+    assert any("type mismatch" in error for error in errors)
+
+    cross_task_result = ProcessEvent.create(
+        kind=ProcessEventKind.TOOL_RESULT,
+        status=ProcessEventStatus.SUCCESS,
+        task_id="task.audit-tool.v2",
+        tool_result_id="result.audit-tool.v2",
+        tool_name_digest="a" * 64,
+        tool_success=True,
+        **common,
+    )
+    errors = audit_process_events((call, cross_task_result))
+    assert any("crosses task boundary" in error for error in errors)
 
 
 @pytest.mark.parametrize(
