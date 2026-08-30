@@ -84,6 +84,24 @@ def test_memory_use_log_is_restart_safe(tmp_path) -> None:
     assert JsonMemoryUseEvidenceLog(path).records() == (evidence,)
 
 
+def test_memory_use_log_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "memory-use.jsonl"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonMemoryUseEvidenceLog(path).records()
+
+
+def test_memory_use_log_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "memory-use.jsonl"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonMemoryUseEvidenceLog(path).records()
+
+
 def test_operation_graph_proves_retrieval_injection_use_outcome_chain() -> None:
     evidence = _evidence()
     assert resolve_memory_use(

@@ -310,7 +310,9 @@ class JsonMemoryUseEvidenceLog:
     """Crash-safe append-only log for generic runtime use evidence."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Keep the final component unresolved so symlinked runtime evidence
+        # cannot redirect the append-only log.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
         self._records: dict[str, str] = {}
         self._load()
@@ -320,6 +322,8 @@ class JsonMemoryUseEvidenceLog:
         return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
     def _load(self) -> None:
+        if self.path.is_symlink():
+            raise ValueError("memory-use evidence log cannot be a symlink")
         if not self.path.exists():
             return
         for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
@@ -338,6 +342,10 @@ class JsonMemoryUseEvidenceLog:
             self._records[evidence.evidence_id] = canonical
 
     def records(self) -> tuple[MemoryUseEvidence, ...]:
+        if self.path.is_symlink():
+            raise ValueError("memory-use evidence log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("memory-use evidence lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
@@ -355,6 +363,10 @@ class JsonMemoryUseEvidenceLog:
         if not isinstance(evidence, MemoryUseEvidence):
             raise TypeError("memory-use log accepts MemoryUseEvidence only")
         serialized = self._canonical(evidence.payload())
+        if self.path.is_symlink():
+            raise ValueError("memory-use evidence log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("memory-use evidence lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)

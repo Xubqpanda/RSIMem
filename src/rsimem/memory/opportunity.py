@@ -208,7 +208,9 @@ class JsonApplicationOpportunitySchemaRegistry:
     """
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Preserve the final component so a schema registry symlink fails
+        # closed instead of redirecting a trusted application contract.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
         self._records: dict[tuple[str, str], str] = {}
         self._load()
@@ -222,6 +224,8 @@ class JsonApplicationOpportunitySchemaRegistry:
         return (schema.schema_id, schema.version)
 
     def _load(self) -> None:
+        if self.path.is_symlink():
+            raise ValueError("application opportunity schema registry cannot be a symlink")
         if not self.path.exists():
             return
         for line_number, line in enumerate(
@@ -245,6 +249,10 @@ class JsonApplicationOpportunitySchemaRegistry:
     def records(self) -> tuple[ApplicationOpportunitySchema, ...]:
         """Return the canonical registry contents in stable key order."""
 
+        if self.path.is_symlink():
+            raise ValueError("application opportunity schema registry cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("application opportunity schema registry lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
@@ -265,6 +273,10 @@ class JsonApplicationOpportunitySchemaRegistry:
             raise TypeError("schema registry accepts ApplicationOpportunitySchema only")
         serialized = self._canonical(schema.payload())
         key = self._key(schema)
+        if self.path.is_symlink():
+            raise ValueError("application opportunity schema registry cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("application opportunity schema registry lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
@@ -532,7 +544,9 @@ class JsonOpportunityEvidenceLog:
         *,
         schema_registry: JsonApplicationOpportunitySchemaRegistry | None = None,
     ) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Preserve the final component so runtime opportunity evidence cannot
+        # be redirected through a symlinked log path.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
         if schema_registry is not None and not isinstance(
             schema_registry, JsonApplicationOpportunitySchemaRegistry
@@ -547,6 +561,8 @@ class JsonOpportunityEvidenceLog:
         return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
     def _load(self) -> None:
+        if self.path.is_symlink():
+            raise ValueError("opportunity evidence log cannot be a symlink")
         if not self.path.exists():
             return
         for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
@@ -584,6 +600,10 @@ class JsonOpportunityEvidenceLog:
             self._records[evidence.evidence_id] = canonical
 
     def records(self) -> tuple[OpportunityEvidence, ...]:
+        if self.path.is_symlink():
+            raise ValueError("opportunity evidence log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("opportunity evidence lock cannot be a symlink")
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
             try:
@@ -622,6 +642,10 @@ class JsonOpportunityEvidenceLog:
         if not isinstance(evidence, OpportunityEvidence):
             raise TypeError("opportunity log accepts OpportunityEvidence only")
         serialized = self._canonical(evidence.payload())
+        if self.path.is_symlink():
+            raise ValueError("opportunity evidence log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("opportunity evidence lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)

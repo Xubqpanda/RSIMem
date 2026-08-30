@@ -243,3 +243,35 @@ def test_opportunity_log_is_restart_safe_and_rejects_conflicts(tmp_path) -> None
     )
     with pytest.raises(ValueError, match="malformed opportunity evidence"):
         JsonOpportunityEvidenceLog(path)
+
+
+@pytest.mark.parametrize(
+    "store_factory",
+    (
+        lambda path: JsonOpportunityEvidenceLog(path),
+        lambda path: JsonApplicationOpportunitySchemaRegistry(path),
+    ),
+)
+def test_opportunity_stores_reject_symlinked_paths(tmp_path, store_factory) -> None:
+    target = tmp_path / "target"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "store"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        store_factory(path)
+
+
+@pytest.mark.parametrize(
+    "store_factory",
+    (
+        lambda path: JsonOpportunityEvidenceLog(path),
+        lambda path: JsonApplicationOpportunitySchemaRegistry(path),
+    ),
+)
+def test_opportunity_stores_reject_symlinked_locks(tmp_path, store_factory) -> None:
+    path = tmp_path / "store"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        store_factory(path).records()
