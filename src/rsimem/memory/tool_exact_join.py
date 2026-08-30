@@ -342,6 +342,9 @@ class ToolCallResultJoin:
             lineage_id=self.policy_lineage_id,
             execution_receipt_ids=((self.result_receipt_id,) if self.result_receipt_id else ()),
             reason_codes=(
+                ("schema_failure",)
+                if self.type_mismatch
+                else
                 ("decision_observed",)
                 if self.success is True
                 else ("tool_failure",)

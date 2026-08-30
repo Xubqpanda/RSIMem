@@ -169,6 +169,7 @@ def test_malformed_tool_result_is_type_mismatch_not_tool_failure(
     tool_results = [event for event in events if event.kind.value == "tool_result"]
     assert len(tool_results) == 1
     assert tool_results[0].status.value == "unknown"
+    assert tool_results[0].reason_codes == ("schema_failure",)
     assert "tool_failure" not in tool_results[0].reason_codes
 
 
