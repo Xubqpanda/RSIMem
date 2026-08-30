@@ -129,13 +129,19 @@ def test_process_signal_gate_requires_two_logical_cases_for_one_hypothesis(
     first = case("logical-case.signal.1", "physical-observation.signal.1", "a" * 64)
     second = case("logical-case.signal.2", "physical-observation.signal.2", "a" * 64)
     assert store.append(first) is True
-    assert _process_signal_gate(tmp_path) == (PROCESS_SIGNAL_GATE_NO_SIGNAL, 1, 1)
+    gate, protocol_id, case_digest, case_count, optimization_count, hypothesis = _process_signal_gate(tmp_path)
+    assert gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
+    assert protocol_id == "signal-protocol.fixture"
+    assert isinstance(case_digest, str) and len(case_digest) == 64
+    assert (case_count, optimization_count, hypothesis) == (1, 1, None)
     assert store.append(second) is True
-    assert _process_signal_gate(tmp_path)[0] == "ready"
+    ready = _process_signal_gate(tmp_path)
+    assert ready[0] == "ready"
+    assert ready[-1] == "a" * 64
 
     distinct = case("logical-case.signal.3", "physical-observation.signal.3", "b" * 64)
     assert store.append(distinct) is True
-    gate, case_count, optimization_count = _process_signal_gate(tmp_path)
+    gate, _, _, case_count, optimization_count, _ = _process_signal_gate(tmp_path)
     assert gate == "ready"
     assert case_count == 3
     assert optimization_count == 3

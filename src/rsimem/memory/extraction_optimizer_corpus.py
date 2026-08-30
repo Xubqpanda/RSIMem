@@ -20,8 +20,8 @@ from .evidence_planes import EvidencePlane, require_optimizer_plane
 from .prompt_components import content_digest
 
 
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 4
-EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v4"
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION = 5
+EXTRACTION_OPTIMIZER_CORPUS_SCHEMA = "extraction-optimizer-corpus-v5"
 PROCESS_SIGNAL_GATE_NOT_BOUND = "not_bound"
 PROCESS_SIGNAL_GATE_NO_SIGNAL = "no_signal"
 PROCESS_SIGNAL_GATE_READY = "ready"
@@ -776,6 +776,11 @@ class ExtractionOptimizerCorpus:
     activation_artifact_id: str | None
     examples: tuple[ExtractionOptimizerCorpusExample, ...]
     process_signal_gate: str = PROCESS_SIGNAL_GATE_NOT_BOUND
+    process_signal_protocol_id: str | None = None
+    process_signal_case_digest: str | None = None
+    process_signal_case_count: int = 0
+    process_signal_optimization_count: int = 0
+    process_signal_hypothesis_digest: str | None = None
     corpus_schema: str = EXTRACTION_OPTIMIZER_CORPUS_SCHEMA
     schema_version: int = EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION
 
@@ -797,6 +802,46 @@ class ExtractionOptimizerCorpus:
         object.__setattr__(self, "retention", OptimizerCorpusRetention(self.retention))
         if self.process_signal_gate not in _PROCESS_SIGNAL_GATES:
             raise ValueError("optimizer corpus process-signal gate is invalid")
+        if self.process_signal_protocol_id is not None:
+            _require_id(self.process_signal_protocol_id, "process signal protocol ID")
+        if self.process_signal_case_digest is not None:
+            _require_digest(self.process_signal_case_digest, "process signal case digest")
+        if self.process_signal_hypothesis_digest is not None:
+            _require_digest(
+                self.process_signal_hypothesis_digest,
+                "process signal hypothesis digest",
+            )
+        for value, name in (
+            (self.process_signal_case_count, "process signal case count"),
+            (self.process_signal_optimization_count, "process signal optimization count"),
+        ):
+            if type(value) is not int or value < 0:
+                raise ValueError(f"{name} must be a non-negative integer")
+        if self.process_signal_optimization_count > self.process_signal_case_count:
+            raise ValueError("process signal optimization count exceeds case count")
+        if self.process_signal_case_count == 0:
+            if self.process_signal_case_digest is not None:
+                raise ValueError("empty process signal gate cannot carry case digest")
+        elif self.process_signal_case_digest is None:
+            raise ValueError("process signal cases require a case digest")
+        if self.process_signal_gate == PROCESS_SIGNAL_GATE_NOT_BOUND:
+            if any((
+                self.process_signal_protocol_id is not None,
+                self.process_signal_case_digest is not None,
+                self.process_signal_case_count,
+                self.process_signal_optimization_count,
+                self.process_signal_hypothesis_digest is not None,
+            )):
+                raise ValueError("unbound process signal gate cannot carry evidence")
+        elif self.process_signal_case_count and self.process_signal_protocol_id is None:
+            raise ValueError("bound process signal gate requires protocol identity")
+        if self.process_signal_gate == PROCESS_SIGNAL_GATE_READY:
+            if self.process_signal_optimization_count < 2:
+                raise ValueError("ready process signal gate requires replicated cases")
+            if self.process_signal_hypothesis_digest is None:
+                raise ValueError("ready process signal gate requires hypothesis identity")
+        elif self.process_signal_hypothesis_digest is not None and self.process_signal_optimization_count == 0:
+            raise ValueError("process signal hypothesis requires optimization cases")
         if not self.examples:
             raise ValueError("optimizer corpus requires examples")
         if self.examples != tuple(sorted(self.examples, key=_example_sort_key)):
@@ -833,6 +878,11 @@ class ExtractionOptimizerCorpus:
         examples: tuple[ExtractionOptimizerCorpusExample, ...],
         activation_artifact_id: str | None = None,
         process_signal_gate: str = PROCESS_SIGNAL_GATE_NOT_BOUND,
+        process_signal_protocol_id: str | None = None,
+        process_signal_case_digest: str | None = None,
+        process_signal_case_count: int = 0,
+        process_signal_optimization_count: int = 0,
+        process_signal_hypothesis_digest: str | None = None,
     ) -> "ExtractionOptimizerCorpus":
         values = {
             "batch_id": batch_id,
@@ -843,6 +893,11 @@ class ExtractionOptimizerCorpus:
             "activation_artifact_id": activation_artifact_id,
             "examples": tuple(sorted(examples, key=_example_sort_key)),
             "process_signal_gate": process_signal_gate,
+            "process_signal_protocol_id": process_signal_protocol_id,
+            "process_signal_case_digest": process_signal_case_digest,
+            "process_signal_case_count": process_signal_case_count,
+            "process_signal_optimization_count": process_signal_optimization_count,
+            "process_signal_hypothesis_digest": process_signal_hypothesis_digest,
             "corpus_schema": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA,
             "schema_version": EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION,
         }
@@ -867,6 +922,11 @@ class ExtractionOptimizerCorpus:
             "activation_artifact_id": values["activation_artifact_id"],
             "examples": [value.payload() for value in values["examples"]],
             "process_signal_gate": values["process_signal_gate"],
+            "process_signal_protocol_id": values["process_signal_protocol_id"],
+            "process_signal_case_digest": values["process_signal_case_digest"],
+            "process_signal_case_count": values["process_signal_case_count"],
+            "process_signal_optimization_count": values["process_signal_optimization_count"],
+            "process_signal_hypothesis_digest": values["process_signal_hypothesis_digest"],
         }
 
     def identity_payload(self) -> dict[str, object]:
@@ -881,6 +941,11 @@ class ExtractionOptimizerCorpus:
             "activation_artifact_id": self.activation_artifact_id,
             "examples": self.examples,
             "process_signal_gate": self.process_signal_gate,
+            "process_signal_protocol_id": self.process_signal_protocol_id,
+            "process_signal_case_digest": self.process_signal_case_digest,
+            "process_signal_case_count": self.process_signal_case_count,
+            "process_signal_optimization_count": self.process_signal_optimization_count,
+            "process_signal_hypothesis_digest": self.process_signal_hypothesis_digest,
         })
 
     def payload(self) -> dict[str, object]:
@@ -896,6 +961,9 @@ class ExtractionOptimizerCorpus:
             "schema_version", "corpus_schema", "corpus_id", "corpus_digest",
             "batch_id", "attempt_id", "split", "observation_cutoff",
             "retention", "activation_artifact_id", "examples", "process_signal_gate",
+            "process_signal_protocol_id", "process_signal_case_digest",
+            "process_signal_case_count", "process_signal_optimization_count",
+            "process_signal_hypothesis_digest",
         }, "extraction optimizer corpus")
         if not isinstance(payload["examples"], list):
             raise ValueError("malformed optimizer corpus examples")
@@ -914,6 +982,11 @@ class ExtractionOptimizerCorpus:
                     for item in payload["examples"]
                 ),
                 process_signal_gate=payload["process_signal_gate"],
+                process_signal_protocol_id=payload["process_signal_protocol_id"],
+                process_signal_case_digest=payload["process_signal_case_digest"],
+                process_signal_case_count=payload["process_signal_case_count"],
+                process_signal_optimization_count=payload["process_signal_optimization_count"],
+                process_signal_hypothesis_digest=payload["process_signal_hypothesis_digest"],
                 corpus_schema=payload["corpus_schema"],
                 schema_version=payload["schema_version"],
             )

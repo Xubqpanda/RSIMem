@@ -207,6 +207,11 @@ def test_process_signal_gate_is_part_of_corpus_identity() -> None:
         retention=baseline.retention,
         examples=baseline.examples,
         process_signal_gate=PROCESS_SIGNAL_GATE_READY,
+        process_signal_protocol_id="signal-protocol.fixture",
+        process_signal_case_digest="c" * 64,
+        process_signal_case_count=2,
+        process_signal_optimization_count=2,
+        process_signal_hypothesis_digest="a" * 64,
     )
     assert baseline.process_signal_gate != no_signal.process_signal_gate
     assert no_signal.corpus_id != ready.corpus_id
