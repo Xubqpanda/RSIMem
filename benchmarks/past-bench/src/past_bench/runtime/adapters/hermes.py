@@ -346,7 +346,11 @@ def _past_bench_artifact_set_provider(
         return ()
     return (ArtifactSetSemanticBinding.create(
         semantic_unit_id=(
-            "notes.semantic-unit."
+            # Keep the unit identity namespaced by the application-owned
+            # semantic key rather than by this benchmark adapter.  This
+            # allows the same provider shape to bind a non-notes schema
+            # without embedding PAST-Bench semantics in the pure contract.
+            semantic_key.split(".", 1)[0] + ".semantic-unit."
             + hashlib.sha256(
                 f"{source.source_projection_digest}|{keys[0]}".encode("utf-8")
             ).hexdigest()[:32]
