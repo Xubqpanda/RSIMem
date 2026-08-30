@@ -541,6 +541,53 @@ def test_past_bench_runtime_observation_does_not_run_family_semantic_parser(
         bridge.close()
 
 
+def test_runtime_opportunity_provider_receives_scope_free_input(tmp_path: Path) -> None:
+    seen: list[object] = []
+
+    def provider(result):
+        seen.append(result)
+        return ()
+
+    bridge = HermesPastBenchBridge(
+        _hermes_home(tmp_path),
+        HermesExperimentConfig(HermesExecutionMode.ADAPTER_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "events.jsonl",
+        run_id="run-scope-free-provider",
+        trace_id="trace-scope-free-provider",
+        episode_id="episode-scope-free-provider",
+        session_id="session-scope-free-provider",
+        task_id="task-scope-free-provider",
+        experiment_variant="native+adapter+ledger",
+        family_id="SM02_constraint_retention",
+        stage="eval_near",
+        opportunity_evidence_provider=provider,
+    )
+    try:
+        bridge._record_runtime_opportunities({
+            "family_id": "SM02_constraint_retention",
+            "stage": "eval_near",
+            "messages": [{
+                "role": "user",
+                "content": "visible request",
+                "metadata": {
+                    "familyId": "nested-family",
+                    "benchmarkStage": "nested-stage",
+                },
+            }],
+            "resource_state": {"available": True},
+        })
+    finally:
+        bridge.close()
+    assert seen == [{
+        "messages": [{
+            "role": "user",
+            "content": "visible request",
+            "metadata": {},
+        }],
+        "resource_state": {"available": True},
+    }]
+
+
 def test_past_bench_bridge_records_generic_memory_use_join(tmp_path: Path) -> None:
     bridge = HermesPastBenchBridge(
         _hermes_home(tmp_path),
