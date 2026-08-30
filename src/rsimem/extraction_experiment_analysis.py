@@ -841,6 +841,9 @@ def _process_signal_case_summary(
             "replicateCount": protocol.replicate_count,
             "observationWindow": protocol.observation_window,
             "caseDedupRule": protocol.case_dedup_rule,
+            # ``caseCount`` is the semantic/logical denominator.  Physical
+            # observations are reported separately below so replicates and
+            # repeated retrieval boundaries cannot inflate sample size.
             "caseCount": 0,
             "boundCaseCount": 0,
             "replicateIds": [],
@@ -848,6 +851,7 @@ def _process_signal_case_summary(
             "logicalCaseCount": 0,
             "conflictCaseCount": 0,
             "statusCounts": {},
+            "optimizationHypothesisCaseCounts": {},
             "replicateConsistentCaseCount": 0,
             "replicateConsistency": None,
         }
@@ -860,11 +864,15 @@ def _process_signal_case_summary(
         "replicateCount": protocol.replicate_count,
         "observationWindow": protocol.observation_window,
         "caseDedupRule": protocol.case_dedup_rule,
-        "caseCount": len(cases),
-        "boundCaseCount": sum(
-            case.analysis_protocol_id == protocol.protocol_id
+        # Keep logical and physical denominators distinct.  Multiple
+        # observations for one case (replicates/retrieval boundaries) count
+        # once for case-level summaries.
+        "caseCount": census.logical_case_count,
+        "boundCaseCount": len({
+            case.logical_case_id
             for case in cases
-        ),
+            if case.analysis_protocol_id == protocol.protocol_id
+        }),
         "replicateIds": sorted({
             case.replicate_id
             for case in cases
