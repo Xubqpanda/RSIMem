@@ -121,6 +121,22 @@ def test_family_bound_optimizer_builder_does_not_accept_pure_projection() -> Non
         )
 
 
+def test_family_bound_builder_cannot_relabel_audit_evidence_as_pure() -> None:
+    projection, source, feedback, observation, graph, facts, delayed = _fixture()
+    with pytest.raises(ValueError, match="cannot be relabeled"):
+        ExtractionOptimizerCorpusBuilder(
+            evidence_plane="pure_process",
+        ).build_examples(
+            projection=projection,
+            source_record=source,
+            feedback_record=feedback,
+            observation=observation,
+            operation_graph=graph,
+            fact_contents=facts,
+            delayed_content=delayed,
+        )
+
+
 def test_pure_optimizer_builder_joins_only_pure_records() -> None:
     projection, source, *_ = _fixture()
     pure_source = PureExtractionSourceRecord.create(
