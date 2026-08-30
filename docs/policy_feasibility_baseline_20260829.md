@@ -61,7 +61,7 @@ opportunity/use/outcome 证据链，否则自动降级为 `unresolved`，避免�
 | commit | 1 | 1/1 | 1/1 | 1 | 0 | 0 | 0 | 0 | 1 | validation-only |
 | exposure | 1 | 1/1 | 1/1 | 1 | 0 | 0 | 0 | 0 | 1 | validation-only |
 
-这里的 `optimization-ready` 只表示该层已有 process signal、目标层 action variation、至少两类 resolved outcome，以及完整可回放 evidence chain。它不表示该层已经在真实任务上提升分数。其余层保留为 `validation-only`，因为当前 fixture 没有足够的 outcome variation；没有将 unknown 或 unresolved 当成 negative。
+这里的 `optimization-ready` 只表示该层已有 process signal、目标层 action variation、至少两类 resolved outcome，以及完整可回放 evidence chain。它不表示该层已经在真实任务上提升分数。报告中的 `optimizationReadyLayers` 只用于 feasibility 分类，`effectExperimentReady` 明确保持 `false`；deterministic fixture 不能解锁真实 matched effect。其余层保留为 `validation-only`，因为当前 fixture 没有足够的 outcome variation；没有将 unknown 或 unresolved 当成 negative。
 
 每层报告同时保留 U/H/M、unresolved、censored 原始计数以及 `resolvedUsefulRate`；resolved denominator 为 U+H，分母为零时输出 unknown（JSON `null`）。
 
