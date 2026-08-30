@@ -95,6 +95,7 @@ from .memory.extraction_optimizer_capture import (
 from .memory.opportunity import (
     JsonOpportunityEvidenceLog,
     OpportunityEvidence,
+    OpportunitySurface,
 )
 from .memory.use_attribution import (
     JsonMemoryUseEvidenceLog,
@@ -2066,7 +2067,16 @@ class HermesPastBenchBridge:
         # adapter from deployment-visible input, environment or tool schema.
         # Do this before constructing the benchmark-audit projection so the
         # two evidence planes cannot be conflated.
-        self._record_runtime_opportunities(result)
+        runtime_opportunities = self._record_runtime_opportunities(result)
+        runtime_requirements = tuple(dict.fromkeys(
+            evidence.semantic_requirement
+            for evidence in runtime_opportunities
+        ))
+        runtime_current_input_requirements = tuple(dict.fromkeys(
+            evidence.semantic_requirement
+            for evidence in runtime_opportunities
+            if evidence.source_surface is OpportunitySurface.CURRENT_INPUT
+        ))
         observation_complete = not (
             result.get("partial") is True or result.get("interrupted") is True
         )
@@ -2077,6 +2087,10 @@ class HermesPastBenchBridge:
             "current_input_digest": hashlib.sha256(
                 current_input.encode("utf-8")
             ).hexdigest(),
+            "runtime_requirements": list(runtime_requirements),
+            "runtime_current_input_requirements": list(
+                runtime_current_input_requirements
+            ),
         }, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
         return DeploymentObservation(
             observation_id=(
@@ -2094,11 +2108,11 @@ class HermesPastBenchBridge:
             # application-owned opportunity provider and are kept in the
             # separate audit projection when a registered benchmark contract
             # is explicitly requested.
-            current_input_semantic_keys=(),
+            current_input_semantic_keys=runtime_current_input_requirements,
             # Task semantic requirements are application-owned runtime
             # evidence.  A benchmark family contract is not allowed to
             # manufacture them at the bridge boundary.
-            task_semantic_keys=(),
+            task_semantic_keys=runtime_requirements,
             final_response=str(result.get("final_response") or ""),
             tool_events=self._observable_tool_events(messages),
             completed=result.get("completed") is True,
@@ -2128,13 +2142,23 @@ class HermesPastBenchBridge:
         contract = resolver.registry.resolver(observation.family_id).contract
         if observation.stage not in contract.opportunity.eligible_stages:
             return observation
+        runtime_current_input_requirements = tuple(
+            observation.current_input_semantic_keys
+        )
+        runtime_task_requirements = tuple(observation.task_semantic_keys)
+        audit_current_input_requirements = detect_current_input_semantic_keys(
+            observation.family_id,
+            current_input,
+        )
+        audit_task_requirements = contract.opportunity.memory_scope_keys
         return replace(
             observation,
-            current_input_semantic_keys=detect_current_input_semantic_keys(
-                observation.family_id,
-                current_input,
-            ),
-            task_semantic_keys=contract.opportunity.memory_scope_keys,
+            current_input_semantic_keys=tuple(dict.fromkeys(
+                (*runtime_current_input_requirements, *audit_current_input_requirements)
+            )),
+            task_semantic_keys=tuple(dict.fromkeys(
+                (*runtime_task_requirements, *audit_task_requirements)
+            )),
         )
 
     @staticmethod

@@ -483,6 +483,17 @@ def test_past_bench_bridge_records_runtime_opportunity_without_family_leakage(
 def test_past_bench_runtime_observation_does_not_run_family_semantic_parser(
     tmp_path: Path,
 ) -> None:
+    def opportunity_provider(result):
+        assert result["messages"][0]["role"] == "user"
+        return (OpportunityEvidence.create(
+            source_surface=OpportunitySurface.CURRENT_INPUT,
+            semantic_requirement="resource.share.recipient_policy",
+            observation_time="2026-08-30T01:02:03Z",
+            operation_id="op.runtime-current-input.v1",
+            provenance_id="provenance.runtime-current-input.v1",
+            source_payload={"input_digest": "a" * 64},
+        ),)
+
     bridge = HermesPastBenchBridge(
         _hermes_home(tmp_path),
         HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
@@ -495,6 +506,7 @@ def test_past_bench_runtime_observation_does_not_run_family_semantic_parser(
         experiment_variant="native+adapter+ledger",
         family_id="SM01_preference_adoption",
         stage="eval_near",
+        opportunity_evidence_provider=opportunity_provider,
         static_writeback_config=StaticSemanticWritebackConfig(
             mode="static",
             feedback_contract="sm01_tsv_v1",
@@ -511,14 +523,19 @@ def test_past_bench_runtime_observation_does_not_run_family_semantic_parser(
     }
     try:
         runtime = bridge._semantic_deployment_observation(result)
-        assert runtime.current_input_semantic_keys == ()
-        assert runtime.task_semantic_keys == ()
+        assert runtime.current_input_semantic_keys == (
+            "resource.share.recipient_policy",
+        )
+        assert runtime.task_semantic_keys == (
+            "resource.share.recipient_policy",
+        )
 
         audit = bridge._semantic_audit_observation(
             runtime,
             current_input="Use TSV with owner, priority, task, and due_date for this report.",
         )
         assert audit.current_input_semantic_keys
+        assert "resource.share.recipient_policy" in audit.current_input_semantic_keys
         assert audit.task_semantic_keys
     finally:
         bridge.close()
