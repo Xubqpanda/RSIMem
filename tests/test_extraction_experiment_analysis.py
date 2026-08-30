@@ -505,6 +505,7 @@ def test_analysis_rejects_process_signal_protocol_manifest_drift(
     drifted = protocol.__class__.create(
         training_family_ids=protocol.training_family_ids,
         task_template_group_ids=protocol.task_template_group_ids,
+        task_manifest_digest=protocol.task_manifest_digest,
         provider_model=protocol.provider_model,
         replicate_count=protocol.replicate_count,
         observation_window="window.drifted.v1",

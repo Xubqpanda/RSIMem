@@ -16,6 +16,7 @@ def _protocol() -> ProcessSignalAnalysisProtocol:
     return ProcessSignalAnalysisProtocol.create(
         training_family_ids=("SM02_constraint_retention",),
         task_template_group_ids=("sm02-process-pilot-train-v1",),
+        task_manifest_digest="a" * 64,
         provider_model="coding.tu-zi.com/gpt-5.6-luna",
         replicate_count=3,
         observation_window="window.pre_registered.v1",
@@ -38,6 +39,7 @@ def test_protocol_rejects_duplicate_or_unfrozen_configuration() -> None:
         ProcessSignalAnalysisProtocol.create(
             training_family_ids=("SM02_constraint_retention", "SM02_constraint_retention"),
             task_template_group_ids=("sm02-process-pilot-train-v1",),
+            task_manifest_digest="a" * 64,
             provider_model="coding.tu-zi.com/gpt-5.6-luna",
             replicate_count=3,
             observation_window="window.pre_registered.v1",
@@ -63,6 +65,7 @@ def test_protocol_store_freezes_once_and_replays_after_restart(tmp_path) -> None
     changed = ProcessSignalAnalysisProtocol.create(
         training_family_ids=protocol.training_family_ids,
         task_template_group_ids=protocol.task_template_group_ids,
+        task_manifest_digest=protocol.task_manifest_digest,
         provider_model=protocol.provider_model,
         replicate_count=protocol.replicate_count + 1,
         observation_window=protocol.observation_window,
@@ -94,6 +97,7 @@ def test_protocol_manifest_binding_is_deterministic_and_result_independent() -> 
         "split": {
             "familyId": "SM02_constraint_retention",
             "taskTemplateGroupId": "sm02-process-pilot-train-v1",
+            "taskManifestDigest": "a" * 64,
         },
         "replicates": 3,
         "modelProfile": {
@@ -107,9 +111,16 @@ def test_protocol_manifest_binding_is_deterministic_and_result_independent() -> 
     assert validate_protocol_for_extraction_manifest(protocol, manifest) == protocol
     assert protocol.training_family_ids == ("SM02_constraint_retention",)
     assert protocol.task_template_group_ids == ("sm02-process-pilot-train-v1",)
+    assert protocol.task_manifest_digest == "a" * 64
     assert protocol.provider_model == "https://coding.tu-zi.com/v1/gpt-5.6-luna"
 
     changed = dict(manifest)
     changed["replicates"] = 4
     with pytest.raises(ValueError, match="does not match extraction manifest"):
         validate_protocol_for_extraction_manifest(protocol, changed)
+
+    drifted_manifest = dict(manifest)
+    drifted_manifest["split"] = dict(manifest["split"])
+    drifted_manifest["split"]["taskManifestDigest"] = "b" * 64
+    with pytest.raises(ValueError, match="does not match extraction manifest"):
+        validate_protocol_for_extraction_manifest(protocol, drifted_manifest)
