@@ -845,7 +845,41 @@ class HermesPastBenchBridge:
         provider = self._opportunity_evidence_provider
         if provider is None:
             return ()
-        return self.record_opportunity_evidence(provider(result))
+        # Keep benchmark scope out of the runtime opportunity surface.  The
+        # bridge may itself be running a PAST-Bench case, but family/stage are
+        # audit metadata and must not influence a deployment-visible provider.
+        visible = self._strip_benchmark_scope(result)
+        return self.record_opportunity_evidence(provider(visible))
+
+    @staticmethod
+    def _strip_benchmark_scope(value: object) -> object:
+        """Return a recursively scope-free view for runtime providers.
+
+        ``family_id``/``stage`` are removed at every nesting level so a host
+        adapter cannot accidentally branch on benchmark identity.  Other
+        deployment-visible fields (messages, tool schemas, resource state)
+        are preserved byte-for-byte as far as the mapping representation
+        permits.
+        """
+
+        forbidden = frozenset({
+            "family_id", "familyId", "stage", "benchmark_family",
+            "benchmarkFamily", "benchmark_stage", "benchmarkStage",
+        })
+        if isinstance(value, Mapping):
+            return {
+                key: HermesPastBenchBridge._strip_benchmark_scope(child)
+                for key, child in value.items()
+                if str(key) not in forbidden
+            }
+        if isinstance(value, list):
+            return [HermesPastBenchBridge._strip_benchmark_scope(child) for child in value]
+        if isinstance(value, tuple):
+            return tuple(
+                HermesPastBenchBridge._strip_benchmark_scope(child)
+                for child in value
+            )
+        return value
 
     def record_opportunity_evidence(
         self,
