@@ -66,6 +66,8 @@ def test_repeated_logical_case_counts_one_case_and_conflict_is_ambiguous() -> No
     assert census.physical_observation_count == 2
     assert census.logical_case_count == 1
     assert census.conflict_case_count == 1
+    assert census.payload()["replicateConsistentCaseCount"] == 0
+    assert census.payload()["replicateConsistency"] == 0.0
     assert census.status_counts == {"ambiguous": 1}
 
 
@@ -101,6 +103,7 @@ def test_census_counts_all_physical_observations_inside_one_case() -> None:
         observation_complete=True,
     )
     assert census_process_signal_cases((case,)).physical_observation_count == 2
+    assert census_process_signal_cases((case,)).payload()["replicateConsistency"] == 1.0
 
 
 def test_process_signal_case_store_replays_logical_census(tmp_path) -> None:

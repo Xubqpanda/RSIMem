@@ -847,6 +847,8 @@ def _process_signal_case_summary(
             "logicalCaseCount": 0,
             "conflictCaseCount": 0,
             "statusCounts": {},
+            "replicateConsistentCaseCount": 0,
+            "replicateConsistency": None,
         }
     census = census_process_signal_cases(cases)
     return {

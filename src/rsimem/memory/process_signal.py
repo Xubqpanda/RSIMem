@@ -365,11 +365,17 @@ class ProcessSignalCaseCensus:
         object.__setattr__(self, "status_counts", dict(sorted(values.items())))
 
     def payload(self) -> dict[str, object]:
+        consistent = self.logical_case_count - self.conflict_case_count
         return {
             "physicalObservationCount": self.physical_observation_count,
             "logicalCaseCount": self.logical_case_count,
             "statusCounts": dict(self.status_counts),
             "conflictCaseCount": self.conflict_case_count,
+            "replicateConsistentCaseCount": consistent,
+            "replicateConsistency": (
+                consistent / self.logical_case_count
+                if self.logical_case_count else None
+            ),
         }
 
 
