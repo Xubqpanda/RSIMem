@@ -188,6 +188,35 @@ def test_process_signal_gate_requires_two_logical_cases_for_one_hypothesis(
     assert optimization_count == 3
 
 
+def test_process_signal_gate_deduplicates_replicates_by_logical_case(
+    tmp_path: Path,
+) -> None:
+    store = JsonProcessSignalCaseStore(tmp_path / "run" / "process_signal_cases.jsonl")
+    for index in range(3):
+        case = ProcessSignalCase.create(
+            logical_case_id="logical-case.same-replicate",
+            physical_observation_ids=(f"physical-observation.same.{index}",),
+            source_observed=True,
+            extraction_observed=True,
+            persistence_observed=True,
+            retrieval_observed=True,
+            exposure_observed=True,
+            outcome_observed=True,
+            extraction_attributable=True,
+            abstract_hypothesis_digest="a" * 64,
+            observation_complete=True,
+            analysis_protocol_id="signal-protocol.replicates",
+            replicate_id=f"replicate.same.{index}",
+            observation_window="window.replicates",
+        )
+        assert store.append(case) is True
+    gate, _, _, case_count, optimization_count, hypothesis = _process_signal_gate(
+        tmp_path
+    )
+    assert gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
+    assert (case_count, optimization_count, hypothesis) == (3, 1, None)
+
+
 def test_process_signal_gate_rejects_unbound_or_mixed_protocol_cases(
     tmp_path: Path,
 ) -> None:
