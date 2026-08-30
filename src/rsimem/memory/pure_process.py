@@ -361,6 +361,8 @@ class JsonPureProcessCorpusStore:
     @contextmanager
     def _lock(self):
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.lock_path.is_symlink():
+            raise ValueError("pure-process corpus lock cannot be a symlink")
         with self.lock_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
             try:

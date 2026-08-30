@@ -142,6 +142,16 @@ def test_pure_process_store_rejects_symlink_on_read_and_write(tmp_path) -> None:
     assert target.read_text(encoding="utf-8").endswith("\n")
 
 
+def test_pure_process_store_rejects_symlinked_lock(tmp_path) -> None:
+    corpus = PureProcessCorpus.create((_event(),))
+    path = tmp_path / "pure-process.json"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_name(path.name + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonPureProcessCorpusStore(path).put(corpus)
+
+
 def test_evidence_plane_source_identity_is_least_privilege() -> None:
     assert validate_plane_source(
         EvidencePlane.PURE_PROCESS,
