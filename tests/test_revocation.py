@@ -73,6 +73,22 @@ def test_corrupt_or_conflicting_registry_fails_closed(tmp_path) -> None:
         )
 
 
+def test_symlinked_registry_fails_closed(tmp_path) -> None:
+    target = tmp_path / "target.jsonl"
+    target.write_text("", encoding="utf-8")
+    path = tmp_path / "revocations.jsonl"
+    path.symlink_to(target)
+    registry = JsonRevocationRegistry(path)
+    with pytest.raises(ValueError, match="cannot be a symlink"):
+        registry.assert_active(
+            artifact_id="artifact.other.v1",
+            artifact_schema_version=1,
+            artifact_digest="b" * 64,
+            evidence_plane=EvidencePlane.BENCHMARK_AUDIT,
+            evidence_source=EvidenceSourceKind.BENCHMARK_CONTRACT,
+        )
+
+
 def test_same_artifact_with_different_digest_is_a_registry_conflict(tmp_path) -> None:
     registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
     registry.initialize()
