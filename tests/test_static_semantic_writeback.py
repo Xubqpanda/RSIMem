@@ -30,6 +30,7 @@ from rsimem.memory.live_writeback import (
     StaticSemanticWritebackConfig,
     StaticSemanticWritebackMode,
     StaticSemanticWritebackRuntime,
+    JsonSemanticCompilationReceiptStore,
 )
 from rsimem.memory.adaptive_mem0_binding import TrustedAdaptiveMem0Parameter
 from rsimem.memory.adaptive_policy import AdaptiveParameterName
@@ -52,6 +53,25 @@ from test_extraction_offline_validation import _candidate
 
 
 PREFERENCE = "Use TSV with owner, priority, task, and due_date."
+
+
+def test_compilation_receipt_store_rejects_symlinked_paths(tmp_path) -> None:
+    target = tmp_path / "target.json"
+    target.write_text("sentinel\n", encoding="utf-8")
+    path = tmp_path / "receipts.json"
+    path.symlink_to(target)
+    with pytest.raises(ValueError, match="symlink"):
+        JsonSemanticCompilationReceiptStore(path)
+    assert target.read_text(encoding="utf-8") == "sentinel\n"
+
+
+def test_compilation_receipt_store_rejects_symlinked_lock(tmp_path) -> None:
+    path = tmp_path / "receipts.json"
+    lock_target = tmp_path / "lock-target"
+    lock_target.write_text("", encoding="utf-8")
+    path.with_suffix(path.suffix + ".lock").symlink_to(lock_target)
+    with pytest.raises(ValueError, match="lock.*symlink"):
+        JsonSemanticCompilationReceiptStore(path)
 
 
 def _lifecycle(tmp_path):
