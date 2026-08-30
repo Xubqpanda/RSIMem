@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import hashlib
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -486,6 +487,27 @@ def test_append_only_conflict_fails_closed() -> None:
     conflict["payload"]["latency_ms"] = 1
     with pytest.raises(ValueError, match="conflicting operation evidence"):
         log.append(conflict)
+
+
+def test_append_only_operation_log_reloads_external_file_changes(tmp_path: Path) -> None:
+    context = _context()
+    path = tmp_path / "operations-reload.jsonl"
+    first_log = AppendOnlyOperationEvidenceLog(path)
+    first = AtomicOperationRecorder(first_log)
+    record_a = OperationRecord(
+        "op.reload.a",
+        OperationKind.VALIDATION,
+        context,
+        (), (), (), "attempt-0", OperationStatus.SUCCESS, None, 0, RawResourceUsage(),
+    )
+    record_b = replace(record_a, operation_id="op.reload.b")
+    first.record_operation(record_a)
+    second_log = AppendOnlyOperationEvidenceLog(path)
+    second = AtomicOperationRecorder(second_log)
+    second.record_operation(record_b)
+    assert len(first_log.events) == 2
+    path.unlink()
+    assert first_log.events == ()
 
 
 def test_append_only_operation_log_rejects_symlinked_path(tmp_path: Path) -> None:
