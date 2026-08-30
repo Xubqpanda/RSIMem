@@ -37,7 +37,7 @@ interventions, strict feedback projection, process feedback, N+1 hypothesis
 identity, and restart-safe content-free evidence. Extraction is currently
 `optimization-ready` in that fixture; the other layers remain
 `validation-only` until outcome variation is observed. The latest regression
-counts are RSIMem `865 passed` and vendored PAST-Bench `399 passed, 2 skipped`.
+counts are RSIMem `866 passed` and vendored PAST-Bench `399 passed, 2 skipped`.
 
 Extraction-prompt Stage 1A through 1H are complete. Legacy threshold artifacts now
 have incompatible identity and no resource-cost activation gates. Static
@@ -99,7 +99,8 @@ provider call. The append-only revocation registry also rejects symlinked
 state, preserving the fail-closed ownership boundary.
 
 The optimizer corpus now also records a process-signal gate. Batches with a
-bound process-signal case store but no `optimization_signal` are retained for
+bound process-signal case store but no replicated generalizable signal (at least
+two logical cases supporting one abstract hypothesis) are retained for
 diagnosis and rejected before any optimizer provider request, even if legacy
 actionable labels are present. Unbound unit fixtures remain explicitly marked
 `not_bound`.
@@ -490,7 +491,7 @@ This is process-signal infrastructure, not a live adaptive-effect result.
 
 ### Verification Baseline
 
-- [x] Pass all RSIMem tests: `865 passed`.
+- [x] Pass all RSIMem tests: `866 passed`.
 - [x] Pass the vendored PAST-Bench regression suite: `399 passed, 2 skipped`.
 - [x] Pass Python import and compile checks.
 - [x] Pass dependency validation with `pip check`.
