@@ -1344,6 +1344,7 @@ class LayerFeasibilityCensus:
     ambiguous_count: int
     status: FeasibilityStatus
     reason_codes: tuple[str, ...]
+    benefit_explanation_codes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "layer", PolicyLayer(self.layer))
@@ -1377,6 +1378,17 @@ class LayerFeasibilityCensus:
         except ValueError as exc:
             raise ValueError("census reason codes must be unique non-empty strings") from exc
         object.__setattr__(self, "reason_codes", reasons)
+        try:
+            explanations = _normalize_strings(
+                self.benefit_explanation_codes,
+                "benefit explanation codes",
+                allow_empty=True,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "benefit explanation codes must be unique non-empty strings"
+            ) from exc
+        object.__setattr__(self, "benefit_explanation_codes", explanations)
 
     @property
     def signal_coverage(self) -> float | None:
@@ -1452,6 +1464,7 @@ class LayerFeasibilityCensus:
             "completeFeedbackCount": self.complete_feedback_count,
             "status": self.status.value,
             "reasonCodes": list(self.reason_codes),
+            "benefitExplanationCodes": list(self.benefit_explanation_codes),
         }
 
 
@@ -1577,6 +1590,10 @@ def build_feasibility_report(cases: Iterable[LayerIntervention]) -> PolicyFeasib
             ambiguous_count,
             status,
             tuple(reasons),
+            tuple(sorted({
+                case.benefit_explanation.mechanism_code
+                for case in items
+            })),
         ))
     return PolicyFeasibilityReport(normalized, tuple(census))
 

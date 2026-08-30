@@ -1041,6 +1041,8 @@ def test_deterministic_fixture_covers_all_six_layers() -> None:
     assert {item.layer for item in report.census if item.case_count} == set(PolicyLayer)
     extraction = next(item for item in report.census if item.layer is PolicyLayer.EXTRACTION)
     assert extraction.status is FeasibilityStatus.OPTIMIZATION_READY
+    assert extraction.benefit_explanation_codes == ("candidate_fact_set",)
+    assert all(item.benefit_explanation_codes for item in report.census if item.case_count)
     assert all(
         item.status in {FeasibilityStatus.OPTIMIZATION_READY, FeasibilityStatus.VALIDATION_ONLY}
         for item in report.census
