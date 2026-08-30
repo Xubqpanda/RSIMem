@@ -1199,6 +1199,9 @@ def test_lifecycle_ledger_reloads_external_append_and_rejects_symlink_lock(
     second.record(fixture.events[1])
     assert len(first.events) == 2
 
+    output.unlink()
+    assert first.events == ()
+
     lock_target = tmp_path / "lock-target"
     lock_target.write_text("", encoding="utf-8")
     output.with_name(output.name + ".lock").unlink()
