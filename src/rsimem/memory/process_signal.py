@@ -639,7 +639,16 @@ def build_process_signal_cases(
                 "kind": event.kind.value,
                 "source_revision": event.source_revision,
                 "input_digest": event.input_digest,
-                "output_digest": event.output_digest,
+                # Source-selection output identifies which source segments
+                # entered formation.  Extraction output is deliberately not
+                # part of the semantic case identity: model/provider
+                # variation across replicates must remain one case with
+                # multiple physical observations, not split the denominator.
+                "output_digest": (
+                    event.output_digest
+                    if event.kind is ProcessEventKind.SOURCE_SELECTION
+                    else None
+                ),
             }
             for event in sorted(
                 source_events,
