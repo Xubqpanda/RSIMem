@@ -16,6 +16,7 @@ from rsimem.memory.pure_extraction import (
     PureExtractionFeedbackRecord,
     PureExtractionOptimizerExample,
     PureExtractionOptimizerCorpus,
+    PureExtractionSourceProjector,
     PureExtractionSourceRecord,
 )
 from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
@@ -305,3 +306,21 @@ def test_pure_feedback_derivation_is_conservative_and_replay_stable() -> None:
         current_input_requirements=("preference.summary.tsv",),
     )
     assert confounded.attribution is PureExtractionAttribution.UNRESOLVED
+
+
+def test_live_pure_projector_does_not_consult_family_parser(tmp_path) -> None:
+    from test_extraction_projection import _compile
+
+    runtime, boundary = _compile(tmp_path, facts=("A durable user preference.",))
+    projected = PureExtractionSourceProjector().project_record(
+        boundary,
+        runtime.policy,
+        runtime.extraction_runtime_binding,
+        source_projection_id="projection.runtime-pure-v1",
+        context_revision="revision.runtime-pure-v1",
+        provenance_id="provenance.runtime-pure-v1",
+        visible_semantic_keys=(),
+    )
+    assert projected.source.available_semantic_keys == ()
+    assert projected.source.facts[0].semantic_keys == ()
+    assert projected.source.facts[0].artifact_id is not None
