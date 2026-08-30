@@ -263,6 +263,29 @@ def test_process_signal_no_signal_gate_blocks_actionable_provider_request() -> N
     assert client.requests == []
 
 
+def test_optimizer_gate_request_carries_process_signal_provenance() -> None:
+    baseline = _corpus()
+    corpus = ExtractionOptimizerCorpus.create(
+        batch_id=baseline.batch_id,
+        attempt_id=baseline.attempt_id,
+        split=baseline.split,
+        observation_cutoff=baseline.observation_cutoff,
+        retention=baseline.retention,
+        examples=baseline.examples,
+        process_signal_gate=PROCESS_SIGNAL_GATE_NO_SIGNAL,
+        process_signal_protocol_id="signal-protocol.gate-v1",
+        process_signal_case_digest="a" * 64,
+        process_signal_case_count=1,
+        process_signal_optimization_count=0,
+    )
+    result = ExtractionPromptOptimizer(
+        CapturedExtractionOptimizerClient('{"decision":"NO_PROPOSAL","reason_codes":["no_signal"],"edits":[]}')
+    ).propose(_parent(), corpus)
+    payload = json.loads(result.request.input_json)
+    assert payload["process_signal"]["protocol_id"] == "signal-protocol.gate-v1"
+    assert payload["process_signal"]["case_count"] == 1
+
+
 def test_logical_case_identity_ignores_request_boundary_and_run_ids() -> None:
     base = _corpus().examples[1]
     join = base.audit_join

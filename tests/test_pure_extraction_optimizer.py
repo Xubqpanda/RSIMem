@@ -296,7 +296,9 @@ def test_pure_optimizer_gate_request_is_provider_ineligible() -> None:
         reason_codes=("no_optimization_process_signal",),
     )
     assert request.provider_eligible is False
-    assert json.loads(request.input_json)["request_mode"] == "deterministic_signal_gate"
+    payload = json.loads(request.input_json)
+    assert payload["request_mode"] == "deterministic_signal_gate"
+    assert payload["process_signal"]["gate"] == "no_signal"
 
 
 def test_pure_optimizer_propose_uses_pure_request_boundary() -> None:
