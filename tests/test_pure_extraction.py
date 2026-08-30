@@ -755,6 +755,51 @@ def test_pure_feedback_derivation_is_conservative_and_replay_stable() -> None:
     assert confounded.attribution is PureExtractionAttribution.UNRESOLVED
 
 
+def test_public_feedback_constructor_cannot_bypass_memory_use_join() -> None:
+    """Hand-built attributable labels must still satisfy the deterministic join."""
+
+    projection, source, *_ = _fixture()
+    provenance = "provenance.constructor-gate-v1"
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id=provenance,
+        visible_semantic_keys=(TSV_KEY,),
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement=TSV_KEY,
+        observation_time="2026-08-22T00:00:00Z",
+        operation_id="op.opportunity.constructor-gate-v1",
+        provenance_id=provenance,
+        source_payload={"tool": "render_table", "schema": "tsv"},
+    )
+    # This evidence claims a downstream use and successful outcome but omits
+    # retrieval and injection closure.  The public constructor must reject it
+    # instead of accepting a caller-supplied ATTRIBUTABLE_SUCCESS label.
+    incomplete_use = MemoryUseEvidence.create(
+        artifact_ids=("artifact.memory-v1",),
+        downstream_operation_id="op.use.constructor-gate-v1",
+        used_artifact_ids=("artifact.memory-v1",),
+        outcome_operation_id="op.outcome.constructor-gate-v1",
+        outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+        outcome_success=True,
+        observation_cutoff="2026-08-23T00:00:00Z",
+        provenance_id=provenance,
+    )
+    with pytest.raises(ValueError, match="complete memory-use join"):
+        PureExtractionFeedbackRecord.create(
+            source_record_id=pure_source.record_id,
+            source_projection_digest=pure_source.source_projection_digest,
+            extraction_set_id=pure_source.extraction_set_id,
+            opportunity=opportunity,
+            memory_use=incomplete_use,
+            observation_window="window.completed-constructor-gate-v1",
+            provenance_id=provenance,
+            attribution=PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
+        )
+
+
 def test_bound_tool_closure_is_required_for_extraction_attribution() -> None:
     """A memory-use claim cannot receive credit without an exact tool closure."""
 
