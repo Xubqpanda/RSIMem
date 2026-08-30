@@ -488,11 +488,15 @@ class JsonExtractionSourceRecordStore:
     """Append-only, restart-safe content-free extraction source records."""
 
     def __init__(self, path: Path) -> None:
-        self.path = path.expanduser().resolve()
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
 
     @contextmanager
     def _lock(self, operation: int) -> Iterator[None]:
+        if self.path.is_symlink():
+            raise ValueError("extraction source record store cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("extraction source record store lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), operation)
@@ -502,6 +506,8 @@ class JsonExtractionSourceRecordStore:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def _read_unlocked(self) -> tuple[ExtractionSourceRecord, ...]:
+        if self.path.is_symlink():
+            raise ValueError("extraction source record store cannot be a symlink")
         if not self.path.exists():
             return ()
         records = []
@@ -571,13 +577,17 @@ class JsonExtractionFeedbackDatasetLog:
     """Append content-free feedback datasets with conflict detection."""
 
     def __init__(self, path: Path) -> None:
-        self.path = path.expanduser().resolve()
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
 
     def append(self, dataset: ExtractionFeedbackDataset) -> bool:
         payload = dataset.payload()
         serialized = _canonical(payload)
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.path.is_symlink():
+            raise ValueError("extraction feedback dataset log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("extraction feedback dataset lock cannot be a symlink")
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
             try:
@@ -834,10 +844,12 @@ class LiveExtractionFeedbackRecord:
 
 class JsonLiveExtractionFeedbackRecordLog:
     def __init__(self, path: Path) -> None:
-        self.path = path.expanduser().resolve()
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_suffix(self.path.suffix + ".lock")
 
     def _read_unlocked(self) -> tuple[LiveExtractionFeedbackRecord, ...]:
+        if self.path.is_symlink():
+            raise ValueError("live extraction feedback log cannot be a symlink")
         if not self.path.exists():
             return ()
         records = []
@@ -860,6 +872,10 @@ class JsonLiveExtractionFeedbackRecordLog:
 
     def records(self) -> tuple[LiveExtractionFeedbackRecord, ...]:
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.path.is_symlink():
+            raise ValueError("live extraction feedback log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("live extraction feedback lock cannot be a symlink")
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
             try:
@@ -870,6 +886,10 @@ class JsonLiveExtractionFeedbackRecordLog:
     def append(self, record: LiveExtractionFeedbackRecord) -> bool:
         serialized = _canonical(record.payload())
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.path.is_symlink():
+            raise ValueError("live extraction feedback log cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("live extraction feedback lock cannot be a symlink")
         with self.lock_path.open("a+", encoding="utf-8") as lock:
             fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
             try:
