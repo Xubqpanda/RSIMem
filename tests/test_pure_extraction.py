@@ -115,6 +115,17 @@ def test_pure_feedback_rejects_malformed_tool_join_collection() -> None:
         replace(record, tool_joins=[])  # type: ignore[arg-type]
     with pytest.raises(TypeError, match="wrong type"):
         replace(record, tool_joins=(object(),))  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="tool joins must be a tuple"):
+        PureExtractionFeedbackRecord.create(
+            source_record_id=record.source_record_id,
+            source_projection_digest=record.source_projection_digest,
+            extraction_set_id=record.extraction_set_id,
+            opportunity=None,
+            memory_use=None,
+            tool_joins=[],  # type: ignore[arg-type]
+            observation_window=record.observation_window,
+            provenance_id=record.provenance_id,
+        )
 
 
 def test_pure_feedback_requires_one_provenance_across_evidence_joins() -> None:
