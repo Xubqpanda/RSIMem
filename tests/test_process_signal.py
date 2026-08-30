@@ -69,6 +69,16 @@ def test_repeated_logical_case_counts_one_case_and_conflict_is_ambiguous() -> No
     assert census.payload()["replicateConsistentCaseCount"] == 0
     assert census.payload()["replicateConsistency"] == 0.0
     assert census.status_counts == {"ambiguous": 1}
+    assert census.payload()["conflictRate"] == 1.0
+
+
+def test_hypothesis_conflict_is_ambiguous_even_when_statuses_match() -> None:
+    first = _case(physical="physical-observation.hypothesis.1", hypothesis="a" * 64)
+    second = _case(physical="physical-observation.hypothesis.2", hypothesis="b" * 64)
+    census = census_process_signal_cases((first, second))
+    assert census.status_counts == {"ambiguous": 1}
+    assert census.conflict_case_count == 1
+    assert census.payload()["conflictRate"] == 1.0
 
 
 def test_non_pure_plane_and_duplicate_physical_ids_fail_closed() -> None:

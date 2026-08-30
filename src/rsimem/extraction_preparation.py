@@ -171,24 +171,7 @@ def _process_signal_gate(
     # is a malformed store and must fail closed rather than being silently
     # deduplicated here.
     census = census_process_signal_cases(cases)
-    hypothesis_by_logical: dict[str, set[str]] = {}
-    for case in cases:
-        if case.status is ProcessSignalCaseStatus.OPTIMIZATION_SIGNAL:
-            # A logical case is one semantic unit across replicates.  Two
-            # different abstract hypotheses for that unit are contradictory
-            # optimization evidence even when both observations have the same
-            # status.
-            assert case.abstract_hypothesis_digest is not None
-            hypothesis_by_logical.setdefault(case.logical_case_id, set()).add(
-                case.abstract_hypothesis_digest
-            )
-    has_conflicting_hypothesis = any(
-        len(hypotheses) > 1
-        for hypotheses in hypothesis_by_logical.values()
-    )
-    has_conflicting_logical_case = (
-        census.conflict_case_count > 0 or has_conflicting_hypothesis
-    )
+    has_conflicting_logical_case = census.conflict_case_count > 0
     metadata = {
         (
             case.analysis_protocol_id,
