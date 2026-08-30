@@ -854,6 +854,19 @@ def test_generated_event_ids_follow_logical_ids_when_evidence_is_reordered(
     assert tool_ids_first == tool_ids_second
 
 
+def test_generated_event_id_conflict_is_not_silently_overwritten(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    payload = json.loads(comparison.read_text(encoding="utf-8"))
+    original = payload["with_persistence"]["episodes"][0]
+    conflicting = json.loads(json.dumps(original))
+    conflicting["task_score"] = 0.25
+    payload["with_persistence"]["episodes"].append(conflicting)
+    comparison.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="conflicting ledger eventId"):
+        build_events(comparison)
+
+
 def test_user_profile_injection_matches_and_is_privacy_audited(tmp_path: Path) -> None:
     comparison = _fixture(tmp_path)
     data = json.loads(comparison.read_text(encoding="utf-8"))
