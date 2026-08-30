@@ -103,6 +103,25 @@ def test_pure_feedback_store_is_restart_safe_and_rejects_benchmark_fields(tmp_pa
         JsonPureExtractionFeedbackRecordStore(path).records()
 
 
+def test_pure_optimizer_rejects_unbound_observation_window() -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+    )
+    feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.unbound",
+        provenance_id=pure_source.provenance_id,
+    )
+    with pytest.raises(ValueError, match="observation window is unbound"):
+        PureExtractionOptimizerExample.from_records(pure_source, feedback)
+
+
 def test_family_bound_optimizer_builder_does_not_accept_pure_projection() -> None:
     projection, source, feedback, observation, graph, facts, delayed = _fixture()
     pure = PureExtractionSourceRecord.from_family_record(

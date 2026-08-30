@@ -731,6 +731,8 @@ class PureExtractionOptimizerExample:
             raise ValueError("pure optimizer source projection join mismatch")
         if feedback.extraction_set_id != source.extraction_set_id:
             raise ValueError("pure optimizer extraction set join mismatch")
+        if feedback.observation_window == "window.unbound":
+            raise ValueError("pure optimizer observation window is unbound")
         if (
             feedback.attribution
             in {
