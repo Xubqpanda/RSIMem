@@ -460,6 +460,7 @@ class HermesPastBenchBridge:
         self._tool_call_result_joins: dict[str, ToolCallResultJoin] = {}
         self._tool_call_ids_seen: set[str] = set()
         self._tool_result_ids_seen: set[str] = set()
+        self._skill_invocation_counts: dict[tuple[str, str], int] = {}
         self._agent: object | None = None
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
@@ -2632,26 +2633,85 @@ class HermesPastBenchBridge:
             entry.handler = handler
 
     def _record_skill_process(self, tool_name: str, query: str, result: str) -> None:
-        """Record a tool result without persisting the returned skill text."""
+        """Record a skill call/result closure without persisting skill text.
+
+        Hermes' registry wrapper does not expose the host's tool-call ID, so
+        this bridge derives a stable per-invocation identity from the tool,
+        query digest, host boundary and retry ordinal.  The closure still
+        carries only digests and status into the process ledger; arguments and
+        returned skill content stay in the owner-controlled Hermes trace.
+        """
 
         try:
             payload = json.loads(result)
         except (TypeError, json.JSONDecodeError):
             payload = {}
-        success = isinstance(payload, Mapping) and payload.get("success") is True
-        digest = hashlib.sha256(
-            f"{tool_name}:{query}".encode("utf-8")
-        ).hexdigest()
-        self._record_process_observation(
-            kind=ProcessEventKind.TOOL_RESULT,
-            status=ProcessEventStatus.SUCCESS if success else ProcessEventStatus.FAILED,
-            host_event_id=f"event.skill.{digest[:40]}",
-            source_revision=self._exposure_context_revision(),
-            input_payload={"tool": tool_name, "query_digest": hashlib.sha256(query.encode("utf-8")).hexdigest()},
-            output_payload={"success": success},
-            reason_codes=("decision_observed",) if success else ("tool_failure",),
-            execution_receipt_ids=(f"receipt.skill.{digest[:24]}",),
+        success = (
+            payload.get("success")
+            if isinstance(payload, Mapping) and type(payload.get("success")) is bool
+            else None
         )
+        type_mismatch = success is None
+        query_digest = hashlib.sha256(query.encode("utf-8")).hexdigest()
+        source_revision = (
+            self._last_host_source_revision or self._exposure_context_revision()
+        )
+        host_event_id = self._last_host_event_id or (
+            "event.skill." + hashlib.sha256(
+                f"{tool_name}:{query_digest}:{source_revision}".encode("utf-8")
+            ).hexdigest()[:40]
+        )
+        invocation_key = (tool_name, query_digest)
+        ordinal = self._skill_invocation_counts.get(invocation_key, 0)
+        self._skill_invocation_counts[invocation_key] = ordinal + 1
+        invocation_digest = hashlib.sha256(json.dumps(
+            {
+                "tool": tool_name,
+                "query_digest": query_digest,
+                "host_event_id": host_event_id,
+                "source_revision": source_revision,
+                "ordinal": ordinal,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        call_id = "call.skill." + invocation_digest[:32]
+        result_id = "result.skill." + invocation_digest[:32]
+        retry_identity = "retry.skill." + invocation_digest[:24]
+        call_receipt_id = "receipt.skill-call." + invocation_digest[:24]
+        result_receipt_id = "receipt.skill-result." + invocation_digest[:24]
+        join = ToolCallResultJoin.create(
+            call_id=call_id,
+            result_id=result_id,
+            tool_name_digest=hashlib.sha256(tool_name.encode("utf-8")).hexdigest(),
+            success=success,
+            retry_identity=retry_identity,
+            run_id=self._run_id,
+            variant=self.ledger.variant,
+            trace_id=self._trace_id,
+            episode_id=self._episode_id,
+            session_id=self._session_id,
+            task_id=self._task_id,
+            source_revision=source_revision,
+            host_event_id=host_event_id,
+            call_receipt_id=call_receipt_id,
+            result_receipt_id=result_receipt_id,
+            type_mismatch=type_mismatch,
+        )
+        previous = self._tool_call_result_joins.get(join.join_id)
+        if previous is not None:
+            if previous != join:
+                raise ValueError("conflicting skill tool call/result join")
+            return
+        self._tool_call_result_joins[join.join_id] = join
+        self._tool_call_ids_seen.add(call_id)
+        self._tool_result_ids_seen.add(result_id)
+        for event in join.process_events(
+            family_id=self._family_id,
+            stage=self._stage,
+        ):
+            self._process_feedback.record(event)
 
     def close(self) -> None:
         if self._closed:
