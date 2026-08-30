@@ -233,11 +233,17 @@ class JsonPureExtractionOptimizerContentCaptureStore:
     """Crash-safe owner-controlled persistence for pure optimizer captures."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Preserve the final component so a symlink cannot redirect the
+        # owner-controlled capture log around the fail-closed checks.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
 
     @contextmanager
     def _locked(self):
+        if self.path.is_symlink():
+            raise ValueError("pure optimizer capture file cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("pure optimizer capture lock cannot be a symlink")
         self.path.parent.mkdir(parents=True, exist_ok=True)
         descriptor = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
         os.chmod(self.lock_path, 0o600)

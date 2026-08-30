@@ -539,11 +539,17 @@ class JsonProcessFeedbackLedger:
     """Append-only, idempotent and restart-safe process event storage."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path(path).expanduser().resolve()
+        # Keep the final path component unresolved so a symlink cannot
+        # redirect the process ledger into an unrelated file.
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
         self.lock_path = self.path.with_name(self.path.name + ".lock")
 
     @contextmanager
     def _lock(self):
+        if self.path.is_symlink():
+            raise ValueError("process feedback ledger cannot be a symlink")
+        if self.lock_path.is_symlink():
+            raise ValueError("process feedback ledger lock cannot be a symlink")
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
         with self.lock_path.open("a+", encoding="utf-8") as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
