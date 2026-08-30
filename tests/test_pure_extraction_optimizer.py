@@ -30,6 +30,7 @@ from rsimem.memory.pure_extraction import (
 from rsimem.memory.pure_extraction_optimizer import (
     JsonPureExtractionOptimizerContentCaptureStore,
     PureExtractionOptimizerContentCapture,
+    PureExtractionOptimizerHypothesisProjection,
     build_pure_extraction_optimizer_gate_request,
     build_pure_extraction_optimizer_request,
 )
@@ -325,6 +326,15 @@ def test_pure_optimizer_propose_uses_pure_request_boundary() -> None:
     assert result.candidate is not None
     assert len(client.requests) == 1
     assert json.loads(client.requests[0].input_json)["evidence_groups"]["useful"]
+    projection = PureExtractionOptimizerHypothesisProjection.from_result(
+        result,
+        corpus,
+        parent_artifact_id=parent.artifact_id,
+    )
+    assert projection.decision == "PROPOSE"
+    assert PureExtractionOptimizerHypothesisProjection.from_payload(
+        projection.payload()
+    ) == projection
 
 
 def test_pure_optimizer_capture_rejects_evaluation_text() -> None:

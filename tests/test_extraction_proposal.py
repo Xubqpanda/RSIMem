@@ -162,8 +162,8 @@ def test_pure_proposal_preparation_uses_pure_stores_without_legacy_projection(
     hypothesis = json.loads(
         (owner / "proposal" / "feasibility-hypothesis.json").read_text()
     )
-    assert hypothesis["projectionSchema"] == "pure-extraction-optimizer-hypothesis-v1"
-    assert hypothesis["corpusId"] == corpus_store.read().corpus_id
+    assert hypothesis["schema"] == "rsimem-pure-extraction-optimizer-hypothesis-v1"
+    assert hypothesis["corpus_id"] == corpus_store.read().corpus_id
 
 
 def test_rejected_candidate_is_persisted_without_deployable_artifact(
