@@ -1533,6 +1533,67 @@ class HermesPastBenchBridge:
                 ),
                 None,
             )
+            if memory_use is None:
+                # The future recorder's operation provenance is independent
+                # of the source compilation provenance.  Bind an observed
+                # memory-use join to this source only when its artifact set
+                # intersects the source's persisted artifacts unambiguously;
+                # the rebased record is content-free and keeps all operation
+                # identities intact.
+                source_artifacts = {
+                    fact.artifact_id
+                    for fact in source.source.facts
+                    if fact.artifact_id is not None
+                }
+                candidates = tuple(
+                    value
+                    for value in memory_uses
+                    if source_artifacts.intersection(
+                        set(value.artifact_ids)
+                        | set(value.retrieved_artifact_ids)
+                        | set(value.injected_artifact_ids)
+                        | set(value.used_artifact_ids)
+                    )
+                )
+                if len(candidates) == 1 and candidates[0].artifact_set_id is None:
+                    observed = candidates[0]
+                    candidate_artifacts = set(observed.artifact_ids) or set(
+                        observed.retrieved_artifact_ids
+                    )
+                    source_match_count = sum(
+                        bool(
+                            candidate_artifacts.intersection({
+                                fact.artifact_id
+                                for fact in item.source.facts
+                                if fact.artifact_id is not None
+                            })
+                        )
+                        for item in sources
+                    )
+                    if source_match_count != 1:
+                        observed = None
+                    if observed is None:
+                        memory_use = None
+                    else:
+                        memory_use = MemoryUseEvidence.create(
+                            artifact_ids=observed.artifact_ids,
+                            artifact_set_id=observed.artifact_set_id,
+                            retrieval_operation_id=observed.retrieval_operation_id,
+                            retrieved_artifact_ids=observed.retrieved_artifact_ids,
+                            retrieval_failure=observed.retrieval_failure,
+                            injection_operation_id=observed.injection_operation_id,
+                            injected_artifact_ids=observed.injected_artifact_ids,
+                            injection_failure=observed.injection_failure,
+                            downstream_operation_id=observed.downstream_operation_id,
+                            used_artifact_ids=observed.used_artifact_ids,
+                            outcome_operation_id=observed.outcome_operation_id,
+                            outcome_kind=observed.outcome_kind,
+                            outcome_success=observed.outcome_success,
+                            observation_cutoff=observed.observation_cutoff,
+                            provenance_id=source.provenance_id,
+                            observation_complete=observed.observation_complete,
+                            behavioral_consistency=observed.behavioral_consistency,
+                        )
             binding = next(
                 (
                     value
