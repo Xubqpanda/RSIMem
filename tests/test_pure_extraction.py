@@ -537,7 +537,7 @@ def test_pure_optimizer_store_honors_shared_revocation_registry(tmp_path) -> Non
     assert corpus_store.read_for_optimizer(revocation_registry=registry) == corpus
     registry.append(RevocationEntry.create(
         artifact_id=corpus.corpus_id,
-        artifact_schema_version=2,
+        artifact_schema_version=3,
         artifact_digest=corpus.corpus_digest,
         evidence_plane="pure_process",
         evidence_source="runtime_observation",
