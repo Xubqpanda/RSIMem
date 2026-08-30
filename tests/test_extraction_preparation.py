@@ -211,6 +211,47 @@ def test_process_signal_gate_rejects_unbound_or_mixed_protocol_cases(
         _process_signal_gate(tmp_path / "mixed")
 
 
+def test_process_signal_gate_does_not_vote_over_conflicting_replicates(
+    tmp_path: Path,
+) -> None:
+    store = JsonProcessSignalCaseStore(
+        tmp_path / "conflict" / "process_signal_cases.jsonl"
+    )
+
+    def case(physical_id: str, *, attributable: bool) -> ProcessSignalCase:
+        return ProcessSignalCase.create(
+            logical_case_id="logical-case.conflict",
+            physical_observation_ids=(physical_id,),
+            source_observed=True,
+            extraction_observed=True,
+            persistence_observed=True,
+            retrieval_observed=True,
+            exposure_observed=True,
+            outcome_observed=True,
+            extraction_attributable=attributable,
+            abstract_hypothesis_digest=("a" * 64 if attributable else None),
+            observation_complete=True,
+            analysis_protocol_id="signal-protocol.conflict",
+            replicate_id=physical_id.replace(
+                "physical-observation", "replicate"
+            ),
+            observation_window="window.conflict",
+        )
+
+    assert store.append(case("physical-observation.conflict.1", attributable=True))
+    assert store.append(case("physical-observation.conflict.2", attributable=False))
+
+    gate, protocol_id, case_digest, case_count, optimization_count, hypothesis = (
+        _process_signal_gate(tmp_path / "conflict")
+    )
+    assert gate == PROCESS_SIGNAL_GATE_NO_SIGNAL
+    assert protocol_id == "signal-protocol.conflict"
+    assert isinstance(case_digest, str) and len(case_digest) == 64
+    assert case_count == 2
+    assert optimization_count == 0
+    assert hypothesis is None
+
+
 def test_build_corpus_exactly_joins_private_and_public_live_evidence(
     tmp_path: Path,
 ) -> None:

@@ -38,6 +38,7 @@ from .memory.extraction_optimizer_corpus import (
 from .memory.process_signal import (
     JsonProcessSignalCaseStore,
     ProcessSignalCaseStatus,
+    census_process_signal_cases,
 )
 from .memory.extraction_optimizer_store import JsonExtractionOptimizerCorpusStore
 from .memory.extraction_projection import (
@@ -149,6 +150,14 @@ def _process_signal_gate(
         cases.extend(JsonProcessSignalCaseStore(path).records())
     if not cases:
         return PROCESS_SIGNAL_GATE_NO_SIGNAL, None, None, 0, 0, None
+    # A logical case may be observed several times (for example across
+    # provider replicates or retrieval boundaries).  Never treat conflicting
+    # statuses as independent optimization evidence.  The census also checks
+    # that a physical observation identity is not reused across cases; that
+    # is a malformed store and must fail closed rather than being silently
+    # deduplicated here.
+    census = census_process_signal_cases(cases)
+    has_conflicting_logical_case = census.conflict_case_count > 0
     metadata = {
         (
             case.analysis_protocol_id,
@@ -167,6 +176,15 @@ def _process_signal_gate(
     case_digest = content_digest(
         [case.payload() for case in sorted(cases, key=lambda item: item.case_id)]
     )
+    if has_conflicting_logical_case:
+        return (
+            PROCESS_SIGNAL_GATE_NO_SIGNAL,
+            protocol_id,
+            case_digest,
+            len(cases),
+            0,
+            None,
+        )
     optimization_cases = [
         case
         for case in cases
