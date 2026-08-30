@@ -73,9 +73,10 @@ def test_each_policy_layer_exposes_a_typed_decision_contract() -> None:
         assert contract.layer is layer
         assert contract.decision_type.endswith("Decision")
         assert set(contract.allowed_actions) == set(DecisionAction)
-        assert {"decision_id", "action", "input_digest", "output_digest"}.issubset(
-            contract.required_fields
-        )
+        assert {
+            "schema_version", "decision_id", "action", "input_digest",
+            "output_digest", "trigger_event_id", "execution_receipt_id",
+        }.issubset(contract.required_fields)
         assert PolicyDecisionContract.from_payload(contract.payload()) == contract
 
 

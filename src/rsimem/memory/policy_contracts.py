@@ -179,9 +179,9 @@ class PolicyDecisionContract:
 
 
 _COMMON_DECISION_FIELDS = (
-    "decision_id", "policy_version", "source_revision", "input_digest",
-    "output_digest", "action", "execution_status", "reason_codes",
-    "lineage_id",
+    "schema_version", "decision_id", "policy_version", "source_revision",
+    "input_digest", "output_digest", "action", "execution_status",
+    "reason_codes", "lineage_id", "trigger_event_id", "execution_receipt_id",
 )
 
 
