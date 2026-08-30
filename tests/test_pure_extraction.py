@@ -789,6 +789,18 @@ def test_bound_tool_closure_is_required_for_extraction_attribution() -> None:
     )
     assert complete.attribution is PureExtractionAttribution.ATTRIBUTABLE_SUCCESS
 
+    failed_tool = ToolCallResultJoin.create(**{**common_join, "success": False})
+    failed = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=memory_use,
+        tool_joins=(failed_tool,),
+        observation_window="window.completed-tool-gate-v1",
+        provenance_id=provenance,
+    )
+    assert failed.attribution is PureExtractionAttribution.UNRESOLVED
+    assert "tool_join_tool_failure" in failed.reason_codes
+
     malformed = (
         {"result_present": False, "result_id": None, "result_receipt_id": None},
         {"orphan_result": True},
