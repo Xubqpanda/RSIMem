@@ -37,6 +37,8 @@ PURE_EXTRACTION_SOURCE_SCHEMA = "rsimem-pure-extraction-source-v1"
 PURE_EXTRACTION_FEEDBACK_SCHEMA_VERSION = 1
 PURE_EXTRACTION_FEEDBACK_SCHEMA = "rsimem-pure-extraction-feedback-v1"
 PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION = 1
+PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION = 1
+PURE_EXTRACTION_OPTIMIZER_SCHEMA = "rsimem-pure-extraction-optimizer-v1"
 _IDENTIFIER = r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$"
 
 
@@ -481,6 +483,252 @@ class PureExtractionFeedbackRecord:
         return result
 
 
+@dataclass(frozen=True, slots=True)
+class PureExtractionOptimizerExample:
+    """A content-free optimizer unit built only from pure-process joins.
+
+    Source text and extracted fact text remain in owner-controlled capture
+    storage.  This identity is the safe join presented to the optimizer
+    builder; it has no benchmark family, stage, score, or answer metadata.
+    """
+
+    example_id: str
+    source_record_id: str
+    source_projection_id: str
+    source_projection_digest: str
+    extraction_set_id: str
+    extraction_artifact_id: str
+    extraction_artifact_digest: str
+    extraction_output_digest: str
+    fact_ids: tuple[str, ...]
+    semantic_keys: tuple[str, ...]
+    opportunity_evidence_id: str | None
+    opportunity_operation_id: str | None
+    memory_use_evidence_id: str | None
+    memory_use_operation_id: str | None
+    outcome_operation_id: str | None
+    artifact_set_binding_id: str | None
+    tool_join_ids: tuple[str, ...]
+    observation_window: str
+    provenance_id: str
+    attribution: PureExtractionAttribution
+    reason_codes: tuple[str, ...]
+    observation_complete: bool
+    schema_version: int = PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION
+    evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
+
+    def __post_init__(self) -> None:
+        if self.schema_version != PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION:
+            raise ValueError("unsupported pure extraction optimizer schema")
+        plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+        if plane is not EvidencePlane.PURE_PROCESS or source is not EvidenceSourceKind.RUNTIME_OBSERVATION:
+            raise ValueError("pure extraction optimizer example must be runtime pure-process evidence")
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
+        for value, name in (
+            (self.example_id, "pure extraction optimizer example ID"),
+            (self.source_record_id, "pure extraction source record ID"),
+            (self.source_projection_id, "source projection ID"),
+            (self.extraction_set_id, "extraction set ID"),
+            (self.extraction_artifact_id, "extraction artifact ID"),
+            (self.observation_window, "observation window"),
+            (self.provenance_id, "optimizer provenance ID"),
+        ):
+            _id(value, name)
+        for value, name in (
+            (self.source_projection_digest, "source projection digest"),
+            (self.extraction_artifact_digest, "extraction artifact digest"),
+            (self.extraction_output_digest, "extraction output digest"),
+        ):
+            _digest(value, name)
+        for values, name in (
+            (self.fact_ids, "optimizer fact IDs"),
+            (self.semantic_keys, "optimizer semantic keys"),
+            (self.tool_join_ids, "optimizer tool join IDs"),
+            (self.reason_codes, "optimizer reason codes"),
+        ):
+            if len(values) != len(set(values)):
+                raise ValueError(f"{name} must be unique")
+            for value in values:
+                _id(value, name)
+        for value, name in (
+            (self.opportunity_evidence_id, "opportunity evidence ID"),
+            (self.opportunity_operation_id, "opportunity operation ID"),
+            (self.memory_use_evidence_id, "memory-use evidence ID"),
+            (self.memory_use_operation_id, "memory-use operation ID"),
+            (self.outcome_operation_id, "outcome operation ID"),
+            (self.artifact_set_binding_id, "artifact-set binding ID"),
+        ):
+            if value is not None:
+                _id(value, name)
+        object.__setattr__(self, "attribution", PureExtractionAttribution(self.attribution))
+        if type(self.observation_complete) is not bool:
+            raise TypeError("optimizer observation completeness must be bool")
+        if not self.observation_complete and self.attribution is not PureExtractionAttribution.CENSORED:
+            raise ValueError("incomplete optimizer observation must be censored")
+        if self.attribution is PureExtractionAttribution.CENSORED and self.observation_complete:
+            raise ValueError("censored optimizer observation must be incomplete")
+        if self.memory_use_evidence_id is None and any(
+            value is not None
+            for value in (self.memory_use_operation_id, self.outcome_operation_id)
+        ):
+            raise ValueError("memory-use operations require memory-use evidence")
+        if self.opportunity_evidence_id is None and self.opportunity_operation_id is not None:
+            raise ValueError("opportunity operation requires opportunity evidence")
+        validate_pure_process_payload(self.payload())
+        if self.example_id != f"pure-extraction-example.{content_digest(self.identity_payload())[:40]}":
+            raise ValueError("pure extraction optimizer example ID mismatch")
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "schema_version": self.schema_version,
+            "source_record_id": self.source_record_id,
+            "source_projection_id": self.source_projection_id,
+            "source_projection_digest": self.source_projection_digest,
+            "extraction_set_id": self.extraction_set_id,
+            "extraction_artifact_id": self.extraction_artifact_id,
+            "extraction_artifact_digest": self.extraction_artifact_digest,
+            "extraction_output_digest": self.extraction_output_digest,
+            "fact_ids": list(self.fact_ids),
+            "semantic_keys": list(self.semantic_keys),
+            "opportunity_evidence_id": self.opportunity_evidence_id,
+            "opportunity_operation_id": self.opportunity_operation_id,
+            "memory_use_evidence_id": self.memory_use_evidence_id,
+            "memory_use_operation_id": self.memory_use_operation_id,
+            "outcome_operation_id": self.outcome_operation_id,
+            "artifact_set_binding_id": self.artifact_set_binding_id,
+            "tool_join_ids": list(self.tool_join_ids),
+            "observation_window": self.observation_window,
+            "provenance_id": self.provenance_id,
+            "attribution": self.attribution.value,
+            "reason_codes": list(self.reason_codes),
+            "observation_complete": self.observation_complete,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
+        }
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "schema": PURE_EXTRACTION_OPTIMIZER_SCHEMA,
+            **self.identity_payload(),
+            "example_id": self.example_id,
+        }
+
+    @classmethod
+    def from_records(
+        cls,
+        source: PureExtractionSourceRecord,
+        feedback: PureExtractionFeedbackRecord,
+    ) -> "PureExtractionOptimizerExample":
+        if not isinstance(source, PureExtractionSourceRecord):
+            raise TypeError("pure optimizer source has the wrong type")
+        if not isinstance(feedback, PureExtractionFeedbackRecord):
+            raise TypeError("pure optimizer feedback has the wrong type")
+        if feedback.source_record_id != source.record_id:
+            raise ValueError("pure optimizer source/feedback record join mismatch")
+        if feedback.source_projection_digest != source.source_projection_digest:
+            raise ValueError("pure optimizer source projection join mismatch")
+        if feedback.extraction_set_id != source.extraction_set_id:
+            raise ValueError("pure optimizer extraction set join mismatch")
+        opportunity_id = feedback.opportunity.evidence_id if feedback.opportunity else None
+        opportunity_operation_id = feedback.opportunity.operation_id if feedback.opportunity else None
+        memory_use_id = feedback.memory_use.evidence_id if feedback.memory_use else None
+        memory_use_operation_id = (
+            feedback.memory_use.downstream_operation_id if feedback.memory_use else None
+        )
+        outcome_operation_id = feedback.memory_use.outcome_operation_id if feedback.memory_use else None
+        fact_ids = tuple(value.fact_id for value in source.source.facts)
+        semantic_keys = tuple(dict.fromkeys(
+            key for value in source.source.facts for key in value.semantic_keys
+        ))
+        values = {
+            "source_record_id": source.record_id,
+            "source_projection_id": source.source_projection_id,
+            "source_projection_digest": source.source_projection_digest,
+            "extraction_set_id": source.extraction_set_id,
+            "extraction_artifact_id": source.extraction_artifact_id,
+            "extraction_artifact_digest": source.extraction_artifact_digest,
+            "extraction_output_digest": source.extraction_output_digest,
+            "fact_ids": fact_ids,
+            "semantic_keys": semantic_keys,
+            "opportunity_evidence_id": opportunity_id,
+            "opportunity_operation_id": opportunity_operation_id,
+            "memory_use_evidence_id": memory_use_id,
+            "memory_use_operation_id": memory_use_operation_id,
+            "outcome_operation_id": outcome_operation_id,
+            "artifact_set_binding_id": (
+                feedback.artifact_set_binding.binding_id
+                if feedback.artifact_set_binding else None
+            ),
+            "tool_join_ids": tuple(value.join_id for value in feedback.tool_joins),
+            "observation_window": feedback.observation_window,
+            "provenance_id": feedback.provenance_id,
+            "attribution": feedback.attribution,
+            "reason_codes": feedback.reason_codes,
+            "observation_complete": feedback.observation_complete,
+            "schema_version": PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION,
+            "evidence_plane": EvidencePlane.PURE_PROCESS,
+            "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION,
+        }
+        return cls(
+            example_id=f"pure-extraction-example.{content_digest({**values, 'attribution': feedback.attribution.value, 'fact_ids': list(fact_ids), 'semantic_keys': list(semantic_keys), 'tool_join_ids': list(values['tool_join_ids']), 'reason_codes': list(feedback.reason_codes), 'evidence_plane': EvidencePlane.PURE_PROCESS.value, 'evidence_source': EvidenceSourceKind.RUNTIME_OBSERVATION.value})[:40]}",
+            **values,
+        )
+
+    @classmethod
+    def from_payload(cls, value: object) -> "PureExtractionOptimizerExample":
+        fields = {
+            "schema", "example_id", "schema_version", "source_record_id",
+            "source_projection_id", "source_projection_digest", "extraction_set_id",
+            "extraction_artifact_id", "extraction_artifact_digest",
+            "extraction_output_digest", "fact_ids", "semantic_keys",
+            "opportunity_evidence_id", "opportunity_operation_id",
+            "memory_use_evidence_id", "memory_use_operation_id", "outcome_operation_id",
+            "artifact_set_binding_id", "tool_join_ids", "observation_window",
+            "provenance_id", "attribution", "reason_codes", "observation_complete",
+            "evidence_plane", "evidence_source",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != PURE_EXTRACTION_OPTIMIZER_SCHEMA:
+            raise ValueError("malformed pure extraction optimizer example")
+        for name in ("fact_ids", "semantic_keys", "tool_join_ids", "reason_codes"):
+            if not isinstance(value[name], list):
+                raise ValueError("malformed pure extraction optimizer collections")
+        try:
+            result = cls(
+                example_id=value["example_id"],
+                source_record_id=value["source_record_id"],
+                source_projection_id=value["source_projection_id"],
+                source_projection_digest=value["source_projection_digest"],
+                extraction_set_id=value["extraction_set_id"],
+                extraction_artifact_id=value["extraction_artifact_id"],
+                extraction_artifact_digest=value["extraction_artifact_digest"],
+                extraction_output_digest=value["extraction_output_digest"],
+                fact_ids=tuple(value["fact_ids"]),
+                semantic_keys=tuple(value["semantic_keys"]),
+                opportunity_evidence_id=value["opportunity_evidence_id"],
+                opportunity_operation_id=value["opportunity_operation_id"],
+                memory_use_evidence_id=value["memory_use_evidence_id"],
+                memory_use_operation_id=value["memory_use_operation_id"],
+                outcome_operation_id=value["outcome_operation_id"],
+                artifact_set_binding_id=value["artifact_set_binding_id"],
+                tool_join_ids=tuple(value["tool_join_ids"]),
+                observation_window=value["observation_window"],
+                provenance_id=value["provenance_id"],
+                attribution=value["attribution"],
+                reason_codes=tuple(value["reason_codes"]),
+                observation_complete=value["observation_complete"],
+                schema_version=value["schema_version"],
+                evidence_plane=EvidencePlane(value["evidence_plane"]),
+                evidence_source=EvidenceSourceKind(value["evidence_source"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed pure extraction optimizer example") from exc
+        if result.payload() != dict(value):
+            raise ValueError("non-canonical pure extraction optimizer example")
+        return result
+
+
 class _JsonPureExtractionStore:
     record_type = PureExtractionSourceRecord
 
@@ -554,11 +802,14 @@ __all__ = [
     "PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION",
     "PURE_EXTRACTION_FEEDBACK_SCHEMA",
     "PURE_EXTRACTION_FEEDBACK_SCHEMA_VERSION",
+    "PURE_EXTRACTION_OPTIMIZER_SCHEMA",
+    "PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION",
     "PURE_EXTRACTION_SOURCE_SCHEMA",
     "PURE_EXTRACTION_SOURCE_SCHEMA_VERSION",
     "JsonPureExtractionFeedbackRecordStore",
     "JsonPureExtractionSourceRecordStore",
     "PureExtractionAttribution",
     "PureExtractionFeedbackRecord",
+    "PureExtractionOptimizerExample",
     "PureExtractionSourceRecord",
 ]
