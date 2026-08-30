@@ -983,6 +983,12 @@ class PureExtractionOptimizerCorpus:
             "examples": [value.payload() for value in self.examples],
         }
 
+    @property
+    def corpus_digest(self) -> str:
+        """Content digest used by the shared revocation registry."""
+
+        return content_digest(self.payload())
+
     @classmethod
     def create(
         cls,
@@ -1397,13 +1403,29 @@ class JsonPureExtractionOptimizerCorpusStore:
             raise FileNotFoundError("pure extraction optimizer corpus has not been persisted")
         return result
 
-    def read_for_optimizer(self) -> PureExtractionOptimizerCorpus:
+    def read_for_optimizer(
+        self,
+        *,
+        revocation_registry: object | None = None,
+    ) -> PureExtractionOptimizerCorpus:
         result = self.read()
         if result.split != "train":
             raise PermissionError("pure optimizer can read only the training corpus")
         if result.process_signal_gate != "ready":
             raise PermissionError(
                 "pure optimizer process-signal gate is not ready"
+            )
+        if revocation_registry is not None:
+            from .revocation import JsonRevocationRegistry
+
+            if not isinstance(revocation_registry, JsonRevocationRegistry):
+                raise TypeError("pure optimizer revocation registry has the wrong type")
+            revocation_registry.assert_active(
+                artifact_id=result.corpus_id,
+                artifact_schema_version=PURE_EXTRACTION_CORPUS_SCHEMA_VERSION,
+                artifact_digest=result.corpus_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
             )
         for example in result.examples:
             if example.evidence_plane is not EvidencePlane.PURE_PROCESS:

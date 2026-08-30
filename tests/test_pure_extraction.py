@@ -24,6 +24,7 @@ from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
 from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
 from rsimem.memory.use_attribution import MemoryUseEvidence, OutcomeEvidenceKind
 from rsimem.memory.process_signal import ProcessSignalCaseCensus
+from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
 from test_extraction_optimizer_builder import _fixture
 
 
@@ -266,6 +267,51 @@ def test_pure_corpus_factory_uses_census_conflicts_as_no_signal() -> None:
             process_signal_case_digest="f" * 64,
             census=census,
         )
+
+
+def test_pure_optimizer_store_honors_shared_revocation_registry(tmp_path) -> None:
+    projection, source, *_ = _fixture()
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id="provenance.revoke-v1",
+    )
+    feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=pure_source.record_id,
+        source_projection_digest=pure_source.source_projection_digest,
+        extraction_set_id=pure_source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.completed-revoke-v1",
+        provenance_id="provenance.revoke-v1",
+    )
+    example = PureExtractionOptimizerExample.from_records(pure_source, feedback)
+    corpus = PureExtractionOptimizerCorpus.create(
+        split="train",
+        observation_cutoff="2026-08-24T00:00:00Z",
+        examples=(example,),
+        process_signal_gate="ready",
+        process_signal_protocol_id="protocol.revoke-v1",
+        process_signal_case_digest="a" * 64,
+        process_signal_case_count=1,
+        process_signal_optimization_count=1,
+    )
+    corpus_store = JsonPureExtractionOptimizerCorpusStore(tmp_path / "corpus.json")
+    corpus_store.write(corpus)
+    registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    registry.initialize()
+    assert corpus_store.read_for_optimizer(revocation_registry=registry) == corpus
+    registry.append(RevocationEntry.create(
+        artifact_id=corpus.corpus_id,
+        artifact_schema_version=2,
+        artifact_digest=corpus.corpus_digest,
+        evidence_plane="pure_process",
+        evidence_source="runtime_observation",
+        revoked_at="2026-08-25T00:00:00Z",
+        reason_code="stale_evidence",
+    ))
+    with pytest.raises(ValueError, match="revoked"):
+        corpus_store.read_for_optimizer(revocation_registry=registry)
 
 
 def test_prepare_pure_extraction_corpus_is_single_join_entrypoint() -> None:
