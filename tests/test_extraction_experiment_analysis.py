@@ -253,9 +253,10 @@ def _batch(tmp_path: Path, *, changed: bool) -> Path:
     inputs["replicates"] = 1
     initialize_extraction_batch_manifest(**inputs)
     manifest = json.loads((root / "batch_manifest.json").read_text(encoding="utf-8"))
+    protocol = protocol_for_extraction_manifest(manifest)
     JsonProcessSignalAnalysisProtocolStore(
         root / PROCESS_SIGNAL_PROTOCOL_FILENAME
-    ).freeze(protocol_for_extraction_manifest(manifest))
+    ).freeze(protocol)
     active = {
         method: (
             inputs["parent_policy"]
@@ -405,9 +406,10 @@ def test_analysis_reports_persisted_logical_process_signal_census(tmp_path: Path
     )
     run = root / completed["outputDirectory"]
     manifest = json.loads((root / "batch_manifest.json").read_text(encoding="utf-8"))
+    protocol = protocol_for_extraction_manifest(manifest)
     JsonProcessSignalAnalysisProtocolStore(
         root / PROCESS_SIGNAL_PROTOCOL_FILENAME
-    ).freeze(protocol_for_extraction_manifest(manifest))
+    ).freeze(protocol)
     case = ProcessSignalCase.create(
         logical_case_id="logical-case.analysis.v1",
         physical_observation_ids=("physical-observation.analysis.v1",),
@@ -420,6 +422,9 @@ def test_analysis_reports_persisted_logical_process_signal_census(tmp_path: Path
         extraction_attributable=False,
         abstract_hypothesis_digest=None,
         observation_complete=True,
+        analysis_protocol_id=protocol.protocol_id,
+        replicate_id=f"replicate.{completed['replicate']}",
+        observation_window=protocol.observation_window,
     )
     JsonProcessSignalCaseStore(run / "process_signal_cases.jsonl").append(case)
     report = analyze_extraction_batch(root)
@@ -440,6 +445,8 @@ def test_analysis_rejects_process_signal_cases_without_frozen_protocol(
         if event["status"] == "completed"
     )
     run = root / completed["outputDirectory"]
+    manifest = json.loads((root / "batch_manifest.json").read_text(encoding="utf-8"))
+    protocol = protocol_for_extraction_manifest(manifest)
     (root / PROCESS_SIGNAL_PROTOCOL_FILENAME).unlink()
     case = ProcessSignalCase.create(
         logical_case_id="logical-case.missing-protocol.v1",
@@ -453,6 +460,9 @@ def test_analysis_rejects_process_signal_cases_without_frozen_protocol(
         extraction_attributable=False,
         abstract_hypothesis_digest=None,
         observation_complete=True,
+        analysis_protocol_id=protocol.protocol_id,
+        replicate_id=f"replicate.{completed['replicate']}",
+        observation_window=protocol.observation_window,
     )
     JsonProcessSignalCaseStore(run / "process_signal_cases.jsonl").append(case)
     with pytest.raises(ValueError, match="process signal protocol is missing"):
@@ -469,6 +479,7 @@ def test_analysis_rejects_process_signal_protocol_manifest_drift(
         event for event in manifest["attemptHistory"] if event["status"] == "completed"
     )
     run = root / completed["outputDirectory"]
+    protocol = protocol_for_extraction_manifest(manifest)
     case = ProcessSignalCase.create(
         logical_case_id="logical-case.drifted-protocol.v1",
         physical_observation_ids=("physical-observation.drifted-protocol.v1",),
@@ -481,9 +492,11 @@ def test_analysis_rejects_process_signal_protocol_manifest_drift(
         extraction_attributable=False,
         abstract_hypothesis_digest=None,
         observation_complete=True,
+        analysis_protocol_id=protocol.protocol_id,
+        replicate_id=f"replicate.{completed['replicate']}",
+        observation_window=protocol.observation_window,
     )
     JsonProcessSignalCaseStore(run / "process_signal_cases.jsonl").append(case)
-    protocol = protocol_for_extraction_manifest(manifest)
     drifted = protocol.__class__.create(
         training_family_ids=protocol.training_family_ids,
         task_template_group_ids=protocol.task_template_group_ids,
