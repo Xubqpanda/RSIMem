@@ -925,6 +925,7 @@ class LayerIntervention:
             raise ValueError("parent and candidate artifacts must be distinct")
         if type(self.process_signal) is not bool:
             raise ValueError("process_signal must be bool")
+        self._validate_upstream_scope()
         outcome = FeasibilityOutcome(self.outcome)
         try:
             reasons = _normalize_strings(
@@ -982,6 +983,31 @@ class LayerIntervention:
             object.__setattr__(self, "hypothesis", hypothesis)
         elif self.hypothesis is not None:
             raise ValueError("policy hypothesis requires process signal")
+
+    def _validate_upstream_scope(self) -> None:
+        """Ensure a single-layer intervention does not alter prior decisions.
+
+        Decisions after the target layer may legitimately change as derived
+        consequences (for example, an empty extraction has no admission or
+        commit).  Any upstream change would make the case a joint intervention
+        and invalidate layer attribution.
+        """
+
+        order = (
+            PolicyLayer.TRIGGER,
+            PolicyLayer.SOURCE_SELECTION,
+            PolicyLayer.EXTRACTION,
+            PolicyLayer.ADMISSION,
+            PolicyLayer.COMMIT,
+            PolicyLayer.EXPOSURE,
+        )
+        parent_by_layer = {item.layer: item for item in self.parent.decisions}
+        candidate_by_layer = {item.layer: item for item in self.candidate.decisions}
+        for layer in order[: order.index(self.target_layer)]:
+            if parent_by_layer.get(layer) != candidate_by_layer.get(layer):
+                raise ValueError(
+                    "single-layer intervention changes an upstream decision"
+                )
 
     def _validate_feedback(self, outcome: FeasibilityOutcome) -> None:
         if outcome == FeasibilityOutcome.USEFUL and not self.feedback.complete_useful:

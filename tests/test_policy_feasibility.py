@@ -326,6 +326,45 @@ def test_candidate_must_change_target_layer_and_artifact_scope() -> None:
         )
 
 
+def test_single_layer_intervention_rejects_upstream_decision_drift() -> None:
+    snapshot, event = _event()
+    common = {
+        "backend": _backend(),
+        "candidate_fact_ids": ("fact.tsv_preference",),
+        "artifact_ids": ("artifact.tsv_preference",),
+        "mutation_ids": ("mutation.parent",),
+    }
+    parent = DeterministicPolicyReplay().run(snapshot, event, **common)
+    candidate = DeterministicPolicyReplay().run(
+        snapshot, event, **{**common, "candidate_fact_ids": ()}
+    )
+    shadow_trigger = DeterministicPolicyReplay(
+        trigger=DeterministicTriggerPolicy(
+            config=TriggerPolicyConfig(task_completed_enabled=False)
+        )
+    ).run(snapshot, event, **common)
+    altered = replace(
+        candidate,
+        decisions=(shadow_trigger.decisions[0], *candidate.decisions[1:]),
+    )
+    with pytest.raises(ValueError, match="upstream decision"):
+        LayerIntervention(
+            case_id="case.upstream-drift",
+            target_layer=PolicyLayer.EXTRACTION,
+            parent=parent,
+            candidate=altered,
+            parent_artifact=_artifact(
+                "fixed.extraction.parent.v1", PolicyArtifactKind.FIXED
+            ),
+            candidate_artifact=_artifact(
+                "adaptive.extraction.candidate.v1",
+                PolicyArtifactKind.SINGLE_LAYER_ADAPTIVE,
+            ),
+            process_signal=True,
+            outcome=FeasibilityOutcome.UNRESOLVED,
+            reason_codes=("upstream_drift",),
+        )
+
 def test_contradictory_complete_chain_cannot_be_marked_unresolved() -> None:
     with pytest.raises(ValueError, match="cannot carry a complete reward chain"):
         _case(
