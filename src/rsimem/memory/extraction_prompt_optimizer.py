@@ -29,6 +29,7 @@ from .pure_extraction_optimizer import (
     PureExtractionOptimizerContentCapture,
     build_pure_extraction_optimizer_gate_request,
     build_pure_extraction_optimizer_request,
+    _logical_groups,
 )
 from .extraction_optimizer_corpus import (
     ExtractionOptimizerCorpus,
@@ -453,13 +454,7 @@ class ExtractionPromptOptimizer:
         }
         if len(capture_by_id) != len(captures):
             raise ValueError("pure optimizer captures must have unique example IDs")
-        groups: dict[str, list[object]] = {}
-        for example in corpus.examples:
-            capture = capture_by_id.get(example.example_id)
-            logical_id = capture.logical_case_id if capture is not None else (
-                "logical-case." + content_digest({"example_id": example.example_id})[:40]
-            )
-            groups.setdefault(logical_id, []).append(example)
+        groups = _logical_groups(corpus, capture_by_id)
         primary = tuple(
             min(values, key=lambda value: value.example_id)
             for values in groups.values()
