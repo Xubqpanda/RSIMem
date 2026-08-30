@@ -55,6 +55,11 @@ from .memory.process_feedback import (
     ProcessEventKind,
     ProcessEventStatus,
 )
+from .memory.process_signal import (
+    JsonProcessSignalCaseStore,
+    ProcessSignalCase,
+    build_process_signal_cases,
+)
 from .memory.live_writeback import (
     ExtractionPromptRuntimeScope,
     StaticSemanticBoundaryResult,
@@ -108,7 +113,7 @@ from .memory.extraction_projection import (
     LiveExtractionFeedbackRecord,
     Mem0FlatExtractionSourceProjector,
 )
-from .memory.operation_graph import OperationContext
+from .memory.operation_graph import OperationContext, OperationStatus
 from .memory.operation_graph import materialize_operation_graph
 from .memory.use_attribution import resolve_memory_use
 from .memory.artifact_set import (
@@ -122,6 +127,7 @@ from .memory.pure_extraction import (
     PureExtractionSourceProjector,
     PureExtractionSourceRecord,
 )
+from .memory.pure_process import PureProcessCorpus
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
 
 
@@ -459,6 +465,13 @@ class HermesPastBenchBridge:
             pure_extraction_feedback_path
             or self.evidence_path.with_name("rsimem_pure_extraction_feedback.jsonl")
         )
+        # A local, unbound signal case is useful for runtime diagnostics even
+        # when the formal batch protocol has not yet been supplied by the
+        # launcher.  Formal runners continue to write their protocol-bound
+        # cases to ``process_signal_cases.jsonl``.
+        self._unbound_process_signal_case_store = JsonProcessSignalCaseStore(
+            self.evidence_path.with_name("process_signal_cases_unbound.jsonl")
+        )
         self._snapshot_collector = HermesStateSnapshotCollector()
         self.ledger = MemoryLedgerObserver(
             run_id=run_id,
@@ -734,7 +747,22 @@ class HermesPastBenchBridge:
                     )
                 )
             else:
-                self.semantic_future_recorder = None
+                # Future semantic traces are deployment-visible process
+                # evidence and do not depend on the benchmark audit resolver.
+                # Keep recording retrieval/injection/use/outcome joins even
+                # when no family feedback contract is configured.
+                self.semantic_future_recorder = SemanticFutureTraceRecorder(
+                    self.static_writeback.operation_recorder,
+                    OperationContext(
+                        run_id,
+                        episode_id,
+                        session_id,
+                        task_id,
+                        self.static_writeback.policy.descriptor.policy_version,
+                        self.static_writeback.policy.descriptor.prompt_version,
+                        self.static_writeback.policy.descriptor.framework_version,
+                    ),
+                )
                 self.semantic_feedback_resolver = None
                 self.extraction_source_projector = None
                 self.extraction_source_store = None
@@ -839,6 +867,12 @@ class HermesPastBenchBridge:
 
         return tuple(self.pure_extraction_feedback_store.records())
 
+    @property
+    def unbound_process_signal_cases(self) -> tuple[ProcessSignalCase, ...]:
+        """Replay-stable process cases pending a frozen batch protocol."""
+
+        return self._unbound_process_signal_case_store.records()
+
     def project_pure_extraction_source(
         self,
         boundary: StaticSemanticBoundaryResult,
@@ -904,6 +938,16 @@ class HermesPastBenchBridge:
         # bridge may itself be running a PAST-Bench case, but family/stage are
         # audit metadata and must not influence a deployment-visible provider.
         visible = self._strip_benchmark_scope(result)
+        # Expose only content-free source provenance to an application-owned
+        # provider so it can bind an opportunity to the prior extraction that
+        # produced the memory.  Do this conditionally to preserve the exact
+        # scope-free payload shape for hosts with no prior sources.
+        prior_sources = tuple(self.pure_extraction_source_store.records())
+        if prior_sources and isinstance(visible, Mapping):
+            visible = dict(visible)
+            visible["rsimem_source_provenance_ids"] = tuple(
+                source.provenance_id for source in prior_sources
+            )
         recorded = self.record_opportunity_evidence(provider(visible))
         self._last_runtime_opportunities = recorded
         return recorded
@@ -1272,38 +1316,63 @@ class HermesPastBenchBridge:
         if self._semantic_outcomes_recorded:
             return
         memory_use_operation_ids: list[str] = []
-        if self.semantic_future_recorder is not None and self.semantic_feedback_resolver is not None:
+        if self.semantic_future_recorder is not None:
             for future, step_id in self._semantic_futures:
                 current_input = self._current_input(result)
-                observation = self._semantic_deployment_observation(result)
-                # Runtime observations must not be seeded with benchmark
-                # contract scope.  The feedback resolver may use a
-                # contract-scoped projection for audit attribution, but that
-                # projection remains local to this benchmark-audit path and
-                # is never emitted as pure-process evidence.
-                audit_observation = self._semantic_audit_observation(
-                    observation,
-                    current_input=current_input,
+                resolution = None
+                audit_observation = None
+                if self.semantic_feedback_resolver is not None:
+                    observation = self._semantic_deployment_observation(result)
+                    # Runtime observations must not be seeded with benchmark
+                    # contract scope.  The feedback resolver may use a
+                    # contract-scoped projection for audit attribution, but
+                    # that projection remains local to this benchmark-audit
+                    # path and is never emitted as pure-process evidence.
+                    audit_observation = self._semantic_audit_observation(
+                        observation,
+                        current_input=current_input,
+                    )
+                    resolution = self.semantic_feedback_resolver.resolve(
+                        future,
+                        audit_observation,
+                    )
+                explicit_used = result.get("rsimem_used_artifact_ids")
+                if isinstance(explicit_used, (list, tuple)):
+                    used_artifact_ids = tuple(
+                        value for value in explicit_used if isinstance(value, str)
+                    )
+                else:
+                    used_artifact_ids = (
+                        resolution.used_artifact_ids if resolution is not None else ()
+                    )
+                outcome_status = (
+                    resolution.outcome_status
+                    if resolution is not None
+                    else OperationStatus.SUCCESS
+                    if result.get("completed") is True
+                    else OperationStatus.FAILED
                 )
-                resolution = self.semantic_feedback_resolver.resolve(
-                    future,
-                    audit_observation,
+                outcome_reason = (
+                    resolution.outcome_reason_code
+                    if resolution is not None
+                    else ("task_completed" if result.get("completed") is True else "task_incomplete")
                 )
                 outcome = self.semantic_future_recorder.record_use_and_outcome(
                     future,
-                    used_artifact_ids=resolution.used_artifact_ids,
-                    outcome_status=resolution.outcome_status,
-                    outcome_reason_code=resolution.outcome_reason_code,
+                    used_artifact_ids=used_artifact_ids,
+                    outcome_status=outcome_status,
+                    outcome_reason_code=outcome_reason,
                     step_id=step_id,
                 )
                 memory_use_operation_ids.append(outcome.use_operation_id)
                 self._record_memory_use_evidence(future, outcome, result)
-                self._record_extraction_feedback(
-                    future,
-                    audit_observation,
-                    outcome,
-                    current_input,
-                )
+                if audit_observation is not None:
+                    self._record_extraction_feedback(
+                        future,
+                        audit_observation,
+                        outcome,
+                        current_input,
+                    )
         self._record_tool_call_results(
             result,
             memory_use_operation_id=(
@@ -1336,7 +1405,47 @@ class HermesPastBenchBridge:
             reason_codes=("task_completed",) if completed else ("task_failure",),
             execution_receipt_ids=(f"receipt.task-outcome.{outcome_digest[:24]}",),
         )
+        self._record_unbound_process_signal_case()
         self._semantic_outcomes_recorded = True
+
+    def _record_unbound_process_signal_case(self) -> None:
+        """Persist a protocol-free diagnostic case for this completed run.
+
+        The case is intentionally written to a separate file and carries no
+        analysis protocol identity.  Formal launchers must still rebuild a
+        protocol-bound case after freezing their manifest; the unbound case
+        cannot unlock optimizer readiness by itself.
+        """
+
+        events = self._process_feedback.events
+        if not events:
+            return
+        # Policy/process events may carry benchmark-audit identity at the
+        # bridge ledger boundary.  Project them through the canonical
+        # content-free pure corpus before building an unbound diagnostic case;
+        # this strips family/stage rather than weakening the process-signal
+        # contract.
+        events = PureProcessCorpus.create(events).events
+        policy_seed = "hermes-process-policy.unbound"
+        if self.static_writeback is not None:
+            policy_seed = self.static_writeback.policy.descriptor.policy_version
+        frozen_policy_digest = hashlib.sha256(
+            policy_seed.encode("utf-8")
+        ).hexdigest()
+        cases = build_process_signal_cases(
+            events,
+            frozen_policy_digest=frozen_policy_digest,
+            source_task_template_id="source.hermes.completed-task.v1",
+            future_task_template_id="future.hermes.completed-task.v1",
+            observation_window="completed-task.v1",
+            replicate_id=(
+                "replicate."
+                + hashlib.sha256(self._run_id.encode("utf-8")).hexdigest()[:24]
+            ),
+            analysis_protocol_id=None,
+        )
+        for case in cases:
+            self._unbound_process_signal_case_store.append(case)
 
     def _record_pure_extraction_feedback(
         self,
