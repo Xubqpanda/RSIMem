@@ -155,7 +155,11 @@ def _past_bench_opportunity_provider(
     or output observation receive an opportunity.
     """
 
-    from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
+    from rsimem.memory.opportunity import (
+        ApplicationOpportunitySchema,
+        OpportunityEvidence,
+        OpportunitySurface,
+    )
 
     if not isinstance(result, Mapping):
         return ()
@@ -194,12 +198,40 @@ def _past_bench_opportunity_provider(
             separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()
+    application_schema = None
+    raw_contract = (
+        result.get("rsimem_application_schema", {}).get("application_contract")
+        if isinstance(result.get("rsimem_application_schema"), Mapping)
+        else None
+    )
+    if raw_contract is not None:
+        try:
+            application_schema = ApplicationOpportunitySchema.from_payload(raw_contract)
+        except (TypeError, ValueError):
+            # The bridge validates the frozen contract before invoking this
+            # provider; malformed metadata is ignored here rather than
+            # turning a diagnostic opportunity into a benchmark label.
+            application_schema = None
     values = []
     for provenance_id, keys, surface_name in candidates:
         if not isinstance(provenance_id, str) or not keys:
             continue
         surface = OpportunitySurface(surface_name)
         for key in keys:
+            use_application_surface = (
+                surface_name == "tool_schema"
+                and application_schema is not None
+                and key in application_schema.requirement_ids
+                and not (
+                    key == _PAST_SHARE_POLICY_KEY
+                    and "recipient" in "\n".join(_past_visible_messages(result)).casefold()
+                )
+            )
+            evidence_surface = (
+                OpportunitySurface.APPLICATION_SCHEMA
+                if use_application_surface
+                else surface
+            )
             operation_id = (
                 "opportunity.notes."
                 + hashlib.sha256(
@@ -207,7 +239,7 @@ def _past_bench_opportunity_provider(
                 ).hexdigest()[:32]
             )
             values.append(OpportunityEvidence.create(
-                source_surface=surface,
+                source_surface=evidence_surface,
                 semantic_requirement=key,
                 observation_time=str(result.get("observed_at") or _PAST_OBSERVATION_TIME),
                 operation_id=operation_id,
@@ -215,7 +247,15 @@ def _past_bench_opportunity_provider(
                 source_payload={
                     "visible_digest": visible_digest,
                     "tool_names": _past_notes_tool_names(result),
+                    "application_schema_id": (
+                        application_schema.schema_id
+                        if use_application_surface and application_schema is not None
+                        else None
+                    ),
                 },
+                application_schema=(
+                    application_schema if use_application_surface else None
+                ),
             ))
     return tuple(values)
 
