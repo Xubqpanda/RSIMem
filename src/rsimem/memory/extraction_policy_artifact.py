@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Mapping
+from typing import TYPE_CHECKING, Mapping
 
-from ..lifecycle import RawResourceUsage
+if TYPE_CHECKING:
+    from ..lifecycle.writeback import RawResourceUsage
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 from .prompt_components import (
     PromptComponentArtifact,
@@ -345,7 +346,12 @@ class ExtractionGenerationProvenance:
             (self.completion_digest, "optimizer completion digest"),
         ):
             _require_digest(value, name)
-        if not isinstance(self.usage, RawResourceUsage):
+        # Import lazily: lifecycle contracts import ``memory.contracts`` while
+        # the memory package is still initializing.  A top-level import of
+        # RawResourceUsage would make ``import rsimem.lifecycle`` circular.
+        from ..lifecycle.writeback import RawResourceUsage as _RawResourceUsage
+
+        if not isinstance(self.usage, _RawResourceUsage):
             raise TypeError("extraction generation usage must be raw resource usage")
 
     def payload(self) -> dict[str, object]:
@@ -399,6 +405,8 @@ class ExtractionGenerationProvenance:
             "extraction generation usage",
         )
         try:
+            from ..lifecycle.writeback import RawResourceUsage as _RawResourceUsage
+
             return cls(
                 optimizer_model=payload["optimizer_model"],
                 optimizer_config_digest=payload["optimizer_config_digest"],
@@ -406,7 +414,7 @@ class ExtractionGenerationProvenance:
                 training_cutoff=payload["training_cutoff"],
                 proposal_request_digest=payload["proposal_request_digest"],
                 completion_digest=payload["completion_digest"],
-                usage=RawResourceUsage(**usage),
+                usage=_RawResourceUsage(**usage),
                 evidence_plane=EvidencePlane(payload["evidence_plane"]),
                 evidence_source=EvidenceSourceKind(payload["evidence_source"]),
                 provenance_schema=payload["provenance_schema"],

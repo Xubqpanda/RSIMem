@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from ..lifecycle import RawResourceUsage
+if TYPE_CHECKING:
+    from ..lifecycle.writeback import RawResourceUsage
 from .extraction_feedback import ExtractionFeedbackLabel
 from .evidence_planes import EvidencePlane, require_optimizer_plane
 from .extraction_optimizer_corpus import (
@@ -300,7 +301,12 @@ class ExtractionOptimizerCompletion:
         _require_id(self.request_id, "optimizer completion request ID")
         if not isinstance(self.output_text, str) or not self.output_text.strip():
             raise ValueError("optimizer completion output must not be empty")
-        if not isinstance(self.usage, RawResourceUsage):
+        # Import lazily: lifecycle contracts import ``memory.contracts`` while
+        # the memory package is still initializing.  A top-level import of
+        # RawResourceUsage would make ``import rsimem.lifecycle`` circular.
+        from ..lifecycle.writeback import RawResourceUsage as _RawResourceUsage
+
+        if not isinstance(self.usage, _RawResourceUsage):
             raise TypeError("optimizer completion usage has the wrong type")
 
 
