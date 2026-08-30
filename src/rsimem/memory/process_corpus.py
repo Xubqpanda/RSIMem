@@ -14,7 +14,7 @@ import os
 import re
 import tempfile
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, Mapping
 
@@ -272,6 +272,7 @@ class ProcessSignalCensus:
     reason_counts: Mapping[str, int]
     layer_counts: Mapping[str, int]
     distinct_source_revision_count: int
+    layer_action_counts: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         values = (
@@ -288,10 +289,35 @@ class ProcessSignalCensus:
         for mapping in (self.kind_counts, self.status_counts, self.reason_counts, self.layer_counts):
             if any(not isinstance(key, str) or type(value) is not int or value < 0 for key, value in mapping.items()):
                 raise ValueError("process census buckets are invalid")
+        if not isinstance(self.layer_action_counts, Mapping):
+            raise ValueError("process census layer action buckets are invalid")
+        normalized_actions: dict[str, dict[str, int]] = {}
+        for layer, actions in self.layer_action_counts.items():
+            if not isinstance(layer, str) or not isinstance(actions, Mapping):
+                raise ValueError("process census layer action buckets are invalid")
+            if any(
+                not isinstance(action, str)
+                or type(count) is not int
+                or count < 0
+                for action, count in actions.items()
+            ):
+                raise ValueError("process census layer action buckets are invalid")
+            normalized_actions[layer] = dict(sorted(actions.items()))
+        if sum(
+            count
+            for actions in normalized_actions.values()
+            for count in actions.values()
+        ) > self.event_count:
+            raise ValueError("process census layer action counts exceed event count")
         object.__setattr__(self, "kind_counts", dict(sorted(self.kind_counts.items())))
         object.__setattr__(self, "status_counts", dict(sorted(self.status_counts.items())))
         object.__setattr__(self, "reason_counts", dict(sorted(self.reason_counts.items())))
         object.__setattr__(self, "layer_counts", dict(sorted(self.layer_counts.items())))
+        object.__setattr__(
+            self,
+            "layer_action_counts",
+            dict(sorted(normalized_actions.items())),
+        )
 
     @property
     def signal_coverage(self) -> float | None:
@@ -313,6 +339,14 @@ class ProcessSignalCensus:
             "statusCounts": dict(self.status_counts),
             "reasonCounts": dict(self.reason_counts),
             "layerCounts": dict(self.layer_counts),
+            "layerActionCounts": {
+                layer: dict(actions)
+                for layer, actions in self.layer_action_counts.items()
+            },
+            "layerActionVariation": {
+                layer: len(actions) > 1
+                for layer, actions in self.layer_action_counts.items()
+            },
             "distinctSourceRevisionCount": self.distinct_source_revision_count,
         }
 
@@ -327,6 +361,16 @@ def census_process_events(events: Iterable[ProcessEvent]) -> ProcessSignalCensus
     statuses: dict[str, int] = {}
     reasons: dict[str, int] = {}
     layers: dict[str, int] = {}
+    layer_actions: dict[str, dict[str, int]] = {}
+    action_by_status = {
+        "skipped": "SKIP",
+        "deferred": "DEFER",
+        "pending": "RUN",
+        "executed": "RUN",
+        "success": "RUN",
+        "failed": "RUN",
+        "rejected": "RUN",
+    }
     for event in items:
         kinds[event.kind.value] = kinds.get(event.kind.value, 0) + 1
         statuses[event.status.value] = statuses.get(event.status.value, 0) + 1
@@ -335,6 +379,9 @@ def census_process_events(events: Iterable[ProcessEvent]) -> ProcessSignalCensus
         if event.policy_layer is not None:
             layer = event.policy_layer.value
             layers[layer] = layers.get(layer, 0) + 1
+            action = action_by_status.get(event.status.value, "UNKNOWN")
+            bucket = layer_actions.setdefault(layer, {})
+            bucket[action] = bucket.get(action, 0) + 1
     return ProcessSignalCensus(
         event_count=len(items),
         policy_bound_count=sum(item.policy_decision_id is not None for item in items),
@@ -345,6 +392,7 @@ def census_process_events(events: Iterable[ProcessEvent]) -> ProcessSignalCensus
         reason_counts=reasons,
         layer_counts=layers,
         distinct_source_revision_count=len({item.source_revision for item in items}),
+        layer_action_counts=layer_actions,
     )
 
 
