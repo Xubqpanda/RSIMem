@@ -853,6 +853,7 @@ def _process_signal_case_summary(
             "statusCounts": {},
             "optimizationHypothesisCaseCounts": {},
             "replicateConsistentCaseCount": 0,
+            "conflictRate": None,
             "replicateConsistency": None,
         }
     census = census_process_signal_cases(cases)

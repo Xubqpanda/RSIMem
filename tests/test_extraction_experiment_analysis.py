@@ -602,6 +602,9 @@ def test_analysis_does_not_report_complete_usage_without_completed_runs(
     assert report["qualityReady"] is False
     assert report["usageComplete"] is False
     assert report["processSignalCases"]["caseCount"] == 0
+    assert report["processSignalCases"]["physicalObservationCount"] == 0
+    assert report["processSignalCases"]["optimizationHypothesisCaseCounts"] == {}
+    assert report["processSignalCases"]["conflictRate"] is None
     assert report["processSignalCases"]["protocolId"].startswith(
         "signal-protocol."
     )
