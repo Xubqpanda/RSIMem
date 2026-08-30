@@ -80,6 +80,13 @@ def test_past_opportunity_provider_uses_frozen_public_schema_for_generic_future_
     schema = {
         "schema_id": "past-bench.notes.application.v1",
         "schema_version": 1,
+        "application_contract": {
+            "schema_id": "past-bench.notes.application.v1",
+            "schema_version": 2,
+            "version": "v1",
+            "requirement_ids": ["application.notes.share.recipient_policy"],
+            "schema_digest": "122c4d36732dd4a2824d1b48944eed2aa80e9bf10ad51f596ba143673051797f",
+        },
         "opportunities": [{
             "semantic_key": "application.notes.share.recipient_policy",
             "surface": "tool_schema",
@@ -103,7 +110,7 @@ def test_past_opportunity_provider_uses_frozen_public_schema_for_generic_future_
     })
     assert len(values) == 1
     assert values[0].semantic_requirement == "application.notes.share.recipient_policy"
-    assert values[0].source_surface.value == "tool_schema"
+    assert values[0].source_surface.value == "application_schema"
 
 
 def test_application_schema_is_derived_from_visible_tool_contract() -> None:
