@@ -610,6 +610,25 @@ def test_feasibility_replay_rejects_unhashable_id_values() -> None:
         })
 
 
+def test_feasibility_replay_rejects_mismatched_benefit_explanation() -> None:
+    case = _case(
+        "case.benefit_tamper",
+        FeasibilityOutcome.USEFUL,
+        FeedbackChain("opportunity.1", "use.1", "outcome.1"),
+    )
+    payload = dict(case.replay_payload)
+    payload["benefit_explanation"] = LayerBenefitExplanation.create(
+        target_layer=PolicyLayer.SOURCE_SELECTION,
+        outcome=FeasibilityOutcome.USEFUL,
+    ).payload()
+    with pytest.raises(ValueError, match="benefit explanation|malformed feasibility"):
+        FeasibilityEvidenceRecord.from_payload({
+            "schemaVersion": 3,
+            "recordId": "feasibility-record.invalid",
+            "replayPayload": payload,
+        })
+
+
 def test_executable_feasibility_census_replays_and_persists(tmp_path) -> None:
     evidence = tmp_path / "fixture-evidence.jsonl"
     first = run_default_feasibility_census(evidence_path=evidence)
