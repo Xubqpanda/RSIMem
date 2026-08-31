@@ -1731,7 +1731,21 @@ def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
             ))
         return tuple(values)
 
-    def fact_keys_provider(record):
+    matcher_calls = []
+
+    def fact_keys_provider(
+        record,
+        *,
+        fact_contents=None,
+        application_schema=None,
+    ):
+        matcher_calls.append((fact_contents, application_schema))
+        assert isinstance(fact_contents, dict)
+        assert set(fact_contents) == {
+            fact.fact_id
+            for fact in record.source.facts
+        }
+        assert application_schema == raw_schema
         return {
             fact.fact_id: (key,)
             for fact in record.source.facts
@@ -1809,6 +1823,8 @@ def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
         "completed": True,
         "messages": [{"role": "user", "content": "Remember this durable preference."}],
     })
+    assert len(matcher_calls) == 1
+    assert all(isinstance(value, str) and value for value in matcher_calls[0][0].values())
     learn_bridge.close()
     learn_db.close()
 
