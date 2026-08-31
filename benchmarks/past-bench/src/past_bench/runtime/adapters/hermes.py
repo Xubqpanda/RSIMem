@@ -1112,6 +1112,12 @@ class HermesAdapter(RuntimeAdapter):
         pure_source = hermes_home / ".rsimem" / "pure_extraction_sources.jsonl"
         if pure_source.exists():
             shutil.copy2(pure_source, target_dir / "pure_extraction_sources.jsonl")
+        pure_process_archive = hermes_home / ".rsimem" / "pure_process_event_archive.jsonl"
+        if pure_process_archive.exists():
+            shutil.copy2(
+                pure_process_archive,
+                target_dir / "pure_process_event_archive.jsonl",
+            )
         # Preserve the frozen application contract registry alongside pure
         # source evidence.  Opportunity payloads carry only its digest; this
         # metadata is required to validate application-schema opportunities
