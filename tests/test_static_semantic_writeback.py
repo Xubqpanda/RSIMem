@@ -142,10 +142,12 @@ def test_static_config_is_default_disabled_and_strict() -> None:
         "mode": "static",
         "extraction_runtime_scope": "matched_validation",
         "extraction_runtime_config_path": "/attempt/extraction-trial.json",
+        "revocation_registry_path": ".rsimem/revocations.jsonl",
     })
     assert matched.matched_extraction_enabled is True
     assert matched.plain_extraction_parent is False
     assert matched.method_identity == MATCHED_EXTRACTION_CANDIDATE_ID
+    assert matched.revocation_registry_path == ".rsimem/revocations.jsonl"
     offline = StaticSemanticWritebackConfig.from_mapping({
         "mode": "static",
         "extraction_runtime_scope": "offline_validation",
@@ -215,6 +217,11 @@ def test_static_config_is_default_disabled_and_strict() -> None:
         StaticSemanticWritebackConfig.from_mapping({
             "mode": "static",
             "extraction_runtime_config_path": "/attempt/extraction-trial.json",
+        })
+    with pytest.raises(ValueError, match="requires validated extraction runtime"):
+        StaticSemanticWritebackConfig.from_mapping({
+            "mode": "static",
+            "revocation_registry_path": ".rsimem/revocations.jsonl",
         })
 
 
