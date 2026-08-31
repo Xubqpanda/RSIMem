@@ -232,9 +232,11 @@ from .process_signal import (
     ProcessSignalCase,
     ProcessSignalCaseCensus,
     ProcessSignalCaseStatus,
+    build_joined_process_signal_cases,
     build_process_signal_cases,
     census_process_signal_cases,
 )
+from .pure_process import JsonPureProcessEventArchive
 from .final_evaluation import (
     FINAL_EVALUATION_SCHEMA,
     FINAL_EVALUATION_SCHEMA_VERSION,
@@ -439,8 +441,10 @@ __all__ = [
     "ProcessSignalCase",
     "ProcessSignalCaseCensus",
     "ProcessSignalCaseStatus",
+    "build_joined_process_signal_cases",
     "build_process_signal_cases",
     "census_process_signal_cases",
+    "JsonPureProcessEventArchive",
     "FINAL_EVALUATION_SCHEMA",
     "FINAL_EVALUATION_SCHEMA_VERSION",
     "FinalEvaluationRecord",
