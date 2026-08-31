@@ -12,6 +12,7 @@ if str(_PAST_BENCH_SRC) not in sys.path:
 
 from past_bench.runtime.adapters.hermes import (
     _past_bench_artifact_set_provider,
+    _past_bench_fact_semantic_keys_provider,
     _past_bench_opportunity_provider,
 )
 from past_bench.models.task import TaskDefinition
@@ -314,6 +315,66 @@ def test_past_artifact_set_provider_requires_complete_multi_fact_source() -> Non
     assert len(values) == 1
     assert values[0].complete is True
     assert values[0].provenance_id == "pure-extraction-provenance.provider-set"
+
+
+def test_past_fact_matcher_uses_transient_content_and_public_contract() -> None:
+    source = ExtractionSourceEvidence(
+        "source.provider-facts",
+        "a" * 64,
+        "extraction-set.provider-facts",
+        ExtractionSetStatus.NONEMPTY,
+        ("application.notes.share.recipient_policy",),
+        (
+            ExtractedFactEvidence(
+                "fact.provider-facts.roster",
+                (),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.provider-facts.roster",
+            ),
+            ExtractedFactEvidence(
+                "fact.provider-facts.share",
+                (),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.provider-facts.share",
+            ),
+        ),
+    )
+    schema = {
+        "application_contract": {
+            "requirement_ids": ["application.notes.share.recipient_policy"],
+        },
+    }
+    mapping = _past_bench_fact_semantic_keys_provider(
+        SimpleNamespace(source=source),
+        fact_contents={
+            "fact.provider-facts.roster": "Ava Chen is on the external advisory roster.",
+            "fact.provider-facts.share": (
+                "Internal notes must never be shared with external recipients."
+            ),
+        },
+        application_schema=schema,
+    )
+    assert mapping == {
+        "fact.provider-facts.roster": ("application.notes.share.recipient_policy",),
+        "fact.provider-facts.share": ("application.notes.share.recipient_policy",),
+    }
+
+
+def test_past_fact_matcher_fails_closed_without_contract_or_text() -> None:
+    source = ExtractionSourceEvidence(
+        "source.provider-facts-missing",
+        "a" * 64,
+        "extraction-set.provider-facts-missing",
+        ExtractionSetStatus.NONEMPTY,
+        ("application.notes.share.recipient_policy",),
+        (ExtractedFactEvidence(
+            "fact.provider-facts-missing",
+            (),
+            FactDisposition.PERSISTED,
+            artifact_id="artifact.provider-facts-missing",
+        ),),
+    )
+    assert _past_bench_fact_semantic_keys_provider(source, fact_contents={}) == {}
 
 
 def test_past_artifact_set_provider_does_not_copy_source_key_to_unbound_facts() -> None:

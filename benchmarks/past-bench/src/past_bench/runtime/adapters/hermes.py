@@ -364,6 +364,68 @@ def _past_bench_artifact_set_provider(
     ),)
 
 
+def _past_bench_fact_semantic_keys_provider(
+    source: object,
+    *,
+    fact_contents: Mapping[str, str] | None = None,
+    application_schema: Mapping[str, Any] | None = None,
+) -> dict[str, tuple[str, ...]]:
+    """Match extracted facts to public PAST application requirements.
+
+    Fact text is inspected only in-memory at the extraction boundary.  The
+    returned mapping contains stable fact IDs and schema keys; no content is
+    copied into the pure-process record.  Unknown schemas, missing text, and
+    ambiguous facts fail closed so an artifact-set binding is never inferred
+    from a source-level key alone.
+    """
+
+    from rsimem.memory.extraction_feedback import ExtractionSourceEvidence
+
+    evidence = getattr(source, "source", source)
+    if not isinstance(evidence, ExtractionSourceEvidence):
+        return {}
+    if (
+        not isinstance(fact_contents, Mapping)
+        or not isinstance(application_schema, Mapping)
+    ):
+        return {}
+    contract = application_schema.get("application_contract")
+    if not isinstance(contract, Mapping):
+        return {}
+    allowed = {
+        str(value)
+        for value in contract.get("requirement_ids", ())
+        if isinstance(value, str)
+    }
+    visible = set(evidence.available_semantic_keys)
+    allowed &= visible
+    result: dict[str, tuple[str, ...]] = {}
+    for fact in evidence.facts:
+        if fact.disposition.value != "persisted" or fact.artifact_id is None:
+            continue
+        content = fact_contents.get(fact.fact_id)
+        if not isinstance(content, str) or not content.strip():
+            continue
+        value = content.casefold()
+        keys: list[str] = []
+        if _PAST_OUTPUT_TSV_KEY in allowed and (
+            "tsv" in value
+            or "tab-separated" in value
+            or all(field in value for field in ("owner", "priority", "task", "due_date"))
+        ):
+            keys.append(_PAST_OUTPUT_TSV_KEY)
+        if _PAST_SHARE_POLICY_KEY in allowed and (
+            "share" in value
+            or "recipient" in value
+            or "external advisory roster" in value
+            or "employee" in value
+        ):
+            keys.append(_PAST_SHARE_POLICY_KEY)
+        if keys:
+            result[fact.fact_id] = tuple(dict.fromkeys(keys))
+    return result
+
+
 class _RecordedHermesCompletionClient:
     """Run RSIMem policy prompts through Hermes request accounting."""
 
@@ -960,6 +1022,11 @@ class HermesAdapter(RuntimeAdapter):
             ),
             artifact_set_binding_provider=(
                 _past_bench_artifact_set_provider
+                if rsimem_writeback_enabled
+                else None
+            ),
+            pure_extraction_fact_semantic_keys_provider=(
+                _past_bench_fact_semantic_keys_provider
                 if rsimem_writeback_enabled
                 else None
             ),
