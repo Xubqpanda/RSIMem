@@ -83,6 +83,21 @@ def test_repeated_logical_case_counts_one_case_and_conflict_is_ambiguous() -> No
     assert census.payload()["conflictRate"] == 1.0
 
 
+def test_consistent_replicates_count_one_logical_case_and_all_physical_observations() -> None:
+    cases = tuple(
+        _case(
+            physical=f"physical-observation.replicate.{index}",
+        )
+        for index in range(3)
+    )
+    census = census_process_signal_cases(cases)
+    assert census.logical_case_count == 1
+    assert census.physical_observation_count == 3
+    assert census.conflict_case_count == 0
+    assert census.optimization_hypothesis_case_counts == {"a" * 64: 1}
+    assert census.payload()["replicateConsistency"] == 1.0
+
+
 def test_hypothesis_conflict_is_ambiguous_even_when_statuses_match() -> None:
     first = _case(physical="physical-observation.hypothesis.1", hypothesis="a" * 64)
     second = _case(physical="physical-observation.hypothesis.2", hypothesis="b" * 64)
@@ -341,6 +356,50 @@ def test_build_process_signal_cases_separates_logical_and_physical_identity() ->
     )
     assert first[0].logical_case_id == second[0].logical_case_id
     assert first[0].physical_observation_ids != second[0].physical_observation_ids
+
+
+def test_repeated_retrieval_boundaries_do_not_increase_semantic_sample_count() -> None:
+    common = dict(
+        run_id="run.retrieval-replay.v1",
+        variant="native+ledger",
+        trace_id="trace.retrieval-replay.v1",
+        episode_id="episode.retrieval-replay.v1",
+        session_id="session.retrieval-replay.v1",
+        task_id="task.retrieval-replay.v1",
+        source_revision="revision.retrieval-replay.v1",
+    )
+    kinds = (
+        ProcessEventKind.SOURCE_SELECTION,
+        ProcessEventKind.EXTRACTION,
+        ProcessEventKind.COMMIT,
+        ProcessEventKind.RETRIEVAL,
+        ProcessEventKind.RETRIEVAL,
+        ProcessEventKind.EXPOSURE,
+        ProcessEventKind.TASK_OUTCOME,
+    )
+    events = tuple(
+        ProcessEvent.create(
+            kind=kind,
+            status=ProcessEventStatus.SUCCESS,
+            host_event_id=f"event.retrieval-replay.{index}",
+            input_payload={"kind": kind.value, "index": index},
+            output_payload={"kind": kind.value, "index": index},
+            **common,
+        )
+        for index, kind in enumerate(kinds)
+    )
+    cases = build_process_signal_cases(
+        events,
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.retrieval-replay",
+        future_task_template_id="future-template.retrieval-replay",
+        observation_window="window.retrieval-replay",
+        replicate_id="replicate.retrieval-replay",
+    )
+    assert len(cases) == 1
+    census = census_process_signal_cases(cases)
+    assert census.logical_case_count == 1
+    assert census.physical_observation_count == 1
 
 
 def test_build_process_signal_cases_ignore_physical_task_ids_when_source_trace_matches() -> None:
