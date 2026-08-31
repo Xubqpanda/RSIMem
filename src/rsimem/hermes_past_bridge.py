@@ -928,11 +928,13 @@ class HermesPastBenchBridge:
     ) -> PureExtractionSourceRecord:
         """Project one live extraction boundary into the pure-process plane.
 
-        This is deliberately opt-in.  It does not consult ``family_id`` or
-        ``stage`` and does not persist a benchmark feedback label.  Callers
-        that have a trusted runtime observation can persist the returned
-        record with :class:`JsonPureExtractionSourceRecordStore` and join it
-        later with :class:`PureExtractionFeedbackRecord`.
+        This low-level projection helper is deliberately non-persisting: it
+        does not consult ``family_id`` or ``stage`` and does not persist a
+        benchmark feedback label.  The live completion path invokes the
+        internal ``_record_pure_extraction_source`` hook automatically and
+        persists its result; callers using this helper directly remain
+        responsible for explicitly appending the returned record and can
+        then join it with :class:`PureExtractionFeedbackRecord`.
         """
 
         if self.static_writeback is None:
