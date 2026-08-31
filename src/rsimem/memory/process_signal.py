@@ -818,6 +818,12 @@ def build_joined_process_signal_cases(
         "injection_failure", "tool_failure", "adapter_failure",
         "opportunity_not_observed", "memory_use_missing",
         "downstream_use_not_observed", "current_input_confounded",
+        # Ownership and set-level join failures are deterministic process
+        # diagnoses, not extraction labels.  Keep them visible as
+        # diagnostic-only cases so an attribution defect is not mistaken for
+        # an unobservable lifecycle.
+        "memory_artifact_foreign", "artifact_set_member_foreign",
+        "artifact_set_semantics_unresolved",
     }
     cases: list[ProcessSignalCase] = []
     for record in records:
