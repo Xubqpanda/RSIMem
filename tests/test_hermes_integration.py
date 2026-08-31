@@ -1823,6 +1823,56 @@ def test_pure_feedback_ambiguous_evidence_stays_unresolved(
     future_db.close()
 
 
+def test_memory_use_recorder_rejects_ambiguous_artifact_sets(
+    tmp_path: Path,
+) -> None:
+    """Future use evidence is suppressed when set ownership is ambiguous."""
+
+    home = _hermes_home(tmp_path / "home")
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "future" / "memory.jsonl",
+        run_id="run.ambiguous-set",
+        trace_id="trace.ambiguous-set",
+        episode_id="episode.ambiguous-set",
+        session_id="session.ambiguous-set",
+        task_id="task.ambiguous-set",
+        experiment_variant="fixture",
+    )
+    artifact_id = "artifact.ambiguous-set.v1"
+    for suffix in ("a", "b"):
+        bridge._artifact_set_binding_log.append(
+            ArtifactSetSemanticBinding.create(
+                semantic_unit_id=f"semantic-unit.recorder.{suffix}",
+                semantic_key="preference.summary.tsv",
+                member_artifact_ids=(artifact_id,),
+                member_fact_ids=(f"fact.recorder.{suffix}",),
+                complete=True,
+                source_digest="a" * 64,
+                provenance_id="provenance.recorder.v1",
+            )
+        )
+    future = SemanticFutureEvidence(
+        query_operation_id="op.recorder.query",
+        retrieval_operation_id="op.recorder.retrieve",
+        injection_operation_id="op.recorder.inject",
+        memory_artifact_ids=(artifact_id,),
+        memory_revisions=("revision.recorder.v1",),
+        injection_artifact_id="artifact.injection.recorder",
+        injected_artifact_ids=(artifact_id,),
+    )
+    outcome = SemanticOutcomeEvidence(
+        use_operation_id="op.recorder.use",
+        outcome_operation_id="op.recorder.outcome",
+        used_artifact_ids=(artifact_id,),
+        outcome_status=OperationStatus.SUCCESS,
+    )
+    bridge._record_memory_use_evidence(future, outcome, {"completed": True})
+    assert bridge.memory_use_evidence == ()
+    bridge.close()
+
+
 def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
     tmp_path: Path,
 ) -> None:
