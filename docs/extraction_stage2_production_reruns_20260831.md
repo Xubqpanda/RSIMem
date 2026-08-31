@@ -49,6 +49,10 @@ task completion
   -> cross-task joined process-signal case
 ```
 
+The current repository also passes the post-rerun focused/full regression
+baseline (RSIMem `1053 passed`; vendored PAST-Bench `399 passed, 2 skipped`),
+with compileall, dependency, shell-syntax, secret-scan, and diff checks clean.
+
 SM02 produced 15 source records, 7 feedback records, and 1 complete
 artifact-set binding per replicate.  Each replicate has 18 persisted facts with
 application semantic keys.  The binding is produced only when the transient
@@ -122,7 +126,7 @@ values are reporting-only and are not used as learner signal.
 The corresponding clean checkout passed:
 
 ```text
-RSIMem: 1049 passed
+RSIMem: 1053 passed
 PAST-Bench: 399 passed, 2 skipped
 pip check: passed
 compileall: passed
