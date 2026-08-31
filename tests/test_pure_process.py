@@ -109,6 +109,44 @@ def test_pure_process_rebuild_preserves_lifecycle_without_family_or_stage() -> N
     )
 
 
+def test_pure_process_projection_identity_is_independent_of_audit_scope() -> None:
+    """Removing family/stage must not change the learner-visible identity."""
+
+    common = dict(
+        kind=ProcessEventKind.EXTRACTION,
+        status=ProcessEventStatus.EXECUTED,
+        run_id="run.scope-independence-v1",
+        variant="native+ledger",
+        trace_id="trace.scope-independence-v1",
+        episode_id="episode.scope-independence-v1",
+        session_id="session.scope-independence-v1",
+        task_id="task.scope-independence-v1",
+        host_event_id="event.scope-independence-v1",
+        source_revision="revision.scope-independence-v1",
+        input_payload={},
+        output_payload={},
+        policy_decision_id="decision.scope-independence-v1",
+        policy_layer=PolicyLayer.EXTRACTION,
+        lineage_id="lineage.scope-independence-v1",
+        execution_receipt_ids=("receipt.scope-independence-v1",),
+    )
+    audit_event = ProcessEvent.create(
+        **common,
+        family_id="SM02_constraint_retention",
+        stage="eval_far",
+    )
+    runtime_event = ProcessEvent.create(**common)
+
+    audit_projection = PureProcessCorpus.create((audit_event,))
+    runtime_projection = PureProcessCorpus.create((runtime_event,))
+    assert audit_projection == runtime_projection
+    assert audit_projection.events[0].event_id.startswith("pure-process-event.")
+    payload = audit_projection.payload()
+    serialized = json.dumps(payload, ensure_ascii=True, sort_keys=True)
+    assert "SM02_constraint_retention" not in serialized
+    assert "eval_far" not in serialized
+
+
 def test_pure_process_rejects_malformed_tool_identity() -> None:
     event = _event()
     payload = event.payload()
