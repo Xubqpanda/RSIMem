@@ -16,12 +16,18 @@ import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Iterable, Mapping
+from typing import TYPE_CHECKING, Iterable, Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 from .process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 from .logical_case import LogicalCaseIdentity
 from .pure_process import PureProcessEvent
+
+if TYPE_CHECKING:
+    from .pure_extraction import (
+        PureExtractionFeedbackRecord,
+        PureExtractionSourceRecord,
+    )
 
 
 PROCESS_SIGNAL_SCHEMA_VERSION = 2
@@ -713,9 +719,9 @@ def build_process_signal_cases(
 
 def build_joined_process_signal_cases(
     events: Iterable[ProcessEvent | PureProcessEvent],
-    feedback: Iterable[object],
+    feedback: Iterable[PureExtractionFeedbackRecord],
     *,
-    sources: Iterable[object] = (),
+    sources: Iterable[PureExtractionSourceRecord] = (),
     frozen_policy_digest: str,
     source_task_template_id: str,
     future_task_template_id: str,
@@ -754,10 +760,19 @@ def build_joined_process_signal_cases(
 
     # Import lazily to keep the process-signal module independent of the
     # extraction contract's import order.
-    from .pure_extraction import PureExtractionAttribution, PureExtractionFeedbackRecord
+    from .pure_extraction import (
+        PureExtractionAttribution,
+        PureExtractionFeedbackRecord,
+        PureExtractionSourceRecord,
+    )
 
     if any(not isinstance(item, PureExtractionFeedbackRecord) for item in records):
         raise TypeError("joined process signal requires pure extraction feedback records")
+    if any(not isinstance(item, PureExtractionSourceRecord) for item in source_records):
+        raise TypeError("joined process signal requires pure extraction source records")
+    sources_by_id = {item.record_id: item for item in source_records}
+    if len(sources_by_id) != len(source_records):
+        raise ValueError("joined process signal source identities must be unique")
 
     def context(event: ProcessEvent | PureProcessEvent) -> tuple[str, str, str, str, str, str]:
         return (
@@ -809,15 +824,8 @@ def build_joined_process_signal_cases(
         # the record available to the ordinary corpus, but fail closed here.
         if len(source_anchors) != 1 or len(future_anchors) != 1:
             continue
-        source_record = next(
-            (
-                item for item in source_records
-                if getattr(item, "record_id", None) == record.source_record_id
-                and getattr(item, "provenance_id", None) == record.provenance_id
-            ),
-            None,
-        )
-        if source_record is None:
+        source_record = sources_by_id.get(record.source_record_id)
+        if source_record is None or source_record.provenance_id != record.provenance_id:
             # A provenance anchor without its typed source record is not
             # sufficient to establish an extraction observation.
             continue
@@ -826,8 +834,7 @@ def build_joined_process_signal_cases(
         if (
             source_anchor.variant != future_anchor.variant
             or source_anchor.run_id != future_anchor.run_id
-            or source_anchor.source_revision
-            != getattr(source_record, "context_revision", None)
+            or source_anchor.source_revision != source_record.context_revision
             or source_anchor.task_id == future_anchor.task_id
         ):
             # A source/future anchor must share the physical run lineage but
@@ -872,13 +879,11 @@ def build_joined_process_signal_cases(
         cases.append(ProcessSignalCase.create(
             logical_case_id=identity.logical_case_id,
             physical_observation_ids=(physical_id,),
-            source_observed=(
-                True
-            ),
+            source_observed=True,
             extraction_observed=True,
             persistence_observed=any(
-                getattr(fact.disposition, "value", fact.disposition) == "persisted"
-                for fact in getattr(getattr(source_record, "source", None), "facts", ())
+                fact.disposition.value == "persisted"
+                for fact in source_record.source.facts
             ),
             retrieval_observed=future_flags[ProcessEventKind.RETRIEVAL],
             exposure_observed=future_flags[ProcessEventKind.EXPOSURE],
