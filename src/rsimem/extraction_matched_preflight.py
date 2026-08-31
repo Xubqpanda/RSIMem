@@ -62,15 +62,15 @@ def initialize_formal_matched_validation_batch(
     config = load_extraction_preflight_config(experiment_config_path)
     if family_root.expanduser().resolve().name != config["familyId"]:
         raise ValueError("PAST family and extraction experiment config disagree")
+    if revocation_registry_path is None:
+        raise ValueError("formal matched validation requires a revocation registry")
     revocation_registry = (
         JsonRevocationRegistry(revocation_registry_path)
-        if revocation_registry_path is not None
-        else None
     )
     trial = load_extraction_matched_trial_profile(
         trial_config_path,
         revocation_registry=revocation_registry,
-        require_revocation_registry=revocation_registry is not None,
+        require_revocation_registry=True,
     )
     parent_policy = _semantic_policy(trial.parent)
     candidate_policy = _semantic_policy(trial.candidate)
@@ -143,8 +143,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--revocation-registry",
         type=Path,
-        default=None,
-        help="owner-controlled revocation registry (required when supplied)",
+        required=True,
+        help="owner-controlled revocation registry",
     )
     parser.add_argument("--agent", default="hermes-luna")
     return parser
