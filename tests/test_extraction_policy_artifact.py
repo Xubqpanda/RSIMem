@@ -120,6 +120,9 @@ def test_root_and_child_artifacts_round_trip_and_replay_exactly() -> None:
     assert child.generation_provenance is not None
     assert child.generation_provenance.evidence_plane is EvidencePlane.PURE_PROCESS
     assert child.generation_provenance.evidence_source is EvidenceSourceKind.RUNTIME_OBSERVATION
+    assert child.evidence_plane is EvidencePlane.PURE_PROCESS
+    assert child.evidence_source is EvidenceSourceKind.RUNTIME_OBSERVATION
+    assert child.attribution_schema_version == 1
     assert child.compiler_digest == EXTRACTION_POLICY_COMPILER_DIGEST
     assert child.compiled_body == compile_extraction_policy_spec(
         apply_extraction_rule_edits(root.spec, edits)
@@ -186,6 +189,24 @@ def test_duplicate_rule_and_edit_ids_fail_closed() -> None:
 def test_generation_provenance_rejects_diagnostic_plane() -> None:
     with pytest.raises(ValueError, match="pure_process runtime evidence"):
         _provenance_with_plane(EvidencePlane.BENCHMARK_AUDIT)
+
+
+def test_artifact_attribution_plane_cannot_drift_from_generation_provenance() -> None:
+    root = _root()
+    child = ExtractionPromptPolicyArtifact.create_child(
+        parent=root,
+        policy_version="candidate-plane-drift",
+        edits=(ExtractionRuleEdit(
+            "edit.plane-drift",
+            ExtractionRuleEditAction.REPLACE,
+            "format",
+            ExtractionPolicyRule("format", "Return standalone durable facts."),
+        ),),
+        generation_provenance=_provenance(),
+    )
+    with pytest.raises(ValueError, match="pure_process"):
+        replace(child, evidence_plane=EvidencePlane.BENCHMARK_AUDIT,
+                evidence_source=EvidenceSourceKind.BENCHMARK_CONTRACT)
 
 
 def _provenance_with_plane(plane: EvidencePlane) -> ExtractionGenerationProvenance:
