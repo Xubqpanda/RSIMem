@@ -453,6 +453,54 @@ def test_build_process_signal_cases_ignore_physical_task_ids_when_source_trace_m
     assert first[0].logical_case_id == second[0].logical_case_id
 
 
+def test_build_process_signal_cases_isolates_reused_task_ids_across_contexts() -> None:
+    """A reused task ID must not splice two physical executions together."""
+
+    def make_events(run_id: str) -> tuple[ProcessEvent, ...]:
+        common = dict(
+            run_id=run_id,
+            variant="native+ledger",
+            trace_id=f"trace.{run_id}",
+            episode_id=f"episode.{run_id}",
+            session_id=f"session.{run_id}",
+            # Providers may reuse a benchmark task ID across runs.
+            task_id="task.reused-id",
+            source_revision="revision.reused-source",
+        )
+        return tuple(
+            ProcessEvent.create(
+                kind=kind,
+                status=ProcessEventStatus.SUCCESS,
+                host_event_id=f"event.{run_id}.{kind.value}",
+                input_payload={"kind": kind.value},
+                output_payload={"ok": True},
+                **common,
+            )
+            for kind in (
+                ProcessEventKind.SOURCE_SELECTION,
+                ProcessEventKind.EXTRACTION,
+                ProcessEventKind.COMMIT,
+                ProcessEventKind.RETRIEVAL,
+                ProcessEventKind.EXPOSURE,
+                ProcessEventKind.TASK_OUTCOME,
+            )
+        )
+
+    cases = build_process_signal_cases(
+        make_events("run.reused.one") + make_events("run.reused.two"),
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.reused",
+        future_task_template_id="future-template.reused",
+        observation_window="window.reused",
+        replicate_id="replicate.reused",
+    )
+    assert len(cases) == 2
+    assert all(len(case.physical_observation_ids) == 1 for case in cases)
+    assert {case.logical_case_id for case in cases} == {
+        cases[0].logical_case_id,
+    }
+
+
 def test_extraction_output_variation_does_not_split_logical_case() -> None:
     """Replicate output differences remain physical observations of one case."""
 
