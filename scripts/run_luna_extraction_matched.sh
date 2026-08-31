@@ -238,9 +238,13 @@ cases = build_process_signal_cases(
     replicate_id="replicate." + str(attempt["replicate"]),
     analysis_protocol_id=protocol.protocol_id,
 )
-archive = next(iter(sorted(run_dir.rglob("pure_process_event_archive.jsonl"))), None)
-if archive is not None:
-    archive_events = JsonPureProcessEventArchive(archive).records()
+archive_paths = tuple(sorted(run_dir.rglob("pure_process_event_archive.jsonl")))
+if archive_paths:
+    archive_events = tuple(
+        event
+        for archive in archive_paths
+        for event in JsonPureProcessEventArchive(archive).records()
+    )
     source_records = tuple(
         source
         for path in sorted(run_dir.rglob("pure_extraction_sources.jsonl"))
