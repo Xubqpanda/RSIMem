@@ -52,6 +52,29 @@ _ALLOWED_RUNTIME_SCOPES = {
 }
 
 
+def _resolve_revocation_registry(
+    revocation_registry: JsonRevocationRegistry | None,
+    *,
+    required: bool,
+    operation: str,
+) -> JsonRevocationRegistry | None:
+    """Validate the owner-controlled revocation dependency at the boundary.
+
+    Deterministic unit fixtures may omit a registry, but formal callers can
+    opt into fail-closed behavior with ``require=True``.  A non-registry
+    object must never be allowed to defer failure until an attribute access
+    deep inside the loader.
+    """
+
+    if revocation_registry is None:
+        if required:
+            raise ValueError(f"{operation} requires a revocation registry")
+        return None
+    if not isinstance(revocation_registry, JsonRevocationRegistry):
+        raise TypeError(f"{operation} revocation registry has the wrong type")
+    return revocation_registry
+
+
 def _file_digest(path: Path) -> str:
     try:
         return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -257,11 +280,17 @@ def prepare_extraction_offline_validation_runtime(
     validation_id: str,
     output_root: Path,
     revocation_registry: JsonRevocationRegistry | None = None,
+    require_revocation_registry: bool = False,
 ) -> dict[str, object]:
     """Create a non-activating candidate bundle for offline observation runs."""
 
     if not isinstance(validation_id, str) or not validation_id.strip():
         raise ValueError("offline validation ID must not be empty")
+    revocation_registry = _resolve_revocation_registry(
+        revocation_registry,
+        required=require_revocation_registry,
+        operation="offline validation runtime",
+    )
     _validate_offline_candidate_bundle(
         parent, candidate, static_safety, deterministic_suite
     )
@@ -313,9 +342,17 @@ def prepare_extraction_offline_validation_runtime(
 
 def load_extraction_offline_validation_profile(
     config_path: Path,
+    *,
+    revocation_registry: JsonRevocationRegistry | None = None,
+    require_revocation_registry: bool = False,
 ) -> ResolvedExtractionOfflineValidationRuntime:
     """Load and validate a non-activating offline candidate bundle."""
 
+    revocation_registry = _resolve_revocation_registry(
+        revocation_registry,
+        required=require_revocation_registry,
+        operation="offline validation runtime loader",
+    )
     path = config_path.expanduser().resolve()
     fields = {
         "schemaVersion", "configSchema", "deploymentScope",
@@ -383,10 +420,16 @@ def prepare_extraction_matched_trial_runtime(
     offline_decision: ExtractionOfflineValidationDecision,
     output_root: Path,
     revocation_registry: JsonRevocationRegistry | None = None,
+    require_revocation_registry: bool = False,
 ) -> dict[str, object]:
     """Activate one candidate only inside a validation-scoped policy store."""
 
     _validate_offline_join(parent, candidate, offline_decision)
+    revocation_registry = _resolve_revocation_registry(
+        revocation_registry,
+        required=require_revocation_registry,
+        operation="matched trial runtime",
+    )
     if revocation_registry is not None:
         for artifact in (parent, candidate):
             revocation_registry.assert_active(
@@ -460,11 +503,17 @@ def load_extraction_runtime_profile(
     *,
     required_scope: str,
     revocation_registry: JsonRevocationRegistry | None = None,
+    require_revocation_registry: bool = False,
 ) -> ResolvedExtractionMatchedTrialRuntime:
     """Load a trial config only for its declared scope."""
 
     if required_scope not in _ALLOWED_RUNTIME_SCOPES:
         raise ValueError("unknown extraction runtime scope")
+    revocation_registry = _resolve_revocation_registry(
+        revocation_registry,
+        required=require_revocation_registry,
+        operation="extraction runtime loader",
+    )
     path = config_path.expanduser().resolve()
     fields = {
         "schemaVersion",
@@ -572,11 +621,13 @@ def load_extraction_matched_trial_profile(
     config_path: Path,
     *,
     revocation_registry: JsonRevocationRegistry | None = None,
+    require_revocation_registry: bool = False,
 ) -> ResolvedExtractionMatchedTrialRuntime:
     return load_extraction_runtime_profile(
         config_path,
         required_scope=EXTRACTION_MATCHED_TRIAL_SCOPE,
         revocation_registry=revocation_registry,
+        require_revocation_registry=require_revocation_registry,
     )
 
 
