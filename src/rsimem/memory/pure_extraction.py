@@ -1311,12 +1311,30 @@ class PureExtractionOptimizerCorpus:
                 PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
             }
         )
+        # Count actionable *logical* observations, not physical feedback
+        # rows.  A single source extraction can be replayed across retries or
+        # replicate boundaries and yield distinct feedback/example IDs while
+        # still representing one semantic case.  The process-signal census
+        # already deduplicates its logical cases; mirror that invariant here
+        # using the stable source projection, extraction-set and observation
+        # window identity available on the optimizer example.  Without this
+        # check, two physical rows for one source could be paired with a
+        # hand-built census claiming two optimization cases and unlock the
+        # optimizer without two independent actionable cases.
+        actionable_case_keys = {
+            (
+                example.source_projection_digest,
+                example.extraction_set_id,
+                example.observation_window,
+            )
+            for example in actionable_examples
+        }
         ready = (
             census.logical_case_count >= 2
             and census.conflict_case_count == 0
             and optimization_count >= 2
             and hypothesis_digest is not None
-            and len(actionable_examples) >= optimization_count
+            and len(actionable_case_keys) >= optimization_count
         )
         if not ready:
             hypothesis_digest = None
