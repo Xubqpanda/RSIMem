@@ -1885,6 +1885,18 @@ def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
     assert feedback[0].artifact_set_binding.member_artifact_ids == member_ids
     assert feedback[0].tool_joins[0].memory_use_operation_id is not None
     assert set(future_bridge.memory_use_evidence[0].retrieved_artifact_ids) == set(member_ids)
+    joined_cases = tuple(
+        case for case in future_bridge.unbound_process_signal_cases
+        if case.source_observed and case.retrieval_observed
+    )
+    assert joined_cases, "source/future pure-process join was not materialized"
+    assert any(
+        case.extraction_observed
+        and case.persistence_observed
+        and case.outcome_observed
+        and case.extraction_attributable
+        for case in joined_cases
+    )
     pure_events = PureProcessCorpus.create(
         tuple(learn_bridge.process_feedback) + tuple(future_bridge.process_feedback)
     )

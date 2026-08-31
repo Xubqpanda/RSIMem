@@ -454,7 +454,86 @@ class JsonPureProcessCorpusStore:
             return PureProcessCorpus.from_payload(value)
 
 
+class JsonPureProcessEventArchive:
+    """Append-only archive for cross-task pure-process event joins.
+
+    Unlike a batch corpus this store accepts events from many execution
+    contexts.  It is used only for delayed source/future attribution and
+    stores the canonical content-free :class:`PureProcessEvent` payload.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(os.path.abspath(os.path.expanduser(os.fspath(path))))
+        self.lock_path = self.path.with_name(self.path.name + ".lock")
+
+    def _read_unlocked(self) -> dict[str, str]:
+        if self.path.is_symlink():
+            raise ValueError("pure-process event archive cannot be a symlink")
+        if not self.path.exists():
+            return {}
+        records: dict[str, str] = {}
+        for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            try:
+                event = PureProcessEvent.from_payload(json.loads(line))
+            except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                raise ValueError(f"malformed pure-process archive at line {line_number}") from exc
+            canonical = json.dumps(event.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+            previous = records.get(event.event_id)
+            if previous is not None and previous != canonical:
+                raise ValueError("conflicting pure-process archive event")
+            records[event.event_id] = canonical
+        return records
+
+    def append(self, events: Iterable[PureProcessEvent]) -> int:
+        values = tuple(events)
+        if any(not isinstance(event, PureProcessEvent) for event in values):
+            raise TypeError("pure-process archive accepts PureProcessEvent values")
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.lock_path.is_symlink():
+            raise ValueError("pure-process event archive lock cannot be a symlink")
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            try:
+                records = self._read_unlocked()
+                added = 0
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                with self.path.open("a", encoding="utf-8") as handle:
+                    for event in sorted(values, key=lambda value: value.event_id):
+                        canonical = json.dumps(event.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+                        previous = records.get(event.event_id)
+                        if previous is not None:
+                            if previous != canonical:
+                                raise ValueError("conflicting pure-process archive event")
+                            continue
+                        handle.write(canonical + "\n")
+                        records[event.event_id] = canonical
+                        added += 1
+                    if added:
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                return added
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+    def records(self) -> tuple[PureProcessEvent, ...]:
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.lock_path.is_symlink():
+            raise ValueError("pure-process event archive lock cannot be a symlink")
+        with self.lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_SH)
+            try:
+                return tuple(
+                    PureProcessEvent.from_payload(json.loads(value))
+                    for _, value in sorted(self._read_unlocked().items())
+                )
+            finally:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
 __all__ = [
+    "JsonPureProcessEventArchive",
     "JsonPureProcessCorpusStore",
     "PureProcessCorpus",
     "PureProcessEvent",

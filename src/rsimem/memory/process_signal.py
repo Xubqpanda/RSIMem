@@ -711,6 +711,190 @@ def build_process_signal_cases(
     return tuple(cases)
 
 
+def build_joined_process_signal_cases(
+    events: Iterable[ProcessEvent | PureProcessEvent],
+    feedback: Iterable[object],
+    *,
+    sources: Iterable[object] = (),
+    frozen_policy_digest: str,
+    source_task_template_id: str,
+    future_task_template_id: str,
+    observation_window: str,
+    replicate_id: str,
+    analysis_protocol_id: str | None = None,
+) -> tuple[ProcessSignalCase, ...]:
+    """Join source and future task observations through trusted feedback.
+
+    ``build_process_signal_cases`` intentionally projects one execution
+    context at a time.  A pure extraction feedback record is the only
+    permitted bridge across a source task and a later future task.  This
+    helper therefore requires deterministic link events carrying the
+    feedback provenance as ``lineage_id``; task IDs, event counts, and result
+    status are never used to infer an attribution.
+
+    Link events are emitted by the Hermes bridge as ``RECOVERY`` observations
+    with host IDs ``event.pure-source.<record-id>`` and
+    ``event.pure-feedback.<record-id>``.  They contain no raw memory or
+    benchmark fields and are only anchors used to recover the two execution
+    contexts after restart.
+    """
+
+    values = tuple(events)
+    records = tuple(feedback)
+    source_records = tuple(sources)
+    _id(replicate_id, "replicate ID")
+    if any(not isinstance(event, (ProcessEvent, PureProcessEvent)) for event in values):
+        raise TypeError("process signal projection requires runtime process events")
+    if any(
+        event.evidence_plane is not EvidencePlane.PURE_PROCESS
+        or event.evidence_source is not EvidenceSourceKind.RUNTIME_OBSERVATION
+        for event in values
+    ):
+        raise ValueError("process signal projection requires pure_process runtime events")
+
+    # Import lazily to keep the process-signal module independent of the
+    # extraction contract's import order.
+    from .pure_extraction import PureExtractionAttribution, PureExtractionFeedbackRecord
+
+    if any(not isinstance(item, PureExtractionFeedbackRecord) for item in records):
+        raise TypeError("joined process signal requires pure extraction feedback records")
+
+    def context(event: ProcessEvent | PureProcessEvent) -> tuple[str, str, str, str, str, str]:
+        return (
+            event.run_id,
+            event.variant,
+            event.trace_id,
+            event.episode_id,
+            event.session_id,
+            event.task_id,
+        )
+
+    def stage_flags(items: tuple[ProcessEvent | PureProcessEvent, ...]) -> dict[ProcessEventKind, bool]:
+        # This is an observation census, not a success label: pending,
+        # skipped and failed boundaries are still observed.  UNKNOWN remains
+        # censored and is handled by ``observation_complete`` below.
+        return {
+            kind: any(event.kind is kind and event.status is not ProcessEventStatus.UNKNOWN for event in items)
+            for kind in ProcessEventKind
+        }
+
+    diagnosis_reasons = {
+        "absence", "non_use", "retrieval_miss", "retrieval_failure",
+        "injection_failure", "tool_failure", "adapter_failure",
+    }
+    cases: list[ProcessSignalCase] = []
+    seen_feedback: set[str] = set()
+    for record in records:
+        if record.record_id in seen_feedback:
+            continue
+        seen_feedback.add(record.record_id)
+        anchors = tuple(
+            event for event in values
+            if event.lineage_id == record.provenance_id
+            and event.kind is ProcessEventKind.RECOVERY
+            and (
+                event.host_event_id.startswith("event.pure-source.")
+                or event.host_event_id.startswith("event.pure-feedback.")
+            )
+        )
+        source_anchors = tuple(
+            event for event in anchors
+            if event.host_event_id == "event.pure-source." + record.source_record_id
+        )
+        future_anchors = tuple(
+            event for event in anchors
+            if event.host_event_id == "event.pure-feedback." + record.record_id
+        )
+        # A missing, duplicated, or conflicting anchor is not a join.  Keep
+        # the record available to the ordinary corpus, but fail closed here.
+        if len(source_anchors) != 1 or len(future_anchors) != 1:
+            continue
+        source_record = next(
+            (
+                item for item in source_records
+                if getattr(item, "record_id", None) == record.source_record_id
+                and getattr(item, "provenance_id", None) == record.provenance_id
+            ),
+            None,
+        )
+        if source_record is None:
+            # A provenance anchor without its typed source record is not
+            # sufficient to establish an extraction observation.
+            continue
+        source_anchor = source_anchors[0]
+        future_anchor = future_anchors[0]
+        if source_anchor.variant != future_anchor.variant or source_anchor.run_id != future_anchor.run_id:
+            continue
+        source_context = context(source_anchor)
+        future_context = context(future_anchor)
+        source_events = tuple(event for event in values if context(event) == source_context)
+        future_events = tuple(event for event in values if context(event) == future_context)
+        if not source_events or not future_events:
+            continue
+        combined = source_events + tuple(event for event in future_events if event not in source_events)
+        source_flags = stage_flags(source_events)
+        future_flags = stage_flags(future_events)
+        attributable = record.attribution in {
+            PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
+            PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
+        }
+        complete = record.observation_complete and not any(
+            "observation_censored" in event.reason_codes
+            or event.status is ProcessEventStatus.UNKNOWN
+            for event in combined
+        )
+        source_set = "extraction-set." + _digest({
+            "source_task_template_id": source_task_template_id,
+            "source_projection_digest": record.source_projection_digest,
+        })[:32]
+        identity = LogicalCaseIdentity.create(
+            frozen_policy_digest=frozen_policy_digest,
+            source_task_template_id=source_task_template_id,
+            source_extraction_set_id=source_set,
+            future_task_template_id=future_task_template_id,
+            observation_window=observation_window,
+        )
+        event_ids = tuple(sorted(event.event_id for event in combined))
+        physical_id = "physical-observation." + _digest({
+            "logical_case_id": identity.logical_case_id,
+            "replicate_id": replicate_id,
+            "feedback_record_id": record.record_id,
+            "event_ids": list(event_ids),
+        })[:40]
+        cases.append(ProcessSignalCase.create(
+            logical_case_id=identity.logical_case_id,
+            physical_observation_ids=(physical_id,),
+            source_observed=(
+                True
+            ),
+            extraction_observed=True,
+            persistence_observed=any(
+                getattr(fact.disposition, "value", fact.disposition) == "persisted"
+                for fact in getattr(getattr(source_record, "source", None), "facts", ())
+            ),
+            retrieval_observed=future_flags[ProcessEventKind.RETRIEVAL],
+            exposure_observed=future_flags[ProcessEventKind.EXPOSURE],
+            outcome_observed=(
+                future_flags[ProcessEventKind.TASK_OUTCOME]
+                or future_flags[ProcessEventKind.TOOL_RESULT]
+            ),
+            extraction_attributable=attributable,
+            abstract_hypothesis_digest=None,
+            observation_complete=complete,
+            stage_diagnosis_observed=(
+                attributable
+                or any(
+                    diagnosis_reasons.intersection(event.reason_codes)
+                    for event in combined
+                )
+            ),
+            analysis_protocol_id=analysis_protocol_id,
+            replicate_id=replicate_id if analysis_protocol_id is not None else None,
+            observation_window=observation_window if analysis_protocol_id is not None else None,
+        ))
+    return tuple(cases)
+
+
 __all__ = [
     "PROCESS_SIGNAL_SCHEMA",
     "PROCESS_SIGNAL_SCHEMA_VERSION",
@@ -720,4 +904,5 @@ __all__ = [
     "ProcessSignalCaseStatus",
     "census_process_signal_cases",
     "build_process_signal_cases",
+    "build_joined_process_signal_cases",
 ]

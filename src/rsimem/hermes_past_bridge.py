@@ -60,6 +60,7 @@ from .memory.process_signal import (
     JsonProcessSignalCaseStore,
     ProcessSignalCase,
     build_process_signal_cases,
+    build_joined_process_signal_cases,
 )
 from .memory.live_writeback import (
     ExtractionPromptRuntimeScope,
@@ -130,7 +131,7 @@ from .memory.pure_extraction import (
     PureExtractionSourceProjector,
     PureExtractionSourceRecord,
 )
-from .memory.pure_process import PureProcessCorpus
+from .memory.pure_process import JsonPureProcessEventArchive, PureProcessCorpus
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
 
 
@@ -510,6 +511,9 @@ class HermesPastBenchBridge:
         # cases to ``process_signal_cases.jsonl``.
         self._unbound_process_signal_case_store = JsonProcessSignalCaseStore(
             self.evidence_path.with_name("process_signal_cases_unbound.jsonl")
+        )
+        self._pure_process_event_archive = JsonPureProcessEventArchive(
+            Path(hermes_home) / ".rsimem" / "pure_process_event_archive.jsonl"
         )
         self._snapshot_collector = HermesStateSnapshotCollector()
         self.ledger = MemoryLedgerObserver(
@@ -1170,6 +1174,11 @@ class HermesPastBenchBridge:
                     ))
                     if self.extraction_source_store is not None:
                         raise
+        # Re-run the unbound projection after static writeback so source
+        # extraction/admission/commit events are present in the archive.  The
+        # operation is idempotent and also closes a delayed source/future join
+        # when this boundary produced feedback for an earlier extraction.
+        self._record_unbound_process_signal_case()
 
     def on_session_end(self, *, task_state: TaskLifecycleState = TaskLifecycleState.COMPLETED) -> None:
         """Observe a real session-end boundary without opening writeback."""
@@ -1527,7 +1536,9 @@ class HermesPastBenchBridge:
         # content-free pure corpus before building an unbound diagnostic case;
         # this strips family/stage rather than weakening the process-signal
         # contract.
-        events = PureProcessCorpus.create(events).events
+        projected = PureProcessCorpus.create(events).events
+        self._pure_process_event_archive.append(projected)
+        events = self._pure_process_event_archive.records()
         policy_seed = "hermes-process-policy.unbound"
         if self.static_writeback is not None:
             policy_seed = self.static_writeback.policy.descriptor.policy_version
@@ -1547,6 +1558,22 @@ class HermesPastBenchBridge:
             analysis_protocol_id=None,
         )
         for case in cases:
+            self._unbound_process_signal_case_store.append(case)
+        joined_cases = build_joined_process_signal_cases(
+            events,
+            self.pure_extraction_feedback_store.records(),
+            sources=self.pure_extraction_source_store.records(),
+            frozen_policy_digest=frozen_policy_digest,
+            source_task_template_id="source.hermes.completed-task.v1",
+            future_task_template_id="future.hermes.completed-task.v1",
+            observation_window="completed-task.v1",
+            replicate_id=(
+                "replicate."
+                + hashlib.sha256(self._run_id.encode("utf-8")).hexdigest()[:24]
+            ),
+            analysis_protocol_id=None,
+        )
+        for case in joined_cases:
             self._unbound_process_signal_case_store.append(case)
 
     def _record_pure_extraction_feedback(
@@ -1781,6 +1808,16 @@ class HermesPastBenchBridge:
                 ),
             )
             self.pure_extraction_feedback_store.append(feedback)
+            # Persist a content-free cross-task anchor in the same process
+            # ledger as the future observation.  The joined process-signal
+            # builder accepts this typed provenance link, while arbitrary
+            # task/result similarity remains non-authoritative.
+            self._record_pure_link_event(
+                link_type="feedback",
+                record_id=feedback.record_id,
+                provenance_id=feedback.provenance_id,
+                source_revision=self._exposure_context_revision(),
+            )
 
     def _record_memory_use_evidence(
         self,
@@ -2242,7 +2279,14 @@ class HermesPastBenchBridge:
                 raise ValueError(
                     "duplicate semantic compilation has no pure source evidence"
                 )
-            return existing[0]
+            record = existing[0]
+            self._record_pure_link_event(
+                link_type="source",
+                record_id=record.record_id,
+                provenance_id=record.provenance_id,
+                source_revision=record.context_revision,
+            )
+            return record
         projection = self.static_writeback.source_projection_for(
             boundary.compilation_id
         )
@@ -2300,7 +2344,42 @@ class HermesPastBenchBridge:
             record.source,
             provenance_id=record.provenance_id,
         )
+        self._record_pure_link_event(
+            link_type="source",
+            record_id=record.record_id,
+            provenance_id=record.provenance_id,
+            source_revision=record.context_revision,
+        )
         return record
+
+    def _record_pure_link_event(
+        self,
+        *,
+        link_type: str,
+        record_id: str,
+        provenance_id: str,
+        source_revision: str,
+    ) -> None:
+        """Record a restart-safe source/feedback provenance anchor.
+
+        The anchor contains only stable IDs.  It deliberately bypasses the
+        most-recent host boundary because its host event identity is the
+        durable join key consumed after source and future tasks are merged.
+        """
+
+        if link_type not in {"source", "feedback"}:
+            raise ValueError("unsupported pure provenance link type")
+        self._record_process_observation(
+            kind=ProcessEventKind.RECOVERY,
+            status=ProcessEventStatus.SUCCESS,
+            host_event_id=f"event.pure-{link_type}.{record_id}",
+            source_revision=source_revision,
+            input_payload={"link_type": link_type, "record_id": record_id},
+            output_payload={"provenance_id": provenance_id},
+            reason_codes=("decision_observed",),
+            lineage_id=provenance_id,
+            use_last_host_boundary=False,
+        )
 
     def _record_artifact_set_bindings(
         self,
@@ -2517,6 +2596,7 @@ class HermesPastBenchBridge:
         policy_decision_id: str | None = None,
         policy_layer: object | None = None,
         lineage_id: str | None = None,
+        use_last_host_boundary: bool = True,
     ) -> None:
         """Append one non-policy host/process observation.
 
@@ -2529,9 +2609,9 @@ class HermesPastBenchBridge:
         # Prefer the most recent real host boundary.  Synthetic IDs are only
         # used for an observation that happens before the first boundary has
         # been delivered by the host adapter.
-        if self._last_host_event_id is not None:
+        if use_last_host_boundary and self._last_host_event_id is not None:
             host_event_id = self._last_host_event_id
-        if self._last_host_source_revision is not None:
+        if use_last_host_boundary and self._last_host_source_revision is not None:
             source_revision = self._last_host_source_revision
         self._process_feedback.record(ProcessEvent.create(
             kind=kind,
