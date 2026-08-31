@@ -124,6 +124,7 @@ from .memory.artifact_set import (
     ArtifactSetSemanticBinding,
     JsonArtifactSetBindingLog,
 )
+from .memory.evidence_planes import validate_pure_process_payload
 from .memory.pure_extraction import (
     JsonPureExtractionFeedbackRecordStore,
     JsonPureExtractionSourceRecordStore,
@@ -1003,14 +1004,31 @@ class HermesPastBenchBridge:
         persist: bool = True,
     ) -> tuple[OpportunityEvidence, ...]:
         provider = self._opportunity_evidence_provider
+        # Strip benchmark identity first, then reject any remaining scoring or
+        # answer-bearing fields before invoking an application-owned provider.
+        # A provider callback is executable code and could otherwise inspect a
+        # leaked grader/answer payload even when the resulting evidence object
+        # itself contains only stable IDs.  Family/stage are intentionally
+        # removed (they are audit metadata); grader, answer and score fields
+        # are forbidden and must fail closed.
+        visible_result = self._strip_benchmark_scope(result)
+        validate_pure_process_payload(visible_result)
         if provider is None:
             # A host may attach already-materialized application evidence to
             # the completion result without installing a Python callback.
             # This is intentionally an explicit field; no opportunity is
             # inferred from task IDs, stages, final strings or tool names.
-            raw = result.get("rsimem_opportunities")
+            raw = (
+                visible_result.get("rsimem_opportunities")
+                if isinstance(visible_result, Mapping)
+                else None
+            )
             if raw is None:
-                raw = result.get("opportunity_evidence")
+                raw = (
+                    visible_result.get("opportunity_evidence")
+                    if isinstance(visible_result, Mapping)
+                    else None
+                )
             if raw is None:
                 self._last_runtime_opportunities = ()
                 return ()
@@ -1034,7 +1052,7 @@ class HermesPastBenchBridge:
         # Keep benchmark scope out of the runtime opportunity surface.  The
         # bridge may itself be running a PAST-Bench case, but family/stage are
         # audit metadata and must not influence a deployment-visible provider.
-        visible = self._strip_benchmark_scope(result)
+        visible = visible_result
         # Expose only content-free source provenance to an application-owned
         # provider so it can bind an opportunity to the prior extraction that
         # produced the memory.  Do this conditionally to preserve the exact

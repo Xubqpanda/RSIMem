@@ -256,6 +256,29 @@ def test_past_opportunity_provider_treats_supplied_schema_as_authoritative() -> 
     assert values == ()
 
 
+def test_past_opportunity_provider_rejects_scoring_or_answer_payloads() -> None:
+    """The bridge must reject evaluation evidence before provider execution."""
+
+    from rsimem.hermes_past_bridge import HermesPastBenchBridge
+
+    called = []
+    bridge = SimpleNamespace(
+        _opportunity_evidence_provider=lambda value: called.append(value) or (),
+        _strip_benchmark_scope=HermesPastBenchBridge._strip_benchmark_scope,
+    )
+    with pytest.raises(ValueError, match="forbidden evaluation fields"):
+        HermesPastBenchBridge._record_runtime_opportunities(bridge, {
+            "messages": [{
+                "role": "user",
+                "content": "Review the note and share it with the project team.",
+            }],
+            # A host accidentally forwarding this field must never reach an
+            # application-owned provider.
+            "grader": {"official_score": 1.0},
+        })
+    assert called == []
+
+
 def test_past_opportunity_provider_supports_non_notes_schema_tools() -> None:
     """Application-owned tool schemas are not coupled to the notes prefix."""
 
