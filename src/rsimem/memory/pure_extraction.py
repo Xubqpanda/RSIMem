@@ -54,8 +54,8 @@ PURE_EXTRACTION_FEEDBACK_SCHEMA = "rsimem-pure-extraction-feedback-v1"
 PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION = 1
 PURE_EXTRACTION_OPTIMIZER_SCHEMA_VERSION = 1
 PURE_EXTRACTION_OPTIMIZER_SCHEMA = "rsimem-pure-extraction-optimizer-v1"
-PURE_EXTRACTION_CORPUS_SCHEMA_VERSION = 3
-PURE_EXTRACTION_CORPUS_SCHEMA = "rsimem-pure-extraction-corpus-v3"
+PURE_EXTRACTION_CORPUS_SCHEMA_VERSION = 4
+PURE_EXTRACTION_CORPUS_SCHEMA = "rsimem-pure-extraction-corpus-v4"
 PURE_PROCESS_SIGNAL_GATES = frozenset({"not_bound", "no_signal", "ready"})
 _IDENTIFIER = r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$"
 
@@ -1125,6 +1125,13 @@ class PureExtractionOptimizerCorpus:
     split: str
     observation_cutoff: str
     examples: tuple[PureExtractionOptimizerExample, ...]
+    # Keep the attribution contract explicit at the corpus boundary rather
+    # than relying only on each example's nested plane fields.  This makes a
+    # corpus' learner eligibility auditable before any examples are grouped
+    # or passed to a provider.
+    attribution_schema_version: int = PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION
+    evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
     process_signal_gate: str = "not_bound"
     process_signal_protocol_id: str | None = None
     process_signal_case_digest: str | None = None
@@ -1136,6 +1143,18 @@ class PureExtractionOptimizerCorpus:
     def __post_init__(self) -> None:
         if self.schema_version != PURE_EXTRACTION_CORPUS_SCHEMA_VERSION:
             raise ValueError("unsupported pure extraction corpus schema")
+        if self.attribution_schema_version != PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION:
+            raise ValueError("unsupported pure extraction attribution schema")
+        plane, source = validate_plane_source(
+            self.evidence_plane,
+            self.evidence_source,
+        )
+        if plane is not EvidencePlane.PURE_PROCESS or source is not EvidenceSourceKind.RUNTIME_OBSERVATION:
+            raise ValueError(
+                "pure extraction optimizer corpus must be runtime pure-process evidence"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         _id(self.corpus_id, "pure extraction corpus ID")
         if self.split not in {"train", "validation", "future_test"}:
             raise ValueError("pure extraction corpus split is invalid")
@@ -1211,9 +1230,12 @@ class PureExtractionOptimizerCorpus:
     def identity_payload(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
+            "attribution_schema_version": self.attribution_schema_version,
             "split": self.split,
             "observation_cutoff": self.observation_cutoff,
             "example_ids": [value.example_id for value in self.examples],
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
             "process_signal_gate": self.process_signal_gate,
             "process_signal_protocol_id": self.process_signal_protocol_id,
             "process_signal_case_digest": self.process_signal_case_digest,
@@ -1243,6 +1265,9 @@ class PureExtractionOptimizerCorpus:
         split: str,
         observation_cutoff: str,
         examples: tuple[PureExtractionOptimizerExample, ...],
+        attribution_schema_version: int = PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION,
+        evidence_plane: EvidencePlane | str = EvidencePlane.PURE_PROCESS,
+        evidence_source: EvidenceSourceKind | str = EvidenceSourceKind.RUNTIME_OBSERVATION,
         process_signal_gate: str = "not_bound",
         process_signal_protocol_id: str | None = None,
         process_signal_case_digest: str | None = None,
@@ -1253,9 +1278,12 @@ class PureExtractionOptimizerCorpus:
         ordered = tuple(sorted(examples, key=lambda value: value.example_id))
         identity = {
             "schema_version": PURE_EXTRACTION_CORPUS_SCHEMA_VERSION,
+            "attribution_schema_version": attribution_schema_version,
             "split": split,
             "observation_cutoff": observation_cutoff,
             "example_ids": [value.example_id for value in ordered],
+            "evidence_plane": EvidencePlane(evidence_plane).value,
+            "evidence_source": EvidenceSourceKind(evidence_source).value,
             "process_signal_gate": process_signal_gate,
             "process_signal_protocol_id": process_signal_protocol_id,
             "process_signal_case_digest": process_signal_case_digest,
@@ -1268,6 +1296,9 @@ class PureExtractionOptimizerCorpus:
             split=split,
             observation_cutoff=observation_cutoff,
             examples=ordered,
+            attribution_schema_version=attribution_schema_version,
+            evidence_plane=EvidencePlane(evidence_plane),
+            evidence_source=EvidenceSourceKind(evidence_source),
             process_signal_gate=process_signal_gate,
             process_signal_protocol_id=process_signal_protocol_id,
             process_signal_case_digest=process_signal_case_digest,
@@ -1371,7 +1402,8 @@ class PureExtractionOptimizerCorpus:
     @classmethod
     def from_payload(cls, value: object) -> "PureExtractionOptimizerCorpus":
         fields = {
-            "schema", "corpus_id", "schema_version", "split", "observation_cutoff",
+            "schema", "corpus_id", "schema_version", "attribution_schema_version",
+            "split", "observation_cutoff", "evidence_plane", "evidence_source",
             "example_ids", "examples", "process_signal_gate",
             "process_signal_protocol_id", "process_signal_case_digest",
             "process_signal_case_count", "process_signal_optimization_count",
@@ -1388,6 +1420,9 @@ class PureExtractionOptimizerCorpus:
                 split=value["split"],
                 observation_cutoff=value["observation_cutoff"],
                 examples=examples,
+                attribution_schema_version=value["attribution_schema_version"],
+                evidence_plane=value["evidence_plane"],
+                evidence_source=value["evidence_source"],
                 process_signal_gate=value["process_signal_gate"],
                 process_signal_protocol_id=value["process_signal_protocol_id"],
                 process_signal_case_digest=value["process_signal_case_digest"],
@@ -1796,6 +1831,10 @@ class JsonPureExtractionOptimizerCorpusStore:
                 evidence_plane=EvidencePlane.PURE_PROCESS,
                 evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
             )
+        if result.evidence_plane is not EvidencePlane.PURE_PROCESS or result.evidence_source is not EvidenceSourceKind.RUNTIME_OBSERVATION:
+            raise ValueError("pure optimizer corpus has an invalid evidence plane")
+        if result.attribution_schema_version != PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION:
+            raise ValueError("pure optimizer corpus has an unsupported attribution schema")
         for example in result.examples:
             if example.evidence_plane is not EvidencePlane.PURE_PROCESS:
                 raise ValueError("pure optimizer corpus contains non-pure evidence")
