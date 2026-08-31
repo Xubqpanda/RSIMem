@@ -650,7 +650,10 @@ def build_process_signal_cases(
     # ``ProcessSignalCase.from_process_events``.  Keep each physical context
     # isolated while allowing the resulting cases to share a logical case ID
     # when their frozen source identity matches.
-    grouped: dict[tuple[str, str, str, str, str, str], list[ProcessEvent]] = {}
+    grouped: dict[
+        tuple[str, str, str, str, str, str],
+        list[ProcessEvent | PureProcessEvent],
+    ] = {}
     for event in values:
         context = (
             event.run_id,
