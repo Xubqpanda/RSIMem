@@ -1642,23 +1642,9 @@ class HermesPastBenchBridge:
             if value.source_surface is OpportunitySurface.CURRENT_INPUT
         ))
         current_input = self._current_input(result)
-        observation_window = (
-            "window."
-            + hashlib.sha256(
-                json.dumps(
-                    {
-                        "task_id": self._task_id,
-                        "current_input_digest": hashlib.sha256(
-                            current_input.encode("utf-8")
-                        ).hexdigest(),
-                        "runtime_opportunity_ids": [
-                            value.evidence_id for value in runtime_opportunities
-                        ],
-                    },
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ).encode("utf-8")
-            ).hexdigest()[:40]
+        observation_window = self._pure_observation_window(
+            current_input,
+            runtime_opportunities,
         )
         for source in sources:
             # A source is only eligible for a feedback join after its own
@@ -2896,6 +2882,52 @@ class HermesPastBenchBridge:
             if message.get("role") == "user"
         )
         return user_inputs[-1] if user_inputs else ""
+
+    @staticmethod
+    def _pure_observation_window(
+        current_input: str,
+        opportunities: Iterable[OpportunityEvidence],
+    ) -> str:
+        """Build a replicate-stable future observation-window identity.
+
+        Run/task IDs, operation IDs and evidence IDs are physical execution
+        metadata.  Including them would split one semantic future boundary
+        across retries or provider replicates.  The pure-process window is
+        instead keyed by the visible current input and the normalized
+        requirement surfaces observed by the application.  Application
+        schema identity is retained when present so two frozen contracts with
+        the same requirement text cannot silently merge.
+        """
+
+        requirement_surfaces = tuple(sorted({
+            (
+                value.source_surface.value,
+                value.semantic_requirement,
+                value.application_schema_digest,
+            )
+            for value in opportunities
+        }))
+        identity = {
+            "current_input_digest": hashlib.sha256(
+                current_input.encode("utf-8")
+            ).hexdigest(),
+            "opportunity_requirements": [
+                {
+                    "surface": surface,
+                    "requirement": requirement,
+                    "application_schema_digest": schema_digest,
+                }
+                for surface, requirement, schema_digest in requirement_surfaces
+            ],
+        }
+        return "window." + hashlib.sha256(
+            json.dumps(
+                identity,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()[:40]
 
     def _semantic_deployment_observation(
         self,
