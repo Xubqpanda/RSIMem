@@ -770,9 +770,12 @@ def build_joined_process_signal_cases(
         raise TypeError("joined process signal requires pure extraction feedback records")
     if any(not isinstance(item, PureExtractionSourceRecord) for item in source_records):
         raise TypeError("joined process signal requires pure extraction source records")
-    sources_by_id = {item.record_id: item for item in source_records}
-    if len(sources_by_id) != len(source_records):
-        raise ValueError("joined process signal source identities must be unique")
+    sources_by_id: dict[str, PureExtractionSourceRecord] = {}
+    for item in source_records:
+        previous = sources_by_id.get(item.record_id)
+        if previous is not None and previous != item:
+            raise ValueError("conflicting joined process signal source identity")
+        sources_by_id[item.record_id] = item
 
     def context(event: ProcessEvent | PureProcessEvent) -> tuple[str, str, str, str, str, str]:
         return (
