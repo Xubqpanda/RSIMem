@@ -21,6 +21,7 @@ from .extraction_experiment_preflight import (
 from .extraction_validation_runtime import load_extraction_matched_trial_profile
 from .extraction_split_plan import ExtractionSplitRole, load_extraction_split_plan
 from .memory.extraction_feedback import default_feedback_contract_registry
+from .memory.revocation import JsonRevocationRegistry
 from .memory.prompt_components import MatchedSemanticPolicyManifest
 from .memory_systems.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT_ID,
@@ -55,12 +56,22 @@ def initialize_formal_matched_validation_batch(
     experiment_config_path: Path,
     trial_config_path: Path,
     split_plan_path: Path,
+    revocation_registry_path: Path | None = None,
     agent: str = "hermes-luna",
 ) -> str:
     config = load_extraction_preflight_config(experiment_config_path)
     if family_root.expanduser().resolve().name != config["familyId"]:
         raise ValueError("PAST family and extraction experiment config disagree")
-    trial = load_extraction_matched_trial_profile(trial_config_path)
+    revocation_registry = (
+        JsonRevocationRegistry(revocation_registry_path)
+        if revocation_registry_path is not None
+        else None
+    )
+    trial = load_extraction_matched_trial_profile(
+        trial_config_path,
+        revocation_registry=revocation_registry,
+        require_revocation_registry=revocation_registry is not None,
+    )
     parent_policy = _semantic_policy(trial.parent)
     candidate_policy = _semantic_policy(trial.candidate)
     matched = MatchedSemanticPolicyManifest.create(parent_policy, candidate_policy)
@@ -129,6 +140,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--experiment-config", type=Path, required=True)
     parser.add_argument("--trial-config", type=Path, required=True)
     parser.add_argument("--split-plan", type=Path, required=True)
+    parser.add_argument(
+        "--revocation-registry",
+        type=Path,
+        default=None,
+        help="owner-controlled revocation registry (required when supplied)",
+    )
     parser.add_argument("--agent", default="hermes-luna")
     return parser
 
@@ -147,6 +164,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         experiment_config_path=args.experiment_config,
         trial_config_path=args.trial_config,
         split_plan_path=args.split_plan,
+        revocation_registry_path=args.revocation_registry,
         agent=args.agent,
     )
     print(json.dumps({

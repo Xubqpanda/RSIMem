@@ -18,6 +18,7 @@ from rsimem.extraction_split_plan import (
     ExtractionSplitRole,
     write_extraction_split_plan,
 )
+from rsimem.memory.revocation import JsonRevocationRegistry
 from test_extraction_matched_activation import _offline_decision
 from test_extraction_offline_validation import _candidate, _parent
 
@@ -110,6 +111,25 @@ def test_matched_preflight_builds_validation_manifest_with_only_extraction_drift
     assert captured["active_policy"].extraction_component_digest == candidate.body_digest
     assert captured["matched_policy"].parent == captured["parent_policy"]
     assert captured["matched_policy"].candidate == captured["active_policy"]
+
+    # Supplying the owner registry opts the formal preflight into fail-closed
+    # artifact validation before the manifest is initialized.
+    revocation_registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    revocation_registry.initialize()
+    initialize_formal_matched_validation_batch(
+        manifest_path=tmp_path / "manifest-with-registry.json",
+        batch_registry_path=tmp_path / "registry-with-registry.json",
+        batch_id="batch.validation-registry-v1",
+        rsimem_root=tmp_path,
+        past_bench_root=tmp_path,
+        family_root=family,
+        agent_registry_path=Path("configs/agents.yaml"),
+        run_config_path=Path("configs/past_bench_luna_smoke.yaml"),
+        experiment_config_path=Path("configs/extraction_feedback_sm01.json"),
+        trial_config_path=trial_root / "extraction-matched-trial.json",
+        split_plan_path=split_plan_path,
+        revocation_registry_path=revocation_registry.path,
+    )
 
 
 def test_matched_preflight_requires_validation_split_assignment(tmp_path: Path) -> None:
