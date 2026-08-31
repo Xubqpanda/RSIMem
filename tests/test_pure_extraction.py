@@ -621,6 +621,74 @@ def test_pure_corpus_factory_does_not_count_duplicate_physical_actionable_rows()
     assert corpus.process_signal_hypothesis_digest is None
 
 
+def test_pure_corpus_factory_accepts_two_independent_actionable_cases() -> None:
+    """Two independently formed source sets still satisfy the ready gate."""
+
+    def actionable_example(tag: str) -> PureExtractionOptimizerExample:
+        projection, source, *_ = _fixture()
+        pure_source = PureExtractionSourceRecord.from_family_record(
+            source,
+            source_projection_id=projection.projection_id,
+            provenance_id=f"provenance.census-independent.{tag}",
+            visible_semantic_keys=(TSV_KEY,),
+        )
+        artifact_ids = tuple(
+            fact.artifact_id
+            for fact in pure_source.source.facts
+            if fact.artifact_id is not None
+        )
+        opportunity = OpportunityEvidence.create(
+            source_surface=OpportunitySurface.TOOL_SCHEMA,
+            semantic_requirement=TSV_KEY,
+            observation_time="2026-08-31T00:00:00Z",
+            operation_id=f"op.opportunity.independent.{tag}",
+            provenance_id=pure_source.provenance_id,
+            source_payload={"tool": "fixture_apply"},
+        )
+        memory_use = MemoryUseEvidence.create(
+            artifact_ids=artifact_ids,
+            retrieval_operation_id=f"op.retrieval.independent.{tag}",
+            retrieved_artifact_ids=artifact_ids,
+            injection_operation_id=f"op.injection.independent.{tag}",
+            injected_artifact_ids=artifact_ids,
+            downstream_operation_id=f"op.use.independent.{tag}",
+            used_artifact_ids=artifact_ids,
+            outcome_operation_id=f"op.outcome.independent.{tag}",
+            outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+            outcome_success=True,
+            observation_cutoff="2026-08-31T00:01:00Z",
+            provenance_id=pure_source.provenance_id,
+        )
+        feedback = PureExtractionFeedbackRecord.derive_from_evidence(
+            source=pure_source,
+            opportunity=opportunity,
+            memory_use=memory_use,
+            observation_window=f"window.independent.{tag}",
+            provenance_id=pure_source.provenance_id,
+        )
+        return PureExtractionOptimizerExample.from_records(pure_source, feedback)
+
+    examples = (actionable_example("one"), actionable_example("two"))
+    hypothesis = "a" * 64
+    census = ProcessSignalCaseCensus(
+        physical_observation_count=2,
+        logical_case_count=2,
+        status_counts={"optimization_signal": 2},
+        conflict_case_count=0,
+        optimization_hypothesis_case_counts={hypothesis: 2},
+    )
+    corpus = PureExtractionOptimizerCorpus.create_from_process_signal_census(
+        split="train",
+        observation_cutoff="2026-08-31T00:00:00Z",
+        examples=examples,
+        process_signal_protocol_id="protocol.census-independent-v1",
+        process_signal_case_digest=None,
+        census=census,
+    )
+    assert corpus.process_signal_gate == "ready"
+    assert corpus.process_signal_hypothesis_digest == hypothesis
+
+
 def test_pure_corpus_factory_rejects_multiple_shared_hypotheses() -> None:
     projection, source, *_ = _fixture()
     pure_source = PureExtractionSourceRecord.from_family_record(
