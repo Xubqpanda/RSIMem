@@ -337,6 +337,12 @@ def test_past_fact_matcher_uses_transient_content_and_public_contract() -> None:
                 FactDisposition.PERSISTED,
                 artifact_id="artifact.provider-facts.share",
             ),
+            ExtractedFactEvidence(
+                "fact.provider-facts.employee",
+                (),
+                FactDisposition.PERSISTED,
+                artifact_id="artifact.provider-facts.employee",
+            ),
         ),
     )
     schema = {
@@ -351,12 +357,16 @@ def test_past_fact_matcher_uses_transient_content_and_public_contract() -> None:
             "fact.provider-facts.share": (
                 "Internal notes must never be shared with external recipients."
             ),
+            "fact.provider-facts.employee": (
+                "For internal planning work, source-note shares should be sent only to employees."
+            ),
         },
         application_schema=schema,
     )
     assert mapping == {
         "fact.provider-facts.roster": ("application.notes.share.recipient_policy",),
         "fact.provider-facts.share": ("application.notes.share.recipient_policy",),
+        "fact.provider-facts.employee": ("application.notes.share.recipient_policy",),
     }
 
 
@@ -375,6 +385,34 @@ def test_past_fact_matcher_fails_closed_without_contract_or_text() -> None:
         ),),
     )
     assert _past_bench_fact_semantic_keys_provider(source, fact_contents={}) == {}
+
+
+def test_past_fact_matcher_rejects_incomplete_compound_unit() -> None:
+    source = ExtractionSourceEvidence(
+        "source.provider-facts-partial",
+        "a" * 64,
+        "extraction-set.provider-facts-partial",
+        ExtractionSetStatus.NONEMPTY,
+        ("application.notes.share.recipient_policy",),
+        (ExtractedFactEvidence(
+            "fact.provider-facts-partial",
+            (),
+            FactDisposition.PERSISTED,
+            artifact_id="artifact.provider-facts-partial",
+        ),),
+    )
+    schema = {
+        "application_contract": {
+            "requirement_ids": ["application.notes.share.recipient_policy"],
+        },
+    }
+    assert _past_bench_fact_semantic_keys_provider(
+        source,
+        fact_contents={
+            "fact.provider-facts-partial": "Internal notes must never be shared with external recipients.",
+        },
+        application_schema=schema,
+    ) == {}
 
 
 def test_past_artifact_set_provider_does_not_copy_source_key_to_unbound_facts() -> None:

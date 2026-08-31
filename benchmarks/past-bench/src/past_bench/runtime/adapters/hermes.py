@@ -399,27 +399,69 @@ def _past_bench_fact_semantic_keys_provider(
     }
     visible = set(evidence.available_semantic_keys)
     allowed &= visible
-    result: dict[str, tuple[str, ...]] = {}
-    for fact in evidence.facts:
-        if fact.disposition.value != "persisted" or fact.artifact_id is None:
-            continue
+    persisted = tuple(
+        fact
+        for fact in evidence.facts
+        if fact.disposition.value == "persisted" and fact.artifact_id is not None
+    )
+    if not persisted or len(persisted) != len(evidence.facts):
+        return {}
+    # The public recipient-policy unit is a compound rule.  Require evidence
+    # for all three semantic roles before assigning the key to any member:
+    # who belongs to the external roster, what prohibition applies, and which
+    # employee-only allowance applies.  This prevents a single fact that
+    # merely mentions ``share`` or ``employee`` from becoming a complete set.
+    required_roles = {"roster", "prohibition", "employee_only"}
+    roles_by_fact: dict[str, set[str]] = {}
+    for fact in persisted:
         content = fact_contents.get(fact.fact_id)
         if not isinstance(content, str) or not content.strip():
-            continue
+            return {}
         value = content.casefold()
+        roles: set[str] = set()
+        if (
+            "external advisory roster" in value
+            or ("external" in value and "roster" in value)
+        ):
+            roles.add("roster")
+        if (
+            any(phrase in value for phrase in (
+                "never share",
+                "must never be shared",
+                "must not share",
+                "do not share",
+                "don't share",
+                "not be shared",
+            ))
+        ):
+            roles.add("prohibition")
+        if (
+            "only employees" in value
+            or "employees only" in value
+            or (
+                "employee" in value
+                and ("receive" in value or "sent" in value)
+                and "share" in value
+            )
+        ):
+            roles.add("employee_only")
+        roles_by_fact[fact.fact_id] = roles
+    complete_share_unit = (
+        _PAST_SHARE_POLICY_KEY in allowed
+        and set().union(*roles_by_fact.values()) == required_roles
+        and all(roles for roles in roles_by_fact.values())
+    )
+    result: dict[str, tuple[str, ...]] = {}
+    for fact in persisted:
         keys: list[str] = []
+        content = fact_contents[fact.fact_id].casefold()
         if _PAST_OUTPUT_TSV_KEY in allowed and (
-            "tsv" in value
-            or "tab-separated" in value
-            or all(field in value for field in ("owner", "priority", "task", "due_date"))
+            "tsv" in content
+            or "tab-separated" in content
+            or all(field in content for field in ("owner", "priority", "task", "due_date"))
         ):
             keys.append(_PAST_OUTPUT_TSV_KEY)
-        if _PAST_SHARE_POLICY_KEY in allowed and (
-            "share" in value
-            or "recipient" in value
-            or "external advisory roster" in value
-            or "employee" in value
-        ):
+        if complete_share_unit:
             keys.append(_PAST_SHARE_POLICY_KEY)
         if keys:
             result[fact.fact_id] = tuple(dict.fromkeys(keys))
