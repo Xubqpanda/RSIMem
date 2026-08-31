@@ -265,11 +265,31 @@ def test_rsimem_bridge_receives_automatic_task_completion_boundary(
             calls["closed"] = True
 
     monkeypatch.setattr(bridge_module, "HermesPastBenchBridge", Bridge)
-    monkeypatch.setattr(hermes_module.HermesAdapter, "_register_past_bench_tools", lambda self: None)
-    monkeypatch.setattr(hermes_module.HermesAdapter, "_capture_hermes_artifacts", staticmethod(lambda *args, **kwargs: None))
-    monkeypatch.setattr(hermes_module.HermesAdapter, "_reload_hermes_modules_if_needed", staticmethod(lambda *args, **kwargs: None))
-    monkeypatch.setattr(hermes_module.HermesAdapter, "_set_session_title_if_missing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(hermes_module.HermesAdapter, "_isolate_rsimem_semantic_writer", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        hermes_module.HermesAdapter,
+        "_register_past_bench_tools",
+        lambda self: None,
+    )
+    monkeypatch.setattr(
+        hermes_module.HermesAdapter,
+        "_capture_hermes_artifacts",
+        staticmethod(lambda *args, **kwargs: None),
+    )
+    monkeypatch.setattr(
+        hermes_module.HermesAdapter,
+        "_reload_hermes_modules_if_needed",
+        staticmethod(lambda *args, **kwargs: None),
+    )
+    monkeypatch.setattr(
+        hermes_module.HermesAdapter,
+        "_set_session_title_if_missing",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        hermes_module.HermesAdapter,
+        "_isolate_rsimem_semantic_writer",
+        lambda *args, **kwargs: None,
+    )
 
     fake_run_agent = types.ModuleType("run_agent")
 

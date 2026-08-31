@@ -1590,7 +1590,7 @@ class HermesPastBenchBridge:
         for case in cases:
             self._unbound_process_signal_case_store.append(case)
         joined_cases = build_joined_process_signal_cases(
-            events,
+            archived_events,
             self.pure_extraction_feedback_store.records(),
             sources=self.pure_extraction_source_store.records(),
             frozen_policy_digest=frozen_policy_digest,
