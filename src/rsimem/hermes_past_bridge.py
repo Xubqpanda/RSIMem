@@ -206,11 +206,20 @@ class _PromptMemoryStore:
             adapter_result,
             lambda: self._native.format_for_system_prompt(target),
         )
-        self._bridge.record_semantic_prompt(
-            adapter_result,
-            target,
-            artifact_ids=tuple(hit.artifact.artifact_id for hit in self._snapshots.get(target, ())),
-        )
+        # A successful adapter read already has the authoritative hit set.
+        # Reuse it when creating the future trace instead of querying the
+        # backend a second time.  Native-bypass reads are deliberately not
+        # attributed to RSIMem artifacts: the adapter did not establish an
+        # exact retrieval/injection join, so recording a synthetic future
+        # would overstate memory use after a failure.
+        if self._bridge._last_adapter_route == "adapter":
+            hits = tuple(self._snapshots.get(target, ()))
+            self._bridge.record_semantic_prompt(
+                adapter_result,
+                target,
+                artifact_ids=tuple(hit.artifact.artifact_id for hit in hits),
+                retrieved_hits=hits,
+            )
         return adapter_result
 
 
@@ -550,6 +559,10 @@ class HermesPastBenchBridge:
         self._source_selection_decisions: list[SourceSelectionDecision] = []
         self._last_host_event_id: str | None = None
         self._last_host_source_revision: str | None = None
+        # Set by ``adapter_call`` for the immediately preceding host
+        # operation.  The prompt adapter uses this to avoid attributing a
+        # native-bypass result to an RSIMem retrieval that never happened.
+        self._last_adapter_route: str | None = None
         self._policy_evidence = JsonPolicyDecisionLedger(
             self.evidence_path.with_name("rsimem_policy_decisions.jsonl"),
             variant=experiment_variant,
@@ -1357,6 +1370,7 @@ class HermesPastBenchBridge:
         namespace: str,
         *,
         artifact_ids: tuple[str, ...] = (),
+        retrieved_hits: Sequence[Any] | None = None,
     ) -> None:
         if not artifact_ids and prompt:
             try:
@@ -1409,6 +1423,7 @@ class HermesPastBenchBridge:
             namespace=namespace,
             parent_operation_ids=(),
             step_id=step_id,
+            retrieved_hits=retrieved_hits,
         )
         self._semantic_futures.append((future, step_id))
 
@@ -3372,13 +3387,16 @@ class HermesPastBenchBridge:
         native_call: Callable[[], Any],
     ) -> Any:
         try:
-            return adapter_call()
+            result = adapter_call()
+            self._last_adapter_route = "adapter"
+            return result
         except Exception as exc:
             failure_type = type(exc).__name__
             if (
                 self.config.adapter_failure_policy
                 == HermesAdapterFailurePolicy.BYPASS_NATIVE
             ):
+                self._last_adapter_route = "native_bypass"
                 if operation == "session_search":
                     kind = MemoryKind.EPISODIC
                     backend = "hermes-native-episodic"
@@ -3467,6 +3485,7 @@ class HermesPastBenchBridge:
                     + hashlib.sha256(operation.encode("utf-8")).hexdigest()[:24],
                 ),
             )
+            self._last_adapter_route = "failed"
             raise HermesAdapterExecutionError(
                 f"Hermes adapter operation failed closed: {operation} ({failure_type})"
             ) from exc
