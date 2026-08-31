@@ -156,7 +156,9 @@ def build_hermes_extra_body(
         ),
     }
     if rsimem_revocation_registry_path:
-        source_registry = Path(rsimem_revocation_registry_path).expanduser().resolve()
+        # Keep the final component unresolved so symlinked owner state is
+        # rejected instead of silently copied from an unrelated target.
+        source_registry = Path(rsimem_revocation_registry_path).expanduser().absolute()
         if source_registry.is_symlink() or not source_registry.is_file():
             raise ValueError(
                 "RSIMem revocation registry must be an existing regular file"
