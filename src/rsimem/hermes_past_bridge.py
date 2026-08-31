@@ -429,7 +429,7 @@ class HermesPastBenchBridge:
             [object], Iterable[ArtifactSetSemanticBinding]
         ] | None = None,
         pure_extraction_fact_semantic_keys_provider: Callable[
-            [PureExtractionSourceRecord], Mapping[str, tuple[str, ...]]
+            ..., Mapping[str, tuple[str, ...]]
         ] | None = None,
         application_opportunity_schema: Mapping[str, Any] | None = None,
         pure_extraction_source_path: Path | None = None,
@@ -2325,7 +2325,56 @@ class HermesPastBenchBridge:
         )
         mapping = None
         if fact_semantic_keys_provider is not None:
-            mapping = fact_semantic_keys_provider(record)
+            # The source record is deliberately content-free, but an owner
+            # matcher may need the transient policy fact text to classify each
+            # fact against a public application contract.  Pass it only to a
+            # callback that explicitly declares the keyword; never persist it.
+            fact_contents = {}
+            ingestion = (
+                boundary.writeback.ingestion
+                if boundary.writeback is not None
+                else None
+            )
+            trace = (
+                self.static_writeback.policy.operation_trace(
+                    ingestion.idempotency_key
+                )
+                if ingestion is not None
+                else None
+            )
+            if trace is not None:
+                for extraction in trace.fact_extractions:
+                    fact = self.static_writeback.policy.fact_for_digest(
+                        extraction.content_digest
+                    )
+                    if fact is not None:
+                        fact_contents[extraction.fact_id] = fact.content
+            try:
+                parameters = inspect.signature(
+                    fact_semantic_keys_provider
+                ).parameters.values()
+                parameter_names = {parameter.name for parameter in parameters}
+                accepts_kwargs = any(
+                    parameter.kind is inspect.Parameter.VAR_KEYWORD
+                    for parameter in parameters
+                )
+            except (TypeError, ValueError):
+                parameter_names = set()
+                accepts_kwargs = False
+            context = {}
+            if accepts_kwargs or "fact_contents" in parameter_names:
+                context["fact_contents"] = fact_contents
+            if accepts_kwargs or "application_schema" in parameter_names:
+                context["application_schema"] = (
+                    self._application_opportunity_schema
+                )
+            if context:
+                mapping = fact_semantic_keys_provider(
+                    record,
+                    **context,
+                )
+            else:
+                mapping = fact_semantic_keys_provider(record)
         elif result is not None and "rsimem_fact_semantic_keys" in result:
             # Hosts that cannot install a Python callback may attach an
             # explicit owner-controlled matcher at the completion boundary.
