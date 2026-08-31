@@ -841,7 +841,6 @@ def build_joined_process_signal_cases(
         if not source_events or not future_events:
             continue
         combined = source_events + tuple(event for event in future_events if event not in source_events)
-        source_flags = stage_flags(source_events)
         future_flags = stage_flags(future_events)
         attributable = record.attribution in {
             PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
