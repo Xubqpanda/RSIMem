@@ -1703,7 +1703,13 @@ class HermesPastBenchBridge:
                 if len(source_memory_uses) == 1
                 else None
             )
-            if memory_use is None:
+            # Only attempt artifact-overlap rebinding when no evidence was
+            # already emitted for this source provenance.  If multiple
+            # memory-use records share the provenance, that is an ambiguous
+            # join and must remain unresolved; selecting one merely because
+            # its artifact set happens to intersect would make append order
+            # (or unrelated evidence) authoritative.
+            if memory_use is None and not source_memory_uses:
                 # The future recorder's operation provenance is independent
                 # of the source compilation provenance.  Bind an observed
                 # memory-use join to this source only when its artifact set
