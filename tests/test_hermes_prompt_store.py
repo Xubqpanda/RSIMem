@@ -95,3 +95,40 @@ def test_adapter_prompt_records_the_same_retrieved_hits_once() -> None:
     _args, kwargs = bridge.recorded_prompts[0]
     assert kwargs["artifact_ids"] == ("semantic.fixture",)
     assert kwargs["retrieved_hits"] == hits
+
+
+def test_adapter_render_failure_does_not_mark_hits_as_injected() -> None:
+    artifact = MemoryArtifact(
+        artifact_id="semantic.render-failure",
+        kind=MemoryKind.SEMANTIC,
+        content="Use TSV for durable reports.",
+        namespace="user",
+        revision="revision.fixture",
+    )
+    hits = (MemoryHit(artifact=artifact, rank=1, backend="fixture-semantic"),)
+
+    class FailingRenderBridge(_Bridge):
+        def __init__(self) -> None:
+            self.runtime = _Runtime(hits)
+            self._last_adapter_route = None
+            self._last_host_event_id = None
+            self._last_host_source_revision = None
+            self.recorded_prompts = []
+
+        def adapter_call(self, _operation, adapter_call, native_call):
+            try:
+                self._last_adapter_route = "adapter"
+                return adapter_call()
+            except RuntimeError:
+                self._last_adapter_route = "native_bypass"
+                return native_call()
+
+    class FailingRenderStore(_NativeStore):
+        def _render_block(self, _target, _contents):
+            raise RuntimeError("renderer unavailable")
+
+    bridge = FailingRenderBridge()
+    store = _PromptMemoryStore(bridge, FailingRenderStore())
+    assert store.format_for_system_prompt("user") == "native:user"
+    assert bridge.runtime.injected == []
+    assert bridge.recorded_prompts == []

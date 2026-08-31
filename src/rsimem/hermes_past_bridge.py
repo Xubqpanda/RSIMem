@@ -188,11 +188,15 @@ class _PromptMemoryStore:
             )
             if not hits:
                 return None
-            self._bridge.runtime.mark_injected(hits, surface="system_prompt")
-            return self._native._render_block(
+            rendered = self._native._render_block(
                 target,
                 [hit.artifact.content for hit in hits],
             )
+            # Rendering is part of the host exposure boundary.  Do not mark
+            # artifacts as injected until the render succeeds; a renderer
+            # failure is an injection failure, not an exposure/use event.
+            self._bridge.runtime.mark_injected(hits, surface="system_prompt")
+            return rendered
 
         adapter_result = self._bridge.adapter_call(
             "system_prompt",
