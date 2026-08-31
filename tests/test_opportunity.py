@@ -245,6 +245,33 @@ def test_opportunity_log_is_restart_safe_and_rejects_conflicts(tmp_path) -> None
         JsonOpportunityEvidenceLog(path)
 
 
+def test_opportunity_log_failed_commit_keeps_previous_complete_records(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    first = _evidence()
+    second = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement="resource.share.recipient_policy",
+        observation_time="2026-08-30T01:02:04Z",
+        operation_id="op.tool-schema.v2",
+        provenance_id="provenance.run.v2",
+        source_payload={"tool_name_digest": "b" * 64, "success_field": True},
+    )
+    path = tmp_path / "opportunities-atomic.jsonl"
+    log = JsonOpportunityEvidenceLog(path)
+    assert log.append(first) is True
+
+    def fail_replace(*args, **kwargs):
+        raise OSError("simulated archive interruption")
+
+    monkeypatch.setattr("rsimem.memory._atomic_jsonl.os.replace", fail_replace)
+    with pytest.raises(OSError, match="simulated archive interruption"):
+        log.append(second)
+    assert log.records() == (first,)
+    assert path.read_text(encoding="utf-8").endswith("\n")
+
+
 @pytest.mark.parametrize(
     "store_factory",
     (

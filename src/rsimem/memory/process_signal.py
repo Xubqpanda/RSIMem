@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
+from ._atomic_jsonl import replace_jsonl
 from .process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 from .logical_case import LogicalCaseIdentity
 from .pure_process import PureProcessEvent
@@ -547,11 +548,12 @@ class JsonProcessSignalCaseStore:
                     if previous != serialized:
                         raise ValueError("conflicting process-signal case")
                     return False
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                with self.path.open("a", encoding="utf-8") as handle:
-                    handle.write(serialized + "\n")
-                    handle.flush()
-                    os.fsync(handle.fileno())
+                replace_jsonl(
+                    self.path,
+                    tuple(value for _, value in sorted(records.items()))
+                    + (serialized,),
+                    error_name="process-signal case store",
+                )
                 return True
             finally:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
