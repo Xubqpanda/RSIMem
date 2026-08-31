@@ -36,6 +36,7 @@ from rsimem.memory.extraction_prompt_validation import (
     ExtractionValidationVariant,
 )
 from rsimem.memory.prompt_components import text_digest
+from rsimem.memory.revocation import JsonRevocationRegistry
 from rsimem.memory_systems.mem0_flat import MEM0_FLAT_EXTRACTION_SLOT
 from test_extraction_offline_validation import (
     _candidate,
@@ -207,16 +208,38 @@ def _coordinator(tmp_path, parent):
     rollback_store = JsonExtractionRollbackEvidenceStore(
         tmp_path / "rollback-evidence"
     )
+    revocation_registry = JsonRevocationRegistry(
+        tmp_path / "revocations.jsonl"
+    )
+    revocation_registry.initialize()
     return (
         policy_store,
         decision_store,
         rollback_store,
+        revocation_registry,
         ExtractionMatchedActivationCoordinator(
             policy_store,
             decision_store,
             rollback_store,
+            revocation_registry,
         ),
     )
+
+
+def test_activation_requires_owner_revocation_registry(tmp_path) -> None:
+    parent = _parent()
+    policy_store = JsonExtractionPolicyStore(
+        tmp_path / "policies-missing-registry.json",
+        trusted_root=parent,
+        slot=MEM0_FLAT_EXTRACTION_SLOT,
+    )
+    policy_store.initialize()
+    with pytest.raises(ValueError, match="requires a revocation registry"):
+        ExtractionMatchedActivationCoordinator(
+            policy_store,
+            JsonExtractionMatchedTrialDecisionStore(tmp_path / "decisions"),
+            JsonExtractionRollbackEvidenceStore(tmp_path / "rollback"),
+        )
 
 
 def test_matched_trial_activation_restart_and_operator_rollback_are_idempotent(
@@ -233,7 +256,7 @@ def test_matched_trial_activation_restart_and_operator_rollback_are_idempotent(
     )
     assert ExtractionMatchedTrialDecision.from_payload(decision.payload()) == decision
 
-    policy_store, decision_store, rollback_store, coordinator = _coordinator(
+    policy_store, decision_store, rollback_store, revocation_registry, coordinator = _coordinator(
         tmp_path,
         parent,
     )
@@ -260,6 +283,7 @@ def test_matched_trial_activation_restart_and_operator_rollback_are_idempotent(
         restarted,
         JsonExtractionMatchedTrialDecisionStore(decision_store.root),
         JsonExtractionRollbackEvidenceStore(rollback_store.root),
+        JsonRevocationRegistry(revocation_registry.path),
     )
     rollback = ExtractionRollbackEvidence.operator_requested(
         candidate=candidate,
@@ -300,7 +324,7 @@ def test_matched_rejection_is_persisted_without_active_pointer(tmp_path) -> None
         ExtractionMatchedConstraint.USEFUL_RATE,
         ExtractionMatchedConstraint.EXTRACTION_INTERVENTION,
     }
-    policy_store, _, _, coordinator = _coordinator(tmp_path, parent)
+    policy_store, _, _, _, coordinator = _coordinator(tmp_path, parent)
     arguments = {
         "parent": parent,
         "candidate": candidate,
@@ -323,7 +347,7 @@ def test_activation_crash_leaves_proposal_and_retry_activates_once(
     parent = _parent()
     candidate = _candidate(parent=parent)
     offline, split, observations, decision = _matched_decision(parent, candidate)
-    policy_store, decision_store, _, coordinator = _coordinator(tmp_path, parent)
+    policy_store, decision_store, _, _, coordinator = _coordinator(tmp_path, parent)
     policy_store.register(candidate)
     original_write = policy_store._write_unlocked
 
@@ -379,7 +403,7 @@ def test_second_candidate_cannot_create_two_active_artifacts(tmp_path) -> None:
     )
     first_inputs = _matched_decision(parent, first)
     second_inputs = _matched_decision(parent, second)
-    policy_store, _, _, coordinator = _coordinator(tmp_path, parent)
+    policy_store, _, _, _, coordinator = _coordinator(tmp_path, parent)
     policy_store.register(first)
     policy_store.register(second)
     for candidate, inputs in ((first, first_inputs),):
@@ -412,7 +436,7 @@ def test_automatic_rollback_requires_observed_safety_failure(tmp_path) -> None:
     parent = _parent()
     candidate = _candidate(parent=parent)
     offline, split, observations, decision = _matched_decision(parent, candidate)
-    _, _, rollback_store, coordinator = _coordinator(tmp_path, parent)
+    _, _, rollback_store, _, coordinator = _coordinator(tmp_path, parent)
     coordinator.apply(
         parent=parent,
         candidate=candidate,
