@@ -217,6 +217,21 @@ def test_eager_injection_without_explicit_use_is_unresolved_not_harmful() -> Non
     assert dataset.examples[-1].label == ExtractionFeedbackLabel.UNRESOLVED
 
 
+def test_task_completion_without_memory_specific_use_stays_unresolved() -> None:
+    observation = replace(
+        _observation(SM01, (TSV_KEY,)),
+        final_response="Task completed.",
+        tool_events=(),
+    )
+    dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
+        _source((TSV_KEY,)),
+        observation,
+        _future((TSV_KEY,)),
+    )
+    assert _primary(dataset).label == ExtractionFeedbackLabel.UNRESOLVED
+    assert _primary(dataset).reason_codes == ("injected_not_used",)
+
+
 def test_sm05_multi_fact_success_counts_one_primary_and_no_fact_reward_copy() -> None:
     dataset = ExtractionFeedbackBuilder(default_feedback_contract_registry()).build(
         _source(SM05_KEYS),
