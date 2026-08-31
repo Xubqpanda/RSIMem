@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Sequence
+
 from .contracts import MemoryHit, MemoryKind, MemoryQuery
 from .extraction_feedback import (
     ArtifactSemanticBinding,
