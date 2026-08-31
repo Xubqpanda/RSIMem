@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
+from ._atomic_jsonl import replace_jsonl
 
 
 ARTIFACT_SET_SCHEMA_VERSION = 1
@@ -270,11 +271,12 @@ class JsonArtifactSetBindingLog:
                     if previous != serialized:
                         raise ValueError("conflicting artifact-set binding")
                     return False
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                with self.path.open("a", encoding="utf-8") as handle:
-                    handle.write(serialized + "\n")
-                    handle.flush()
-                    os.fsync(handle.fileno())
+                replace_jsonl(
+                    self.path,
+                    tuple(value for _, value in sorted(self._records.items()))
+                    + (serialized,),
+                    error_name="artifact-set binding log",
+                )
                 self._records[binding.binding_id] = serialized
                 return True
             finally:

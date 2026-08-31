@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
+from ._atomic_jsonl import replace_jsonl
 
 if TYPE_CHECKING:
     from .artifact_set import ArtifactSetSemanticBinding
@@ -378,11 +379,12 @@ class JsonMemoryUseEvidenceLog:
                     if previous != serialized:
                         raise ValueError("conflicting memory-use evidence")
                     return False
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                with self.path.open("a", encoding="utf-8") as handle:
-                    handle.write(serialized + "\n")
-                    handle.flush()
-                    os.fsync(handle.fileno())
+                replace_jsonl(
+                    self.path,
+                    tuple(value for _, value in sorted(self._records.items()))
+                    + (serialized,),
+                    error_name="memory-use evidence log",
+                )
                 self._records[evidence.evidence_id] = serialized
                 return True
             finally:

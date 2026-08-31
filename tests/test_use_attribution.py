@@ -84,6 +84,29 @@ def test_memory_use_log_is_restart_safe(tmp_path) -> None:
     assert JsonMemoryUseEvidenceLog(path).records() == (evidence,)
 
 
+def test_memory_use_log_failed_commit_keeps_previous_complete_records(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    first = _evidence()
+    second = _evidence(
+        provenance_id="provenance.case.v2",
+        observation_cutoff="2026-08-30T01:02:04Z",
+    )
+    path = tmp_path / "memory-use-atomic.jsonl"
+    log = JsonMemoryUseEvidenceLog(path)
+    assert log.append(first) is True
+
+    def fail_replace(*args, **kwargs):
+        raise OSError("simulated archive interruption")
+
+    monkeypatch.setattr("rsimem.memory._atomic_jsonl.os.replace", fail_replace)
+    with pytest.raises(OSError, match="simulated archive interruption"):
+        log.append(second)
+    assert log.records() == (first,)
+    assert path.read_text(encoding="utf-8").endswith("\n")
+
+
 def test_memory_use_log_rejects_symlinked_paths(tmp_path) -> None:
     target = tmp_path / "target"
     target.write_text("", encoding="utf-8")

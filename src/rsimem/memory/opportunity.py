@@ -25,6 +25,7 @@ from .evidence_planes import (
     validate_plane_source,
     validate_pure_process_payload,
 )
+from ._atomic_jsonl import replace_jsonl
 
 
 OPPORTUNITY_SCHEMA_VERSION = 2
@@ -657,11 +658,12 @@ class JsonOpportunityEvidenceLog:
                     if previous != serialized:
                         raise ValueError("conflicting opportunity evidence")
                     return False
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                with self.path.open("a", encoding="utf-8") as handle:
-                    handle.write(serialized + "\n")
-                    handle.flush()
-                    os.fsync(handle.fileno())
+                replace_jsonl(
+                    self.path,
+                    tuple(value for _, value in sorted(self._records.items()))
+                    + (serialized,),
+                    error_name="opportunity evidence log",
+                )
                 self._records[evidence.evidence_id] = serialized
                 return True
             finally:
