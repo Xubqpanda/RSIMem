@@ -2323,8 +2323,26 @@ class HermesPastBenchBridge:
         fact_semantic_keys_provider = (
             self._pure_extraction_fact_semantic_keys_provider
         )
+        mapping = None
         if fact_semantic_keys_provider is not None:
             mapping = fact_semantic_keys_provider(record)
+        elif result is not None and "rsimem_fact_semantic_keys" in result:
+            # Hosts that cannot install a Python callback may attach an
+            # explicit owner-controlled matcher at the completion boundary.
+            # This field is never inferred from family/stage or copied from a
+            # source-level key; malformed mappings fail closed.
+            raw_mapping = result.get("rsimem_fact_semantic_keys")
+            if not isinstance(raw_mapping, Mapping):
+                raise TypeError("runtime fact semantic keys must be a mapping")
+            mapping = {
+                fact_id: (
+                    tuple(keys)
+                    if isinstance(keys, (list, tuple)) and not isinstance(keys, str)
+                    else keys
+                )
+                for fact_id, keys in raw_mapping.items()
+            }
+        if mapping is not None:
             if not isinstance(mapping, Mapping):
                 raise TypeError(
                     "pure extraction fact semantic key provider must return a mapping"
