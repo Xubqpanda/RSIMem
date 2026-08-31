@@ -1540,7 +1540,35 @@ class HermesPastBenchBridge:
         # contract.
         projected = PureProcessCorpus.create(events).events
         self._pure_process_event_archive.append(projected)
-        events = self._pure_process_event_archive.records()
+        archived_events = self._pure_process_event_archive.records()
+        # ``pure_process_event_archive`` is intentionally shared by all
+        # tasks that use the same Hermes home so a later future task can join
+        # back to an earlier source.  A task-level observation case, however,
+        # must never splice events from another execution context (for
+        # example, a matched variant or a replay with the same task ID).  Keep
+        # the local diagnostic projection scoped to this bridge's context;
+        # the cross-task archive is still passed intact to the typed joined
+        # projection below.
+        current_context = (
+            self._run_id,
+            self.ledger.variant,
+            self._trace_id,
+            self._episode_id,
+            self._session_id,
+            self._task_id,
+        )
+        events = tuple(
+            event
+            for event in archived_events
+            if (
+                event.run_id,
+                event.variant,
+                event.trace_id,
+                event.episode_id,
+                event.session_id,
+                event.task_id,
+            ) == current_context
+        )
         policy_seed = "hermes-process-policy.unbound"
         if self.static_writeback is not None:
             policy_seed = self.static_writeback.policy.descriptor.policy_version
