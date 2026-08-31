@@ -823,7 +823,16 @@ def build_joined_process_signal_cases(
             continue
         source_anchor = source_anchors[0]
         future_anchor = future_anchors[0]
-        if source_anchor.variant != future_anchor.variant or source_anchor.run_id != future_anchor.run_id:
+        if (
+            source_anchor.variant != future_anchor.variant
+            or source_anchor.run_id != future_anchor.run_id
+            or source_anchor.source_revision
+            != getattr(source_record, "context_revision", None)
+            or source_anchor.task_id == future_anchor.task_id
+        ):
+            # A source/future anchor must share the physical run lineage but
+            # represent distinct task boundaries.  Any mismatch (including a
+            # stale source revision) is rejected rather than guessed.
             continue
         source_context = context(source_anchor)
         future_context = context(future_anchor)
