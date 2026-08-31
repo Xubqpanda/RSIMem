@@ -16,10 +16,12 @@ from pathlib import Path
 from typing import Mapping
 
 from .extraction_feedback import ExtractionFeedbackLabel, ExtractionSetStatus
+from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 
 
-EXTRACTION_VALIDATION_SCHEMA_VERSION = 1
-EXTRACTION_VALIDATION_SCHEMA = "extraction-prompt-validation-v1"
+EXTRACTION_VALIDATION_SCHEMA_VERSION = 2
+EXTRACTION_VALIDATION_SCHEMA = "extraction-prompt-validation-v2"
+EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION = 1
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _REQUIRED_METRICS = {"harmful_rate", "missed_rate"}
@@ -137,11 +139,30 @@ class ExtractionValidationObservation:
     safety_failure_count: int = 0
     prompt_leakage_failure_count: int = 0
     native_writer_failure_count: int = 0
+    attribution_schema_version: int = EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION
+    evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
     schema_version: int = EXTRACTION_VALIDATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         if self.schema_version != EXTRACTION_VALIDATION_SCHEMA_VERSION:
             raise ValueError("unsupported extraction validation observation schema")
+        if (
+            type(self.attribution_schema_version) is not int
+            or self.attribution_schema_version
+            != EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION
+        ):
+            raise ValueError("unsupported extraction validation attribution schema")
+        plane, source = validate_plane_source(
+            self.evidence_plane,
+            self.evidence_source,
+        )
+        if plane is not EvidencePlane.BENCHMARK_AUDIT or source is not EvidenceSourceKind.BENCHMARK_CONTRACT:
+            raise ValueError(
+                "extraction validation observation must be benchmark-audit evidence"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         object.__setattr__(self, "variant", ExtractionValidationVariant(self.variant))
         object.__setattr__(self, "label", ExtractionFeedbackLabel(self.label))
         object.__setattr__(
@@ -193,6 +214,9 @@ class ExtractionValidationObservation:
             raise ValueError("extraction validation pair ID mismatch")
         identity = {
             **pair_identity,
+            "attribution_schema_version": self.attribution_schema_version,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
             "variant": self.variant.value,
             "run_id": self.run_id,
             "episode_id": self.episode_id,
@@ -233,6 +257,9 @@ class ExtractionValidationObservation:
     def payload(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
+            "attribution_schema_version": self.attribution_schema_version,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
             "observation_id": self.observation_id,
             "pair_id": self.pair_id,
             "variant": self.variant.value,
@@ -260,6 +287,9 @@ class ExtractionValidationObservation:
     def from_payload(cls, value: object) -> "ExtractionValidationObservation":
         fields = {
             "schema_version",
+            "attribution_schema_version",
+            "evidence_plane",
+            "evidence_source",
             "observation_id",
             "pair_id",
             "variant",
@@ -315,6 +345,9 @@ class ExtractionValidationObservation:
                 safety_failure_count=value["failure_counts"][1],
                 prompt_leakage_failure_count=value["failure_counts"][2],
                 native_writer_failure_count=value["failure_counts"][3],
+                attribution_schema_version=value["attribution_schema_version"],
+                evidence_plane=EvidencePlane(value["evidence_plane"]),
+                evidence_source=EvidenceSourceKind(value["evidence_source"]),
                 schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -343,6 +376,9 @@ class ExtractionValidationObservation:
         extraction_status: ExtractionSetStatus,
         missed_assessable: bool | None,
         failure_counts: tuple[int, int, int, int] = (0, 0, 0, 0),
+        attribution_schema_version: int = EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION,
+        evidence_plane: EvidencePlane | str = EvidencePlane.BENCHMARK_AUDIT,
+        evidence_source: EvidenceSourceKind | str = EvidenceSourceKind.BENCHMARK_CONTRACT,
     ) -> "ExtractionValidationObservation":
         pair_identity = {
             "replicate": replicate,
@@ -357,6 +393,9 @@ class ExtractionValidationObservation:
         pair_id = f"extraction-pair.{_digest(pair_identity)[:40]}"
         identity = {
             **pair_identity,
+            "attribution_schema_version": attribution_schema_version,
+            "evidence_plane": EvidencePlane(evidence_plane).value,
+            "evidence_source": EvidenceSourceKind(evidence_source).value,
             "variant": ExtractionValidationVariant(variant).value,
             "run_id": run_id,
             "episode_id": episode_id,
@@ -392,6 +431,9 @@ class ExtractionValidationObservation:
             extraction_status,
             missed_assessable,
             *failure_counts,
+            attribution_schema_version=attribution_schema_version,
+            evidence_plane=EvidencePlane(evidence_plane),
+            evidence_source=EvidenceSourceKind(evidence_source),
         )
 
 
@@ -408,11 +450,30 @@ class ExtractionValidationSafetyEvidence:
     safety_failure_count: int
     prompt_leakage_failure_count: int
     native_writer_failure_count: int
+    attribution_schema_version: int = EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION
+    evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
     schema_version: int = EXTRACTION_VALIDATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         if self.schema_version != EXTRACTION_VALIDATION_SCHEMA_VERSION:
             raise ValueError("unsupported extraction validation safety evidence")
+        if (
+            type(self.attribution_schema_version) is not int
+            or self.attribution_schema_version
+            != EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION
+        ):
+            raise ValueError("unsupported extraction validation attribution schema")
+        plane, source = validate_plane_source(
+            self.evidence_plane,
+            self.evidence_source,
+        )
+        if plane is not EvidencePlane.BENCHMARK_AUDIT or source is not EvidenceSourceKind.BENCHMARK_CONTRACT:
+            raise ValueError(
+                "extraction validation safety evidence must be benchmark-audit evidence"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         for value in (
             self.evidence_id,
             self.live_feedback_record_id,
@@ -435,6 +496,9 @@ class ExtractionValidationSafetyEvidence:
             "evidence_cutoff_operation_id": self.evidence_cutoff_operation_id,
             "complete": self.complete,
             "failure_counts": list(self.failure_counts),
+            "attribution_schema_version": self.attribution_schema_version,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
         })
         if self.evidence_id != f"validation-safety.{expected[:40]}":
             raise ValueError("validation safety evidence ID mismatch")
@@ -451,6 +515,9 @@ class ExtractionValidationSafetyEvidence:
     def payload(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
+            "attribution_schema_version": self.attribution_schema_version,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
             "evidence_id": self.evidence_id,
             "live_feedback_record_id": self.live_feedback_record_id,
             "source_record_id": self.source_record_id,
@@ -465,6 +532,9 @@ class ExtractionValidationSafetyEvidence:
     def from_payload(cls, value: object) -> "ExtractionValidationSafetyEvidence":
         fields = {
             "schema_version",
+            "attribution_schema_version",
+            "evidence_plane",
+            "evidence_source",
             "evidence_id",
             "live_feedback_record_id",
             "source_record_id",
@@ -491,6 +561,9 @@ class ExtractionValidationSafetyEvidence:
                 value["evidence_cutoff_operation_id"],
                 value["complete"],
                 *value["failure_counts"],
+                attribution_schema_version=value["attribution_schema_version"],
+                evidence_plane=EvidencePlane(value["evidence_plane"]),
+                evidence_source=EvidenceSourceKind(value["evidence_source"]),
                 schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -512,6 +585,9 @@ class ExtractionValidationSafetyEvidence:
         safety_failure_count: int,
         prompt_leakage_failure_count: int,
         native_writer_failure_count: int,
+        attribution_schema_version: int = EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION,
+        evidence_plane: EvidencePlane | str = EvidencePlane.BENCHMARK_AUDIT,
+        evidence_source: EvidenceSourceKind | str = EvidenceSourceKind.BENCHMARK_CONTRACT,
     ) -> "ExtractionValidationSafetyEvidence":
         counts = (
             schema_failure_count,
@@ -527,6 +603,9 @@ class ExtractionValidationSafetyEvidence:
             "evidence_cutoff_operation_id": evidence_cutoff_operation_id,
             "complete": complete,
             "failure_counts": list(counts),
+            "attribution_schema_version": attribution_schema_version,
+            "evidence_plane": EvidencePlane(evidence_plane).value,
+            "evidence_source": EvidenceSourceKind(evidence_source).value,
         }
         return cls(
             f"validation-safety.{_digest(identity)[:40]}",
@@ -537,6 +616,9 @@ class ExtractionValidationSafetyEvidence:
             evidence_cutoff_operation_id,
             complete,
             *counts,
+            attribution_schema_version=attribution_schema_version,
+            evidence_plane=EvidencePlane(evidence_plane),
+            evidence_source=EvidenceSourceKind(evidence_source),
         )
 
 
@@ -814,6 +896,9 @@ class ExtractionValidationDecision:
     reason_codes: tuple[str, ...]
     pair_ids: tuple[str, ...]
     observation_ids: tuple[str, ...]
+    attribution_schema_version: int = EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION
+    evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
     decision_schema: str = EXTRACTION_VALIDATION_SCHEMA
     schema_version: int = EXTRACTION_VALIDATION_SCHEMA_VERSION
 
@@ -823,6 +908,22 @@ class ExtractionValidationDecision:
             or self.decision_schema != EXTRACTION_VALIDATION_SCHEMA
         ):
             raise ValueError("unsupported extraction validation decision schema")
+        if (
+            type(self.attribution_schema_version) is not int
+            or self.attribution_schema_version
+            != EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION
+        ):
+            raise ValueError("unsupported extraction validation attribution schema")
+        plane, source = validate_plane_source(
+            self.evidence_plane,
+            self.evidence_source,
+        )
+        if plane is not EvidencePlane.BENCHMARK_AUDIT or source is not EvidenceSourceKind.BENCHMARK_CONTRACT:
+            raise ValueError(
+                "extraction validation decision must be benchmark-audit evidence"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         for value in (
             self.decision_id,
             self.split_id,
@@ -862,6 +963,9 @@ class ExtractionValidationDecision:
     def identity_payload(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
+            "attribution_schema_version": self.attribution_schema_version,
+            "evidence_plane": self.evidence_plane.value,
+            "evidence_source": self.evidence_source.value,
             "decision_schema": self.decision_schema,
             "accepted": self.accepted,
             "split_id": self.split_id,
@@ -889,6 +993,9 @@ class ExtractionValidationDecision:
     def from_payload(cls, value: object) -> "ExtractionValidationDecision":
         fields = {
             "schema_version",
+            "attribution_schema_version",
+            "evidence_plane",
+            "evidence_source",
             "decision_schema",
             "decision_id",
             "accepted",
@@ -938,6 +1045,9 @@ class ExtractionValidationDecision:
                 reason_codes=tuple(reason_codes),
                 pair_ids=tuple(pair_ids),
                 observation_ids=tuple(observation_ids),
+                attribution_schema_version=value["attribution_schema_version"],
+                evidence_plane=EvidencePlane(value["evidence_plane"]),
+                evidence_source=EvidenceSourceKind(value["evidence_source"]),
                 decision_schema=value["decision_schema"],
                 schema_version=value["schema_version"],
             )
@@ -1057,6 +1167,9 @@ class ExtractionPromptMatchedValidator:
             else tuple(dict.fromkeys(reasons))
         )
         values = {
+            "attribution_schema_version": EXTRACTION_VALIDATION_ATTRIBUTION_SCHEMA_VERSION,
+            "evidence_plane": EvidencePlane.BENCHMARK_AUDIT,
+            "evidence_source": EvidenceSourceKind.BENCHMARK_CONTRACT,
             "accepted": accepted,
             "split_id": split.split_id,
             "parent_artifact_id": parent_artifact_id,
@@ -1083,6 +1196,8 @@ class ExtractionPromptMatchedValidator:
                     if isinstance(value, ExtractionQualityMetrics)
                     else list(value)
                     if isinstance(value, tuple)
+                    else value.value
+                    if isinstance(value, (EvidencePlane, EvidenceSourceKind))
                     else value
                 )
                 for key, value in values.items()
@@ -1104,6 +1219,9 @@ class ExtractionPromptMatchedValidator:
             reason_codes,
             values["pair_ids"],
             values["observation_ids"],
+            attribution_schema_version=values["attribution_schema_version"],
+            evidence_plane=values["evidence_plane"],
+            evidence_source=values["evidence_source"],
         )
 
 
