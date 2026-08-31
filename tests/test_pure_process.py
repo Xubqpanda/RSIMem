@@ -130,6 +130,9 @@ def test_pure_process_payload_rejects_evaluation_fields() -> None:
     for field in ("Task-Score", "OFFICIAL.Score", "judge_feedback"):
         with pytest.raises(ValueError, match="forbidden evaluation fields"):
             validate_pure_process_payload({field: 1})
+    for field in ("metric_value", "metricValue", "metric_name", "metricName"):
+        with pytest.raises(ValueError, match="forbidden evaluation fields"):
+            validate_pure_process_payload({field: 1})
     # Digest-bearing metadata is not itself a score and remains valid.
     validate_pure_process_payload({"score_digest": "a" * 64})
 
