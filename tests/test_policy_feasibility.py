@@ -230,6 +230,42 @@ def test_complete_useful_and_missed_chains_make_extraction_optimization_ready() 
     assert not report.ok
 
 
+def test_outcome_variation_excludes_unresolved_and_censored_cases() -> None:
+    useful = _case(
+        "case.variation.useful",
+        FeasibilityOutcome.USEFUL,
+        FeedbackChain("opportunity.variation", "use.variation", "outcome.variation"),
+    )
+    missed = _case(
+        "case.variation.missed",
+        FeasibilityOutcome.MISSED,
+        FeedbackChain(
+            source_id="source.variation",
+            demand_id="demand.variation",
+            absence_id="absence.variation",
+            outcome_id="outcome.variation.missed",
+        ),
+    )
+    unresolved = _case(
+        "case.variation.unresolved",
+        FeasibilityOutcome.UNRESOLVED,
+        FeedbackChain(),
+    )
+    census = next(
+        item
+        for item in build_feasibility_report((useful, missed, unresolved)).census
+        if item.layer is PolicyLayer.EXTRACTION
+    )
+    assert census.outcome_counts == {
+        "useful": 1,
+        "missed": 1,
+        "unresolved": 1,
+    }
+    assert census.outcome_variation_count == 2
+    assert census.outcome_variation == 2 / 3
+    assert census.unknown_count == 1
+
+
 def test_missing_feedback_node_degrades_to_unresolved() -> None:
     case = _case(
         "case.incomplete",
