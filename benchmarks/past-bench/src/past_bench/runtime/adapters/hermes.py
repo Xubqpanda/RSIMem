@@ -110,8 +110,8 @@ def _past_notes_tool_names(result: Mapping[str, Any]) -> tuple[str, ...]:
     )
 
 
-def _past_semantic_keys(result: Mapping[str, Any]) -> tuple[str, ...]:
-    """Detect only public, deployment-visible notes requirements."""
+def _past_text_semantic_keys(result: Mapping[str, Any]) -> tuple[str, ...]:
+    """Detect requirements explicitly stated in the current user request."""
 
     text = "\n".join(_past_visible_messages(result)).casefold()
     keys: list[str] = []
@@ -131,6 +131,13 @@ def _past_semantic_keys(result: Mapping[str, Any]) -> tuple[str, ...]:
         # request itself states one.  Merely invoking notes_share is not
         # evidence that a particular recipient policy was required.
         keys.append(_PAST_SHARE_POLICY_KEY)
+    return tuple(dict.fromkeys(keys))
+
+
+def _past_semantic_keys(result: Mapping[str, Any]) -> tuple[str, ...]:
+    """Detect text requirements plus public future tool-schema opportunities."""
+
+    keys = list(_past_text_semantic_keys(result))
     # A generic future request may not repeat the source policy in prose.  A
     # notes_share call still exposes the application's public recipient field;
     # use the frozen task-local schema to record that opportunity without
@@ -198,6 +205,12 @@ def _past_bench_opportunity_provider(
     # case derive observations from the declared public tool contract only;
     # the old notes text detector is retained for direct audit fixtures that
     # intentionally omit a schema.
+    # Keep the text-derived view separate from schema/tool observations.  A
+    # source boundary may expose a notes_share tool while the user's request
+    # says nothing about a durable recipient policy; that tool capability is a
+    # future opportunity, not evidence that the current extraction source owns
+    # the semantic unit.
+    text_observed_keys = _past_text_semantic_keys(result)
     if application_schema is not None:
         declared = raw_schema.get("opportunities") if isinstance(raw_schema, Mapping) else None
         observed_tool_names = set(_past_tool_names(result))
@@ -233,7 +246,11 @@ def _past_bench_opportunity_provider(
         if isinstance(item, Mapping)
     ) if isinstance(descriptors, (list, tuple)) else ()
     if isinstance(source_provenance, str) and source_provenance:
-        candidates = ((source_provenance, observed_keys, "current_input"),)
+        source_keys = tuple(
+            key for key in observed_keys
+            if key in text_observed_keys
+        )
+        candidates = ((source_provenance, source_keys, "current_input"),)
     else:
         candidates = tuple(
             (
