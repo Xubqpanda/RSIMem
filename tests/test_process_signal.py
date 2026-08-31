@@ -238,6 +238,28 @@ def test_process_signal_case_store_replays_logical_census(tmp_path) -> None:
     assert census.conflict_case_count == 1
 
 
+def test_process_signal_case_store_failed_commit_preserves_previous_records(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    first = _case(physical="physical-observation.atomic.1")
+    second = _case(
+        hypothesis=None,
+        physical="physical-observation.atomic.2",
+    )
+    path = tmp_path / "process-signal-atomic.jsonl"
+    store = JsonProcessSignalCaseStore(path)
+    assert store.append(first) is True
+
+    def fail_replace(*args, **kwargs):
+        raise OSError("simulated archive interruption")
+
+    monkeypatch.setattr("rsimem.memory._atomic_jsonl.os.replace", fail_replace)
+    with pytest.raises(OSError, match="simulated archive interruption"):
+        store.append(second)
+    assert store.records() == (first,)
+
+
 def test_process_signal_case_store_replay_order_is_canonical(tmp_path) -> None:
     first = _case(physical="physical-observation.order.1")
     second = _case(hypothesis=None, physical="physical-observation.order.2")
