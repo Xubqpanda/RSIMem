@@ -1650,21 +1650,30 @@ class HermesPastBenchBridge:
             # A source is only eligible for a feedback join after its own
             # extraction completed.  Future evidence from another source or
             # another provenance remains diagnostic and is not attached.
-            opportunity = next(
-                (
-                    value
-                    for value in opportunities
-                    if value.provenance_id == source.provenance_id
-                ),
-                None,
+            source_opportunities = tuple(
+                value
+                for value in opportunities
+                if value.provenance_id == source.provenance_id
             )
-            memory_use = next(
-                (
-                    value
-                    for value in memory_uses
-                    if value.provenance_id == source.provenance_id
-                ),
-                None,
+            # One feedback record has one opportunity slot.  Multiple
+            # requirements for the same source cannot be safely projected by
+            # selecting an arbitrary first row; preserve them as
+            # unresolved and let an application-specific join aggregate them
+            # explicitly later.
+            opportunity = (
+                source_opportunities[0]
+                if len(source_opportunities) == 1
+                else None
+            )
+            source_memory_uses = tuple(
+                value
+                for value in memory_uses
+                if value.provenance_id == source.provenance_id
+            )
+            memory_use = (
+                source_memory_uses[0]
+                if len(source_memory_uses) == 1
+                else None
             )
             if memory_use is None:
                 # The future recorder's operation provenance is independent
@@ -1754,15 +1763,27 @@ class HermesPastBenchBridge:
                             observation_complete=observed.observation_complete,
                             behavioral_consistency=observed.behavioral_consistency,
                         )
-            binding = next(
-                (
-                    value
-                    for value in bindings
-                    if value.provenance_id == source.provenance_id
-                    and value.source_digest == source.source_projection_digest
-                ),
-                None,
+            source_bindings = tuple(
+                value
+                for value in bindings
+                if value.provenance_id == source.provenance_id
+                and value.source_digest == source.source_projection_digest
             )
+            # A binding is only authoritative when it is unique for the
+            # source provenance.  Ambiguous set-level evidence must not be
+            # resolved by append order.
+            binding = source_bindings[0] if len(source_bindings) == 1 else None
+            if (
+                memory_use is not None
+                and memory_use.artifact_set_id is not None
+                and binding is None
+            ):
+                # ``PureExtractionFeedbackRecord`` requires a trusted binding
+                # whenever memory-use evidence references an artifact set.
+                # Drop the ambiguous use join rather than raising and
+                # accidentally turning a malformed association into a task
+                # failure; the resulting feedback remains unresolved.
+                memory_use = None
             joins: tuple[ToolCallResultJoin, ...] = ()
             if memory_use is not None:
                 operation_ids = {
