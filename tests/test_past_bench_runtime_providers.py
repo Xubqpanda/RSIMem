@@ -80,6 +80,45 @@ def test_past_opportunity_provider_binds_only_retrieved_source_keys() -> None:
     assert values[0].source_surface.value == "tool_schema"
 
 
+def test_past_opportunity_provider_is_invariant_to_benchmark_scope_fields() -> None:
+    base = {
+        "messages": [
+            {
+                "role": "user",
+                "content": "Extract the note and do not share it with external recipients.",
+            },
+            {
+                "role": "assistant",
+                "tool_calls": [{"function": {"name": "notes_share"}}],
+            },
+        ],
+        "rsimem_source_records": [{
+            "provenance_id": "pure-extraction-provenance.scope",
+            "semantic_keys": ["application.notes.share.recipient_policy"],
+        }],
+    }
+    without_scope = _past_bench_opportunity_provider(base)
+    with_scope = _past_bench_opportunity_provider({
+        **base,
+        "family_id": "SM02_constraint_retention",
+        "stage": "eval_far",
+    })
+    assert tuple(value.payload() for value in with_scope) == tuple(
+        value.payload() for value in without_scope
+    )
+
+
+def test_past_opportunity_provider_does_not_infer_from_task_completion_only() -> None:
+    assert _past_bench_opportunity_provider({
+        "completed": True,
+        "messages": [{"role": "user", "content": "Task completed."}],
+        "rsimem_source_records": [{
+            "provenance_id": "pure-extraction-provenance.complete-only",
+            "semantic_keys": ["application.notes.share.recipient_policy"],
+        }],
+    }) == ()
+
+
 def test_past_opportunity_provider_uses_frozen_public_schema_for_generic_future_request() -> None:
     schema = {
         "schema_id": "past-bench.notes.application.v1",
