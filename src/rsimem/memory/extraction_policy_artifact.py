@@ -19,10 +19,11 @@ from .prompt_components import (
 
 
 EXTRACTION_POLICY_SCHEMA_VERSION = 1
+EXTRACTION_POLICY_ATTRIBUTION_SCHEMA_VERSION = 1
 EXTRACTION_POLICY_SPEC_SCHEMA = "extraction-policy-spec-v1"
 EXTRACTION_RULE_EDIT_SCHEMA = "extraction-policy-rule-edit-v1"
 EXTRACTION_GENERATION_PROVENANCE_SCHEMA = "extraction-generation-provenance-v2"
-EXTRACTION_PROMPT_ARTIFACT_SCHEMA = "extraction-prompt-policy-artifact-v1"
+EXTRACTION_PROMPT_ARTIFACT_SCHEMA = "extraction-prompt-policy-artifact-v2"
 EXTRACTION_POLICY_COMPILER_ID = "extraction-policy-compiler-v1"
 EXTRACTION_POLICY_COMPILER_DIGEST = content_digest({
     "compiler_id": EXTRACTION_POLICY_COMPILER_ID,
@@ -447,6 +448,9 @@ class ExtractionPromptPolicyArtifact:
     max_body_chars: int
     source_provenance: str | None
     generation_provenance: ExtractionGenerationProvenance | None
+    attribution_schema_version: int = EXTRACTION_POLICY_ATTRIBUTION_SCHEMA_VERSION
+    evidence_plane: EvidencePlane = EvidencePlane.PURE_PROCESS
+    evidence_source: EvidenceSourceKind = EvidenceSourceKind.RUNTIME_OBSERVATION
     artifact_schema: str = EXTRACTION_PROMPT_ARTIFACT_SCHEMA
     schema_version: int = EXTRACTION_POLICY_SCHEMA_VERSION
 
@@ -456,6 +460,22 @@ class ExtractionPromptPolicyArtifact:
             or self.artifact_schema != EXTRACTION_PROMPT_ARTIFACT_SCHEMA
         ):
             raise ValueError("unsupported extraction prompt artifact schema")
+        if (
+            type(self.attribution_schema_version) is not int
+            or self.attribution_schema_version
+            != EXTRACTION_POLICY_ATTRIBUTION_SCHEMA_VERSION
+        ):
+            raise ValueError("unsupported extraction policy attribution schema")
+        plane, source = validate_plane_source(
+            self.evidence_plane,
+            self.evidence_source,
+        )
+        if plane is not EvidencePlane.PURE_PROCESS or source is not EvidenceSourceKind.RUNTIME_OBSERVATION:
+            raise ValueError(
+                "extraction prompt artifact must be pure_process runtime evidence"
+            )
+        object.__setattr__(self, "evidence_plane", plane)
+        object.__setattr__(self, "evidence_source", source)
         for value, name in (
             (self.artifact_id, "extraction prompt artifact ID"),
             (self.policy_version, "extraction prompt policy version"),
@@ -489,6 +509,13 @@ class ExtractionPromptPolicyArtifact:
             ExtractionGenerationProvenance,
         ):
             raise TypeError("extraction prompt generation provenance has the wrong type")
+        if self.generation_provenance is not None and (
+            self.generation_provenance.evidence_plane is not self.evidence_plane
+            or self.generation_provenance.evidence_source is not self.evidence_source
+        ):
+            raise ValueError(
+                "extraction prompt provenance evidence plane does not match artifact"
+            )
         if (
             not isinstance(self.required_placeholders, tuple)
             or not self.required_placeholders
@@ -631,6 +658,9 @@ class ExtractionPromptPolicyArtifact:
             "max_body_chars": max_body_chars,
             "source_provenance": source_provenance,
             "generation_provenance": generation_provenance,
+            "attribution_schema_version": EXTRACTION_POLICY_ATTRIBUTION_SCHEMA_VERSION,
+            "evidence_plane": EvidencePlane.PURE_PROCESS,
+            "evidence_source": EvidenceSourceKind.RUNTIME_OBSERVATION,
             "artifact_schema": EXTRACTION_PROMPT_ARTIFACT_SCHEMA,
             "schema_version": EXTRACTION_POLICY_SCHEMA_VERSION,
         }
@@ -682,6 +712,9 @@ class ExtractionPromptPolicyArtifact:
             "max_body_chars": self.max_body_chars,
             "source_provenance": self.source_provenance,
             "generation_provenance": self.generation_provenance,
+            "attribution_schema_version": self.attribution_schema_version,
+            "evidence_plane": self.evidence_plane,
+            "evidence_source": self.evidence_source,
             "artifact_schema": self.artifact_schema,
             "schema_version": self.schema_version,
         })
@@ -744,6 +777,9 @@ class ExtractionPromptPolicyArtifact:
             "max_body_chars",
             "source_provenance",
             "generation_provenance",
+            "attribution_schema_version",
+            "evidence_plane",
+            "evidence_source",
         }
         payload = _strict_mapping(value, fields, "extraction prompt policy artifact")
         edits = payload["edits"]
@@ -779,6 +815,9 @@ class ExtractionPromptPolicyArtifact:
                     if payload["generation_provenance"] is not None
                     else None
                 ),
+                attribution_schema_version=payload["attribution_schema_version"],
+                evidence_plane=EvidencePlane(payload["evidence_plane"]),
+                evidence_source=EvidenceSourceKind(payload["evidence_source"]),
                 artifact_schema=payload["artifact_schema"],
                 schema_version=payload["schema_version"],
             )
