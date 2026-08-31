@@ -62,7 +62,7 @@ from rsimem.memory.pure_extraction import (
     JsonPureExtractionFeedbackRecordStore,
     JsonPureExtractionSourceRecordStore,
 )
-from rsimem.memory.pure_process import PureProcessCorpus
+from rsimem.memory.pure_process import JsonPureProcessEventArchive, PureProcessCorpus
 from rsimem.memory.process_feedback import ProcessEventKind
 from rsimem.memory.tool_exact_join import ToolJoinResolutionStatus, resolve_tool_call_result
 from rsimem.memory.extraction_optimizer_capture import (
@@ -1383,6 +1383,61 @@ def test_live_bridge_persists_pre_snapshot_failure_without_failing_task(tmp_path
     assert [event["kind"] for event in events] == ["boundary_rejected"]
     assert all(event["snapshotId"] is None for event in events)
     assert PRIVATE_PREFERENCE not in json.dumps(events, ensure_ascii=True)
+
+
+def test_pure_process_archive_is_incremental_and_restart_recoverable(
+    tmp_path: Path,
+) -> None:
+    """A process event survives before task completion or bridge shutdown."""
+
+    home = _hermes_home(tmp_path)
+    evidence_path = tmp_path / "artifacts" / "process-events.jsonl"
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=evidence_path,
+        run_id="run-archive-incremental",
+        trace_id="trace-archive-incremental",
+        episode_id="episode-archive-incremental",
+        session_id="session-archive-incremental",
+        task_id="task-archive-incremental",
+        experiment_variant="native+ledger",
+    )
+    bridge._record_process_observation(
+        kind=ProcessEventKind.TASK_OUTCOME,
+        status="success",
+        host_event_id="event.archive-incremental",
+        source_revision="revision.archive-incremental",
+        input_payload={"task_id": "task-archive-incremental"},
+        output_payload={"outcome_digest": "a" * 64},
+        reason_codes=("task_completed",),
+        execution_receipt_ids=("receipt.archive-incremental",),
+    )
+
+    archive_path = home / ".rsimem" / "pure_process_event_archive.jsonl"
+    archived = JsonPureProcessEventArchive(archive_path).records()
+    assert len(archived) == 1
+    event_id = archived[0].event_id
+    bridge.close()
+
+    # Reopening the run replays its process ledger and reconciles the shared
+    # archive idempotently; the event remains available for delayed joins.
+    restarted = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=evidence_path,
+        run_id="run-archive-incremental",
+        trace_id="trace-archive-incremental",
+        episode_id="episode-archive-incremental",
+        session_id="session-archive-incremental",
+        task_id="task-archive-incremental",
+        experiment_variant="native+ledger",
+    )
+    try:
+        replayed = JsonPureProcessEventArchive(archive_path).records()
+        assert tuple(event.event_id for event in replayed) == (event_id,)
+    finally:
+        restarted.close()
 
 
 def test_live_bridge_trigger_and_source_decisions_replay_from_persisted_evidence(tmp_path: Path) -> None:

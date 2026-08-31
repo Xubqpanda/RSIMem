@@ -560,6 +560,12 @@ class HermesPastBenchBridge:
             or self.evidence_path.with_name("rsimem_process_feedback.jsonl")
         )
         existing_process_events = self._process_feedback.events
+        # Rehydrate the cross-task pure-process archive from any events that
+        # were durably written before a prior bridge instance crashed.  The
+        # archive is intentionally separate from the run-scoped ledger, but a
+        # restart must not lose source/future join evidence merely because the
+        # completion boundary was never delivered.
+        self._archive_pure_process_events(existing_process_events)
         self._tool_call_ids_seen.update(
             event.tool_call_id
             for event in existing_process_events
@@ -2248,6 +2254,7 @@ class HermesPastBenchBridge:
                 stage=self._stage,
             ):
                 self._process_feedback.record(event)
+                self._archive_pure_process_events((event,))
         self._tool_call_ids_seen.update(
             join.call_id for join in joins if join.call_present and join.call_id is not None
         )
@@ -2725,7 +2732,7 @@ class HermesPastBenchBridge:
                 "event.snapshot."
                 + hashlib.sha256(snapshot.snapshot_id.encode("utf-8")).hexdigest()[:40]
             )
-            self._process_feedback.record(ProcessEvent.from_policy_decision(
+            event = ProcessEvent.from_policy_decision(
                 decision,
                 run_id=snapshot.run_id,
                 variant=self.ledger.variant,
@@ -2737,7 +2744,9 @@ class HermesPastBenchBridge:
                 family_id=self._family_id,
                 stage=self._stage,
                 execution_receipt_ids=injection_receipt_ids,
-            ))
+            )
+            self._process_feedback.record(event)
+            self._archive_pure_process_events((event,))
 
     def _record_process_observation(
         self,
@@ -2770,7 +2779,7 @@ class HermesPastBenchBridge:
             host_event_id = self._last_host_event_id
         if use_last_host_boundary and self._last_host_source_revision is not None:
             source_revision = self._last_host_source_revision
-        self._process_feedback.record(ProcessEvent.create(
+        event = ProcessEvent.create(
             kind=kind,
             status=status,
             run_id=self._run_id,
@@ -2790,7 +2799,29 @@ class HermesPastBenchBridge:
             lineage_id=lineage_id,
             family_id=self._family_id,
             stage=self._stage,
-        ))
+        )
+        self._process_feedback.record(event)
+        self._archive_pure_process_events((event,))
+
+    def _archive_pure_process_events(
+        self,
+        events: Iterable[ProcessEvent],
+    ) -> None:
+        """Persist content-free projections for crash-safe delayed joins.
+
+        ``JsonProcessFeedbackLedger`` is run-scoped while the pure archive is
+        shared by the Hermes home so a future task can join a source emitted
+        by an earlier task.  Every event is projected as soon as it is
+        recorded; the completion-boundary archive pass remains as an
+        idempotent repair/reconciliation step.
+        """
+
+        values = tuple(events)
+        if not values:
+            return
+        self._pure_process_event_archive.append(
+            PureProcessCorpus.create(values).events
+        )
 
     def _record_extraction_feedback(
         self,
@@ -3680,6 +3711,7 @@ class HermesPastBenchBridge:
             stage=self._stage,
         ):
             self._process_feedback.record(event)
+            self._archive_pure_process_events((event,))
 
     def close(self) -> None:
         if self._closed:
