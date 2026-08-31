@@ -10,7 +10,7 @@ import pytest
 
 from past_bench.models.content import TextBlock
 from past_bench.models.message import Message
-from past_bench.runtime.adapters.hermes import HermesAdapter
+from past_bench.runtime.adapters.hermes import HermesAdapter, _past_bench_opportunity_provider
 from past_bench.runtime.protocol import (
     RuntimeConfigPayload,
     RuntimeModelConfig,
@@ -22,6 +22,30 @@ from rsimem.memory.process_feedback import audit_process_events
 
 
 PRIVATE_MEMORY = "Use TSV with owner, priority, task, and due_date."
+
+
+def test_past_opportunity_provider_ignores_benchmark_scope_metadata() -> None:
+    base = {
+        "messages": [{
+            "role": "user",
+            "content": "Please produce a TSV with owner, priority, task, and due_date.",
+        }],
+        "rsimem_source_provenance_id": "provenance.provider.scope-v1",
+    }
+    first = _past_bench_opportunity_provider({
+        **base,
+        "family_id": "SM01_preference_adoption",
+        "stage": "eval_near",
+    })
+    second = _past_bench_opportunity_provider({
+        **base,
+        "family_id": "SM05_weak_trigger_preference_adoption",
+        "stage": "eval_far",
+    })
+    assert first == second
+    assert len(first) == 1
+    assert first[0].evidence_plane.value == "pure_process"
+    assert first[0].evidence_source.value == "runtime_observation"
 
 
 def _home(path: Path) -> Path:
