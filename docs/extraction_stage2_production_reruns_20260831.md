@@ -90,6 +90,33 @@ commit, and exposure remain fixed/shadow or validation-only until an
 extraction-owned, replay-stable opportunity → persisted artifact/set →
 retrieval → exposure → memory-specific use → observable outcome chain exists.
 
+## Strict compound-matcher rerun (SM02 v4)
+
+After the initial production reruns, SM02 was repeated with the complete
+compound semantic-role matcher enabled.  The run was performed in the same
+clean detached tree and used the same frozen provider/model and feedback
+protocol; only the matcher implementation changed.  All three replicates
+completed with clean audits:
+
+| replicate | process events | source records | feedback records | complete bindings | process-case statuses |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| r01 | 146 | 15 | 7 | 1 | 3 `observable_only`, 4 `diagnostic_only`, 9 `censored` |
+| r02 | 140 | 15 | 7 | 1 | 3 `observable_only`, 4 `diagnostic_only`, 9 `censored` |
+| r03 | 144 | 15 | 7 | 1 | 3 `observable_only`, 4 `diagnostic_only`, 9 `censored` |
+
+The batch contains 25 logical cases and 48 physical observations after the
+registered `logical_case_v1` join.  Every feedback record remains
+`unresolved`; the pure optimizer corpus has 21 examples and reports
+`process_signal_gate = no_signal` with zero optimization cases.  The strict
+matcher therefore confirms the earlier conservative result rather than
+creating a candidate: the benchmark-audit compound binding is observable,
+but no extraction-owned useful, harmful, or missed chain is available for a
+general prompt update.
+
+Raw provider accounting for the three replicates is recorded in their
+manifests and audit artifacts (41/38/41 model requests respectively); these
+values are reporting-only and are not used as learner signal.
+
 ## Verification
 
 The corresponding clean checkout passed:
@@ -103,4 +130,3 @@ shell syntax: passed
 secret scan: passed
 git diff --check: passed
 ```
-
