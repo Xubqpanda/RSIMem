@@ -1628,8 +1628,13 @@ def build_feasibility_report(cases: Iterable[LayerIntervention]) -> PolicyFeasib
         }
         # "Variation" means at least two distinct resolved outcomes.  A lone
         # useful/harmful/missed observation is coverage, not outcome variation.
+        # Unresolved/censored cases remain visible in their own counters but
+        # must not inflate the resolved variation denominator.
+        resolved_case_count = sum(
+            1 for case in items if case.outcome_resolved
+        )
         outcome_variation_count = (
-            len(items) if len(resolved_outcomes) >= 2 else 0
+            resolved_case_count if len(resolved_outcomes) >= 2 else 0
         )
         unknown_count = sum(
             1 for case in items
