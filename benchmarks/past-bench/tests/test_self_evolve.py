@@ -443,6 +443,7 @@ def test_extraction_trial_transport_is_attempt_local_and_content_free(
     ).model_dump(mode="json")
     assert "rsimem_extraction_trial_profile" in manifest_value
     assert "rsimem_extraction_trial_source_path" not in manifest_value
+
     assert str(config_path) not in json.dumps(manifest_value, sort_keys=True)
 
     (target / store_path.name).write_text("conflict\n", encoding="utf-8")
@@ -450,6 +451,57 @@ def test_extraction_trial_transport_is_attempt_local_and_content_free(
         build_hermes_extra_body(persistence_enabled=True, **common)
 
 
+def test_validated_extraction_transports_owner_revocation_registry(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    import rsimem.extraction_validation_runtime as runtime_module
+
+    source = tmp_path / "prepared"
+    source.mkdir()
+    config_path = source / "extraction-matched-trial.json"
+    config_path.write_text("{}\n", encoding="utf-8")
+    registry_path = source / "revocations.jsonl"
+    registry_path.write_text("", encoding="utf-8")
+    profile_payload = _extraction_trial_profile()
+    profile = RSIMemExtractionTrialProfile.model_validate(profile_payload)
+    resolved = SimpleNamespace(
+        config_path=config_path,
+        policy_store_path=source / "extraction-trial-policies.json",
+        offline_decision_path=source / "offline-validation-decision.json",
+        profile=lambda: profile_payload,
+    )
+    for path in (resolved.policy_store_path, resolved.offline_decision_path):
+        path.write_text("{}\n", encoding="utf-8")
+    monkeypatch.setattr(
+        runtime_module,
+        "load_extraction_matched_trial_profile",
+        lambda path: resolved,
+    )
+    payload = build_hermes_extra_body(
+        home_dir=tmp_path / "home",
+        artifacts_dir=tmp_path / "artifacts",
+        persistence_enabled=True,
+        memory_enabled=True,
+        user_profile_enabled=True,
+        skills_enabled=True,
+        session_search_enabled=True,
+        memory_nudge_interval=1,
+        memory_flush_min_turns=1,
+        skill_creation_nudge_interval=1,
+        background_review_wait_s=0.0,
+        rsimem_mode="native+ledger",
+        rsimem_semantic_writeback_mode="static",
+        rsimem_extraction_trial_profile=profile,
+        rsimem_extraction_trial_source_path=str(config_path),
+        rsimem_revocation_registry_path=str(registry_path),
+    )
+    assert payload["hermes"]["rsimem"]["semantic_writeback"][
+        "revocation_registry_path"
+    ] == ".rsimem/revocations.jsonl"
+    assert (
+        tmp_path / "home" / ".rsimem" / "revocations.jsonl"
+    ).read_bytes() == registry_path.read_bytes()
 def test_extraction_trial_transport_rejects_profile_or_mode_drift(
     tmp_path: Path,
     monkeypatch,

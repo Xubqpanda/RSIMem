@@ -156,6 +156,13 @@ def build_hermes_extra_body(
         ),
     }
     if rsimem_revocation_registry_path:
+        if (
+            rsimem_extraction_trial_profile is None
+            and rsimem_extraction_offline_profile is None
+        ):
+            raise ValueError(
+                "revocation registry requires validated extraction runtime"
+            )
         # Keep the final component unresolved so symlinked owner state is
         # rejected instead of silently copied from an unrelated target.
         source_registry = Path(rsimem_revocation_registry_path).expanduser().absolute()
