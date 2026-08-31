@@ -643,11 +643,26 @@ def build_process_signal_cases(
         )
     if not values:
         return ()
-    grouped: dict[str, list[ProcessEvent]] = {}
+    # A task ID is only unique inside one execution context.  Matched runs,
+    # retries, or provider variants may legitimately reuse the same task ID;
+    # grouping by that field alone would splice their events together and
+    # either mis-report stage coverage or trip the cross-context guard in
+    # ``ProcessSignalCase.from_process_events``.  Keep each physical context
+    # isolated while allowing the resulting cases to share a logical case ID
+    # when their frozen source identity matches.
+    grouped: dict[tuple[str, str, str, str, str, str], list[ProcessEvent]] = {}
     for event in values:
-        grouped.setdefault(event.task_id, []).append(event)
+        context = (
+            event.run_id,
+            event.variant,
+            event.trace_id,
+            event.episode_id,
+            event.session_id,
+            event.task_id,
+        )
+        grouped.setdefault(context, []).append(event)
     cases: list[ProcessSignalCase] = []
-    for task_id, task_events in sorted(grouped.items()):
+    for _, task_events in sorted(grouped.items()):
         # ``task_id``/run identifiers are physical observation metadata and
         # must not split one semantic case across provider replicates.  Bind
         # the source extraction set to stable process digests instead.  When
