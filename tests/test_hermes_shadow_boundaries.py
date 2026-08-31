@@ -365,6 +365,47 @@ def test_duplicate_tool_call_id_without_result_remains_duplicate_missing_closure
     )
 
 
+def test_multiple_tool_calls_do_not_all_inherit_one_memory_use_operation(tmp_path) -> None:
+    bridge = _bridge(tmp_path, [])
+    result = {
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call-multi-one",
+                        "function": {"name": "inspect", "arguments": "{}"},
+                    },
+                    {
+                        "id": "call-multi-two",
+                        "function": {"name": "calendar.create", "arguments": "{}"},
+                    },
+                ],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-multi-one",
+                "content": '{"success": true}',
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call-multi-two",
+                "content": '{"success": true}',
+            },
+        ],
+    }
+    try:
+        bridge._record_tool_call_results(
+            result,
+            memory_use_operation_id="op.use.multi-tools",
+        )
+        joins = bridge.tool_call_result_joins
+    finally:
+        bridge.close()
+    assert len(joins) == 2
+    assert all(join.memory_use_operation_id is None for join in joins)
+
+
 def test_replayed_tool_identity_is_marked_duplicate_across_bridge_calls(tmp_path) -> None:
     bridge = _bridge(tmp_path, [])
     result = {
