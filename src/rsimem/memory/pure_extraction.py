@@ -1296,12 +1296,30 @@ class PureExtractionOptimizerCorpus:
             if type(count) is int and count >= 2
         }
         hypothesis_digest = next(iter(supporting_hypotheses), None) if len(supporting_hypotheses) == 1 else None
+        # A process-signal census is only a gate input; it cannot by itself
+        # manufacture optimizer evidence.  Require at least one
+        # extraction-owned, complete pure example per logical optimization
+        # case before exposing a ready corpus.  This blocks a hand-built or
+        # unrelated deterministic census from unlocking a corpus whose
+        # feedback examples are all unresolved/diagnostic.
+        actionable_examples = tuple(
+            example
+            for example in examples
+            if example.observation_complete
+            and example.attribution in {
+                PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
+                PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
+            }
+        )
         ready = (
             census.logical_case_count >= 2
             and census.conflict_case_count == 0
             and optimization_count >= 2
             and hypothesis_digest is not None
+            and len(actionable_examples) >= optimization_count
         )
+        if not ready:
+            hypothesis_digest = None
         return cls.create(
             split=split,
             observation_cutoff=observation_cutoff,

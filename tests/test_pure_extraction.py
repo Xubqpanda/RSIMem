@@ -509,7 +509,7 @@ def test_pure_corpus_factory_rejects_single_optimization_case() -> None:
     assert corpus.process_signal_gate == "no_signal"
 
 
-def test_pure_corpus_factory_requires_shared_hypothesis_across_logical_cases() -> None:
+def test_pure_corpus_factory_requires_shared_hypothesis_and_actionable_examples() -> None:
     projection, source, *_ = _fixture()
     pure_source = PureExtractionSourceRecord.from_family_record(
         source,
@@ -542,8 +542,11 @@ def test_pure_corpus_factory_requires_shared_hypothesis_across_logical_cases() -
         process_signal_case_digest=None,
         census=census,
     )
-    assert corpus.process_signal_gate == "ready"
-    assert corpus.process_signal_hypothesis_digest == hypothesis
+    # Census metadata is not sufficient to unlock optimization.  The
+    # examples themselves must contain extraction-owned attributable joins;
+    # this fixture intentionally carries only unresolved feedback.
+    assert corpus.process_signal_gate == "no_signal"
+    assert corpus.process_signal_hypothesis_digest is None
 
 
 def test_pure_corpus_factory_rejects_multiple_shared_hypotheses() -> None:
