@@ -15,6 +15,7 @@ from collections.abc import Callable
 from typing import Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
+from ._atomic_jsonl import replace_jsonl
 
 
 FINAL_EVALUATION_SCHEMA_VERSION = 1
@@ -256,11 +257,12 @@ class JsonFinalEvaluationStore:
                     if previous != serialized:
                         raise ValueError("conflicting final evaluation record")
                     return False
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                with self.path.open("a", encoding="utf-8") as handle:
-                    handle.write(serialized + "\n")
-                    handle.flush()
-                    os.fsync(handle.fileno())
+                replace_jsonl(
+                    self.path,
+                    tuple(value for _, value in sorted(self._records.items()))
+                    + (serialized,),
+                    error_name="final evaluation store",
+                )
                 self._records[record.report_id] = serialized
                 return True
             finally:

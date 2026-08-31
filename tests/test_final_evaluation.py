@@ -102,6 +102,29 @@ def test_final_evaluation_store_rejects_symlinked_lock(tmp_path) -> None:
         JsonFinalEvaluationStore(path).records()
 
 
+def test_final_evaluation_store_failed_commit_preserves_previous_record(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    path = tmp_path / "final-atomic.jsonl"
+    store = JsonFinalEvaluationStore(path)
+    first = _record()
+    assert store.append(first) is True
+    second = _record(
+        candidate_artifact_id="candidate.reporter.atomic.second",
+        run_id="run.reporter.atomic.second",
+    )
+
+    def fail_replace(*args, **kwargs):
+        raise OSError("simulated final evaluation interruption")
+
+    monkeypatch.setattr("rsimem.memory._atomic_jsonl.os.replace", fail_replace)
+    with pytest.raises(OSError, match="simulated final evaluation interruption"):
+        store.append(second)
+    assert JsonFinalEvaluationStore(path).records() == (first,)
+    assert path.read_text(encoding="utf-8").endswith("\n")
+
+
 def test_final_reporter_reads_score_only_after_completed_run(tmp_path) -> None:
     store = JsonFinalEvaluationStore(tmp_path / "final.jsonl")
     reporter = FinalEvaluationReporter(store)
