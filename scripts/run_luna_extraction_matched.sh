@@ -163,10 +163,20 @@ PY
 import json, sys
 from pathlib import Path
 from rsimem.memory.process_corpus import JsonProcessCorpusStore, ProcessCorpus
-from rsimem.memory.pure_process import JsonPureProcessCorpusStore, PureProcessCorpus
+from rsimem.memory.pure_process import (
+    JsonPureProcessCorpusStore,
+    JsonPureProcessEventArchive,
+    PureProcessCorpus,
+)
+from rsimem.memory.pure_extraction import (
+    JsonPureExtractionFeedbackRecordStore,
+    JsonPureExtractionSourceRecordStore,
+)
+from rsimem.memory.opportunity import JsonApplicationOpportunitySchemaRegistry
 from rsimem.memory.process_feedback import JsonProcessFeedbackLedger, audit_process_events
 from rsimem.memory.process_signal import (
     JsonProcessSignalCaseStore,
+    build_joined_process_signal_cases,
     build_process_signal_cases,
 )
 from rsimem.memory.signal_protocol import (
@@ -228,6 +238,46 @@ cases = build_process_signal_cases(
     replicate_id="replicate." + str(attempt["replicate"]),
     analysis_protocol_id=protocol.protocol_id,
 )
+archive = next(iter(sorted(run_dir.rglob("pure_process_event_archive.jsonl"))), None)
+if archive is not None:
+    archive_events = JsonPureProcessEventArchive(archive).records()
+    source_records = tuple(
+        source
+        for path in sorted(run_dir.rglob("pure_extraction_sources.jsonl"))
+        for source in JsonPureExtractionSourceRecordStore(path).records()
+    )
+    schema_registry_path = next(iter(sorted(run_dir.rglob("application_opportunity_schemas.jsonl"))), None)
+    schema_registry = (
+        JsonApplicationOpportunitySchemaRegistry(schema_registry_path)
+        if schema_registry_path is not None
+        else None
+    )
+    feedback_records = tuple(
+        feedback
+        for path in sorted(run_dir.rglob("rsimem_pure_extraction_feedback.jsonl"))
+        for feedback in JsonPureExtractionFeedbackRecordStore(
+            path,
+            schema_registry=schema_registry,
+        ).records()
+    )
+    cases += build_joined_process_signal_cases(
+        archive_events,
+        feedback_records,
+        sources=source_records,
+        frozen_policy_digest=policy_digest,
+        source_task_template_id="source." + split["taskTemplateGroupId"],
+        future_task_template_id="future." + split["taskTemplateGroupId"],
+        observation_window=PROCESS_SIGNAL_OBSERVATION_WINDOW,
+        replicate_id="replicate." + str(attempt["replicate"]),
+        analysis_protocol_id=protocol.protocol_id,
+    )
+deduped = {}
+for case in cases:
+    previous = deduped.get(case.case_id)
+    if previous is not None and previous != case:
+        raise ValueError("formal process signal case identity conflicts")
+    deduped[case.case_id] = case
+cases = tuple(deduped.values())
 if not cases:
     raise ValueError("formal matched run emitted no process signal cases")
 case_store = JsonProcessSignalCaseStore(run_dir / "process_signal_cases.jsonl")
