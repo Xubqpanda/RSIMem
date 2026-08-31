@@ -1957,6 +1957,28 @@ class HermesPastBenchBridge:
         if not isinstance(raw_messages, (list, tuple)):
             return
         messages = tuple(value for value in raw_messages if isinstance(value, Mapping))
+        # A single memory-use operation may only be attached to one
+        # unambiguous tool closure.  When a response contains multiple calls
+        # (including retries), assigning the same operation ID to every join
+        # would make unrelated tool outcomes appear causally attributable to
+        # the memory.  Keep all joins as independent process evidence and
+        # leave memory attribution unresolved unless the closure is singular.
+        assistant_call_count = sum(
+            len(message.get("tool_calls", ()))
+            for message in messages
+            if message.get("role") == "assistant"
+            and isinstance(message.get("tool_calls"), (list, tuple))
+        )
+        tool_result_count = sum(
+            1 for message in messages if message.get("role") == "tool"
+        )
+        bound_memory_use_operation_id = (
+            memory_use_operation_id
+            if memory_use_operation_id is not None
+            and assistant_call_count == 1
+            and tool_result_count == 1
+            else None
+        )
         calls: dict[str, list[tuple[str, str, str, str, bool, bool]]] = {}
         call_counts: dict[str, int] = {}
         duplicate_call_ids: set[str] = set(self._tool_call_ids_seen)
@@ -2078,7 +2100,7 @@ class HermesPastBenchBridge:
                     task_id=self._task_id,
                     source_revision=source_revision,
                     host_event_id=host_event_id,
-                    memory_use_operation_id=memory_use_operation_id,
+                    memory_use_operation_id=bound_memory_use_operation_id,
                     result_receipt_id="receipt.tool-result."
                     + hashlib.sha256(result_id.encode("utf-8")).hexdigest()[:24],
                     call_present=False,
@@ -2110,7 +2132,7 @@ class HermesPastBenchBridge:
                 task_id=self._task_id,
                 source_revision=source_revision,
                 host_event_id=host_event_id,
-                memory_use_operation_id=memory_use_operation_id,
+                memory_use_operation_id=bound_memory_use_operation_id,
                 call_receipt_id=call_receipt,
                 result_receipt_id="receipt.tool-result."
                 + hashlib.sha256(result_id.encode("utf-8")).hexdigest()[:24],
@@ -2149,7 +2171,7 @@ class HermesPastBenchBridge:
                     task_id=self._task_id,
                     source_revision=source_revision,
                     host_event_id=host_event_id,
-                    memory_use_operation_id=memory_use_operation_id,
+                    memory_use_operation_id=bound_memory_use_operation_id,
                     call_receipt_id=call_receipt,
                     call_present=True,
                     result_present=False,
