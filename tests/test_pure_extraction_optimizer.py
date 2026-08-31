@@ -43,6 +43,8 @@ from rsimem.memory.extraction_prompt_optimizer import (
     ExtractionPromptOptimizer,
 )
 from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
+from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
 from rsimem.memory.use_attribution import MemoryUseEvidence, OutcomeEvidenceKind
 from rsimem.memory_systems.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT_ID,
@@ -368,6 +370,31 @@ def test_pure_optimizer_request_fails_closed_without_ready_gate() -> None:
             blocked,
             captures=(capture,),
         )
+
+
+def test_pure_optimizer_rejects_revoked_corpus_before_signal_gate(tmp_path) -> None:
+    parent, example, capture = _fixture()
+    corpus = _corpus(example)
+    registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    registry.initialize()
+    registry.append(RevocationEntry.create(
+        artifact_id=corpus.corpus_id,
+        artifact_schema_version=corpus.schema_version,
+        artifact_digest=corpus.corpus_digest,
+        evidence_plane=EvidencePlane.PURE_PROCESS,
+        evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        revoked_at="2026-08-31T01:02:03Z",
+        reason_code="stale_corpus",
+    ))
+    client = CapturedExtractionOptimizerClient(
+        '{"decision":"NO_PROPOSAL","reason_codes":["x"],"edits":[]}'
+    )
+    with pytest.raises(ValueError, match="artifact is revoked"):
+        ExtractionPromptOptimizer(
+            client,
+            revocation_registry=registry,
+        ).propose_pure(parent, corpus, captures=(capture,))
+    assert client.requests == []
 
 
 def test_pure_optimizer_gate_request_is_provider_ineligible() -> None:
