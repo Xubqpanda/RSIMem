@@ -1431,6 +1431,31 @@ def test_hermes_adapter_prepares_home_and_captures_artifacts(tmp_path: Path):
     assert summary["internal_tools"]["memory_write_count"] == 1
 
 
+def test_capture_hermes_artifacts_copies_pure_process_runtime_records(
+    tmp_path: Path,
+):
+    """Automatic pure-process records survive the host artifact boundary."""
+
+    home_dir = tmp_path / "home"
+    capture_dir = tmp_path / "capture"
+    (home_dir / ".rsimem").mkdir(parents=True)
+    records = {
+        "pure_extraction_sources.jsonl": '{"record_id":"pure-source.fixture"}\n',
+        "pure_process_event_archive.jsonl": '{"event_id":"pure-event.fixture"}\n',
+        "application_opportunity_schemas.jsonl": '{"schema_id":"application.fixture.v1"}\n',
+    }
+    for name, content in records.items():
+        (home_dir / ".rsimem" / name).write_text(content, encoding="utf-8")
+
+    HermesAdapter._capture_hermes_artifacts(
+        {"capture_artifacts_dir": str(capture_dir)},
+        home_dir,
+    )
+
+    for name, content in records.items():
+        assert (capture_dir / name).read_text(encoding="utf-8") == content
+
+
 def test_save_episode_history_anchor_registers_anchor_mapping(tmp_path: Path):
     hermes_home = tmp_path / "hermes_home"
     hermes_home.mkdir(parents=True)
