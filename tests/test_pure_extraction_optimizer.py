@@ -302,6 +302,43 @@ def test_pure_optimizer_groups_content_free_replicates_by_stable_case_inputs() -
     assert unresolved[0]["replica_count"] == 2
 
 
+def test_pure_optimizer_joins_uncaptured_unresolved_replica_to_captured_case() -> None:
+    """A mixed captured/unresolved replicate must fail as one ambiguous case."""
+
+    parent, useful, capture = _fixture()
+    source = capture.source_record
+    unresolved_feedback = PureExtractionFeedbackRecord.create(
+        source_record_id=source.record_id,
+        source_projection_digest=source.source_projection_digest,
+        extraction_set_id=source.extraction_set_id,
+        opportunity=None,
+        memory_use=None,
+        observation_window="window.pure-request",
+        provenance_id=source.provenance_id,
+        reason_codes=("retrieval_miss",),
+    )
+    unresolved = PureExtractionOptimizerExample.from_records(
+        source, unresolved_feedback
+    )
+    corpus = PureExtractionOptimizerCorpus.create(
+        split="train",
+        observation_cutoff="2026-08-22T00:00:00Z",
+        examples=(useful, unresolved),
+        process_signal_gate="ready",
+        process_signal_protocol_id="protocol.pure-mixed-replicates",
+        process_signal_case_digest="a" * 64,
+        process_signal_case_count=2,
+        process_signal_optimization_count=2,
+        process_signal_hypothesis_digest="b" * 64,
+    )
+    with pytest.raises(ValueError, match="conflicting attribution"):
+        build_pure_extraction_optimizer_request(
+            parent,
+            corpus,
+            captures=(capture,),
+        )
+
+
 def test_pure_optimizer_request_rejects_capture_outside_corpus() -> None:
     parent, example, capture = _fixture()
     extra = replace(

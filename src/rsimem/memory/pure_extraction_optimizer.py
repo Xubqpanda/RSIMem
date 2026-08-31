@@ -656,17 +656,57 @@ def _logical_groups(
         }
         return "logical-case." + content_digest(identity)[:40]
 
+    # A content capture is available only for owner-controlled actionable
+    # observations.  Diagnostic unresolved/censored replicas intentionally
+    # remain content-free, but they must still join the same logical case when
+    # their stable source/extraction/window identity matches a captured
+    # observation.  Otherwise one semantic case could be split into a useful
+    # unit plus an unrelated unresolved unit, allowing the optimizer to ignore
+    # an ambiguity that should have blocked attribution.
+    case_ids_by_stable_identity: dict[tuple[str, str, str], set[str]] = {}
+    for example in corpus.examples:
+        capture = captures.get(example.example_id)
+        if capture is None:
+            continue
+        stable_identity = (
+            example.source_projection_digest,
+            example.extraction_set_id,
+            example.observation_window,
+        )
+        case_ids_by_stable_identity.setdefault(stable_identity, set()).add(
+            capture.logical_case_id
+        )
+    ambiguous_identities = {
+        identity
+        for identity, logical_ids in case_ids_by_stable_identity.items()
+        if len(logical_ids) > 1
+    }
+    if ambiguous_identities:
+        raise ValueError("pure optimizer captures have ambiguous logical case identity")
+
     groups: dict[str, list[PureExtractionOptimizerExample]] = {}
     for example in corpus.examples:
         capture = captures.get(example.example_id)
         # Diagnostic unresolved/censored observations may intentionally have
         # no owner-controlled text.  Keep them as one physical unit; only
         # actionable examples need a content capture and replicate identity.
-        logical_id = (
-            capture.logical_case_id
-            if capture is not None
-            else fallback_logical_case_id(example)
-        )
+        if capture is not None:
+            logical_id = capture.logical_case_id
+        else:
+            stable_identity = (
+                example.source_projection_digest,
+                example.extraction_set_id,
+                example.observation_window,
+            )
+            known_ids = case_ids_by_stable_identity.get(stable_identity, set())
+            # A single captured logical ID is trusted as the owner-controlled
+            # case identity for matching content-free observations.  With no
+            # capture, retain the deterministic fallback identity.
+            logical_id = (
+                next(iter(known_ids))
+                if len(known_ids) == 1
+                else fallback_logical_case_id(example)
+            )
         groups.setdefault(logical_id, []).append(example)
     return groups
 
