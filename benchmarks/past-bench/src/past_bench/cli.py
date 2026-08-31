@@ -1987,6 +1987,21 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         "rsimem_extraction_offline_config",
         None,
     )
+    revocation_registry_path = getattr(
+        args,
+        "rsimem_revocation_registry",
+        None,
+    )
+    revocation_registry = None
+    if revocation_registry_path is not None:
+        from rsimem.memory.revocation import JsonRevocationRegistry
+
+        path = Path(revocation_registry_path).expanduser().resolve()
+        if not path.is_file() or path.is_symlink():
+            raise SystemExit(
+                "invalid RSIMem revocation registry: expected an existing regular file"
+            )
+        revocation_registry = JsonRevocationRegistry(path)
     if all(value is None for value in (
         mode,
         failure_policy,
@@ -2002,6 +2017,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         adaptive_config_path,
         extraction_trial_path,
         extraction_offline_path,
+        revocation_registry_path,
     )) and not verify_projection:
         return
     if not str(args.agent).startswith("hermes"):
@@ -2058,7 +2074,15 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
 
         path = Path(extraction_trial_path).expanduser().resolve()
         try:
-            resolved = load_extraction_matched_trial_profile(path)
+            resolved = (
+                load_extraction_matched_trial_profile(path)
+                if revocation_registry is None
+                else load_extraction_matched_trial_profile(
+                    path,
+                    revocation_registry=revocation_registry,
+                    require_revocation_registry=True,
+                )
+            )
             sequence.hermes.rsimem_extraction_trial_profile = (
                 RSIMemExtractionTrialProfile.model_validate(resolved.profile())
             )
@@ -2074,13 +2098,25 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         )
         path = Path(extraction_offline_path).expanduser().resolve()
         try:
-            resolved = load_extraction_offline_validation_profile(path)
+            resolved = (
+                load_extraction_offline_validation_profile(path)
+                if revocation_registry is None
+                else load_extraction_offline_validation_profile(
+                    path,
+                    revocation_registry=revocation_registry,
+                    require_revocation_registry=True,
+                )
+            )
             sequence.hermes.rsimem_extraction_offline_profile = (
                 RSIMemExtractionOfflineValidationProfile.model_validate(resolved.profile())
             )
             sequence.hermes.rsimem_extraction_offline_source_path = str(path)
         except (OSError, ValueError) as exc:
             raise SystemExit(f"invalid RSIMem extraction offline config: {exc}") from exc
+    if revocation_registry_path is not None:
+        sequence.hermes.rsimem_revocation_registry_path = str(
+            revocation_registry.path
+        )
     adaptive_selected = (
         sequence.hermes.rsimem_semantic_writeback_mode == "adaptive_utility"
     )
@@ -3639,6 +3675,11 @@ def main(argv: list[str] | None = None) -> None:
         "--rsimem-adaptive-config",
         default=None,
         help="Strict JSON config for an attempt-local ACTIVE adaptive policy store",
+    )
+    p_evolve.add_argument(
+        "--rsimem-revocation-registry",
+        default=None,
+        help="Owner-controlled revocation registry required for validated extraction runs",
     )
     p_evolve.add_argument(
         "--rsimem-extraction-trial-config",

@@ -131,6 +131,7 @@ def build_hermes_extra_body(
     rsimem_extraction_trial_source_path: str = "",
     rsimem_extraction_offline_profile: RSIMemExtractionOfflineValidationProfile | dict | None = None,
     rsimem_extraction_offline_source_path: str = "",
+    rsimem_revocation_registry_path: str = "",
     rsimem_application_opportunity_schema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
@@ -154,6 +155,15 @@ def build_hermes_extra_body(
             else "disabled"
         ),
     }
+    if rsimem_revocation_registry_path:
+        source_registry = Path(rsimem_revocation_registry_path).expanduser().resolve()
+        if source_registry.is_symlink() or not source_registry.is_file():
+            raise ValueError(
+                "RSIMem revocation registry must be an existing regular file"
+            )
+        target_registry = home_dir / ".rsimem" / "revocations.jsonl"
+        _copy_immutable_file(source_registry, target_registry)
+        semantic_writeback["revocation_registry_path"] = ".rsimem/revocations.jsonl"
     application_schema = None
     if rsimem_application_opportunity_schema is not None:
         # The schema is public application metadata, not benchmark evidence.
@@ -826,6 +836,9 @@ class HermesPersistenceBackend(PersistenceBackend):
             ),
             rsimem_extraction_offline_source_path=(
                 sequence.hermes.rsimem_extraction_offline_source_path
+            ),
+            rsimem_revocation_registry_path=(
+                sequence.hermes.rsimem_revocation_registry_path
             ),
             rsimem_application_opportunity_schema=(
                 tool_config.get("application_opportunity_schema")
