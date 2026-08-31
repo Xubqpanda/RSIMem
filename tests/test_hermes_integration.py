@@ -1420,6 +1420,11 @@ def test_pure_process_archive_is_incremental_and_restart_recoverable(
     event_id = archived[0].event_id
     bridge.close()
 
+    # Simulate a crash window in which the run-scoped ledger reached disk but
+    # the shared archive did not.  Constructor recovery must project the
+    # durable ledger event before any future-task join is attempted.
+    archive_path.unlink()
+
     # Reopening the run replays its process ledger and reconciles the shared
     # archive idempotently; the event remains available for delayed joins.
     restarted = HermesPastBenchBridge(
