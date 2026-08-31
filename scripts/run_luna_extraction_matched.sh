@@ -19,6 +19,7 @@ PAST_BASE_URL="${RSIMEM_PAST_BASE_URL:-https://coding.tu-zi.com/v1}"
 # here as a compatibility marker; it must not be used for the PAST schema.)
 TRIAL_CONFIG="${RSIMEM_EXTRACTION_TRIAL_CONFIG:-}"
 EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-}"
+REVOCATION_REGISTRY="${RSIMEM_REVOCATION_REGISTRY:-}"
 # Formal matched validation always uses the checked-in family/template split.
 # Callers may provide an immutable replacement plan for a separately authored
 # experiment, but omitting it must not silently disable the split gate.
@@ -30,6 +31,7 @@ TASK_FAMILY="${RSIMEM_EXTRACTION_TASK_FAMILY:-}"
 export OPENAI_API_KEY="${OPENAI_API_KEY:-${GPT_LUNA_API_KEY}}"
 [[ -n "${TRIAL_CONFIG}" && -f "${TRIAL_CONFIG}" ]] || { echo "RSIMEM_EXTRACTION_TRIAL_CONFIG is required." >&2; exit 2; }
 [[ -n "${EXPERIMENT_CONFIG}" && -f "${EXPERIMENT_CONFIG}" ]] || { echo "RSIMEM_EXTRACTION_EXPERIMENT_CONFIG is required." >&2; exit 2; }
+[[ -n "${REVOCATION_REGISTRY}" && -f "${REVOCATION_REGISTRY}" && ! -L "${REVOCATION_REGISTRY}" ]] || { echo "RSIMEM_REVOCATION_REGISTRY must reference an existing regular file." >&2; exit 2; }
 [[ -n "${BATCH_ID}" && "${BATCH_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*$ ]] || { echo "RSIMEM_BATCH_ID is invalid." >&2; exit 2; }
 [[ -n "${TASK_FAMILY}" ]] || { echo "RSIMEM_EXTRACTION_TASK_FAMILY is required." >&2; exit 2; }
 [[ -x "${PAST_BENCH_BIN}" && -x "${PYTHON_BIN}" ]] || { echo "RSIMem virtual environment is incomplete." >&2; exit 2; }
@@ -51,6 +53,7 @@ PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.extraction_matched_pre
   --family-root "${family_root}" --agent-registry "${AGENT_REGISTRY}" \
   --run-config "${RSIMEM_ROOT}/configs/past_bench_luna_smoke.yaml" \
   --experiment-config "${EXPERIMENT_CONFIG}" --trial-config "${TRIAL_CONFIG}" \
+  --revocation-registry "${REVOCATION_REGISTRY}" \
   "${split_plan_args[@]}"
 
 # Freeze the result-independent process-signal contract before any task run.
@@ -133,7 +136,9 @@ for replicate in $(seq 1 "${replicates}"); do
         --trace-dir "${trace_dir}" --background-review-wait-s 0 \
         --rsimem-mode native+ledger --rsimem-adapter-failure-policy fail_closed \
         --rsimem-lifecycle-evaluator-mode disabled --rsimem-semantic-writeback-mode static \
-        --rsimem-semantic-feedback-contract "${feedback_contract}" "${trial_args[@]}" "${proxy_args[@]}"
+        --rsimem-semantic-feedback-contract "${feedback_contract}" \
+        --rsimem-revocation-registry "${REVOCATION_REGISTRY}" \
+        "${trial_args[@]}" "${proxy_args[@]}"
     ); then
       manifest_call record "${manifest_path}" "${replicate}" "${ordinal}" "${method}" "${run_name}" failed past_bench
       exit 1
@@ -296,18 +301,23 @@ PY
   done
 done
 
-PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${batch_root}" "${manifest_path}" "${TRIAL_CONFIG}" <<'PY'
+PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" - "${batch_root}" "${manifest_path}" "${TRIAL_CONFIG}" "${REVOCATION_REGISTRY}" <<'PY'
 import sys
 from pathlib import Path
 from rsimem.extraction_validation_evidence import assemble_extraction_matched_evidence_batch
 from rsimem.extraction_experiment_manifest import load_extraction_manifest
 from rsimem.extraction_validation_runtime import load_extraction_matched_trial_profile
+from rsimem.memory.revocation import JsonRevocationRegistry
 from rsimem.memory.extraction_prompt_validation import (
     ExtractionPromptValidationSplit, ExtractionSplitAssignment,
     ExtractionValidationSplitRole,
 )
-root, manifest, trial = map(Path, sys.argv[1:])
-profile = load_extraction_matched_trial_profile(trial)
+root, manifest, trial, revocation_registry = map(Path, sys.argv[1:])
+profile = load_extraction_matched_trial_profile(
+    trial,
+    revocation_registry=JsonRevocationRegistry(revocation_registry),
+    require_revocation_registry=True,
+)
 registered = load_extraction_manifest(manifest)
 split = ExtractionPromptValidationSplit(
     "live-validation." + registered["experimentId"][:24],
