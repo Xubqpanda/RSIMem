@@ -62,6 +62,9 @@ from rsimem.memory.pure_extraction import (
     JsonPureExtractionFeedbackRecordStore,
     JsonPureExtractionSourceRecordStore,
 )
+from rsimem.memory.pure_process import PureProcessCorpus
+from rsimem.memory.process_feedback import ProcessEventKind
+from rsimem.memory.tool_exact_join import ToolJoinResolutionStatus, resolve_tool_call_result
 from rsimem.memory.extraction_optimizer_capture import (
     ExtractionOptimizerFeedbackCapture,
     ExtractionOptimizerSourceCapture,
@@ -91,6 +94,27 @@ from extraction_fingerprint_support import extraction_activation_fixture
 
 
 PRIVATE_PREFERENCE = "Use TSV with owner, priority, task, and due_date."
+
+
+def _fixture_application_schema() -> dict[str, object]:
+    from rsimem.memory.opportunity import ApplicationOpportunitySchema
+
+    contract = ApplicationOpportunitySchema.create(
+        schema_id="fixture.application.v1",
+        version="v1",
+        requirement_ids=("application.fixture.preference",),
+    )
+    return {
+        "schema_id": contract.schema_id,
+        "schema_version": 1,
+        "application_contract": contract.payload(),
+        "opportunities": [{
+            "semantic_key": "application.fixture.preference",
+            "surface": "tool_schema",
+            "tool_name": "fixture_apply",
+            "required_parameter": "preference",
+        }],
+    }
 
 
 def _hermes_home(path: Path) -> Path:
@@ -1634,6 +1658,241 @@ def test_live_bridge_compiles_completed_task_without_lifecycle_evaluator(
     assert bridge.unbound_process_signal_cases
     assert bridge.unbound_process_signal_cases[0].analysis_protocol_id is None
     db.close()
+
+
+def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
+    tmp_path: Path,
+) -> None:
+    """Exercise the deployment-only chain without family/grader semantics.
+
+    The application provider is deliberately tiny and deterministic: a public
+    tool schema identifies the future opportunity, while the owner-controlled
+    matcher binds both extracted facts to one semantic unit.  The bridge must
+    persist source, artifact-set, retrieval/exposure, exact tool closure and
+    pure feedback across a learn -> future restart.
+    """
+
+    from hermes_state import SessionDB
+    from rsimem.memory.opportunity import ApplicationOpportunitySchema
+    from rsimem.memory.tool_exact_join import resolve_tool_call_result
+
+    key = "application.fixture.preference"
+    raw_schema = _fixture_application_schema()
+    application_schema = ApplicationOpportunitySchema.from_payload(
+        raw_schema["application_contract"]
+    )
+
+    def visible_messages(result: dict[str, object]) -> tuple[dict[str, object], ...]:
+        raw = result.get("messages")
+        return tuple(item for item in raw if isinstance(item, dict)) if isinstance(raw, (list, tuple)) else ()
+
+    def opportunity_provider(result: dict[str, object]):
+        messages = visible_messages(result)
+        source_provenance = result.get("rsimem_source_provenance_id")
+        source_records = result.get("rsimem_source_records")
+        has_apply_call = any(
+            isinstance(call, dict)
+            and isinstance(call.get("function"), dict)
+            and call["function"].get("name") == "fixture_apply"
+            for message in messages
+            for call in (message.get("tool_calls") or ())
+            if isinstance(message.get("tool_calls"), (list, tuple))
+        )
+        if isinstance(source_provenance, str) and any(
+            "durable preference" in str(message.get("content") or "").casefold()
+            for message in messages
+            if message.get("role") == "user"
+        ):
+            return (OpportunityEvidence.create(
+                source_surface=OpportunitySurface.CURRENT_INPUT,
+                semantic_requirement=key,
+                observation_time="2026-08-31T00:00:00Z",
+                operation_id="opportunity.fixture.source",
+                provenance_id=source_provenance,
+                source_payload={"visible_input": "durable preference"},
+            ),)
+        if not has_apply_call or not isinstance(source_records, (list, tuple)):
+            return ()
+        values = []
+        for record in source_records:
+            if not isinstance(record, dict) or key not in tuple(record.get("semantic_keys") or ()):
+                continue
+            provenance = record.get("provenance_id")
+            if not isinstance(provenance, str):
+                continue
+            values.append(OpportunityEvidence.create(
+                source_surface=OpportunitySurface.APPLICATION_SCHEMA,
+                semantic_requirement=key,
+                observation_time="2026-08-31T00:00:00Z",
+                operation_id="opportunity.fixture.future",
+                provenance_id=provenance,
+                source_payload={"tool_name": "fixture_apply"},
+                application_schema=application_schema,
+            ))
+        return tuple(values)
+
+    def fact_keys_provider(record):
+        return {
+            fact.fact_id: (key,)
+            for fact in record.source.facts
+            if fact.artifact_id is not None
+        }
+
+    def binding_provider(source, *, provenance_id=None):
+        facts = tuple(
+            fact for fact in source.facts
+            if fact.artifact_id is not None and fact.disposition.value == "persisted"
+        )
+        if provenance_id is None or len(facts) < 2 or len(facts) != len(source.facts):
+            return ()
+        if any(fact.semantic_keys != (key,) for fact in facts):
+            return ()
+        return (ArtifactSetSemanticBinding.create(
+            semantic_unit_id="fixture.semantic-unit.preference",
+            semantic_key=key,
+            member_artifact_ids=tuple(fact.artifact_id for fact in facts),
+            member_fact_ids=tuple(fact.fact_id for fact in facts),
+            complete=True,
+            source_digest=source.source_projection_digest,
+            provenance_id=provenance_id,
+        ),)
+
+    class NativeStore:
+        def format_for_system_prompt(self, target: str) -> str | None:
+            if target != "user":
+                return None
+            content = (home / "memories" / "USER.md").read_text(encoding="utf-8").strip()
+            return "MEMORY\n" + content if content else None
+
+    home = tmp_path / "home"
+    (home / "memories").mkdir(parents=True)
+    (home / "memories" / "MEMORY.md").write_text("", encoding="utf-8")
+    (home / "memories" / "USER.md").write_text("", encoding="utf-8")
+
+    def client_for(facts: tuple[str, ...], operations: list[dict[str, object]]):
+        return FakeCompletionClient({
+            POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id: json.dumps({"facts": list(facts)}),
+            POLICY_INTERNAL_OPERATION_PROMPT.artifact.prompt_id: json.dumps({"operations": operations}),
+        })
+
+    learn_db = SessionDB(home / "state.db")
+    learn_session = "session.fixture.learn"
+    learn_db.create_session(learn_session, "fixture", model="fixture-model")
+    learn_db.append_message(learn_session, "user", "Remember this durable preference.")
+    learn_db.append_message(learn_session, "assistant", "Saved.")
+    facts = ("Prefer fixture format.", "Apply the preference only to fixture tasks.")
+    learn_client = client_for(
+        facts,
+        [{"fact_index": index, "action": "add", "candidate_id": None} for index in range(2)],
+    )
+    learn_bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "learn" / "memory.jsonl",
+        run_id="run.fixture",
+        trace_id="trace.fixture.learn",
+        episode_id="episode.fixture.learn",
+        session_id=learn_session,
+        task_id="task.fixture.learn",
+        experiment_variant="fixture",
+        static_writeback_config=StaticSemanticWritebackConfig(mode="static"),
+        static_completion_client=learn_client,
+        opportunity_evidence_provider=opportunity_provider,
+        artifact_set_binding_provider=binding_provider,
+        pure_extraction_fact_semantic_keys_provider=fact_keys_provider,
+        application_opportunity_schema=raw_schema,
+    )
+    learn_bridge.attach(SimpleNamespace(
+        _memory_store=NativeStore(), _session_db=learn_db, session_id=learn_session,
+    ))
+    learn_bridge.on_task_completed({
+        "completed": True,
+        "messages": [{"role": "user", "content": "Remember this durable preference."}],
+    })
+    learn_bridge.close()
+    learn_db.close()
+
+    source_records = JsonPureExtractionSourceRecordStore(
+        home / ".rsimem" / "pure_extraction_sources.jsonl"
+    ).records()
+    assert len(source_records) == 1
+    assert source_records[0].source.available_semantic_keys == (key,)
+    assert all(fact.semantic_keys == (key,) for fact in source_records[0].source.facts)
+    bindings = learn_bridge.artifact_set_bindings
+    assert len(bindings) == 1
+    member_ids = bindings[0].member_artifact_ids
+
+    future_db = SessionDB(home / "state.db")
+    future_session = "session.fixture.future"
+    future_db.create_session(future_session, "fixture", model="fixture-model")
+    future_db.append_message(future_session, "user", "Apply the saved preference.")
+    future_db.append_message(future_session, "assistant", "Applied.")
+    future_client = client_for((), [])
+    future_bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "future" / "memory.jsonl",
+        run_id="run.fixture",
+        trace_id="trace.fixture.future",
+        episode_id="episode.fixture.future",
+        session_id=future_session,
+        task_id="task.fixture.future",
+        experiment_variant="fixture",
+        static_writeback_config=StaticSemanticWritebackConfig(mode="static"),
+        static_completion_client=future_client,
+        opportunity_evidence_provider=opportunity_provider,
+        artifact_set_binding_provider=binding_provider,
+        pure_extraction_fact_semantic_keys_provider=fact_keys_provider,
+        memory_use_attribution_provider=lambda future, result: (
+            future.memory_artifact_ids if result.get("memory_used") is True else ()
+        ),
+        application_opportunity_schema=raw_schema,
+    )
+    future_bridge.attach(SimpleNamespace(
+        _memory_store=NativeStore(), _session_db=future_db, session_id=future_session,
+    ))
+    prompt = future_bridge._agent._memory_store.format_for_system_prompt("user")
+    assert prompt is not None
+    future_bridge.on_task_completed({
+        "completed": True,
+        "memory_used": True,
+        "messages": [
+            {"role": "user", "content": "Apply the saved preference."},
+            {"role": "assistant", "tool_calls": [{"id": "call.fixture", "function": {"name": "fixture_apply", "arguments": "{}"}}]},
+            {"role": "tool", "tool_call_id": "call.fixture", "id": "result.fixture", "content": '{"success": true}'},
+        ],
+    })
+    joins = future_bridge.tool_call_result_joins
+    assert len(joins) == 1
+    assert resolve_tool_call_result(joins[0]).status is ToolJoinResolutionStatus.COMPLETE
+    from rsimem.memory.opportunity import JsonApplicationOpportunitySchemaRegistry
+
+    feedback = JsonPureExtractionFeedbackRecordStore(
+        tmp_path / "future" / "rsimem_pure_extraction_feedback.jsonl",
+        schema_registry=JsonApplicationOpportunitySchemaRegistry(
+            home / ".rsimem" / "application_opportunity_schemas.jsonl"
+        ),
+    ).records()
+    assert len(feedback) == 1
+    assert feedback[0].attribution.value == "attributable_success", (
+        feedback[0].reason_codes,
+        [item.payload() for item in future_bridge.opportunity_evidence],
+        future_bridge.memory_use_evidence,
+        [item.payload() for item in future_bridge.artifact_set_bindings],
+        source_records[0].payload(),
+    )
+    assert feedback[0].artifact_set_binding is not None
+    assert feedback[0].artifact_set_binding.member_artifact_ids == member_ids
+    assert feedback[0].tool_joins[0].memory_use_operation_id is not None
+    assert set(future_bridge.memory_use_evidence[0].retrieved_artifact_ids) == set(member_ids)
+    pure_events = PureProcessCorpus.create(
+        tuple(learn_bridge.process_feedback) + tuple(future_bridge.process_feedback)
+    )
+    assert any(event.kind is ProcessEventKind.EXTRACTION for event in pure_events.events)
+    assert any(event.kind is ProcessEventKind.TOOL_RESULT for event in pure_events.events)
+    assert all(event.evidence_plane.value == "pure_process" for event in pure_events.events)
+    future_bridge.close()
+    future_db.close()
 
 
 def test_live_bridge_records_content_free_sm01_future_feedback(tmp_path: Path) -> None:

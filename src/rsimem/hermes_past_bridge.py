@@ -420,9 +420,15 @@ class HermesPastBenchBridge:
             [Mapping[str, Any]], Iterable[OpportunityEvidence]
         ] | None = None,
         memory_use_evidence_path: Path | None = None,
+        memory_use_attribution_provider: Callable[
+            [SemanticFutureEvidence, Mapping[str, Any]], Iterable[str]
+        ] | None = None,
         artifact_set_binding_path: Path | None = None,
         artifact_set_binding_provider: Callable[
             [object], Iterable[ArtifactSetSemanticBinding]
+        ] | None = None,
+        pure_extraction_fact_semantic_keys_provider: Callable[
+            [PureExtractionSourceRecord], Mapping[str, tuple[str, ...]]
         ] | None = None,
         application_opportunity_schema: Mapping[str, Any] | None = None,
         pure_extraction_source_path: Path | None = None,
@@ -440,6 +446,7 @@ class HermesPastBenchBridge:
         self._family_id = family_id
         self._stage = stage
         self._opportunity_evidence_provider = opportunity_evidence_provider
+        self._memory_use_attribution_provider = memory_use_attribution_provider
         self._last_runtime_opportunities: tuple[OpportunityEvidence, ...] = ()
         self._application_opportunity_schema = (
             dict(application_opportunity_schema)
@@ -468,6 +475,15 @@ class HermesPastBenchBridge:
             or self.evidence_path.with_name("rsimem_memory_use_evidence.jsonl")
         )
         self._artifact_set_binding_provider = artifact_set_binding_provider
+        # An application/owner-controlled matcher may provide explicit
+        # per-fact semantic membership after a source projection is built.
+        # Keeping this separate from the opportunity provider prevents a
+        # visible future demand key from being copied onto every extracted
+        # fact.  The callback is optional; without it, set-level attribution
+        # remains unresolved by design.
+        self._pure_extraction_fact_semantic_keys_provider = (
+            pure_extraction_fact_semantic_keys_provider
+        )
         self._artifact_set_binding_log = JsonArtifactSetBindingLog(
             artifact_set_binding_path
             or Path(hermes_home) / ".rsimem" / "artifact_set_bindings.jsonl"
@@ -1402,9 +1418,34 @@ class HermesPastBenchBridge:
                     used_artifact_ids = tuple(
                         value for value in explicit_used if isinstance(value, str)
                     )
+                elif self._memory_use_attribution_provider is not None:
+                    provided_used = self._memory_use_attribution_provider(
+                        future,
+                        result,
+                    )
+                    if isinstance(provided_used, (str, bytes, Mapping)):
+                        raise TypeError(
+                            "memory-use attribution provider must return an iterable"
+                        )
+                    provided_used = tuple(provided_used)
+                    if any(not isinstance(value, str) for value in provided_used):
+                        raise TypeError(
+                            "memory-use attribution provider returned a non-string artifact"
+                        )
+                    used_artifact_ids = provided_used
                 else:
                     used_artifact_ids = (
                         resolution.used_artifact_ids if resolution is not None else ()
+                    )
+                if len(used_artifact_ids) != len(set(used_artifact_ids)):
+                    raise ValueError(
+                        "memory-use attribution provider returned duplicate artifacts"
+                    )
+                if not set(used_artifact_ids).issubset(
+                    set(future.memory_artifact_ids)
+                ):
+                    raise ValueError(
+                        "memory-use attribution provider returned an artifact outside retrieval"
                     )
                 outcome_status = (
                     resolution.outcome_status
@@ -1548,8 +1589,24 @@ class HermesPastBenchBridge:
         # deployment-visible current-input requirements needed by the pure
         # resolver.
         runtime_opportunities = self._last_runtime_opportunities
-        if not runtime_opportunities and self._opportunity_evidence_provider is not None:
+        # Providers are evaluated at each completed future boundary.  A
+        # source projection may have populated the bridge-local cache with a
+        # non-persisted source annotation; reusing that cache here would hide
+        # the later opportunity.  Runtime providers are required to be
+        # deterministic and their append-only log makes repeat evaluation
+        # idempotent.
+        if self._opportunity_evidence_provider is not None or not runtime_opportunities:
             runtime_opportunities = self._record_runtime_opportunities(result)
+            # ``opportunities`` was loaded before invoking the provider so a
+            # provider-generated future observation is not accidentally
+            # omitted from the source join below.  Keep the local view in
+            # sync with the append-only log while preserving idempotent
+            # evidence identity across retries.
+            by_id = {value.evidence_id: value for value in opportunities}
+            by_id.update(
+                (value.evidence_id, value) for value in runtime_opportunities
+            )
+            opportunities = tuple(by_id[value] for value in sorted(by_id))
         current_input_requirements = tuple(dict.fromkeys(
             value.semantic_requirement
             for value in runtime_opportunities
@@ -1616,11 +1673,30 @@ class HermesPastBenchBridge:
                         | set(value.used_artifact_ids)
                     )
                 )
-                if len(candidates) == 1 and candidates[0].artifact_set_id is None:
+                if len(candidates) == 1:
                     observed = candidates[0]
                     candidate_artifacts = set(observed.artifact_ids) or set(
                         observed.retrieved_artifact_ids
                     )
+                    if observed.artifact_set_id is not None:
+                        observed_binding = next(
+                            (
+                                value
+                                for value in bindings
+                                if value.binding_id == observed.artifact_set_id
+                            ),
+                            None,
+                        )
+                        if (
+                            observed_binding is None
+                            or not observed_binding.complete
+                            or not set(observed_binding.member_artifact_ids).issubset(
+                                source_artifacts
+                            )
+                            or set(observed_binding.member_artifact_ids)
+                            != candidate_artifacts
+                        ):
+                            observed = None
                     source_artifact_ids = {
                         fact.artifact_id
                         for fact in source.source.facts
@@ -1635,7 +1711,7 @@ class HermesPastBenchBridge:
                             })
                         )
                         for item in sources
-                    )
+                    ) if observed is not None else 0
                     if (
                         source_match_count != 1
                         or not candidate_artifacts.issubset(source_artifact_ids)
@@ -2200,6 +2276,25 @@ class HermesPastBenchBridge:
             provenance_id=provenance_id,
             visible_semantic_keys=visible_semantic_keys,
         )
+        fact_semantic_keys_provider = (
+            self._pure_extraction_fact_semantic_keys_provider
+        )
+        if fact_semantic_keys_provider is not None:
+            mapping = fact_semantic_keys_provider(record)
+            if not isinstance(mapping, Mapping):
+                raise TypeError(
+                    "pure extraction fact semantic key provider must return a mapping"
+                )
+            record = self.pure_extraction_source_projector.project_record(
+                boundary,
+                self.static_writeback.policy,
+                self.static_writeback.extraction_runtime_binding,
+                source_projection_id=projection.projection_id,
+                context_revision=snapshot.context_revision,
+                provenance_id=provenance_id,
+                visible_semantic_keys=visible_semantic_keys,
+                fact_semantic_keys=mapping,
+            )
         self.pure_extraction_source_store.append(record)
         self._record_artifact_set_bindings(
             record.source,
