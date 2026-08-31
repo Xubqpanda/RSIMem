@@ -1253,3 +1253,59 @@ def test_live_pure_projector_does_not_consult_family_parser(tmp_path) -> None:
             provenance_id="provenance.runtime-pure-v1",
             fact_semantic_keys="not-a-map",  # type: ignore[arg-type]
         )
+
+
+def test_live_pure_projector_accepts_only_explicit_visible_fact_bindings(tmp_path) -> None:
+    """Set-level semantics require an owner-provided per-fact mapping."""
+
+    from test_extraction_projection import _compile
+
+    runtime, boundary = _compile(
+        tmp_path,
+        facts=("A durable preference.", "A second member of the same rule."),
+    )
+    try:
+        assert boundary.writeback is not None
+        trace = runtime.policy.operation_trace(
+            boundary.writeback.ingestion.idempotency_key
+        )
+        assert trace is not None
+        fact_ids = tuple(item.fact_id for item in trace.fact_extractions)
+        projected = PureExtractionSourceProjector().project_record(
+            boundary,
+            runtime.policy,
+            runtime.extraction_runtime_binding,
+            source_projection_id="projection.runtime-set-v1",
+            context_revision="revision.runtime-set-v1",
+            provenance_id="provenance.runtime-set-v1",
+            visible_semantic_keys=(TSV_KEY,),
+            fact_semantic_keys={fact_id: (TSV_KEY,) for fact_id in fact_ids},
+        )
+        assert tuple(
+            fact.semantic_keys for fact in projected.source.facts
+        ) == ((TSV_KEY,), (TSV_KEY,))
+
+        with pytest.raises(ValueError, match="unknown fact"):
+            PureExtractionSourceProjector().project_record(
+                boundary,
+                runtime.policy,
+                runtime.extraction_runtime_binding,
+                source_projection_id="projection.runtime-set-v1",
+                context_revision="revision.runtime-set-v1",
+                provenance_id="provenance.runtime-set-v1",
+                visible_semantic_keys=(TSV_KEY,),
+                fact_semantic_keys={"fact.unknown": (TSV_KEY,)},
+            )
+        with pytest.raises(ValueError, match="not visible"):
+            PureExtractionSourceProjector().project_record(
+                boundary,
+                runtime.policy,
+                runtime.extraction_runtime_binding,
+                source_projection_id="projection.runtime-set-v1",
+                context_revision="revision.runtime-set-v1",
+                provenance_id="provenance.runtime-set-v1",
+                visible_semantic_keys=(TSV_KEY,),
+                fact_semantic_keys={fact_ids[0]: ("preference.hidden",)},
+            )
+    finally:
+        runtime.close()

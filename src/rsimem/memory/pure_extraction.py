@@ -1433,6 +1433,27 @@ class PureExtractionSourceProjector:
             fact_semantic_keys = {}
         elif not isinstance(fact_semantic_keys, Mapping):
             raise TypeError("fact semantic keys must be a mapping")
+        # A semantic key on the source boundary is not proof that every
+        # extracted fact expresses that unit.  Callers that own an explicit
+        # matcher must therefore bind keys per fact, and the binding is
+        # constrained to the deployment-visible source key allow-list.  This
+        # prevents an adapter from silently copying one benchmark/application
+        # key onto all members of a multi-fact extraction set.
+        trace_fact_ids = {extraction.fact_id for extraction in trace.fact_extractions}
+        if any(fact_id not in trace_fact_ids for fact_id in fact_semantic_keys):
+            raise ValueError("fact semantic key mapping references an unknown fact")
+        visible_keys = set(visible_semantic_keys)
+        normalized_fact_keys: dict[str, tuple[str, ...]] = {}
+        for fact_id, raw_keys in fact_semantic_keys.items():
+            if not isinstance(fact_id, str):
+                raise TypeError("fact semantic key mapping IDs must be strings")
+            if isinstance(raw_keys, str) or not isinstance(raw_keys, tuple):
+                raise TypeError("fact semantic key mapping values must be tuples")
+            if len(raw_keys) != len(set(raw_keys)):
+                raise ValueError("fact semantic keys must be unique")
+            if any(key not in visible_keys for key in raw_keys):
+                raise ValueError("fact semantic key is not visible at the source boundary")
+            normalized_fact_keys[fact_id] = raw_keys
         operations = ingestion.operations
         executions = boundary.writeback.executions
         accepted_index = 0
@@ -1441,7 +1462,7 @@ class PureExtractionSourceProjector:
             fact = policy.fact_for_digest(extraction.content_digest)
             if fact is None or fact.fact_id != extraction.fact_id:
                 raise ValueError("pure extraction fact owner disagrees with trace")
-            keys = tuple(fact_semantic_keys.get(extraction.fact_id, ()))
+            keys = normalized_fact_keys.get(extraction.fact_id, ())
             quality_issue = None
             artifact_id = None
             if not extraction.accepted:
