@@ -757,6 +757,13 @@ def build_joined_process_signal_cases(
         for event in values
     ):
         raise ValueError("process signal projection requires pure_process runtime events")
+    events_by_id: dict[str, ProcessEvent | PureProcessEvent] = {}
+    for event in values:
+        previous = events_by_id.get(event.event_id)
+        if previous is not None and previous != event:
+            raise ValueError("conflicting joined process signal event identity")
+        events_by_id[event.event_id] = event
+    values = tuple(events_by_id[event_id] for event_id in sorted(events_by_id))
 
     # Import lazily to keep the process-signal module independent of the
     # extraction contract's import order.
@@ -768,6 +775,13 @@ def build_joined_process_signal_cases(
 
     if any(not isinstance(item, PureExtractionFeedbackRecord) for item in records):
         raise TypeError("joined process signal requires pure extraction feedback records")
+    feedback_by_id: dict[str, PureExtractionFeedbackRecord] = {}
+    for item in records:
+        previous = feedback_by_id.get(item.record_id)
+        if previous is not None and previous != item:
+            raise ValueError("conflicting joined process signal feedback identity")
+        feedback_by_id[item.record_id] = item
+    records = tuple(feedback_by_id[record_id] for record_id in sorted(feedback_by_id))
     if any(not isinstance(item, PureExtractionSourceRecord) for item in source_records):
         raise TypeError("joined process signal requires pure extraction source records")
     sources_by_id: dict[str, PureExtractionSourceRecord] = {}
@@ -801,11 +815,7 @@ def build_joined_process_signal_cases(
         "injection_failure", "tool_failure", "adapter_failure",
     }
     cases: list[ProcessSignalCase] = []
-    seen_feedback: set[str] = set()
     for record in records:
-        if record.record_id in seen_feedback:
-            continue
-        seen_feedback.add(record.record_id)
         anchors = tuple(
             event for event in values
             if event.lineage_id == record.provenance_id

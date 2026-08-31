@@ -802,6 +802,38 @@ def test_joined_process_signal_deduplicates_replayed_source_records() -> None:
     assert len(cases) == 1
 
 
+def test_joined_process_signal_deduplicates_replayed_events_and_feedback() -> None:
+    source, feedback, events = _joined_signal_fixture()
+    cases = build_joined_process_signal_cases(
+        (*events, *events),
+        (feedback, feedback),
+        sources=(source,),
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.joined.v1",
+        future_task_template_id="future-template.joined.v1",
+        observation_window="window.joined.v1",
+        replicate_id="replicate.joined.v1",
+    )
+    assert len(cases) == 1
+
+
+def test_joined_process_signal_rejects_conflicting_event_identity() -> None:
+    source, feedback, events = _joined_signal_fixture()
+    conflicting = copy.copy(events[0])
+    object.__setattr__(conflicting, "output_digest", "f" * 64)
+    with pytest.raises(ValueError, match="conflicting joined process signal event"):
+        build_joined_process_signal_cases(
+            (*events, conflicting),
+            (feedback,),
+            sources=(source,),
+            frozen_policy_digest="a" * 64,
+            source_task_template_id="source-template.joined.v1",
+            future_task_template_id="future-template.joined.v1",
+            observation_window="window.joined.v1",
+            replicate_id="replicate.joined.v1",
+        )
+
+
 def test_joined_process_signal_rejects_conflicting_source_identity() -> None:
     source, feedback, events = _joined_signal_fixture()
     conflicting = copy.copy(source)
