@@ -231,6 +231,43 @@ class ExtractionPromptOptimizer:
         self.config = config
         self.revocation_registry = revocation_registry
 
+    def _assert_revocation_active(
+        self,
+        *,
+        parent: ExtractionPromptPolicyArtifact,
+        corpus_id: str,
+        corpus_schema_version: int,
+        corpus_digest: str,
+    ) -> None:
+        """Fail closed on revoked artifacts before deriving any gate result.
+
+        A deterministic ``NO_PROPOSAL`` gate is safe only for evidence that
+        is still valid.  Checking revocation before logical-case grouping and
+        actionability classification prevents a stale corpus from being
+        silently reclassified as an ordinary no-signal outcome.  The registry
+        remains optional for local deterministic fixtures; production clients
+        advertise ``requires_revocation_registry`` and are checked below.
+        """
+
+        if self.revocation_registry is None:
+            return
+        if not isinstance(self.revocation_registry, JsonRevocationRegistry):
+            raise TypeError("optimizer revocation registry has the wrong type")
+        self.revocation_registry.assert_active(
+            artifact_id=corpus_id,
+            artifact_schema_version=corpus_schema_version,
+            artifact_digest=corpus_digest,
+            evidence_plane=EvidencePlane.PURE_PROCESS,
+            evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        )
+        self.revocation_registry.assert_active(
+            artifact_id=parent.artifact_id,
+            artifact_schema_version=parent.schema_version,
+            artifact_digest=parent.artifact_digest,
+            evidence_plane=EvidencePlane.PURE_PROCESS,
+            evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        )
+
     def propose(
         self,
         parent: ExtractionPromptPolicyArtifact,
@@ -238,10 +275,18 @@ class ExtractionPromptOptimizer:
     ) -> ExtractionOptimizerResult:
         if not isinstance(corpus, ExtractionOptimizerCorpus):
             raise TypeError("optimizer requires an extraction optimizer corpus")
+        if not isinstance(parent, ExtractionPromptPolicyArtifact):
+            raise TypeError("optimizer requires a policy artifact")
         planes = {EvidencePlane(example.evidence_plane) for example in corpus.examples}
         if len(planes) != 1:
             raise ValueError("optimizer corpus mixes evidence planes")
         require_optimizer_plane(next(iter(planes)))
+        self._assert_revocation_active(
+            parent=parent,
+            corpus_id=corpus.corpus_id,
+            corpus_schema_version=corpus.schema_version,
+            corpus_digest=corpus.corpus_digest,
+        )
         if corpus.process_signal_gate == PROCESS_SIGNAL_GATE_NO_SIGNAL:
             request = build_extraction_optimizer_gate_request(
                 parent,
@@ -327,21 +372,6 @@ class ExtractionPromptOptimizer:
         ):
             raise ValueError(
                 "optimizer provider proposal requires a revocation registry"
-            )
-        if self.revocation_registry is not None:
-            self.revocation_registry.assert_active(
-                artifact_id=corpus.corpus_id,
-                artifact_schema_version=corpus.schema_version,
-                artifact_digest=corpus.corpus_digest,
-                evidence_plane=EvidencePlane.PURE_PROCESS,
-                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
-            )
-            self.revocation_registry.assert_active(
-                artifact_id=parent.artifact_id,
-                artifact_schema_version=parent.schema_version,
-                artifact_digest=parent.artifact_digest,
-                evidence_plane=EvidencePlane.PURE_PROCESS,
-                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
             )
         if (
             getattr(self.client, "requires_process_signal_gate", False)
@@ -449,6 +479,12 @@ class ExtractionPromptOptimizer:
             raise TypeError("pure optimizer requires a pure extraction corpus")
         if not isinstance(parent, ExtractionPromptPolicyArtifact):
             raise TypeError("pure optimizer requires a policy artifact")
+        self._assert_revocation_active(
+            parent=parent,
+            corpus_id=corpus.corpus_id,
+            corpus_schema_version=corpus.schema_version,
+            corpus_digest=corpus.corpus_digest,
+        )
         capture_by_id = {
             capture.example_id: capture for capture in captures
         }
@@ -506,21 +542,6 @@ class ExtractionPromptOptimizer:
         ):
             raise ValueError(
                 "optimizer provider proposal requires a revocation registry"
-            )
-        if self.revocation_registry is not None:
-            self.revocation_registry.assert_active(
-                artifact_id=corpus.corpus_id,
-                artifact_schema_version=corpus.schema_version,
-                artifact_digest=corpus.corpus_digest,
-                evidence_plane=EvidencePlane.PURE_PROCESS,
-                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
-            )
-            self.revocation_registry.assert_active(
-                artifact_id=parent.artifact_id,
-                artifact_schema_version=parent.schema_version,
-                artifact_digest=parent.artifact_digest,
-                evidence_plane=EvidencePlane.PURE_PROCESS,
-                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
             )
         request = build_pure_extraction_optimizer_request(
             parent,
