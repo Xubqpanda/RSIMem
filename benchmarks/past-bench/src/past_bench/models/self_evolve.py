@@ -665,7 +665,7 @@ class HermesPersistenceConfig(BaseModel):
     rsimem_extraction_trial_source_path: str = Field(default="", exclude=True)
     rsimem_extraction_offline_profile: RSIMemExtractionOfflineValidationProfile | None = None
     rsimem_extraction_offline_source_path: str = Field(default="", exclude=True)
-    rsimem_revocation_registry_path: str = ""
+    rsimem_revocation_registry_path: str = Field(default="", exclude=True)
 
     @model_validator(mode="after")
     def _validate_adaptive_writeback_pair(self):
