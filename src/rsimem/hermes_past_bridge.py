@@ -149,14 +149,20 @@ class _PromptMemoryStore:
     def format_for_system_prompt(self, target: str) -> str | None:
         if not self._bridge.uses_adapter:
             result = self._native.format_for_system_prompt(target)
-            self._bridge.observe_query(
+            hits = self._bridge.observe_query(
                 MemoryKind.SEMANTIC,
                 "",
                 namespace=target,
                 limit=100,
                 surface="system_prompt" if result else None,
             )
-            self._bridge.record_semantic_prompt(result, target)
+            self._bridge.record_semantic_prompt(
+                result,
+                target,
+                artifact_ids=tuple(hit.artifact.artifact_id for hit in hits),
+                retrieved_hits=hits,
+                retrieval_limit=100,
+            )
             return result
 
         def adapter_read() -> str | None:
@@ -223,6 +229,7 @@ class _PromptMemoryStore:
                 target,
                 artifact_ids=tuple(hit.artifact.artifact_id for hit in hits),
                 retrieved_hits=hits,
+                retrieval_limit=100,
             )
         return adapter_result
 
@@ -1375,6 +1382,7 @@ class HermesPastBenchBridge:
         *,
         artifact_ids: tuple[str, ...] = (),
         retrieved_hits: Sequence[Any] | None = None,
+        retrieval_limit: int = 10_000,
     ) -> None:
         if not artifact_ids and prompt:
             try:
@@ -1428,6 +1436,7 @@ class HermesPastBenchBridge:
             parent_operation_ids=(),
             step_id=step_id,
             retrieved_hits=retrieved_hits,
+            retrieval_limit=retrieval_limit,
         )
         self._semantic_futures.append((future, step_id))
 
@@ -3536,7 +3545,7 @@ class HermesPastBenchBridge:
         namespace: str = "default",
         limit: int,
         surface: str | None,
-    ) -> None:
+    ) -> tuple[Any, ...]:
         try:
             hits = self.runtime.query(MemoryQuery(
                 kind,
@@ -3570,6 +3579,7 @@ class HermesPastBenchBridge:
                     ).hexdigest()[:24],
                 ),
             )
+            return hits
         except Exception as exc:
             query_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
             self._record_process_observation(
@@ -3582,7 +3592,7 @@ class HermesPastBenchBridge:
                 reason_codes=("retrieval_failure",),
                 execution_receipt_ids=(f"receipt.query-failure.{query_digest[:24]}",),
             )
-            return
+            return ()
 
     def record_native_search(
         self,

@@ -306,14 +306,17 @@ class SemanticFutureTraceRecorder:
         parent_operation_ids: tuple[str, ...],
         step_id: str = "future-semantic",
         retrieved_hits: Sequence[MemoryHit] | None = None,
+        retrieval_limit: int = 10_000,
     ) -> SemanticFutureEvidence:
         if not isinstance(model_visible_prompt, str):
             raise TypeError("future semantic trace prompt must be a string")
+        if type(retrieval_limit) is not int or retrieval_limit < 1:
+            raise ValueError("future semantic trace retrieval_limit must be positive")
         backend = registry.resolve(MemoryKind.SEMANTIC)
         query_artifact = self._artifact(
             ArtifactKind.QUERY,
             f"{step_id}.query",
-            {"kind": "semantic", "namespace": namespace, "limit": 10_000},
+            {"kind": "semantic", "namespace": namespace, "limit": retrieval_limit},
             provenance_ref=backend.descriptor.name,
         )
         self.recorder.record_artifact(query_artifact)
@@ -331,7 +334,7 @@ class SemanticFutureTraceRecorder:
                 MemoryKind.SEMANTIC,
                 "",
                 namespace=namespace,
-                limit=10_000,
+                limit=retrieval_limit,
             )))
         else:
             # Host adapters may already have performed the authoritative
