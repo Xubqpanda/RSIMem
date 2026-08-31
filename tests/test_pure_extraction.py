@@ -10,6 +10,7 @@ from rsimem.memory.extraction_optimizer_builder import (
     PureExtractionOptimizerBuilder,
 )
 from rsimem.memory.pure_extraction import (
+    PURE_EXTRACTION_CORPUS_SCHEMA_VERSION,
     JsonPureExtractionFeedbackRecordStore,
     JsonPureExtractionOptimizerCorpusStore,
     JsonPureExtractionSourceRecordStore,
@@ -395,8 +396,17 @@ def test_pure_optimizer_corpus_is_sorted_and_restart_safe(tmp_path) -> None:
     assert store.write(corpus) is True
     assert store.write(corpus) is False
     assert store.read_for_optimizer() == corpus
+    assert corpus.attribution_schema_version == 1
+    assert corpus.evidence_plane.value == "pure_process"
+    assert corpus.evidence_source.value == "runtime_observation"
 
     payload = corpus.payload()
+    assert payload["evidence_plane"] == "pure_process"
+    assert payload["evidence_source"] == "runtime_observation"
+    malformed_plane = dict(payload)
+    malformed_plane["evidence_plane"] = "benchmark_audit"
+    with pytest.raises(ValueError, match="malformed|runtime pure-process"):
+        PureExtractionOptimizerCorpus.from_payload(malformed_plane)
     payload["schema_version"] = 0
     with pytest.raises(ValueError, match="malformed|unsupported"):
         PureExtractionOptimizerCorpus.from_payload(payload)
@@ -800,7 +810,7 @@ def test_pure_optimizer_store_honors_shared_revocation_registry(tmp_path) -> Non
     assert corpus_store.read_for_optimizer(revocation_registry=registry) == corpus
     registry.append(RevocationEntry.create(
         artifact_id=corpus.corpus_id,
-        artifact_schema_version=3,
+        artifact_schema_version=PURE_EXTRACTION_CORPUS_SCHEMA_VERSION,
         artifact_digest=corpus.corpus_digest,
         evidence_plane="pure_process",
         evidence_source="runtime_observation",
