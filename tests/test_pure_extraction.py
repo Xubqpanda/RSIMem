@@ -1369,6 +1369,48 @@ def test_set_binding_must_belong_to_source_before_attribution() -> None:
         )
 
 
+def test_plain_memory_use_artifact_ownership_is_checked_before_attribution() -> None:
+    projection, source, *_ = _fixture()
+    provenance = "provenance.plain-ownership-v1"
+    pure_source = PureExtractionSourceRecord.from_family_record(
+        source,
+        source_projection_id=projection.projection_id,
+        provenance_id=provenance,
+        visible_semantic_keys=(TSV_KEY,),
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement=TSV_KEY,
+        observation_time="2026-08-22T00:00:00Z",
+        operation_id="op.opportunity.plain-ownership-v1",
+        provenance_id=provenance,
+        source_payload={"tool": "render_table"},
+    )
+    foreign = MemoryUseEvidence.create(
+        artifact_ids=("artifact.foreign-plain.v1",),
+        retrieval_operation_id="op.retrieval.plain-ownership-v1",
+        retrieved_artifact_ids=("artifact.foreign-plain.v1",),
+        injection_operation_id="op.injection.plain-ownership-v1",
+        injected_artifact_ids=("artifact.foreign-plain.v1",),
+        downstream_operation_id="op.use.plain-ownership-v1",
+        used_artifact_ids=("artifact.foreign-plain.v1",),
+        outcome_operation_id="op.outcome.plain-ownership-v1",
+        outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+        outcome_success=True,
+        observation_cutoff="2026-08-23T00:00:00Z",
+        provenance_id=provenance,
+    )
+    derived = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=pure_source,
+        opportunity=opportunity,
+        memory_use=foreign,
+        observation_window="window.completed-plain-ownership-v1",
+        provenance_id=provenance,
+    )
+    assert derived.attribution is PureExtractionAttribution.UNRESOLVED
+    assert derived.reason_codes == ("memory_artifact_foreign",)
+
+
 def test_live_pure_projector_does_not_consult_family_parser(tmp_path) -> None:
     from test_extraction_projection import _compile
 
