@@ -232,6 +232,101 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
     )
 
 
+def test_rsimem_bridge_receives_automatic_task_completion_boundary(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """The production Hermes runner must invoke the bridge after one-shot execution.
+
+    Bridge-level tests exercise source/feedback projection directly.  This
+    check covers the host wiring itself: a completed Hermes result is passed
+    to ``on_task_completed`` without a launcher-side opt-in callback.
+    """
+
+    import past_bench.runtime.adapters.hermes as hermes_module
+    import rsimem.hermes_past_bridge as bridge_module
+
+    calls: dict[str, object] = {"completed": [], "closed": False}
+
+    class Bridge:
+        process_feedback_event_ids = ()
+        process_feedback_digest = "0" * 64
+
+        def __init__(self, *args, **kwargs):
+            calls["bridge_kwargs"] = kwargs
+
+        def attach(self, agent):
+            calls["agent"] = agent
+
+        def on_task_completed(self, result):
+            calls["completed"].append(dict(result))
+
+        def close(self):
+            calls["closed"] = True
+
+    monkeypatch.setattr(bridge_module, "HermesPastBenchBridge", Bridge)
+    monkeypatch.setattr(hermes_module.HermesAdapter, "_register_past_bench_tools", lambda self: None)
+    monkeypatch.setattr(hermes_module.HermesAdapter, "_capture_hermes_artifacts", staticmethod(lambda *args, **kwargs: None))
+    monkeypatch.setattr(hermes_module.HermesAdapter, "_reload_hermes_modules_if_needed", staticmethod(lambda *args, **kwargs: None))
+    monkeypatch.setattr(hermes_module.HermesAdapter, "_set_session_title_if_missing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(hermes_module.HermesAdapter, "_isolate_rsimem_semantic_writer", lambda *args, **kwargs: None)
+
+    fake_run_agent = types.ModuleType("run_agent")
+
+    class FixtureAgent:
+        def __init__(self, **kwargs):
+            self.session_log_file = None
+            self.model_call_usage_records = []
+
+        def _execute_recorded_model_call(self, request, **kwargs):
+            return request()
+
+        async def _execute_recorded_async_model_call(self, request, **kwargs):
+            return request()
+
+        def run_conversation(self, **kwargs):
+            return {
+                "completed": True,
+                "final_response": "done",
+                "messages": [{"role": "user", "content": "finish"}],
+                "input_tokens": 0,
+                "output_tokens": 0,
+            }
+
+        def wait_for_background_reviews(self, timeout=0):
+            return True
+
+    fake_run_agent.AIAgent = FixtureAgent
+    monkeypatch.setitem(sys.modules, "run_agent", fake_run_agent)
+
+    request = _request(_home(tmp_path / "home"), tmp_path / "artifacts", "native+ledger")
+    request.model.extra_body["hermes"]["session_search_enabled"] = False
+    request.model.extra_body["hermes"]["rsimem"]["semantic_writeback"] = {
+        "mode": "static",
+        "feedback_contract": "disabled",
+    }
+    adapter = HermesAdapter(AgentSpec(name="hermes", adapter="hermes"), request)
+    try:
+        response = adapter.step(StepRequest(session_id=request.session_id, step_id=0))
+    finally:
+        adapter.close("automatic boundary fixture")
+
+    assert response.status == "finished", response.error
+    assert calls["agent"] is not None
+    bridge_kwargs = calls["bridge_kwargs"]
+    assert callable(bridge_kwargs["opportunity_evidence_provider"])
+    assert callable(bridge_kwargs["artifact_set_binding_provider"])
+    assert callable(bridge_kwargs["pure_extraction_fact_semantic_keys_provider"])
+    assert calls["completed"] == [{
+        "completed": True,
+        "final_response": "done",
+        "messages": [{"role": "user", "content": "finish"}],
+        "input_tokens": 0,
+        "output_tokens": 0,
+    }]
+    assert calls["closed"] is True
+
+
 def test_past_bench_error_response_keeps_process_identity(monkeypatch) -> None:
     """A post-bridge failure must not sever the process-corpus join."""
 
