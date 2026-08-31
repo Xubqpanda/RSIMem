@@ -803,8 +803,9 @@ def build_joined_process_signal_cases(
 
     def stage_flags(items: tuple[ProcessEvent | PureProcessEvent, ...]) -> dict[ProcessEventKind, bool]:
         # This is an observation census, not a success label: pending,
-        # skipped and failed boundaries are still observed.  UNKNOWN remains
-        # censored and is handled by ``observation_complete`` below.
+        # skipped and failed boundaries are still observed.  UNKNOWN does not
+        # count as a stage observation; an unrelated UNKNOWN event is likewise
+        # insufficient to censor a typed cross-task feedback window.
         return {
             kind: any(event.kind is kind and event.status is not ProcessEventStatus.UNKNOWN for event in items)
             for kind in ProcessEventKind
@@ -813,6 +814,8 @@ def build_joined_process_signal_cases(
     diagnosis_reasons = {
         "absence", "non_use", "retrieval_miss", "retrieval_failure",
         "injection_failure", "tool_failure", "adapter_failure",
+        "opportunity_not_observed", "memory_use_missing",
+        "downstream_use_not_observed", "current_input_confounded",
     }
     cases: list[ProcessSignalCase] = []
     for record in records:
@@ -866,10 +869,14 @@ def build_joined_process_signal_cases(
             PureExtractionAttribution.ATTRIBUTABLE_SUCCESS,
             PureExtractionAttribution.ATTRIBUTABLE_FAILURE,
         }
+        # The typed feedback record already validates the opportunity/use/tool
+        # closure relevant to this source.  An unrelated tool result may be
+        # UNKNOWN because that tool has no application success schema; it must
+        # not censor an otherwise complete delayed observation.  Only an
+        # explicit censor marker or an incomplete feedback window closes the
+        # whole logical case.
         complete = record.observation_complete and not any(
-            "observation_censored" in event.reason_codes
-            or event.status is ProcessEventStatus.UNKNOWN
-            for event in combined
+            "observation_censored" in event.reason_codes for event in combined
         )
         source_set = "extraction-set." + _digest({
             "source_task_template_id": source_task_template_id,
@@ -909,6 +916,7 @@ def build_joined_process_signal_cases(
             observation_complete=complete,
             stage_diagnosis_observed=(
                 attributable
+                or bool(diagnosis_reasons.intersection(record.reason_codes))
                 or any(
                     diagnosis_reasons.intersection(event.reason_codes)
                     for event in combined

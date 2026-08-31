@@ -740,6 +740,29 @@ def test_joined_process_signal_uses_typed_feedback_across_task_contexts() -> Non
     assert cases[0].extraction_attributable is True
 
 
+def test_joined_process_signal_ignores_unrelated_unknown_tool_result() -> None:
+    source, feedback, events = _joined_signal_fixture()
+    future_task_id = "task.future.v1"
+    unrelated = ProcessEvent.create(
+        kind=ProcessEventKind.TOOL_RESULT,
+        status=ProcessEventStatus.UNKNOWN,
+        run_id="run.joined.v1",
+        variant="native+ledger",
+        trace_id="trace.future.v1",
+        episode_id="episode." + future_task_id,
+        session_id="session." + future_task_id,
+        task_id=future_task_id,
+        host_event_id="event.future.unrelated-tool-result",
+        source_revision="revision.future.v1",
+        input_payload={"tool": "notes_list"},
+        output_payload={"observed": True},
+    )
+    cases = _build_joined_fixture_case(source, feedback, events + (unrelated,))
+    assert len(cases) == 1
+    assert cases[0].observation_complete is True
+    assert cases[0].status is ProcessSignalCaseStatus.DIAGNOSTIC_ONLY
+
+
 @pytest.mark.parametrize(
     "fixture_kwargs",
     (
