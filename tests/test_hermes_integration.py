@@ -1925,6 +1925,48 @@ def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
     future_db.close()
 
 
+def test_hermes_tool_identity_gaps_are_type_mismatch_not_exact_closure(
+    tmp_path: Path,
+) -> None:
+    """Synthetic IDs preserve diagnostics but cannot grant attribution."""
+
+    home = _hermes_home(tmp_path / "home")
+    bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "artifacts" / "memory.jsonl",
+        run_id="run.tool-identity-gap",
+        trace_id="trace.tool-identity-gap",
+        episode_id="episode.tool-identity-gap",
+        session_id="session.tool-identity-gap",
+        task_id="task.tool-identity-gap",
+        experiment_variant="fixture",
+    )
+    bridge._record_tool_call_results({
+        "messages": [
+            {
+                "role": "assistant",
+                # Missing host call ID: bridge may retain a synthetic ID for
+                # deterministic diagnostics, but must mark the join unsafe.
+                "tool_calls": [{
+                    "function": {"name": "fixture_apply", "arguments": "{}"},
+                }],
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "tool-call-1",
+                # Missing host result ID: same fail-closed rule applies.
+                "content": '{"success": true}',
+            },
+        ],
+    })
+    assert len(bridge.tool_call_result_joins) == 1
+    join = bridge.tool_call_result_joins[0]
+    assert join.type_mismatch is True
+    assert resolve_tool_call_result(join).status is ToolJoinResolutionStatus.TYPE_MISMATCH
+    bridge.close()
+
+
 def test_live_bridge_records_content_free_sm01_future_feedback(tmp_path: Path) -> None:
     from hermes_state import SessionDB
 
