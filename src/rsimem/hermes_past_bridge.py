@@ -2387,6 +2387,12 @@ class HermesPastBenchBridge:
 
         if link_type not in {"source", "feedback"}:
             raise ValueError("unsupported pure provenance link type")
+        receipt_id = (
+            "receipt.pure-link."
+            + hashlib.sha256(
+                f"{link_type}:{record_id}:{provenance_id}".encode("utf-8")
+            ).hexdigest()[:24]
+        )
         self._record_process_observation(
             kind=ProcessEventKind.RECOVERY,
             status=ProcessEventStatus.SUCCESS,
@@ -2395,6 +2401,7 @@ class HermesPastBenchBridge:
             input_payload={"link_type": link_type, "record_id": record_id},
             output_payload={"provenance_id": provenance_id},
             reason_codes=("decision_observed",),
+            execution_receipt_ids=(receipt_id,),
             lineage_id=provenance_id,
             use_last_host_boundary=False,
         )

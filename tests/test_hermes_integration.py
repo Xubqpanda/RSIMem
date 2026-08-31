@@ -1903,6 +1903,8 @@ def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
     assert any(event.kind is ProcessEventKind.EXTRACTION for event in pure_events.events)
     assert any(event.kind is ProcessEventKind.TOOL_RESULT for event in pure_events.events)
     assert all(event.evidence_plane.value == "pure_process" for event in pure_events.events)
+    from rsimem.memory.process_feedback import audit_process_events
+    assert audit_process_events(future_bridge.process_feedback) == ()
     future_bridge.close()
     future_db.close()
 
