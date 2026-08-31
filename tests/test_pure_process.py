@@ -14,6 +14,7 @@ from rsimem.memory.evidence_planes import (
 from rsimem.memory.policy_contracts import PolicyLayer
 from rsimem.memory.process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 from rsimem.memory.pure_process import (
+    JsonPureProcessEventArchive,
     JsonPureProcessCorpusStore,
     PureProcessCorpus,
 )
@@ -168,6 +169,51 @@ def test_pure_process_store_rejects_symlinked_lock(tmp_path) -> None:
     path.with_name(path.name + ".lock").symlink_to(lock_target)
     with pytest.raises(ValueError, match="lock.*symlink"):
         JsonPureProcessCorpusStore(path).put(corpus)
+
+
+def test_pure_process_archive_atomic_replace_preserves_previous_records(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    """A failed archive commit must not leave a truncated JSONL tail."""
+
+    first = PureProcessCorpus.create((_event(),)).events[0]
+    second_event = ProcessEvent.create(
+        kind=ProcessEventKind.TASK_OUTCOME,
+        status=ProcessEventStatus.SUCCESS,
+        run_id="run.pure-v1",
+        variant="native+ledger",
+        trace_id="trace.pure-v1",
+        episode_id="episode.pure-v1",
+        session_id="session.pure-v1",
+        task_id="task.pure-v1",
+        host_event_id="event.pure-outcome-v1",
+        source_revision="revision.pure-v1",
+        input_payload={"completed": True},
+        output_payload={"completed": True},
+        execution_receipt_ids=("receipt.pure-outcome-v1",),
+        reason_codes=("task_completed",),
+    )
+    second = PureProcessCorpus.create((second_event,)).events[0]
+    archive = JsonPureProcessEventArchive(tmp_path / "events.jsonl")
+    assert archive.append((first,)) == 1
+    original = archive.records()
+
+    def fail_replace(*args, **kwargs):
+        raise OSError("simulated interruption before archive commit")
+
+    monkeypatch.setattr("rsimem.memory.pure_process.os.replace", fail_replace)
+    with pytest.raises(OSError, match="simulated interruption"):
+        archive.append((second,))
+
+    # The old complete archive remains readable; no partial second line is
+    # visible and temporary files are cleaned up by the failed transaction.
+    assert archive.records() == original
+    assert archive.path.read_text(encoding="utf-8").endswith("\n")
+    assert not tuple(
+        path for path in tmp_path.glob("events.jsonl.*")
+        if path.name != "events.jsonl.lock"
+    )
 
 
 def test_evidence_plane_source_identity_is_least_privilege() -> None:

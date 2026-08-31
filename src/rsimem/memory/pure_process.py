@@ -499,20 +499,53 @@ class JsonPureProcessEventArchive:
                 records = self._read_unlocked()
                 added = 0
                 self.path.parent.mkdir(parents=True, exist_ok=True)
-                with self.path.open("a", encoding="utf-8") as handle:
-                    for event in sorted(values, key=lambda value: value.event_id):
-                        canonical = json.dumps(event.payload(), ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-                        previous = records.get(event.event_id)
-                        if previous is not None:
-                            if previous != canonical:
-                                raise ValueError("conflicting pure-process archive event")
-                            continue
-                        handle.write(canonical + "\n")
-                        records[event.event_id] = canonical
-                        added += 1
-                    if added:
-                        handle.flush()
-                        os.fsync(handle.fileno())
+                for event in sorted(values, key=lambda value: value.event_id):
+                    canonical = json.dumps(
+                        event.payload(),
+                        ensure_ascii=True,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    )
+                    previous = records.get(event.event_id)
+                    if previous is not None:
+                        if previous != canonical:
+                            raise ValueError("conflicting pure-process archive event")
+                        continue
+                    records[event.event_id] = canonical
+                    added += 1
+                if added:
+                    # Do not append directly to the archive.  A process crash
+                    # between write(2) calls can leave a truncated final JSONL
+                    # record that poisons every later replay.  Rewriting the
+                    # complete canonical set through a temporary file keeps
+                    # the archive logically append-only while making each
+                    # commit atomic and restart-safe.
+                    descriptor, temporary = tempfile.mkstemp(
+                        prefix=self.path.name + ".",
+                        dir=self.path.parent,
+                    )
+                    try:
+                        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                            for canonical in (
+                                records[event_id]
+                                for event_id in sorted(records)
+                            ):
+                                handle.write(canonical + "\n")
+                            handle.flush()
+                            os.fsync(handle.fileno())
+                        if self.path.is_symlink():
+                            raise ValueError(
+                                "pure-process event archive cannot be a symlink"
+                            )
+                        os.replace(temporary, self.path)
+                        directory = os.open(self.path.parent, os.O_RDONLY)
+                        try:
+                            os.fsync(directory)
+                        finally:
+                            os.close(directory)
+                    finally:
+                        if os.path.exists(temporary):
+                            os.unlink(temporary)
                 return added
             finally:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
