@@ -68,6 +68,8 @@ def test_matched_preflight_builds_validation_manifest_with_only_extraction_drift
         "rsimem.extraction_matched_preflight.initialize_extraction_batch_manifest",
         lambda path, **kwargs: captured.update(kwargs) or "experiment.fixture-v1",
     )
+    revocation_registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    revocation_registry.initialize()
     split_plan = ExtractionSplitPlan.create((
         ExtractionSplitAssignment(
             ExtractionSplitRole.TRAIN,
@@ -103,6 +105,7 @@ def test_matched_preflight_builds_validation_manifest_with_only_extraction_drift
         experiment_config_path=Path("configs/extraction_feedback_sm01.json"),
         trial_config_path=trial_root / "extraction-matched-trial.json",
         split_plan_path=split_plan_path,
+        revocation_registry_path=revocation_registry.path,
     )
 
     assert result == "experiment.fixture-v1"
@@ -114,8 +117,6 @@ def test_matched_preflight_builds_validation_manifest_with_only_extraction_drift
 
     # Supplying the owner registry opts the formal preflight into fail-closed
     # artifact validation before the manifest is initialized.
-    revocation_registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
-    revocation_registry.initialize()
     initialize_formal_matched_validation_batch(
         manifest_path=tmp_path / "manifest-with-registry.json",
         batch_registry_path=tmp_path / "registry-with-registry.json",
@@ -162,6 +163,8 @@ def test_matched_preflight_requires_validation_split_assignment(tmp_path: Path) 
     ))
     split_path = tmp_path / "wrong-split.json"
     write_extraction_split_plan(split_path, split_plan)
+    revocation_registry = JsonRevocationRegistry(tmp_path / "wrong-split-revocations.jsonl")
+    revocation_registry.initialize()
     with pytest.raises(ValueError, match="does not match split plan"):
         initialize_formal_matched_validation_batch(
             manifest_path=tmp_path / "manifest.json",
@@ -175,6 +178,36 @@ def test_matched_preflight_requires_validation_split_assignment(tmp_path: Path) 
             experiment_config_path=Path("configs/extraction_feedback_sm01.json"),
             trial_config_path=trial_root / "extraction-matched-trial.json",
             split_plan_path=split_path,
+            revocation_registry_path=revocation_registry.path,
+        )
+
+
+def test_formal_matched_preflight_requires_revocation_registry(tmp_path: Path) -> None:
+    parent = _parent()
+    candidate = _candidate(parent=parent)
+    trial_root = tmp_path / "trial"
+    prepare_extraction_matched_trial_runtime(
+        parent=parent,
+        candidate=candidate,
+        offline_decision=_offline_decision(parent, candidate),
+        output_root=trial_root,
+    )
+    family = tmp_path / "SM01_preference_adoption"
+    family.mkdir()
+    (family / "family.yaml").write_text("episode_order: []\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="requires a revocation registry"):
+        initialize_formal_matched_validation_batch(
+            manifest_path=tmp_path / "manifest.json",
+            batch_registry_path=tmp_path / "registry.json",
+            batch_id="batch.validation-missing-registry-v1",
+            rsimem_root=tmp_path,
+            past_bench_root=tmp_path,
+            family_root=family,
+            agent_registry_path=Path("configs/agents.yaml"),
+            run_config_path=Path("configs/past_bench_luna_smoke.yaml"),
+            experiment_config_path=Path("configs/extraction_feedback_sm01.json"),
+            trial_config_path=trial_root / "extraction-matched-trial.json",
+            split_plan_path=tmp_path / "missing-split.json",
         )
 
 
