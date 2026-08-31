@@ -28,6 +28,7 @@ from .prompt_components import PromptSlotDescriptor, content_digest, text_digest
 
 
 EXTRACTION_OFFLINE_SCHEMA_VERSION = 2
+EXTRACTION_OFFLINE_ATTRIBUTION_SCHEMA_VERSION = 1
 EXTRACTION_STATIC_SAFETY_SCHEMA = "extraction-candidate-static-safety-v2"
 EXTRACTION_DETERMINISTIC_SUITE_SCHEMA = "extraction-deterministic-suite-v2"
 EXTRACTION_OFFLINE_DECISION_SCHEMA = "extraction-offline-validation-decision-v2"
@@ -634,6 +635,7 @@ class ExtractionOfflineValidationDecision:
     reason_codes: tuple[str, ...]
     decision_schema: str = EXTRACTION_OFFLINE_DECISION_SCHEMA
     schema_version: int = EXTRACTION_OFFLINE_SCHEMA_VERSION
+    attribution_schema_version: int = EXTRACTION_OFFLINE_ATTRIBUTION_SCHEMA_VERSION
     evidence_plane: EvidencePlane = EvidencePlane.BENCHMARK_AUDIT
     evidence_source: EvidenceSourceKind = EvidenceSourceKind.BENCHMARK_CONTRACT
 
@@ -643,6 +645,12 @@ class ExtractionOfflineValidationDecision:
             or self.decision_schema != EXTRACTION_OFFLINE_DECISION_SCHEMA
         ):
             raise ValueError("unsupported extraction offline decision")
+        if (
+            type(self.attribution_schema_version) is not int
+            or self.attribution_schema_version
+            != EXTRACTION_OFFLINE_ATTRIBUTION_SCHEMA_VERSION
+        ):
+            raise ValueError("unsupported extraction offline attribution schema")
         plane, source = validate_plane_source(
             self.evidence_plane,
             self.evidence_source,
@@ -717,6 +725,7 @@ class ExtractionOfflineValidationDecision:
     def identity_payload(self) -> dict[str, object]:
         return {
             "schema_version": self.schema_version,
+            "attribution_schema_version": self.attribution_schema_version,
             "decision_schema": self.decision_schema,
             "status": self.status.value,
             "split_id": self.split_id,
@@ -747,6 +756,7 @@ class ExtractionOfflineValidationDecision:
         fields = {
             "decision_id",
             "schema_version",
+            "attribution_schema_version",
             "decision_schema",
             "status",
             "split_id",
@@ -801,6 +811,7 @@ class ExtractionOfflineValidationDecision:
                 reason_codes=tuple(value["reason_codes"]),
                 decision_schema=value["decision_schema"],
                 schema_version=value["schema_version"],
+                attribution_schema_version=value["attribution_schema_version"],
                 evidence_plane=EvidencePlane(value["evidence_plane"]),
                 evidence_source=EvidenceSourceKind(value["evidence_source"]),
             )
@@ -893,11 +904,13 @@ class ExtractionPromptOfflineValidator:
             "reason_codes": reason_codes,
             "decision_schema": EXTRACTION_OFFLINE_DECISION_SCHEMA,
             "schema_version": EXTRACTION_OFFLINE_SCHEMA_VERSION,
+            "attribution_schema_version": EXTRACTION_OFFLINE_ATTRIBUTION_SCHEMA_VERSION,
             "evidence_plane": EvidencePlane.BENCHMARK_AUDIT,
             "evidence_source": EvidenceSourceKind.BENCHMARK_CONTRACT,
         }
         identity = {
             "schema_version": values["schema_version"],
+            "attribution_schema_version": values["attribution_schema_version"],
             "decision_schema": values["decision_schema"],
             "status": status.value,
             "split_id": values["split_id"],
