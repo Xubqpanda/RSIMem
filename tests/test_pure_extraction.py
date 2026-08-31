@@ -407,6 +407,10 @@ def test_pure_optimizer_corpus_is_sorted_and_restart_safe(tmp_path) -> None:
     malformed_plane["evidence_plane"] = "benchmark_audit"
     with pytest.raises(ValueError, match="malformed|runtime pure-process"):
         PureExtractionOptimizerCorpus.from_payload(malformed_plane)
+    malformed_attribution = dict(payload)
+    malformed_attribution["attribution_schema_version"] = True
+    with pytest.raises(ValueError, match="malformed|attribution schema"):
+        PureExtractionOptimizerCorpus.from_payload(malformed_attribution)
     payload["schema_version"] = 0
     with pytest.raises(ValueError, match="malformed|unsupported"):
         PureExtractionOptimizerCorpus.from_payload(payload)

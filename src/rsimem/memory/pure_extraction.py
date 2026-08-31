@@ -369,7 +369,10 @@ class PureExtractionFeedbackRecord:
     def __post_init__(self) -> None:
         if self.schema_version != PURE_EXTRACTION_FEEDBACK_SCHEMA_VERSION:
             raise ValueError("unsupported pure extraction feedback schema")
-        if self.attribution_schema_version != PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION:
+        if (
+            type(self.attribution_schema_version) is not int
+            or self.attribution_schema_version != PURE_EXTRACTION_ATTRIBUTION_SCHEMA_VERSION
+        ):
             raise ValueError("unsupported pure extraction attribution schema")
         plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
         if plane is not EvidencePlane.PURE_PROCESS or source is not EvidenceSourceKind.RUNTIME_OBSERVATION:
@@ -1218,6 +1221,14 @@ class PureExtractionOptimizerCorpus:
             raise ValueError("pure extraction corpus requires examples")
         if any(not isinstance(value, PureExtractionOptimizerExample) for value in self.examples):
             raise TypeError("pure extraction corpus example has the wrong type")
+        if any(
+            value.evidence_plane is not self.evidence_plane
+            or value.evidence_source is not self.evidence_source
+            for value in self.examples
+        ):
+            raise ValueError(
+                "pure extraction corpus example evidence plane does not match corpus"
+            )
         ids = tuple(value.example_id for value in self.examples)
         if len(ids) != len(set(ids)):
             raise ValueError("pure extraction corpus examples must be unique")
