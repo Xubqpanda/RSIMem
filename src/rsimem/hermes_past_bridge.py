@@ -680,6 +680,18 @@ class HermesPastBenchBridge:
                 static_writeback_config.extraction_runtime_scope
                 == ExtractionPromptRuntimeScope.OFFLINE_VALIDATION
             ):
+                # Formal benchmark runs carry family/stage metadata and must
+                # bind their validated extraction artifact to the owner
+                # revocation registry.  Direct deterministic fixtures omit
+                # that metadata and may continue using the explicit optional
+                # loader mode for backwards compatibility.
+                if (
+                    (self._family_id is not None or self._stage is not None)
+                    and static_writeback_config.revocation_registry_path is None
+                ):
+                    raise ValueError(
+                        "formal validated extraction runtime requires a revocation registry"
+                    )
                 extraction_config_path = Path(
                     static_writeback_config.extraction_runtime_config_path or ""
                 ).expanduser().resolve()

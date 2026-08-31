@@ -2923,6 +2923,26 @@ def test_matched_extraction_bridge_rechecks_configured_revocation_registry(
         extraction_runtime_config_path=str(trial / EXTRACTION_TRIAL_CONFIG_FILE),
         revocation_registry_path=".rsimem/revocations.jsonl",
     )
+    with pytest.raises(ValueError, match="formal validated extraction runtime requires"):
+        HermesPastBenchBridge(
+            home,
+            HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+            evidence_path=artifacts / "missing-registry-events.jsonl",
+            run_id="run-extraction-formal-missing-registry",
+            trace_id="trace-extraction-formal-missing-registry",
+            episode_id="episode-extraction-formal-missing-registry",
+            session_id="session-extraction-formal-missing-registry",
+            task_id="task-extraction-formal-missing-registry",
+            experiment_variant="adaptive-extraction-rsimem",
+            family_id="SM01_preference_adoption",
+            stage="validation",
+            static_writeback_config=StaticSemanticWritebackConfig(
+                mode="static",
+                extraction_runtime_scope="matched_validation",
+                extraction_runtime_config_path=str(trial / EXTRACTION_TRIAL_CONFIG_FILE),
+            ),
+            static_completion_client=FakeCompletionClient({}),
+        )
     with pytest.raises(ValueError, match="artifact is revoked"):
         HermesPastBenchBridge(
             home,
