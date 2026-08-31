@@ -78,7 +78,9 @@ from rsimem.memory.operation_graph import (
 )
 from rsimem.memory.future_trace import SemanticFutureEvidence, SemanticOutcomeEvidence
 from rsimem.memory.use_attribution import (
+    MemoryUseEvidence,
     MemoryUseResolutionStatus,
+    OutcomeEvidenceKind,
     resolve_memory_use,
 )
 from rsimem.memory.adaptive_policy import AdaptiveParameterName
@@ -1690,6 +1692,135 @@ def test_live_bridge_compiles_completed_task_without_lifecycle_evaluator(
     assert bridge.unbound_process_signal_cases
     assert bridge.unbound_process_signal_cases[0].analysis_protocol_id is None
     db.close()
+
+
+def test_pure_feedback_ambiguous_evidence_stays_unresolved(
+    tmp_path: Path,
+) -> None:
+    """Multiple joins never become authoritative by append order or overlap."""
+
+    from hermes_state import SessionDB
+
+    home = _hermes_home(tmp_path / "home")
+    db = SessionDB(home / "state.db")
+    session_id = "session-ambiguous-source"
+    db.create_session(session_id, "past_bench", model="fixture-model")
+    db.append_message(session_id, "user", "Remember this durable preference.")
+
+    client = FakeCompletionClient({
+        POLICY_FACT_EXTRACTION_PROMPT.artifact.prompt_id: json.dumps({
+            "facts": ["Always use pipe-delimited output."],
+        }),
+        POLICY_INTERNAL_OPERATION_PROMPT.artifact.prompt_id: json.dumps({
+            "operations": [{"fact_index": 0, "action": "add", "candidate_id": None}],
+        }),
+    })
+    source_bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "source" / "memory.jsonl",
+        run_id="run.ambiguous-source",
+        trace_id="trace.ambiguous-source",
+        episode_id="episode.ambiguous-source",
+        session_id=session_id,
+        task_id="task.ambiguous-source",
+        experiment_variant="fixture",
+        static_writeback_config=StaticSemanticWritebackConfig(mode="static"),
+        static_completion_client=client,
+    )
+    source_bridge.attach(SimpleNamespace(
+        _memory_store=None,
+        _session_db=db,
+        session_id=session_id,
+    ))
+    source_bridge.on_task_completed({
+        "completed": True,
+        "messages": [{"role": "user", "content": "Remember this durable preference."}],
+    })
+    source = source_bridge.pure_extraction_sources[0]
+    artifact_id = next(
+        fact.artifact_id for fact in source.source.facts if fact.artifact_id is not None
+    )
+    source_bridge.close()
+    db.close()
+
+    future_db = SessionDB(home / "state.db")
+    future_session = "session-ambiguous-future"
+    future_db.create_session(future_session, "past_bench", model="fixture-model")
+    future_bridge = HermesPastBenchBridge(
+        home,
+        HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+        evidence_path=tmp_path / "future" / "memory.jsonl",
+        run_id="run.ambiguous-source",
+        trace_id="trace.ambiguous-future",
+        episode_id="episode.ambiguous-future",
+        session_id=future_session,
+        task_id="task.ambiguous-future",
+        experiment_variant="fixture",
+        static_writeback_config=StaticSemanticWritebackConfig(mode="static"),
+        static_completion_client=client,
+    )
+
+    # Two opportunities, two use records and two set bindings share the same
+    # source provenance.  A valid resolver must retain the source record but
+    # leave every selected join empty rather than choosing the first row.
+    provenance = source.provenance_id
+    for suffix in ("a", "b"):
+        future_bridge._opportunity_evidence_log.append(OpportunityEvidence.create(
+            source_surface=OpportunitySurface.TOOL_SCHEMA,
+            semantic_requirement="preference.summary.tsv",
+            observation_time="2026-08-31T00:00:00Z",
+            operation_id=f"op.ambiguous-opportunity.{suffix}",
+            provenance_id=provenance,
+            source_payload={"tool_name": "fixture_apply", "variant": suffix},
+        ))
+        future_bridge._memory_use_evidence_log.append(MemoryUseEvidence.create(
+            artifact_ids=(artifact_id,),
+            retrieval_operation_id=f"op.ambiguous-retrieval.{suffix}",
+            retrieved_artifact_ids=(artifact_id,),
+            injection_operation_id=f"op.ambiguous-injection.{suffix}",
+            injected_artifact_ids=(artifact_id,),
+            downstream_operation_id=f"op.ambiguous-use.{suffix}",
+            used_artifact_ids=(artifact_id,),
+            outcome_operation_id=f"op.ambiguous-outcome.{suffix}",
+            outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+            outcome_success=True,
+            observation_cutoff="2026-08-31T00:01:00Z",
+            provenance_id=provenance,
+        ))
+        future_bridge._artifact_set_binding_log.append(
+            ArtifactSetSemanticBinding.create(
+                semantic_unit_id=f"semantic-unit.ambiguous.{suffix}",
+                semantic_key="preference.summary.tsv",
+                member_artifact_ids=(artifact_id,),
+                member_fact_ids=tuple(
+                    fact.fact_id
+                    for fact in source.source.facts
+                    if fact.artifact_id is not None
+                ),
+                complete=True,
+                source_digest=source.source_projection_digest,
+                provenance_id=provenance,
+            )
+        )
+
+    future_bridge._record_pure_extraction_feedback({
+        "completed": True,
+        "messages": [],
+    })
+    records = future_bridge.pure_extraction_feedback_store.records()
+    assert len(records) == 1
+    feedback = records[0]
+    assert feedback.attribution.value == "unresolved"
+    assert feedback.opportunity is None
+    assert feedback.memory_use is None
+    assert feedback.artifact_set_binding is None
+    # Opportunity resolution is evaluated first, so the unresolved record
+    # carries that deterministic reason while still proving that no memory
+    # join was selected.
+    assert feedback.reason_codes == ("opportunity_not_observed",)
+    future_bridge.close()
+    future_db.close()
 
 
 def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
