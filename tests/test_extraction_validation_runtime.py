@@ -283,6 +283,74 @@ def test_offline_runtime_revocation_gate_runs_before_bundle_write(tmp_path) -> N
     assert not output.exists()
 
 
+def test_offline_runtime_can_require_owner_revocation_registry(tmp_path) -> None:
+    parent, candidate, static, suite = _offline_bundle_inputs()
+    with pytest.raises(ValueError, match="requires a revocation registry"):
+        prepare_extraction_offline_validation_runtime(
+            parent=parent,
+            candidate=candidate,
+            static_safety=static,
+            deterministic_suite=suite,
+            validation_id="sm03-heldout-requires-registry-v1",
+            output_root=tmp_path / "missing-registry",
+            require_revocation_registry=True,
+        )
+    with pytest.raises(TypeError, match="wrong type"):
+        prepare_extraction_offline_validation_runtime(
+            parent=parent,
+            candidate=candidate,
+            static_safety=static,
+            deterministic_suite=suite,
+            validation_id="sm03-heldout-wrong-registry-v1",
+            output_root=tmp_path / "wrong-registry",
+            revocation_registry=object(),
+            require_revocation_registry=True,
+        )
+
+    registry = JsonRevocationRegistry(tmp_path / "active.jsonl")
+    registry.initialize()
+    output = tmp_path / "active-runtime"
+    prepare_extraction_offline_validation_runtime(
+        parent=parent,
+        candidate=candidate,
+        static_safety=static,
+        deterministic_suite=suite,
+        validation_id="sm03-heldout-requires-registry-v1",
+        output_root=output,
+        revocation_registry=registry,
+        require_revocation_registry=True,
+    )
+    resolved = load_extraction_offline_validation_profile(
+        output / EXTRACTION_OFFLINE_CONFIG_FILE,
+        revocation_registry=registry,
+        require_revocation_registry=True,
+    )
+    assert resolved.candidate == candidate
+
+
+def test_runtime_loader_can_require_owner_revocation_registry(tmp_path) -> None:
+    parent, candidate, static, suite = _offline_bundle_inputs()
+    output = tmp_path / "offline-loader"
+    prepare_extraction_offline_validation_runtime(
+        parent=parent,
+        candidate=candidate,
+        static_safety=static,
+        deterministic_suite=suite,
+        validation_id="sm03-loader-requires-registry-v1",
+        output_root=output,
+    )
+    with pytest.raises(ValueError, match="requires a revocation registry"):
+        load_extraction_offline_validation_profile(
+            output / EXTRACTION_OFFLINE_CONFIG_FILE,
+            require_revocation_registry=True,
+        )
+    with pytest.raises(TypeError, match="wrong type"):
+        load_extraction_matched_trial_profile(
+            output / EXTRACTION_OFFLINE_CONFIG_FILE,
+            revocation_registry=object(),
+        )
+
+
 def test_matched_runtime_loader_rechecks_revocation_before_use(tmp_path) -> None:
     parent, candidate, static, suite = _offline_bundle_inputs()
     decision = _offline_decision(parent, candidate)
