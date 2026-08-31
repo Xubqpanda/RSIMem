@@ -1883,16 +1883,20 @@ class HermesPastBenchBridge:
             result.get("partial") is True or result.get("interrupted") is True
         )
         outcome_kind = self._outcome_kind(result)
-        matching_binding = next(
-            (
-                binding
-                for binding in self.artifact_set_bindings
-                if binding.complete
-                and set(binding.member_artifact_ids)
-                == set(future.memory_artifact_ids)
-            ),
-            None,
+        matching_bindings = tuple(
+            binding
+            for binding in self.artifact_set_bindings
+            if binding.complete
+            and set(binding.member_artifact_ids)
+            == set(future.memory_artifact_ids)
         )
+        # A future retrieval that matches more than one complete semantic set
+        # has no authoritative artifact-set identity.  Do not select by log
+        # order: suppressing the use record keeps delayed extraction feedback
+        # unresolved until an application-owned resolver disambiguates it.
+        if len(matching_bindings) > 1:
+            return
+        matching_binding = matching_bindings[0] if matching_bindings else None
         evidence = MemoryUseEvidence.create(
             artifact_ids=(
                 () if matching_binding is not None
