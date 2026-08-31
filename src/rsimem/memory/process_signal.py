@@ -880,6 +880,12 @@ def build_joined_process_signal_cases(
         )
         source_set = "extraction-set." + _digest({
             "source_task_template_id": source_task_template_id,
+            # The extraction operation/set is the stable semantic source
+            # identity.  Keep it in the logical-case key instead of relying
+            # solely on a projection digest: two independent source
+            # compilations may expose identical bounded context while still
+            # representing distinct memory formation events.
+            "source_extraction_set_id": record.extraction_set_id,
             "source_projection_digest": record.source_projection_digest,
         })[:32]
         identity = LogicalCaseIdentity.create(
