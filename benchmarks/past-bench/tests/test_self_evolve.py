@@ -866,6 +866,8 @@ def test_cli_extraction_trial_override_records_profile_without_machine_path(
     )
     dumped = sequence.hermes.model_dump(mode="json")
     assert "rsimem_extraction_trial_source_path" not in dumped
+    sequence.hermes.rsimem_revocation_registry_path = "/tmp/owner-revocations.jsonl"
+    assert "rsimem_revocation_registry_path" not in sequence.hermes.model_dump(mode="json")
     with pytest.raises(SystemExit, match="requires static"):
         other = SelfEvolveSequenceDefinition.from_yaml(manifest)
         _apply_rsimem_execution_overrides(other, SimpleNamespace(
