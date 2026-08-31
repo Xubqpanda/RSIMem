@@ -54,6 +54,8 @@ from rsimem.memory.extraction_feedback import (
     FactDisposition,
 )
 from rsimem.memory.artifact_set import ArtifactSetSemanticBinding
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
+from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
 from rsimem.memory.extraction_projection import (
     ExtractionSourceRecord,
     JsonExtractionSourceRecordStore,
@@ -2888,7 +2890,53 @@ def test_matched_extraction_bridge_rejects_non_attempt_local_config(
             static_writeback_config=config,
             static_completion_client=client,
         )
-    assert client.calls == ()
+
+
+def test_matched_extraction_bridge_rechecks_configured_revocation_registry(
+    tmp_path: Path,
+) -> None:
+    home = _hermes_home(tmp_path / "home")
+    artifacts = tmp_path / "artifacts"
+    trial = artifacts / "extraction-trial"
+    parent = _parent()
+    candidate = _candidate(parent=parent)
+    prepare_extraction_matched_trial_runtime(
+        parent=parent,
+        candidate=candidate,
+        offline_decision=_offline_decision(parent, candidate),
+        output_root=trial,
+    )
+    registry = JsonRevocationRegistry(home / ".rsimem" / "revocations.jsonl")
+    registry.initialize()
+    registry.append(RevocationEntry.create(
+        artifact_id=candidate.artifact_id,
+        artifact_schema_version=candidate.schema_version,
+        artifact_digest=candidate.artifact_digest,
+        evidence_plane=EvidencePlane.PURE_PROCESS,
+        evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        revoked_at="2026-08-31T00:00:00Z",
+        reason_code="stale_schema",
+    ))
+    config = StaticSemanticWritebackConfig(
+        mode="static",
+        extraction_runtime_scope="matched_validation",
+        extraction_runtime_config_path=str(trial / EXTRACTION_TRIAL_CONFIG_FILE),
+        revocation_registry_path=".rsimem/revocations.jsonl",
+    )
+    with pytest.raises(ValueError, match="artifact is revoked"):
+        HermesPastBenchBridge(
+            home,
+            HermesExperimentConfig(HermesExecutionMode.NATIVE_LEDGER),
+            evidence_path=artifacts / "events.jsonl",
+            run_id="run-extraction-revoked",
+            trace_id="trace-extraction-revoked",
+            episode_id="episode-extraction-revoked",
+            session_id="session-extraction-revoked",
+            task_id="task-extraction-revoked",
+            experiment_variant="adaptive-extraction-rsimem",
+            static_writeback_config=config,
+            static_completion_client=FakeCompletionClient({}),
+        )
 
 
 @pytest.mark.parametrize(

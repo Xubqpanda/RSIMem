@@ -132,6 +132,7 @@ from .memory.pure_extraction import (
     PureExtractionSourceRecord,
 )
 from .memory.pure_process import JsonPureProcessEventArchive, PureProcessCorpus
+from .memory.revocation import JsonRevocationRegistry
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
 
 
@@ -657,6 +658,7 @@ class HermesPastBenchBridge:
             )
             adaptive_store = None
             extraction_profile = None
+            extraction_revocation_registry = None
             if static_writeback_config.adaptive_enabled:
                 relative_store = Path(
                     static_writeback_config.adaptive_policy_store_path or ""
@@ -686,13 +688,38 @@ class HermesPastBenchBridge:
                     raise ValueError(
                         "extraction runtime config must stay inside capture artifacts"
                     )
+                if static_writeback_config.revocation_registry_path is not None:
+                    registry_path = Path(
+                        static_writeback_config.revocation_registry_path
+                    ).expanduser()
+                    if not registry_path.is_absolute():
+                        registry_path = hermes_home / registry_path
+                    # Preserve the final path component so JsonRevocationRegistry
+                    # can reject symlink redirection; ``resolve()`` here would
+                    # erase that security boundary before the registry sees it.
+                    registry_path = registry_path.absolute()
+                    if not registry_path.is_relative_to(hermes_home.resolve()):
+                        raise ValueError(
+                            "extraction revocation registry must stay inside Hermes home"
+                        )
+                    extraction_revocation_registry = JsonRevocationRegistry(
+                        registry_path
+                    )
                 if static_writeback_config.matched_extraction_enabled:
                     extraction_profile = load_extraction_matched_trial_profile(
-                        extraction_config_path
+                        extraction_config_path,
+                        revocation_registry=extraction_revocation_registry,
+                        require_revocation_registry=(
+                            extraction_revocation_registry is not None
+                        ),
                     )
                 else:
                     extraction_profile = load_extraction_offline_validation_profile(
-                        extraction_config_path
+                        extraction_config_path,
+                        revocation_registry=extraction_revocation_registry,
+                        require_revocation_registry=(
+                            extraction_revocation_registry is not None
+                        ),
                     )
             self.static_writeback = StaticSemanticWritebackRuntime(
                 hermes_home,

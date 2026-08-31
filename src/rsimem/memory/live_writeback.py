@@ -430,6 +430,7 @@ class StaticSemanticWritebackConfig:
         ExtractionPromptRuntimeScope.ROOT_STATIC
     )
     extraction_runtime_config_path: str | None = None
+    revocation_registry_path: str | None = None
     schema_version: int = STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -480,9 +481,20 @@ class StaticSemanticWritebackConfig:
                 raise ValueError(
                     "validated extraction runtime requires an explicit config path"
                 )
+            if self.revocation_registry_path is not None and not (
+                isinstance(self.revocation_registry_path, str)
+                and self.revocation_registry_path.strip()
+            ):
+                raise ValueError(
+                    "validated extraction runtime revocation registry path must be non-empty"
+                )
         elif self.extraction_runtime_config_path is not None:
             raise ValueError(
                 "extraction runtime config path requires matched_validation scope"
+            )
+        elif self.revocation_registry_path is not None:
+            raise ValueError(
+                "revocation registry path requires validated extraction runtime"
             )
 
     @property
@@ -554,6 +566,7 @@ class StaticSemanticWritebackConfig:
             "feedback_contract",
             "extraction_runtime_scope",
             "extraction_runtime_config_path",
+            "revocation_registry_path",
         }
         unknown = set(value) - allowed
         if unknown:
@@ -609,6 +622,11 @@ class StaticSemanticWritebackConfig:
             extraction_runtime_config_path=(
                 str(value["extraction_runtime_config_path"])
                 if value.get("extraction_runtime_config_path")
+                else None
+            ),
+            revocation_registry_path=(
+                str(value["revocation_registry_path"])
+                if value.get("revocation_registry_path")
                 else None
             ),
         )
