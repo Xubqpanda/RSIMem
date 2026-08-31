@@ -816,6 +816,16 @@ class ExtractionMatchedActivationCoordinator:
         rollback_store: JsonExtractionRollbackEvidenceStore,
         revocation_registry: JsonRevocationRegistry | None = None,
     ) -> None:
+        # Activation is a production state transition.  Without an explicit
+        # owner-controlled revocation registry, a stale parent/candidate
+        # artifact cannot be distinguished from an active one; fail closed
+        # before any ACTIVE pointer or rollback evidence is written.
+        if revocation_registry is None:
+            raise ValueError(
+                "extraction activation requires a revocation registry"
+            )
+        if not isinstance(revocation_registry, JsonRevocationRegistry):
+            raise TypeError("extraction activation revocation registry has the wrong type")
         self.policy_store = policy_store
         self.decision_store = decision_store
         self.rollback_store = rollback_store
@@ -841,15 +851,14 @@ class ExtractionMatchedActivationCoordinator:
         parent_runtime_artifact_id: str | None = None,
         candidate_runtime_artifact_id: str | None = None,
     ) -> ExtractionPolicyState:
-        if self.revocation_registry is not None:
-            for artifact in (parent, candidate):
-                self.revocation_registry.assert_active(
-                    artifact_id=artifact.artifact_id,
-                    artifact_schema_version=artifact.schema_version,
-                    artifact_digest=artifact.artifact_digest,
-                    evidence_plane=EvidencePlane.PURE_PROCESS,
-                    evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
-                )
+        for artifact in (parent, candidate):
+            self.revocation_registry.assert_active(
+                artifact_id=artifact.artifact_id,
+                artifact_schema_version=artifact.schema_version,
+                artifact_digest=artifact.artifact_digest,
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )
         if parent != self.policy_store.trusted_root:
             raise ValueError("first extraction activation requires trusted root parent")
         replay = ExtractionMatchedTrialEvaluator().evaluate(
