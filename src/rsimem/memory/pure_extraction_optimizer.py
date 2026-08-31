@@ -860,6 +860,9 @@ def build_pure_extraction_optimizer_request(
         },
         "process_signal": {
             "gate": corpus.process_signal_gate,
+            "attribution_schema_version": corpus.attribution_schema_version,
+            "evidence_plane": corpus.evidence_plane.value,
+            "evidence_source": corpus.evidence_source.value,
             "protocol_id": corpus.process_signal_protocol_id,
             "case_digest": corpus.process_signal_case_digest,
             "case_count": corpus.process_signal_case_count,
@@ -958,6 +961,9 @@ def build_pure_extraction_optimizer_gate_request(
         "process_signal_gate": corpus.process_signal_gate,
         "process_signal": {
             "gate": corpus.process_signal_gate,
+            "attribution_schema_version": corpus.attribution_schema_version,
+            "evidence_plane": corpus.evidence_plane.value,
+            "evidence_source": corpus.evidence_source.value,
             "protocol_id": corpus.process_signal_protocol_id,
             "case_digest": corpus.process_signal_case_digest,
             "case_count": corpus.process_signal_case_count,
