@@ -36,7 +36,8 @@ from rsimem.memory.extraction_prompt_validation import (
     ExtractionValidationVariant,
 )
 from rsimem.memory.prompt_components import text_digest
-from rsimem.memory.revocation import JsonRevocationRegistry
+from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
+from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory_systems.mem0_flat import MEM0_FLAT_EXTRACTION_SLOT
 from test_extraction_offline_validation import (
     _candidate,
@@ -240,6 +241,38 @@ def test_activation_requires_owner_revocation_registry(tmp_path) -> None:
             JsonExtractionMatchedTrialDecisionStore(tmp_path / "decisions"),
             JsonExtractionRollbackEvidenceStore(tmp_path / "rollback"),
         )
+
+
+def test_activation_rejects_revoked_candidate_before_pointer_write(tmp_path) -> None:
+    parent = _parent()
+    candidate = _candidate(parent=parent)
+    offline, split, observations, decision = _matched_decision(parent, candidate)
+    policy_store, decision_store, rollback_store, registry, coordinator = _coordinator(
+        tmp_path,
+        parent,
+    )
+    registry.append(RevocationEntry.create(
+        artifact_id=candidate.artifact_id,
+        artifact_schema_version=candidate.schema_version,
+        artifact_digest=candidate.artifact_digest,
+        evidence_plane=EvidencePlane.PURE_PROCESS,
+        evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        revoked_at="2026-08-31T01:02:03Z",
+        reason_code="stale_candidate",
+    ))
+    with pytest.raises(ValueError, match="artifact is revoked"):
+        coordinator.apply(
+            parent=parent,
+            candidate=candidate,
+            offline_decision=offline,
+            decision=decision,
+            split=split,
+            observations=observations,
+            criteria=_criteria(),
+        )
+    assert policy_store.snapshot().active is None
+    assert decision_store.get(decision.decision_id) is None
+    assert not rollback_store.root.exists() or not tuple(rollback_store.root.iterdir())
 
 
 def test_matched_trial_activation_restart_and_operator_rollback_are_idempotent(
