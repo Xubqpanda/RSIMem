@@ -6,7 +6,8 @@ import hashlib
 import json
 from dataclasses import dataclass
 from enum import StrEnum
-from .contracts import MemoryKind, MemoryQuery
+from typing import Sequence
+from .contracts import MemoryHit, MemoryKind, MemoryQuery
 from .extraction_feedback import (
     ArtifactSemanticBinding,
     DeploymentObservation,
@@ -304,6 +305,7 @@ class SemanticFutureTraceRecorder:
         namespace: str,
         parent_operation_ids: tuple[str, ...],
         step_id: str = "future-semantic",
+        retrieved_hits: Sequence[MemoryHit] | None = None,
     ) -> SemanticFutureEvidence:
         if not isinstance(model_visible_prompt, str):
             raise TypeError("future semantic trace prompt must be a string")
@@ -324,12 +326,30 @@ class SemanticFutureTraceRecorder:
         with self.recorder.operation_scope(query_spec) as operation:
             operation.complete()
 
-        hits = tuple(backend.query(MemoryQuery(
-            MemoryKind.SEMANTIC,
-            "",
-            namespace=namespace,
-            limit=10_000,
-        )))
+        if retrieved_hits is None:
+            hits = tuple(backend.query(MemoryQuery(
+                MemoryKind.SEMANTIC,
+                "",
+                namespace=namespace,
+                limit=10_000,
+            )))
+        else:
+            # Host adapters may already have performed the authoritative
+            # retrieval.  Reusing those hits keeps the future trace tied to
+            # the exact model-visible read and avoids a second query that can
+            # diverge after a concurrent memory mutation.  Validate the
+            # ownership/type boundary just as ``MemoryBackendRuntime.query``
+            # does for backend-produced hits.
+            hits = tuple(retrieved_hits)
+            for hit in hits:
+                if not isinstance(hit, MemoryHit):
+                    raise TypeError("retrieved semantic hits must be MemoryHit values")
+                if hit.artifact.kind is not MemoryKind.SEMANTIC:
+                    raise ValueError("future semantic trace received a non-semantic hit")
+                if hit.backend != backend.descriptor.name:
+                    raise ValueError(
+                        "future semantic trace received a hit owned by another backend"
+                    )
         memory_ids = []
         revisions = []
         for hit in hits:

@@ -7,6 +7,7 @@ import pytest
 from rsimem.lifecycle import RawResourceUsage
 from rsimem.memory.attribution import DeterministicFirstAttributor, FailureCategory
 from rsimem.memory.backends import build_hermes_native_registry
+from rsimem.memory.contracts import MemoryKind, MemoryQuery
 from rsimem.memory.future_trace import (
     SemanticFeedbackContract,
     SemanticFeedbackResolver,
@@ -116,6 +117,37 @@ def test_future_retrieval_miss_is_distinct_from_unexposed_use(tmp_path) -> None:
     assert [record.category for record in report.records] == [
         FailureCategory.RETRIEVAL_MISS,
     ]
+    registry.close()
+
+
+def test_future_trace_reuses_authoritative_adapter_hits(tmp_path, monkeypatch) -> None:
+    """An adapter retrieval is not repeated while recording future evidence."""
+
+    registry, log, recorder = _environment(tmp_path, memory="Use TSV for durable reports.")
+    backend = registry.resolve(MemoryKind.SEMANTIC)
+    authoritative_hits = tuple(backend.query(MemoryQuery(
+        MemoryKind.SEMANTIC,
+        "",
+        namespace="user",
+        limit=10,
+    )))
+    assert authoritative_hits
+
+    def fail_query(_query):
+        raise AssertionError("future trace performed a second semantic query")
+
+    monkeypatch.setattr(backend, "query", fail_query)
+    future = recorder.record_prompt_injection(
+        registry,
+        "Base prompt.\nUse TSV for durable reports.",
+        namespace="user",
+        parent_operation_ids=("op.learn-verification",),
+        retrieved_hits=authoritative_hits,
+    )
+    assert future.memory_artifact_ids == tuple(
+        hit.artifact.artifact_id for hit in authoritative_hits
+    )
+    assert future.injection_artifact_id is not None
     registry.close()
 
 
