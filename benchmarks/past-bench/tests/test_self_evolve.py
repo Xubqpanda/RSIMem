@@ -403,7 +403,7 @@ def test_extraction_trial_transport_is_attempt_local_and_content_free(
     monkeypatch.setattr(
         runtime_module,
         "load_extraction_matched_trial_profile",
-        lambda path: resolved,
+        lambda path, **kwargs: resolved,
     )
     common = {
         "home_dir": tmp_path / "home",
@@ -476,7 +476,7 @@ def test_validated_extraction_transports_owner_revocation_registry(
     monkeypatch.setattr(
         runtime_module,
         "load_extraction_matched_trial_profile",
-        lambda path: resolved,
+        lambda path, **kwargs: resolved,
     )
     payload = build_hermes_extra_body(
         home_dir=tmp_path / "home",

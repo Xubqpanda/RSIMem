@@ -155,6 +155,7 @@ def build_hermes_extra_body(
             else "disabled"
         ),
     }
+    attempt_revocation_registry: Path | None = None
     if rsimem_revocation_registry_path:
         if (
             rsimem_extraction_trial_profile is None
@@ -172,6 +173,7 @@ def build_hermes_extra_body(
             )
         target_registry = home_dir / ".rsimem" / "revocations.jsonl"
         _copy_immutable_file(source_registry, target_registry)
+        attempt_revocation_registry = target_registry
         semantic_writeback["revocation_registry_path"] = ".rsimem/revocations.jsonl"
     application_schema = None
     if rsimem_application_opportunity_schema is not None:
@@ -235,6 +237,7 @@ def build_hermes_extra_body(
                 source_config_path=rsimem_extraction_trial_source_path,
                 artifacts_dir=artifacts_dir,
                 expected_profile=profile,
+                revocation_registry_path=attempt_revocation_registry,
             )
             semantic_writeback.update({
                 "extraction_runtime_scope": "matched_validation",
@@ -248,6 +251,7 @@ def build_hermes_extra_body(
                 source_config_path=rsimem_extraction_offline_source_path,
                 artifacts_dir=artifacts_dir,
                 expected_profile=profile,
+                revocation_registry_path=attempt_revocation_registry,
             )
             semantic_writeback.update({
                 "extraction_runtime_scope": "offline_validation",
@@ -329,6 +333,7 @@ def _materialize_extraction_trial_bundle(
     source_config_path: str,
     artifacts_dir: Path,
     expected_profile: RSIMemExtractionTrialProfile,
+    revocation_registry_path: Path | None = None,
 ) -> Path:
     if not source_config_path:
         raise ValueError("extraction matched trial requires a source config")
@@ -339,8 +344,23 @@ def _materialize_extraction_trial_bundle(
         EXTRACTION_TRIAL_POLICY_STORE_FILE,
         load_extraction_matched_trial_profile,
     )
+    from rsimem.memory.revocation import JsonRevocationRegistry
 
-    resolved = load_extraction_matched_trial_profile(source)
+    revocation_registry = (
+        JsonRevocationRegistry(revocation_registry_path)
+        if revocation_registry_path is not None
+        else None
+    )
+
+    resolved = (
+        load_extraction_matched_trial_profile(source)
+        if revocation_registry is None
+        else load_extraction_matched_trial_profile(
+            source,
+            revocation_registry=revocation_registry,
+            require_revocation_registry=True,
+        )
+    )
     actual_profile = RSIMemExtractionTrialProfile.model_validate(
         resolved.profile()
     )
@@ -357,7 +377,15 @@ def _materialize_extraction_trial_bundle(
     for source_path, target_path in targets.items():
         _copy_immutable_file(source_path, target_path)
     target_config = target_root / EXTRACTION_TRIAL_CONFIG_FILE
-    copied = load_extraction_matched_trial_profile(target_config)
+    copied = (
+        load_extraction_matched_trial_profile(target_config)
+        if revocation_registry is None
+        else load_extraction_matched_trial_profile(
+            target_config,
+            revocation_registry=revocation_registry,
+            require_revocation_registry=True,
+        )
+    )
     copied_profile = RSIMemExtractionTrialProfile.model_validate(copied.profile())
     if copied_profile != expected_profile:
         raise ValueError("attempt-local extraction trial profile differs")
@@ -369,6 +397,7 @@ def _materialize_extraction_offline_bundle(
     source_config_path: str,
     artifacts_dir: Path,
     expected_profile: RSIMemExtractionOfflineValidationProfile,
+    revocation_registry_path: Path | None = None,
 ) -> Path:
     if not source_config_path:
         raise ValueError("extraction offline validation requires a source config")
@@ -378,7 +407,22 @@ def _materialize_extraction_offline_bundle(
         EXTRACTION_OFFLINE_CONFIG_FILE,
         load_extraction_offline_validation_profile,
     )
-    resolved = load_extraction_offline_validation_profile(source)
+    from rsimem.memory.revocation import JsonRevocationRegistry
+
+    revocation_registry = (
+        JsonRevocationRegistry(revocation_registry_path)
+        if revocation_registry_path is not None
+        else None
+    )
+    resolved = (
+        load_extraction_offline_validation_profile(source)
+        if revocation_registry is None
+        else load_extraction_offline_validation_profile(
+            source,
+            revocation_registry=revocation_registry,
+            require_revocation_registry=True,
+        )
+    )
     actual = RSIMemExtractionOfflineValidationProfile.model_validate(resolved.profile())
     if actual != expected_profile:
         raise ValueError("extraction offline source profile differs from manifest")
@@ -390,7 +434,15 @@ def _materialize_extraction_offline_bundle(
     for source_path, target_path in targets.items():
         _copy_immutable_file(source_path, target_path)
     target_config = target_root / EXTRACTION_OFFLINE_CONFIG_FILE
-    copied = load_extraction_offline_validation_profile(target_config)
+    copied = (
+        load_extraction_offline_validation_profile(target_config)
+        if revocation_registry is None
+        else load_extraction_offline_validation_profile(
+            target_config,
+            revocation_registry=revocation_registry,
+            require_revocation_registry=True,
+        )
+    )
     copied_profile = RSIMemExtractionOfflineValidationProfile.model_validate(copied.profile())
     if copied_profile != expected_profile:
         raise ValueError("attempt-local extraction offline profile differs")
