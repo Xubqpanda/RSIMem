@@ -631,15 +631,26 @@ class PureExtractionFeedbackRecord:
             and artifact_set_binding.provenance_id != provenance_id
         ):
             raise ValueError("artifact-set provenance does not match extraction feedback")
+        source_artifacts = {
+            value.artifact_id
+            for value in source.source.facts
+            if value.artifact_id is not None
+        }
         foreign_binding_members = False
+        foreign_memory_members = False
+        if memory_use is not None and memory_use.artifact_set_id is None:
+            referenced_artifacts = (
+                set(memory_use.artifact_ids)
+                | set(memory_use.retrieved_artifact_ids)
+                | set(memory_use.injected_artifact_ids)
+                | set(memory_use.used_artifact_ids)
+            )
+            foreign_memory_members = not referenced_artifacts.issubset(
+                source_artifacts
+            )
         if artifact_set_binding is not None:
             if artifact_set_binding.source_digest != source.source_projection_digest:
                 raise ValueError("artifact-set binding source digest mismatch")
-            source_artifacts = {
-                value.artifact_id
-                for value in source.source.facts
-                if value.artifact_id is not None
-            }
             source_facts = {value.fact_id for value in source.source.facts}
             foreign_binding_members = (
                 not set(artifact_set_binding.member_artifact_ids).issubset(
@@ -711,6 +722,11 @@ class PureExtractionFeedbackRecord:
             reasons.append(opportunity_resolution.reason_code)
         elif memory_resolution is None:
             reasons.append("memory_use_missing")
+        elif foreign_memory_members:
+            # A provenance string is not an ownership proof.  A malformed or
+            # cross-source memory-use record must not grant credit to this
+            # extraction merely because its operation chain is complete.
+            reasons.append("memory_artifact_foreign")
         elif foreign_binding_members:
             # A binding with the right provenance can still point at another
             # extraction source.  Keep the evidence for diagnostics, but do
