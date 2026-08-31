@@ -51,6 +51,75 @@ def test_past_opportunity_provider_uses_source_provenance_and_visible_surface() 
     )
 
 
+def test_past_source_provenance_does_not_bind_schema_only_tool_observation() -> None:
+    """A tool capability is a future opportunity, not source ownership."""
+
+    schema = {
+        "schema_id": "past-bench.notes.application.v1",
+        "schema_version": 1,
+        "application_contract": {
+            "schema_id": "past-bench.notes.application.v1",
+            "schema_version": 2,
+            "version": "v1",
+            "requirement_ids": ["application.notes.share.recipient_policy"],
+            "schema_digest": "122c4d36732dd4a2824d1b48944eed2aa80e9bf10ad51f596ba143673051797f",
+        },
+        "opportunities": [{
+            "semantic_key": "application.notes.share.recipient_policy",
+            "surface": "tool_schema",
+            "tool_name": "notes_share",
+            "required_parameter": "recipients",
+        }],
+    }
+    values = _past_bench_opportunity_provider({
+        "messages": [{
+            "role": "user",
+            "content": "Share today's note with the project team.",
+        }, {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "notes_share"}}],
+        }],
+        "rsimem_application_schema": schema,
+        "rsimem_source_provenance_id": "pure-extraction-provenance.tool-only",
+    })
+    assert values == ()
+
+
+def test_past_source_provenance_accepts_explicit_user_policy_with_schema() -> None:
+    schema = {
+        "schema_id": "past-bench.notes.application.v1",
+        "schema_version": 1,
+        "application_contract": {
+            "schema_id": "past-bench.notes.application.v1",
+            "schema_version": 2,
+            "version": "v1",
+            "requirement_ids": ["application.notes.share.recipient_policy"],
+            "schema_digest": "122c4d36732dd4a2824d1b48944eed2aa80e9bf10ad51f596ba143673051797f",
+        },
+        "opportunities": [{
+            "semantic_key": "application.notes.share.recipient_policy",
+            "surface": "tool_schema",
+            "tool_name": "notes_share",
+            "required_parameter": "recipients",
+        }],
+    }
+    values = _past_bench_opportunity_provider({
+        "messages": [{
+            "role": "user",
+            "content": "Do not share this internal note with external recipients.",
+        }, {
+            "role": "assistant",
+            "tool_calls": [{"function": {"name": "notes_share"}}],
+        }],
+        "rsimem_application_schema": schema,
+        "rsimem_source_provenance_id": "pure-extraction-provenance.explicit-policy",
+    })
+    assert [value.semantic_requirement for value in values] == [
+        "application.notes.share.recipient_policy"
+    ]
+    assert values[0].source_surface.value == "current_input"
+
+
 def test_past_opportunity_provider_binds_only_retrieved_source_keys() -> None:
     values = _past_bench_opportunity_provider({
         "messages": [
