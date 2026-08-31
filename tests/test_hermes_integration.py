@@ -117,6 +117,38 @@ def _fixture_application_schema() -> dict[str, object]:
     }
 
 
+def test_pure_observation_window_is_stable_across_physical_replays() -> None:
+    first = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement="application.fixture.preference",
+        observation_time="2026-08-31T00:00:00Z",
+        operation_id="opportunity.physical.one",
+        provenance_id="provenance.physical.one",
+        source_payload={"tool_name": "fixture_apply"},
+    )
+    replay = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement="application.fixture.preference",
+        observation_time="2026-08-31T00:00:00Z",
+        operation_id="opportunity.physical.two",
+        provenance_id="provenance.physical.two",
+        source_payload={"tool_name": "fixture_apply"},
+    )
+    first_window = HermesPastBenchBridge._pure_observation_window(
+        "Apply the saved preference.",
+        (first,),
+    )
+    replay_window = HermesPastBenchBridge._pure_observation_window(
+        "Apply the saved preference.",
+        (replay,),
+    )
+    assert first_window == replay_window
+    assert first_window != HermesPastBenchBridge._pure_observation_window(
+        "Apply a different preference.",
+        (replay,),
+    )
+
+
 def _hermes_home(path: Path) -> Path:
     memories = path / "memories"
     memories.mkdir(parents=True)
