@@ -237,6 +237,9 @@ def test_pure_optimizer_request_is_content_bound_and_replay_stable() -> None:
     )
     assert first == second
     payload = json.loads(first.input_json)
+    assert payload["process_signal"]["attribution_schema_version"] == 1
+    assert payload["process_signal"]["evidence_plane"] == "pure_process"
+    assert payload["process_signal"]["evidence_source"] == "runtime_observation"
     assert payload["evidence_groups"]["useful"][0]["replica_count"] == 1
     assert payload["process_signal"]["optimization_count"] == 2
     assert payload["process_signal"]["hypothesis_digest"] == corpus.process_signal_hypothesis_digest
