@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import copy
 from dataclasses import replace
 
 import pytest
@@ -778,6 +779,38 @@ def test_joined_process_signal_requires_both_typed_anchors_and_source() -> None:
             events,
             (feedback,),
             sources=(object(),),  # type: ignore[arg-type]
+            frozen_policy_digest="a" * 64,
+            source_task_template_id="source-template.joined.v1",
+            future_task_template_id="future-template.joined.v1",
+            observation_window="window.joined.v1",
+            replicate_id="replicate.joined.v1",
+        )
+
+
+def test_joined_process_signal_deduplicates_replayed_source_records() -> None:
+    source, feedback, events = _joined_signal_fixture()
+    cases = build_joined_process_signal_cases(
+        events,
+        (feedback,),
+        sources=(source, source),
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.joined.v1",
+        future_task_template_id="future-template.joined.v1",
+        observation_window="window.joined.v1",
+        replicate_id="replicate.joined.v1",
+    )
+    assert len(cases) == 1
+
+
+def test_joined_process_signal_rejects_conflicting_source_identity() -> None:
+    source, feedback, events = _joined_signal_fixture()
+    conflicting = copy.copy(source)
+    object.__setattr__(conflicting, "context_revision", "revision.other.v1")
+    with pytest.raises(ValueError, match="conflicting joined process signal source"):
+        build_joined_process_signal_cases(
+            events,
+            (feedback,),
+            sources=(source, conflicting),
             frozen_policy_digest="a" * 64,
             source_task_template_id="source-template.joined.v1",
             future_task_template_id="future-template.joined.v1",
