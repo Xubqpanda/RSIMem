@@ -10,11 +10,19 @@ from rsimem.memory.process_signal import (
     JsonProcessSignalCaseStore,
     ProcessSignalCase,
     ProcessSignalCaseStatus,
+    build_joined_process_signal_cases,
     build_process_signal_cases,
     census_process_signal_cases,
 )
+from rsimem.memory.opportunity import OpportunityEvidence, OpportunitySurface
+from rsimem.memory.pure_extraction import (
+    PureExtractionFeedbackRecord,
+    PureExtractionSourceRecord,
+)
 from rsimem.memory.process_feedback import ProcessEvent, ProcessEventKind, ProcessEventStatus
 from rsimem.memory.pure_process import PureProcessCorpus
+from rsimem.memory.use_attribution import MemoryUseEvidence, OutcomeEvidenceKind
+from test_extraction_optimizer_builder import _fixture
 
 
 def _case(*, logical: str = "logical-case.fixture.v1", complete: bool = True, attribution: bool = True, hypothesis: str | None = "a" * 64, physical: str = "physical-observation.1", stage_diagnosis_observed: bool = True) -> ProcessSignalCase:
@@ -551,4 +559,228 @@ def test_signal_projection_uses_pure_runtime_events_and_strips_benchmark_identit
             logical_case_id="logical-case.signal-plane-audit.v1",
             physical_observation_ids=("physical-observation.signal-plane-audit.v1",),
             events=(audit_event,),
+        )
+
+
+def _joined_signal_fixture(
+    *,
+    source_revision: str | None = None,
+    future_run_id: str = "run.joined.v1",
+    future_task_id: str = "task.future.v1",
+    future_provenance_id: str | None = None,
+) -> tuple[
+    PureExtractionSourceRecord,
+    PureExtractionFeedbackRecord,
+    tuple[ProcessEvent, ...],
+]:
+    projection, family_source, *_ = _fixture()
+    provenance_id = "provenance.joined.v1"
+    semantic_key = "preference.summary.tsv"
+    source = PureExtractionSourceRecord.from_family_record(
+        family_source,
+        source_projection_id=projection.projection_id,
+        context_revision="revision.source.v1",
+        provenance_id=provenance_id,
+        visible_semantic_keys=(semantic_key,),
+    )
+    artifact_ids = tuple(
+        fact.artifact_id
+        for fact in source.source.facts
+        if fact.artifact_id is not None
+    )
+    opportunity = OpportunityEvidence.create(
+        source_surface=OpportunitySurface.TOOL_SCHEMA,
+        semantic_requirement=semantic_key,
+        observation_time="2026-08-31T00:00:00Z",
+        operation_id="op.opportunity.joined.v1",
+        provenance_id=provenance_id,
+        source_payload={"tool": "fixture_apply"},
+    )
+    memory_use = MemoryUseEvidence.create(
+        artifact_ids=artifact_ids,
+        retrieval_operation_id="op.retrieval.joined.v1",
+        retrieved_artifact_ids=artifact_ids,
+        injection_operation_id="op.injection.joined.v1",
+        injected_artifact_ids=artifact_ids,
+        downstream_operation_id="op.use.joined.v1",
+        used_artifact_ids=artifact_ids,
+        outcome_operation_id="op.outcome.joined.v1",
+        outcome_kind=OutcomeEvidenceKind.STATE_TRANSITION,
+        outcome_success=True,
+        observation_cutoff="2026-08-31T00:01:00Z",
+        provenance_id=provenance_id,
+    )
+    feedback = PureExtractionFeedbackRecord.derive_from_evidence(
+        source=source,
+        opportunity=opportunity,
+        memory_use=memory_use,
+        observation_window="window.joined.v1",
+        provenance_id=provenance_id,
+    )
+
+    def event(
+        kind: ProcessEventKind,
+        *,
+        task_id: str,
+        run_id: str,
+        trace_id: str,
+        revision: str,
+        host_event_id: str,
+        status: ProcessEventStatus = ProcessEventStatus.SUCCESS,
+        lineage_id: str | None = None,
+    ) -> ProcessEvent:
+        return ProcessEvent.create(
+            kind=kind,
+            status=status,
+            run_id=run_id,
+            variant="native+ledger",
+            trace_id=trace_id,
+            episode_id="episode." + task_id,
+            session_id="session." + task_id,
+            task_id=task_id,
+            host_event_id=host_event_id,
+            source_revision=revision,
+            input_payload={"kind": kind.value},
+            output_payload={"observed": True},
+            lineage_id=lineage_id,
+        )
+
+    source_task_id = "task.source.v1"
+    source_revision = source_revision or source.context_revision
+    source_events = tuple(
+        event(
+            kind,
+            task_id=source_task_id,
+            run_id="run.joined.v1",
+            trace_id="trace.source.v1",
+            revision=source_revision,
+            host_event_id=(
+                "event.pure-source." + source.record_id
+                if kind is ProcessEventKind.RECOVERY
+                else "event.source." + kind.value
+            ),
+            status=(
+                ProcessEventStatus.PENDING
+                if kind in {ProcessEventKind.SOURCE_SELECTION, ProcessEventKind.EXTRACTION}
+                else ProcessEventStatus.EXECUTED
+                if kind is ProcessEventKind.COMMIT
+                else ProcessEventStatus.SUCCESS
+            ),
+            lineage_id=provenance_id if kind is ProcessEventKind.RECOVERY else None,
+        )
+        for kind in (
+            ProcessEventKind.SOURCE_SELECTION,
+            ProcessEventKind.EXTRACTION,
+            ProcessEventKind.COMMIT,
+            ProcessEventKind.RECOVERY,
+        )
+    )
+    future_events = tuple(
+        event(
+            kind,
+            task_id=future_task_id,
+            run_id=future_run_id,
+            trace_id="trace.future.v1",
+            revision="revision.future.v1",
+            host_event_id=(
+                "event.pure-feedback." + feedback.record_id
+                if kind is ProcessEventKind.RECOVERY
+                else "event.future." + kind.value
+            ),
+            status=(
+                ProcessEventStatus.PENDING
+                if kind is ProcessEventKind.EXPOSURE
+                else ProcessEventStatus.SUCCESS
+            ),
+            lineage_id=(
+                future_provenance_id or provenance_id
+                if kind is ProcessEventKind.RECOVERY
+                else None
+            ),
+        )
+        for kind in (
+            ProcessEventKind.RETRIEVAL,
+            ProcessEventKind.EXPOSURE,
+            ProcessEventKind.TASK_OUTCOME,
+            ProcessEventKind.RECOVERY,
+        )
+    )
+    return source, feedback, source_events + future_events
+
+
+def _build_joined_fixture_case(
+    source: PureExtractionSourceRecord,
+    feedback: PureExtractionFeedbackRecord,
+    events: tuple[ProcessEvent, ...],
+) -> tuple[ProcessSignalCase, ...]:
+    return build_joined_process_signal_cases(
+        events,
+        (feedback,),
+        sources=(source,),
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.joined.v1",
+        future_task_template_id="future-template.joined.v1",
+        observation_window="window.joined.v1",
+        replicate_id="replicate.joined.v1",
+    )
+
+
+def test_joined_process_signal_uses_typed_feedback_across_task_contexts() -> None:
+    source, feedback, events = _joined_signal_fixture()
+    cases = _build_joined_fixture_case(source, feedback, events)
+    assert len(cases) == 1
+    assert cases[0].status is ProcessSignalCaseStatus.DIAGNOSTIC_ONLY
+    assert cases[0].source_observed is True
+    assert cases[0].extraction_observed is True
+    assert cases[0].persistence_observed is True
+    assert cases[0].retrieval_observed is True
+    assert cases[0].exposure_observed is True
+    assert cases[0].outcome_observed is True
+    assert cases[0].extraction_attributable is True
+
+
+@pytest.mark.parametrize(
+    "fixture_kwargs",
+    (
+        {"source_revision": "revision.stale.v1"},
+        {"future_run_id": "run.foreign.v1"},
+        {"future_task_id": "task.source.v1"},
+        {"future_provenance_id": "provenance.foreign.v1"},
+    ),
+)
+def test_joined_process_signal_rejects_untrusted_cross_task_links(
+    fixture_kwargs: dict[str, str],
+) -> None:
+    source, feedback, events = _joined_signal_fixture(**fixture_kwargs)
+    assert _build_joined_fixture_case(source, feedback, events) == ()
+
+
+def test_joined_process_signal_requires_both_typed_anchors_and_source() -> None:
+    source, feedback, events = _joined_signal_fixture()
+    without_feedback_anchor = tuple(
+        event
+        for event in events
+        if event.host_event_id != "event.pure-feedback." + feedback.record_id
+    )
+    assert _build_joined_fixture_case(source, feedback, without_feedback_anchor) == ()
+    assert build_joined_process_signal_cases(
+        events,
+        (feedback,),
+        sources=(),
+        frozen_policy_digest="a" * 64,
+        source_task_template_id="source-template.joined.v1",
+        future_task_template_id="future-template.joined.v1",
+        observation_window="window.joined.v1",
+        replicate_id="replicate.joined.v1",
+    ) == ()
+    with pytest.raises(TypeError, match="source records"):
+        build_joined_process_signal_cases(
+            events,
+            (feedback,),
+            sources=(object(),),  # type: ignore[arg-type]
+            frozen_policy_digest="a" * 64,
+            source_task_template_id="source-template.joined.v1",
+            future_task_template_id="future-template.joined.v1",
+            observation_window="window.joined.v1",
+            replicate_id="replicate.joined.v1",
         )
