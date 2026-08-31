@@ -644,12 +644,14 @@ def _logical_groups(
         """
 
         identity = {
-            # Record/operation/provenance IDs identify a physical run and
-            # therefore must not split replicate observations.  The source
-            # projection and frozen policy digests are the stable semantic
-            # inputs available on a content-free example.
+            # Record/provenance IDs identify a physical run and therefore
+            # must not split replicate observations.  The source projection
+            # and extraction-set identities are the stable semantic inputs
+            # available on a content-free example; extraction output digest
+            # is intentionally excluded because provider variation remains a
+            # physical observation of the same source/future case.
             "source_projection_digest": example.source_projection_digest,
-            "extraction_artifact_digest": example.extraction_artifact_digest,
+            "source_extraction_set_id": example.extraction_set_id,
             "observation_window": example.observation_window,
         }
         return "logical-case." + content_digest(identity)[:40]
