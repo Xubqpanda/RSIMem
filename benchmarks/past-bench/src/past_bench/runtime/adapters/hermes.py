@@ -213,7 +213,20 @@ def _past_bench_opportunity_provider(
     text_observed_keys = _past_text_semantic_keys(result)
     if application_schema is not None:
         declared = raw_schema.get("opportunities") if isinstance(raw_schema, Mapping) else None
+        # The frozen application schema is itself deployment-visible.  A
+        # future task need not actually invoke a tool for its input contract
+        # to expose an opportunity; use the schema's declared tool names and
+        # augment them with any names observed in the bounded conversation.
         observed_tool_names = set(_past_tool_names(result))
+        declared_tools = raw_schema.get("tools") if isinstance(raw_schema, Mapping) else None
+        if isinstance(declared_tools, (list, tuple)):
+            observed_tool_names.update(
+                str(item.get("name"))
+                for item in declared_tools
+                if isinstance(item, Mapping)
+                and isinstance(item.get("name"), str)
+                and item["name"].strip()
+            )
         observed_keys: tuple[str, ...] = tuple(
             dict.fromkeys(
                 str(item.get("semantic_key"))
@@ -269,6 +282,16 @@ def _past_bench_opportunity_provider(
             {
                 "messages": _past_visible_messages(result),
                 "tools": _past_tool_names(result),
+                "application_schema": (
+                    {
+                        "schema_id": application_schema.schema_id,
+                        "schema_version": application_schema.schema_version,
+                        "version": application_schema.version,
+                        "schema_digest": application_schema.schema_digest,
+                    }
+                    if application_schema is not None
+                    else None
+                ),
             },
             ensure_ascii=True,
             sort_keys=True,

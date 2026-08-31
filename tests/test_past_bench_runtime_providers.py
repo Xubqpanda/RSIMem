@@ -225,6 +225,48 @@ def test_past_opportunity_provider_uses_frozen_public_schema_for_generic_future_
     assert values[0].source_surface.value == "application_schema"
 
 
+def test_past_opportunity_provider_uses_declared_schema_without_tool_call() -> None:
+    """A visible tool contract remains an opportunity before invocation."""
+
+    schema = {
+        "schema_id": "calendar.application.v1",
+        "schema_version": 1,
+        "application_contract": {
+            "schema_version": 2,
+            "schema_id": "calendar.application.v1",
+            "version": "v1",
+            "requirement_ids": ["application.calendar.read.policy"],
+            "schema_digest": "f5a237b9767a690b8f63c5596724acc9a41d5d7b008848e8978cb4ac74a2a533",
+        },
+        "tools": [{
+            "name": "calendar_read",
+            "input_schema": {
+                "type": "object",
+                "properties": {"calendar_id": {"type": "string"}},
+            },
+        }],
+        "opportunities": [{
+            "semantic_key": "application.calendar.read.policy",
+            "surface": "tool_schema",
+            "tool_name": "calendar_read",
+            "required_parameter": "calendar_id",
+        }],
+    }
+    values = _past_bench_opportunity_provider({
+        "messages": [{
+            "role": "user",
+            "content": "Review the upcoming calendar entry.",
+        }],
+        "rsimem_application_schema": schema,
+        "rsimem_source_records": [{
+            "provenance_id": "pure-extraction-provenance.calendar-no-call",
+            "semantic_keys": ["application.calendar.read.policy"],
+        }],
+    })
+    assert len(values) == 1
+    assert values[0].source_surface.value == "application_schema"
+
+
 def test_past_opportunity_provider_treats_supplied_schema_as_authoritative() -> None:
     """Legacy notes text must not manufacture pure opportunities in a formal run."""
 
