@@ -19,6 +19,15 @@ The probe itself was outside benchmark accounting. Each registered clean-parent
 batch also passed the same completion probe immediately before its first task;
 provider diagnostics do not enter a process corpus.
 
+After the deterministic boundary-join fix (`a89f7d7`), a new SM02 batch was
+registered as `s2-sm02-clean-parent-20260901-v2`. Its first replicate was
+audit-clean; the second replicate had one provider `InternalServerError` and
+failed `incomplete_model_usage`, then passed on attempt 2; the third replicate
+failed `incomplete_model_usage` after a fail-closed `skip/defer extraction`
+response. The batch is therefore an infrastructure/provider attempt, not a
+valid process-signal census. Its partial artifacts are retained but excluded
+from all counts and conclusions. SM05 was not started from this attempt.
+
 ## Implementation Position
 
 The generic pure-process runtime path is wired and covered by deterministic
@@ -57,7 +66,7 @@ The following remain deliberately unavailable or deferred:
 
 | Area | State | Release condition |
 | --- | --- | --- |
-| Provider-backed process-signal census | complete for SM02/SM05 attempt | both fresh train batches completed; `STOP_NO_SIGNAL` |
+| Provider-backed process-signal census | complete for SM02/SM05 v1 attempt | both fresh train batches completed; `STOP_NO_SIGNAL`; later v2 attempt excluded after incomplete model usage |
 | Extraction N+1 proposal | locked | replicated, generalizable pure-process signal |
 | Held-out validation and ACTIVE pointer | locked | independently authored candidate plus valid parent evidence |
 | Matched uplift/adaptive claim | deferred | completed held-out validation and matched runs |
@@ -91,12 +100,15 @@ does not inspect untracked credential files, ignored run outputs, or drafts.
 
 ## Resume Order
 
-The registered SM02 and SM05 clean-parent attempt is complete. The next
-authorized implementation work is deterministic contract/replay maintenance,
-or a separately pre-registered family only if a new application-owned
-opportunity schema is available. No proposal gate opens until a replicated
-pure-process corpus contains a valid extraction-owned signal. Cost and token
-data remain raw accounting fields, never policy input.
+The registered SM02 and SM05 clean-parent v1 attempt remains the only valid
+provider census and is complete with `STOP_NO_SIGNAL`. The later SM02 v2
+attempt did not satisfy the replicated audit gate and must not be resumed as a
+partial experiment; any future retry requires a newly registered batch and a
+fresh pre-task probe. The next authorized implementation work is deterministic
+contract/replay maintenance, or a separately pre-registered family only if a
+new application-owned opportunity schema is available. No proposal gate opens
+until a replicated pure-process corpus contains a valid extraction-owned
+signal. Cost and token data remain raw accounting fields, never policy input.
 
 Until then, permitted work is deterministic regression, documentation,
 contract review, and replay/audit maintenance.
