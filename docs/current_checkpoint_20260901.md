@@ -4,9 +4,10 @@ Date: 2026-09-01
 
 ## Decision
 
-Formal provider-backed experiments remain paused until a fresh preflight is
-run immediately before a registered batch. This is an operational gate, not a
-negative task result and not an update to any policy conclusion.
+The provider gate is healthy, and the finite Stage 2 clean-parent rerun is now
+complete. Formal proposal, held-out, activation, and matched-effect work
+remains closed because the rerun produced no extraction-owned signal. This is
+an evidence decision, not a negative task-quality result.
 
 The latest bounded provider probe (2026-09-01) passed:
 
@@ -14,10 +15,9 @@ The latest bounded provider probe (2026-09-01) passed:
   object present.
 - Model: `gpt-5.6-luna`.
 
-No benchmark was started by this probe. A fresh probe must still pass under the
-exact frozen run profile after batch registration and before the first task.
-Provider diagnostics remain outside benchmark accounting and must not enter a
-process corpus.
+The probe itself was outside benchmark accounting. Each registered clean-parent
+batch also passed the same completion probe immediately before its first task;
+provider diagnostics do not enter a process corpus.
 
 ## Implementation Position
 
@@ -57,7 +57,7 @@ The following remain deliberately unavailable or deferred:
 
 | Area | State | Release condition |
 | --- | --- | --- |
-| Provider-backed process-signal census | paused | healthy probe, then a fresh clean parent batch |
+| Provider-backed process-signal census | complete for SM02/SM05 attempt | both fresh train batches completed; `STOP_NO_SIGNAL` |
 | Extraction N+1 proposal | locked | replicated, generalizable pure-process signal |
 | Held-out validation and ACTIVE pointer | locked | independently authored candidate plus valid parent evidence |
 | Matched uplift/adaptive claim | deferred | completed held-out validation and matched runs |
@@ -91,11 +91,12 @@ does not inspect untracked credential files, ignored run outputs, or drafts.
 
 ## Resume Order
 
-The next authorized action is one fresh, pre-registered clean parent batch. It
-must pass provider preflight immediately before task execution and retain the
-current conservative `unresolved`/`censored` semantics. Only after its
-pure-process corpus yields a valid replicated signal may the proposal gate be
-opened. Cost and token data remain raw accounting fields, never policy input.
+The registered SM02 and SM05 clean-parent attempt is complete. The next
+authorized implementation work is deterministic contract/replay maintenance,
+or a separately pre-registered family only if a new application-owned
+opportunity schema is available. No proposal gate opens until a replicated
+pure-process corpus contains a valid extraction-owned signal. Cost and token
+data remain raw accounting fields, never policy input.
 
 Until then, permitted work is deterministic regression, documentation,
 contract review, and replay/audit maintenance.

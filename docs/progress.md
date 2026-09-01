@@ -62,7 +62,7 @@ Current capability matrix:
 | Procedural adapter projection | complete as read-only/read-through surface | skills list/view materialization and projection tests |
 | Tool call/result and memory-use joins | complete at content-free contract boundary | exact-closure and fail-closed fixtures |
 | Six-layer policy feasibility | deterministic/shadow complete | replayable action variation and mechanism explanations |
-| Real provider process-signal census | preflight-ready, not started | latest primary probe `200`; fresh batch-time probe required |
+| Real provider process-signal census | complete for SM02/SM05 train attempt | both fresh batches completed; `STOP_NO_SIGNAL` |
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 
 The completed rows establish implementation capacity and deterministic
@@ -70,16 +70,16 @@ observability.  They do not establish matched real-model equivalence, an
 extraction-owned optimization signal, or a quality improvement.
 
 The latest bounded probe against the configured primary endpoint returned HTTP
-`200` with non-empty content and a usage object.  No formal provider batch was
-started, and no quality, process-signal, or optimizer result was inferred from
-the probe.  Existing SM02/SM05 clean parent reruns remain `STOP_NO_SIGNAL`;
-no N+1 candidate, held-out validation, or adaptive effect batch is authorized.
+`200` with non-empty content and a usage object.  The fresh SM02 and SM05
+clean-parent batches then completed with audit-clean manifests and no
+extraction-owned process signal.  No N+1 candidate, held-out validation, or
+adaptive effect batch is authorized.
 
-Current implementation priority remains documentation and deterministic
-acceptance maintenance.  The next experiment, when explicitly started, is a
-fresh, pre-registered clean parent batch; it must pass the provider probe after
-registration and retain the existing conservative unresolved/censored
-semantics before any proposal generation.
+Current implementation priority remains documentation, deterministic acceptance
+maintenance, and tightening the general opportunity/use contract.  The finite
+SM02/SM05 family attempt is closed as `STOP_NO_SIGNAL`; any future family must
+be separately pre-registered with a deployment-visible opportunity schema
+before another provider batch is authorized.
 
 ## Current State
 

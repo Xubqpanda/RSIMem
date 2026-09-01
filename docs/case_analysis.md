@@ -51,6 +51,10 @@ source context
 
 四批当前 process census 使用的 clean parent runs 是 SM01 v9a、SM02 v5、SM05 v1 和 SM02 rerun；早期 SM01 batch 没有当前版本的 canonical `process_corpus.json`，只作为 no-signal strict-feedback 的重复证据。所有这些 batch 都是 fixed parent policy，不是 parent/candidate matched comparison。
 
+2026-09-01 的 authoritative fresh provider-backed reruns 已替代下表中的
+2026-08-30 process-only counts，详见
+[`extraction_stage2_clean_parent_20260901.md`](extraction_stage2_clean_parent_20260901.md)。
+
 ### 2.1.1 Clean process rerun（本次更新）
 
 为避免继续使用已撤销的 SM02/SM05 historical labels，使用当前
@@ -68,6 +72,22 @@ selection、Extraction 均保持 shadow `pending`。SM02 的详细记录见
 [`extraction_stage2_sm05_process_signal_20260830.md`](extraction_stage2_sm05_process_signal_20260830.md)。它们只增加 process
 observability 证据，不把 benchmark-audit 的 `missed`/`unresolved` 标签
 转成 learner signal。
+
+### 2.1.2 Fresh provider-backed clean parent (2026-09-01)
+
+SM02 和 SM05 按冻结 parent profile 各运行 3 个 replicate；每批都通过
+provider preflight、usage/audit、privacy 和 process-corpus 校验。新的
+batch-level `logical_case_v1` census 为：
+
+| batch | pure-process events | optimizer examples | logical cases | physical observations | status | replicate consistency |
+| --- | ---: | ---: | ---: | ---: | --- | ---: |
+| `s2-sm02-clean-parent-20260901-v1` | 422 | 21 (`unresolved`) | 25 | 48 | 3 `observable_only`, 3 `diagnostic_only`, 19 `censored` | 1.0 |
+| `s2-sm05-clean-parent-20260901-v1` | 565 | 33 (`unresolved`) | 31 | 63 | 2 `observable_only`, 7 `diagnostic_only`, 22 `censored` | 1.0 |
+
+两批的 pure optimizer corpus 都固定为 `evidence_plane=pure_process`、
+`process_signal_gate=no_signal`、zero optimization cases。SM05 的 12 条
+`missed` 仅存在于独立 benchmark-audit projection；它们没有进入 pure
+corpus。故本次 2D 决策仍为 `STOP_NO_SIGNAL`，不生成 N+1。
 
 ### 2.2 不能进入语义结论的尝试
 

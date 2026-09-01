@@ -320,7 +320,7 @@ conflict 均继续 fail closed。
 - √ 每个 logical case 收集 source、extraction、persisted memory、retrieval、exposure、tool call/result 和 observable outcome。
 - √ 每个失败/partial run 保留 diagnosis，但不进入完整 observation denominator。
 
-2B 的已完成 clean parent evidence 见 [`extraction_stage2_production_reruns_20260831.md`](extraction_stage2_production_reruns_20260831.md)。当前 provider 暂停只阻止新的复现实验，不撤销这些已审计的 runtime evidence。
+2B 的 clean parent evidence 见 [`extraction_stage2_production_reruns_20260831.md`](extraction_stage2_production_reruns_20260831.md) 和本次 fresh rerun 报告 [`extraction_stage2_clean_parent_20260901.md`](extraction_stage2_clean_parent_20260901.md)。两组新 batch 均完成 audit；它们仍只提供 process observability，不提供 extraction-owned signal。
 
 ### 2C：逐 Case 三层分析
 
@@ -489,9 +489,9 @@ Provider gate、验证基线和下一批恢复顺序的完整记录见
 - 当前结论：SM02/SM05 clean parent process-signal census 均为
   `STOP_NO_SIGNAL`，因此不生成 N+1，也不启动 held-out 或 adaptive effect
   experiment。
-- 当前状态：primary provider bounded probe 已返回 HTTP `200`、非空内容和
-  usage；尚未启动正式 benchmark，正式 batch 仍须在注册后、首个 task 前
-  重新执行 probe。
+- 当前状态：primary provider bounded probe 和 SM02/SM05 fresh clean-parent
+  batches 均完成；两组结果都是 `STOP_NO_SIGNAL`，未生成 candidate。任何
+  后续 batch 仍须在注册后、首个 task 前重新执行 probe。
 - 下一步：provider 恢复后重新执行预注册 clean parent batch，并重新核验
   source、extraction、persisted memory、retrieval、exposure、tool
   call/result 和 observable outcome 的完整链路。
@@ -507,4 +507,4 @@ Provider gate、验证基线和下一批恢复顺序的完整记录见
 - □ 真实 N+1、held-out、activation 和 matched effect 仍未开放。
 - □ 阶段三未解锁；当前不存在可信、可验证的 N+1 candidate。
 
-最近验证基线：RSIMem `.venv/bin/python -m pytest -q tests` 为 `1101 passed`，vendored PAST-Bench 为 `401 passed, 2 skipped`；compileall、pip check、shell syntax、tracked-secret scan 和 git diff --check 均通过。`configs/revocations.jsonl` 现为 v2 content-free historical denylist seed，formal matched launcher 会在 batch 输出目录创建并锁定副本，避免工作树污染；五个已撤销 SM02/SM05 corpus/candidate identity 均在 proposal、validation 与 activation 边界前 fail closed。最近补强了 policy/process/operation/lifecycle evidence 的重载、锁和 tool-closure fail-closed 验证；adapter semantic exposure 现在复用同一次检索命中，native bypass 不会伪造 RSIMem future trace。最新 provider completion probe 返回 HTTP `200`、非空内容和 usage，未启动正式 provider batch，阶段二仍为 `STOP_NO_SIGNAL`，阶段三未解锁。
+最近验证基线：RSIMem `.venv/bin/python -m pytest -q tests` 为 `1101 passed`，vendored PAST-Bench 为 `401 passed, 2 skipped`；compileall、pip check、shell syntax、tracked-secret scan 和 git diff --check 均通过。`configs/revocations.jsonl` 现为 v2 content-free historical denylist seed，formal matched launcher 会在 batch 输出目录创建并锁定副本，避免工作树污染；五个已撤销 SM02/SM05 corpus/candidate identity 均在 proposal、validation 与 activation 边界前 fail closed。最近补强了 policy/process/operation/lifecycle evidence 的重载、锁和 tool-closure fail-closed 验证；adapter semantic exposure 现在复用同一次检索命中，native bypass 不会伪造 RSIMem future trace。最新 provider probe 为 HTTP `200`、非空内容和 usage；SM02/SM05 fresh clean-parent batch 均 audit-clean 但阶段二仍为 `STOP_NO_SIGNAL`，阶段三未解锁。
