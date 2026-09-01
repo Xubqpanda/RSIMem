@@ -43,6 +43,24 @@ The deterministic and storage-boundary test baselines are:
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
   passed.
 
+Current capability matrix:
+
+| Area | Current status | Evidence boundary |
+| --- | --- | --- |
+| Context/snapshot, provenance, revision, idempotency | complete | deterministic contracts and restart tests |
+| Semantic extraction/writeback | complete as static parent path | isolated Hermes native+ledger runtime |
+| Semantic pure source/feedback/case wiring | complete | automatic completion hook plus cross-task archive/replay |
+| Episodic adapter projection | complete as read-only surface | FTS normalization, filters, offset, lineage projection tests |
+| Procedural adapter projection | complete as read-only/read-through surface | skills list/view materialization and projection tests |
+| Tool call/result and memory-use joins | complete at content-free contract boundary | exact-closure and fail-closed fixtures |
+| Six-layer policy feasibility | deterministic/shadow complete | replayable action variation and mechanism explanations |
+| Real provider process-signal census | not currently runnable | primary `429`, backup `invalid_json` |
+| Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
+
+The completed rows establish implementation capacity and deterministic
+observability.  They do not establish matched real-model equivalence, an
+extraction-owned optimization signal, or a quality improvement.
+
 The configured primary provider probe returned HTTP `429`.  The documented
 backup endpoint returned HTTP `200` but an invalid response payload.  No new
 formal provider batch was started, and no new quality, process-signal, or
