@@ -7,7 +7,7 @@
   "supersedes": "docs/baseline_manifest_20260901.json",
   "repository": {
     "root": "Study/RSIMem",
-    "commit": "25c4f69b785b32a987ad8ff12419337640b221c1",
+    "commit": "5e896a0ac8d8f6d44e8412ed1f46c06854eacab3",
     "workingTreeClean": true,
     "trackedFileCount": 2430,
     "branch": "main",
@@ -31,7 +31,7 @@
     },
     "dependencyLock": {
       "lockFilePresent": false,
-      "pipFreezeDigest": "869c7cf0c5b316440205b86ab1e5af0419dcd06623a704b42aeb34e7b04b1aec",
+      "pipFreezeDigest": "917b47492cd1f6010ceb8a1f27d58a7f97e4277246bfeed7114bc5cdb4f7c362",
       "requirementsDigests": {
         "pyproject.toml": "286790b7a44d033eaca51c5abcc74454abff468cd75061007c32684eba216018",
         "benchmarks/past-bench/pyproject.toml": "ab9747819c6a11b6eeb503d757dd39e753cedcac98630c803856eb6fd2e90de5",
@@ -55,7 +55,7 @@
       "gitTreeDigest": "01ff23513bbc5db3063f916333c81c2c31be99e02551b3fe4f4be143be79f9d1"
     },
     "rsimemSource": {
-      "gitTreeDigest": "3d9e1d509f5537c6568f2aa5edc2b280f6b870e926cd05ba8641a850a8052eb3"
+      "gitTreeDigest": "6b58931c2d8aa4424765ec7670304f7d0d55e0c48f0eeff624b121fe0f93efe1"
     }
   },
   "verification": {
