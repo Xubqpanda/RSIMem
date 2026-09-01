@@ -254,6 +254,13 @@ def test_pure_process_archive_atomic_replace_preserves_previous_records(
     )
 
 
+def test_pure_process_archive_rejects_blank_records(tmp_path) -> None:
+    path = tmp_path / "events-blank.jsonl"
+    path.write_text("\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed pure-process archive"):
+        JsonPureProcessEventArchive(path).records()
+
+
 def test_evidence_plane_source_identity_is_least_privilege() -> None:
     assert validate_plane_source(
         EvidencePlane.PURE_PROCESS,

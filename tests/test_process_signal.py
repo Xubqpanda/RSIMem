@@ -310,6 +310,13 @@ def test_process_signal_case_store_rejects_symlinked_lock(tmp_path) -> None:
         JsonProcessSignalCaseStore(path).records()
 
 
+def test_process_signal_case_store_rejects_blank_records(tmp_path) -> None:
+    path = tmp_path / "process-signal-blank.jsonl"
+    path.write_text("\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="malformed process-signal case"):
+        JsonProcessSignalCaseStore(path).records()
+
+
 def test_build_process_signal_cases_separates_logical_and_physical_identity() -> None:
     common = dict(
         run_id="run.builder.v1",
