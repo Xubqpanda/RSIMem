@@ -4,6 +4,12 @@ Last updated: 2026-09-01
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
+The authoritative current operating status, including the provider pause and
+the boundary between completed runtime work and deferred experiments, is in
+[`current_checkpoint_20260901.md`](current_checkpoint_20260901.md). Historical
+sections below are retained for provenance and may describe superseded attempts
+or earlier regression counts.
+
 ## Status Legend
 
 - [x] Completed and verified.
@@ -37,7 +43,7 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1089 passed`.
+- RSIMem: `1095 passed`.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
