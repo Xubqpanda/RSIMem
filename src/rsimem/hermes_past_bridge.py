@@ -1495,6 +1495,7 @@ class HermesPastBenchBridge:
         if self._semantic_outcomes_recorded:
             return
         memory_use_operation_ids: list[str] = []
+        current_memory_uses: list[MemoryUseEvidence] = []
         if self.semantic_future_recorder is not None:
             for future, step_id in self._semantic_futures:
                 current_input = self._current_input(result)
@@ -1569,7 +1570,9 @@ class HermesPastBenchBridge:
                     step_id=step_id,
                 )
                 memory_use_operation_ids.append(outcome.use_operation_id)
-                self._record_memory_use_evidence(future, outcome, result)
+                evidence = self._record_memory_use_evidence(future, outcome, result)
+                if evidence is not None:
+                    current_memory_uses.append(evidence)
                 if audit_observation is not None:
                     self._record_extraction_feedback(
                         future,
@@ -1585,7 +1588,10 @@ class HermesPastBenchBridge:
                 else None
             ),
         )
-        self._record_pure_extraction_feedback(result)
+        self._record_pure_extraction_feedback(
+            result,
+            current_memory_uses=tuple(current_memory_uses),
+        )
         completed = result.get("completed") is True
         outcome_digest = hashlib.sha256(
             json.dumps(
@@ -1700,6 +1706,8 @@ class HermesPastBenchBridge:
     def _record_pure_extraction_feedback(
         self,
         result: Mapping[str, Any],
+        *,
+        current_memory_uses: tuple[MemoryUseEvidence, ...] | None = None,
     ) -> None:
         """Materialize host-neutral feedback for previously captured sources.
 
@@ -1724,7 +1732,15 @@ class HermesPastBenchBridge:
         if not sources:
             return
         opportunities = tuple(self._opportunity_evidence_log.records())
-        memory_uses = tuple(self._memory_use_evidence_log.records())
+        # A normal completion callback passes only evidence emitted by the
+        # current future boundary.  Direct callers that omit the argument
+        # retain the historical full-log behavior, which is useful for
+        # explicit ambiguity/replay fixtures.
+        memory_uses = (
+            current_memory_uses
+            if current_memory_uses is not None
+            else tuple(self._memory_use_evidence_log.records())
+        )
         bindings = tuple(self._artifact_set_binding_log.records())
         graph = (
             materialize_operation_graph(self.static_writeback.operation_log.events)
@@ -1737,6 +1753,16 @@ class HermesPastBenchBridge:
         # deployment-visible current-input requirements needed by the pure
         # resolver.
         runtime_opportunities = self._last_runtime_opportunities
+        scope_opportunities_to_boundary = (
+            self._opportunity_evidence_provider is not None
+            or (
+                isinstance(result, Mapping)
+                and any(
+                    key in result
+                    for key in ("rsimem_opportunities", "opportunity_evidence")
+                )
+            )
+        )
         # Providers are evaluated at each completed future boundary.  A
         # source projection may have populated the bridge-local cache with a
         # non-persisted source annotation; reusing that cache here would hide
@@ -1755,6 +1781,11 @@ class HermesPastBenchBridge:
                 (value.evidence_id, value) for value in runtime_opportunities
             )
             opportunities = tuple(by_id[value] for value in sorted(by_id))
+        if scope_opportunities_to_boundary:
+            # The append-only log is for audit/replay.  It is not a join key:
+            # using all historical rows here makes a later boundary look
+            # ambiguous merely because the same source was observed before.
+            opportunities = tuple(runtime_opportunities)
         current_input_requirements = tuple(dict.fromkeys(
             value.semantic_requirement
             for value in runtime_opportunities
@@ -1958,7 +1989,7 @@ class HermesPastBenchBridge:
         future: SemanticFutureEvidence,
         outcome: SemanticOutcomeEvidence,
         result: Mapping[str, Any],
-    ) -> None:
+    ) -> MemoryUseEvidence | None:
         """Persist a generic operation-bound use/outcome join.
 
         This evidence deliberately carries no benchmark family or parser
@@ -1968,7 +1999,7 @@ class HermesPastBenchBridge:
         """
 
         if not future.memory_artifact_ids:
-            return
+            return None
         completed = result.get("completed") is True
         observation_complete = not (
             result.get("partial") is True or result.get("interrupted") is True
@@ -1986,7 +2017,7 @@ class HermesPastBenchBridge:
         # order: suppressing the use record keeps delayed extraction feedback
         # unresolved until an application-owned resolver disambiguates it.
         if len(matching_bindings) > 1:
-            return
+            return None
         matching_binding = matching_bindings[0] if matching_bindings else None
         evidence = MemoryUseEvidence.create(
             artifact_ids=(
@@ -2036,6 +2067,7 @@ class HermesPastBenchBridge:
             if joined.reason_code == "operation_join_invalid":
                 raise ValueError("semantic memory-use operation join is invalid")
         self._memory_use_evidence_log.append(evidence)
+        return evidence
 
     @staticmethod
     def _outcome_kind(
