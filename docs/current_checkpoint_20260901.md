@@ -68,11 +68,17 @@ offline-validation interpretations remain revoked as defined in
 They may be retained for audit and regression fixtures but cannot enter a new
 proposal, validation input, ACTIVE pointer, or paper result.
 
+The checked-in denylist is `rsimem-revocation-registry-v2`. Its five historical
+entries use `scope=legacy_untyped` and null evidence plane/source because their
+original provenance is unavailable; they match any typed lookup only by the
+artifact identity (ID, schema version, and digest). New revocations must use
+`scope=typed` and carry validated evidence provenance.
+
 ## Verification Baseline
 
 The most recent deterministic acceptance baseline is:
 
-- RSIMem: `1097 passed`.
+- RSIMem: `1098 passed`.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when invoked from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`, and

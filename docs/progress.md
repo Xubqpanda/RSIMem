@@ -43,7 +43,7 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1097 passed`.
+- RSIMem: `1098 passed`.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
@@ -169,6 +169,13 @@ Revocation checks now cover the training optimizer corpus identity in addition
 to parent/candidate artifacts, so a revoked corpus is rejected before any
 provider call. The append-only revocation registry also rejects symlinked
 state, preserving the fail-closed ownership boundary.
+
+The checked-in registry is now `rsimem-revocation-registry-v2`. Historical
+identities are represented as `scope=legacy_untyped` with null evidence
+plane/source rather than guessed provenance; they are rejected for every typed
+lookup with the same artifact ID, schema version, and digest. New entries use
+`scope=typed` and require validated plane/source values. Malformed, missing,
+symlinked, or conflicting registry state remains fail closed.
 
 The optimizer corpus now also records a process-signal gate. Batches with a
 bound process-signal case store but no replicated generalizable signal (at least
