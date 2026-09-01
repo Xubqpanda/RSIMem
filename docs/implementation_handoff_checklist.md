@@ -158,19 +158,19 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 
 反向验收：
 
-- □ 不能仅凭文件名含 `extraction` 就删除，通用 contract 必须先迁移调用者。
-- □ 不能删除 revocation entry 后让旧 candidate 重新可加载。
-- □ 不能删除解释旧判断和 `STOP_NO_SIGNAL` 的唯一 evidence。
-- □ Dataset、grader、task prompt 和原始 fixture 不参与格式清理。
+- √ 不能仅凭文件名含 `extraction` 就删除，通用 contract 必须先迁移调用者。
+- √ 不能删除 revocation entry 后让旧 candidate 重新可加载。
+- √ 不能删除解释旧判断和 `STOP_NO_SIGNAL` 的唯一 evidence。
+- √ Dataset、grader、task prompt 和原始 fixture 不参与格式清理。
 
 ### 0C：删除与收敛
 
-- □ 对 `DELETE` 文件完成 import/call-site 审计，确保无 production、test、CLI 或 packaging 引用。
-- □ 删除停止的 N+1 launcher、无调用 wrapper、重复 config 和仅服务撤销 artifact 的代码。
-- □ 删除 dead tests，但保留保护 generic contract 的反向测试。
+- 部分完成：已对候选 `DELETE` 文件运行 import/call-site、CLI、shell、test、docs 和 packaging 审计；仍有活动 generalized consumer 的行暂不删除。
+- √ 删除停止的 N+1 launcher、无调用 wrapper、重复 config 和仅服务撤销 artifact 的代码（提交 `b1c9970`、`480f77b`、`3b2cbb4`）。
+- √ 删除 dead tests，但保留保护 generic contract 的反向测试。
 - □ 将重复流水账收敛为少量 current-state 文档后删除旧报告；Git 历史负责归档，不创建大型 `legacy/`。
 - □ 删除生成物和缓存，不跟踪 `__pycache__`、`.pyc`、`.pytest_cache`、临时 HOME、日志或 editable-install metadata。
-- □ 更新 exports、CLI help、README、docs index 和 `.gitignore`，不留旧路径。
+- 部分完成：已移除 `rsimem-propose-extraction` export；Stage 1 protocol manifest 落地后再清理剩余旧 config/test 引用。
 
 ### 0D：清理后验收
 
@@ -178,8 +178,8 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 - □ Tracked imports 可解析，CLI help 可执行，配置引用文件存在。
 - □ `rg` 不存在指向已删除模块、脚本、配置和文档的路径。
 - □ Generic corpus 和 `STOP_NO_SIGNAL` evidence 仍可读；停止入口必须明确不可调用。
-- □ 记录删除文件数、净减少行数、保留测试数和公共接口变化。
-- □ 全量验收通过，工作树 clean，清理提交可独立 review/revert。
+- 部分完成：当前已记录 launcher、proposal 和 orphaned config 的删除提交；待 0C 收敛结束后补齐总文件数、净行数和公共接口清单。
+- 部分完成：每个清理提交均通过对应测试，最终 0D 仍需一次 clean-tree 全量验收。
 
 ## 4. 阶段 1：研究协议冻结
 
@@ -451,7 +451,7 @@ Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 
 - 部分完成：PAST/Hermes 可运行，但仍集中在大型 `hermes_past_bridge.py`。
 - √ 阶段 0A baseline 冻结和 0B 逐文件资产分类已完成；`baseline_preflight`
   可在 cleanup 前 fail closed。
-- □ 阶段 0C/0D 尚未执行删除、收敛和清理后等价验收。
+- 部分完成：阶段 0C 已删除无活动依赖的旧 launcher、proposal 入口和三个 orphaned config；其余清理与 0D 等价验收待 Stage 1 replacement boundary。
 - □ 阶段 1 未生成冻结 protocol manifest 和完整 family matrix。
 - □ 阶段 2 未完成四个 adapter contracts 和单体拆分。
 - □ 阶段 3 未运行三类 oracle sensitivity matrix。
