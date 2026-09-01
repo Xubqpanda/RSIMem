@@ -51,6 +51,18 @@ def test_formal_launchers_use_one_overridable_agent_registry() -> None:
         )
 
 
+def test_formal_matched_launcher_seeds_batch_revocation_registry() -> None:
+    script = (ROOT / "scripts" / "run_luna_extraction_matched.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'REVOCATION_SEED="${RSIMEM_REVOCATION_SEED:-${RSIMEM_ROOT}/configs/revocations.jsonl}"' in script
+    assert 'REVOCATION_REGISTRY="${batch_root}/revocations.jsonl"' in script
+    assert 'cmp -s "${REVOCATION_SEED}" "${REVOCATION_REGISTRY}"' in script
+    assert 'cp "${REVOCATION_SEED}" "${REVOCATION_REGISTRY}"' in script
+    assert '--revocation-registry "${REVOCATION_REGISTRY}"' in script
+
+
 def test_backup_agent_registry_contains_no_credential() -> None:
     path = ROOT / "configs/agents_backup.yaml"
     raw = path.read_text(encoding="utf-8")

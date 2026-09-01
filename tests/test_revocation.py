@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
 from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _entry() -> RevocationEntry:
@@ -138,3 +142,37 @@ def test_same_artifact_with_different_digest_is_a_registry_conflict(tmp_path) ->
             evidence_plane=conflicting.evidence_plane,
             evidence_source=conflicting.evidence_source,
         )
+
+
+def test_checked_in_historical_denylist_rejects_revoked_identities(tmp_path) -> None:
+    path = ROOT / "configs" / "revocations.jsonl"
+    allowed_fields = {
+        "schema",
+        "revocation_id",
+        "schema_version",
+        "artifact_id",
+        "artifact_schema_version",
+        "artifact_digest",
+        "evidence_plane",
+        "evidence_source",
+        "revoked_at",
+        "reason_code",
+    }
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert len(records) == 5
+    assert all(set(record) == allowed_fields for record in records)
+    assert all(record["reason_code"] == "historical_attribution_revoked" for record in records)
+
+    registry_path = tmp_path / "revocations.jsonl"
+    registry_path.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    registry = JsonRevocationRegistry(registry_path)
+
+    for record in records:
+        with pytest.raises(ValueError, match="artifact is revoked"):
+            registry.assert_active(
+                artifact_id=record["artifact_id"],
+                artifact_schema_version=record["artifact_schema_version"],
+                artifact_digest=record["artifact_digest"],
+                evidence_plane=EvidencePlane.PURE_PROCESS,
+                evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            )

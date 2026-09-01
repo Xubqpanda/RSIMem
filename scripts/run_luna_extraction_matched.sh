@@ -20,6 +20,7 @@ PAST_BASE_URL="${RSIMEM_PAST_BASE_URL:-https://coding.tu-zi.com/v1}"
 TRIAL_CONFIG="${RSIMEM_EXTRACTION_TRIAL_CONFIG:-}"
 EXPERIMENT_CONFIG="${RSIMEM_EXTRACTION_EXPERIMENT_CONFIG:-}"
 REVOCATION_REGISTRY="${RSIMEM_REVOCATION_REGISTRY:-}"
+REVOCATION_SEED="${RSIMEM_REVOCATION_SEED:-${RSIMEM_ROOT}/configs/revocations.jsonl}"
 # Formal matched validation always uses the checked-in family/template split.
 # Callers may provide an immutable replacement plan for a separately authored
 # experiment, but omitting it must not silently disable the split gate.
@@ -31,7 +32,6 @@ TASK_FAMILY="${RSIMEM_EXTRACTION_TASK_FAMILY:-}"
 export OPENAI_API_KEY="${OPENAI_API_KEY:-${GPT_LUNA_API_KEY}}"
 [[ -n "${TRIAL_CONFIG}" && -f "${TRIAL_CONFIG}" ]] || { echo "RSIMEM_EXTRACTION_TRIAL_CONFIG is required." >&2; exit 2; }
 [[ -n "${EXPERIMENT_CONFIG}" && -f "${EXPERIMENT_CONFIG}" ]] || { echo "RSIMEM_EXTRACTION_EXPERIMENT_CONFIG is required." >&2; exit 2; }
-[[ -n "${REVOCATION_REGISTRY}" && -f "${REVOCATION_REGISTRY}" && ! -L "${REVOCATION_REGISTRY}" ]] || { echo "RSIMEM_REVOCATION_REGISTRY must reference an existing regular file." >&2; exit 2; }
 [[ -n "${BATCH_ID}" && "${BATCH_ID}" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]*$ ]] || { echo "RSIMEM_BATCH_ID is invalid." >&2; exit 2; }
 [[ -n "${TASK_FAMILY}" ]] || { echo "RSIMEM_EXTRACTION_TASK_FAMILY is required." >&2; exit 2; }
 [[ -x "${PAST_BENCH_BIN}" && -x "${PYTHON_BIN}" ]] || { echo "RSIMem virtual environment is incomplete." >&2; exit 2; }
@@ -46,6 +46,22 @@ batch_root="${RSIMEM_ROOT}/outputs/extraction_matched/${BATCH_ID}"
 manifest_path="${batch_root}/batch_manifest.json"
 registry_path="${RSIMEM_ROOT}/outputs/extraction_formal/batch_registry.json"
 mkdir -p "${batch_root}"
+
+# A checked-in registry is an immutable seed, not live registry state: the
+# registry's lock must live in the ignored batch directory so it cannot make a
+# later clean-tree preflight fail. Operators may still provide an existing
+# owner-controlled registry explicitly for separately authored experiments.
+if [[ -z "${REVOCATION_REGISTRY}" ]]; then
+  [[ -f "${REVOCATION_SEED}" && ! -L "${REVOCATION_SEED}" ]] || { echo "RSIMEM_REVOCATION_SEED must reference an existing regular file." >&2; exit 2; }
+  REVOCATION_REGISTRY="${batch_root}/revocations.jsonl"
+  if [[ -e "${REVOCATION_REGISTRY}" ]]; then
+    cmp -s "${REVOCATION_SEED}" "${REVOCATION_REGISTRY}" || { echo "Batch revocation registry conflicts with seed." >&2; exit 2; }
+  else
+    cp "${REVOCATION_SEED}" "${REVOCATION_REGISTRY}"
+    chmod 600 "${REVOCATION_REGISTRY}"
+  fi
+fi
+[[ -f "${REVOCATION_REGISTRY}" && ! -L "${REVOCATION_REGISTRY}" ]] || { echo "RSIMEM_REVOCATION_REGISTRY must reference an existing regular file." >&2; exit 2; }
 
 PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.extraction_matched_preflight \
   --manifest "${manifest_path}" --batch-registry "${registry_path}" --batch-id "${BATCH_ID}" \
