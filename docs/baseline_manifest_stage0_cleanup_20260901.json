@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "rsimem-stage0-cleanup-baseline-20260901",
+  "capturedAt": "2026-09-01T23:30:00+08:00",
+  "purpose": "Cleanup-ready identity baseline after Stage 0A/0B tooling and asset classification.",
+  "deletionAuthorized": false,
+  "supersedes": "docs/baseline_manifest_20260901.json",
+  "repository": {
+    "root": "Study/RSIMem",
+    "commit": "25c4f69b785b32a987ad8ff12419337640b221c1",
+    "workingTreeClean": true,
+    "trackedFileCount": 2430,
+    "branch": "main",
+    "allowedPostBaselinePaths": [
+      "docs/baseline_manifest_stage0_cleanup_20260901.json"
+    ]
+  },
+  "runtime": {
+    "python": "3.11.15",
+    "pythonRequirement": ">=3.11,<3.12",
+    "environment": ".venv",
+    "packageVersions": {
+      "rsimem": "0.1.0",
+      "past-bench": "1.0.0",
+      "hermes-agent": "0.4.0",
+      "pytest": "9.1.1",
+      "pydantic": "2.13.4",
+      "openai": "2.54.0",
+      "httpx": "0.28.1",
+      "pyyaml": "6.0.3"
+    },
+    "dependencyLock": {
+      "lockFilePresent": false,
+      "pipFreezeDigest": "d259cd3ce1c05bc0b57757167023b0f3a3cde7999d62ade969cf8ca89cecf836",
+      "requirementsDigests": {
+        "pyproject.toml": "286790b7a44d033eaca51c5abcc74454abff468cd75061007c32684eba216018",
+        "benchmarks/past-bench/pyproject.toml": "ab9747819c6a11b6eeb503d757dd39e753cedcac98630c803856eb6fd2e90de5",
+        "benchmarks/past-bench/requirements.txt": "10c13c962c46345c3698e35c56ecc34e0dd7c8775c7f32cf4a7101cf9fb758e0",
+        "benchmarks/past-bench/requirements-sandbox-server.txt": "f11336d3f97239512984ae28bf830bb2e0848c74139bd604850cb2cf06b97147"
+      },
+      "editableHermesPath": "benchmarks/past-bench/agents/hermes-agent",
+      "editableHermesPathVerified": true
+    }
+  },
+  "vendoredIdentity": {
+    "hermesAgent": {
+      "packageVersion": "0.4.0",
+      "lastRepositoryCommit": "c79be3a443cfe8118684c307400c6a9b143395b4",
+      "gitTreeDigest": "96bac5d90d7762d36bd1fc43020cac63d21e33ebcf9178c4108ef1b9a7a4b02b",
+      "upstreamCommit": null
+    },
+    "pastBench": {
+      "packageVersion": "1.0.0",
+      "lastRepositoryCommit": "f4cce4814ad402952e462291dbbd2b26c841800b",
+      "gitTreeDigest": "01ff23513bbc5db3063f916333c81c2c31be99e02551b3fe4f4be143be79f9d1"
+    },
+    "rsimemSource": {
+      "gitTreeDigest": "3d9e1d509f5537c6568f2aa5edc2b280f6b870e926cd05ba8641a850a8052eb3"
+    }
+  },
+  "verification": {
+    "rsimemTests": "1105 passed",
+    "pastBenchTests": "401 passed, 2 skipped",
+    "compileall": "passed",
+    "pipCheck": "No broken requirements found",
+    "shellSyntax": "passed",
+    "trackedSecretScan": "clean",
+    "diffCheck": "passed",
+    "commands": [
+      ".venv/bin/python -m pytest -q tests",
+      "(cd benchmarks/past-bench && ../../.venv/bin/pytest -q)",
+      ".venv/bin/python -m compileall -q src tests",
+      ".venv/bin/python -m pip check",
+      "bash -n scripts/*.sh",
+      ".venv/bin/python -m rsimem.secret_scan",
+      "git diff --check"
+    ]
+  },
+  "publicInterfaces": {
+    "newBaselinePreflight": "rsimem.baseline:main / rsimem-preflight-baseline",
+    "bridge": "rsimem.hermes_past_bridge.HermesPastBenchBridge",
+    "host": "past_bench.runtime.adapters.hermes.HermesAdapter",
+    "configs": [
+      "configs/agents.yaml",
+      "configs/agents_backup.yaml",
+      "configs/past_bench_luna_smoke.yaml",
+      "configs/revocations.jsonl"
+    ],
+    "artifactSchemas": [
+      "lifecycle.v1",
+      "ledger.v1",
+      "process_feedback.v1",
+      "process_corpus.v1",
+      "memory_use_evidence.v1",
+      "artifact_set.v1",
+      "tool_exact_join.v1",
+      "logical_case.v1",
+      "process_signal.v1",
+      "revocation.v2"
+    ]
+  },
+  "cleanupGuard": {
+    "assetInventory": "docs/asset_inventory_20260901.md",
+    "deletionRequires": [
+      "import_call_site_audit",
+      "replacement_contract_or_migration",
+      "clean_tree",
+      "baseline_preflight"
+    ],
+    "historicalEvidence": [
+      "docs/current_checkpoint_20260901.md",
+      "docs/case_analysis.md",
+      "outputs/extraction_feedback/hermes_luna/s2-sm02-clean-parent-20260901-v1",
+      "outputs/extraction_feedback/hermes_luna/s2-sm05-clean-parent-20260901-v1"
+    ]
+  }
+}
