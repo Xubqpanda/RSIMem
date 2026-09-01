@@ -10,17 +10,31 @@ import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Mapping
 
 from .evidence_planes import EvidencePlane, EvidenceSourceKind, validate_plane_source
 
 
-REVOCATION_SCHEMA_VERSION = 1
-REVOCATION_SCHEMA = "rsimem-revocation-registry-v1"
+REVOCATION_SCHEMA_VERSION = 2
+REVOCATION_SCHEMA = "rsimem-revocation-registry-v2"
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:+-]{0,255}$")
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 _ISO_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
+
+
+class RevocationScope(StrEnum):
+    """Whether a revocation entry carries typed provenance.
+
+    Legacy artifacts were produced before evidence planes existed.  Their
+    identity must still be revocable, but assigning a current plane/source to
+    them would invent provenance.  ``LEGACY_UNTYPED`` therefore matches any
+    typed lookup for the same artifact identity.
+    """
+
+    TYPED = "typed"
+    LEGACY_UNTYPED = "legacy_untyped"
 
 
 def _canonical(value: object) -> str:
@@ -57,10 +71,11 @@ class RevocationEntry:
     artifact_id: str
     artifact_schema_version: int
     artifact_digest: str
-    evidence_plane: EvidencePlane
-    evidence_source: EvidenceSourceKind
+    evidence_plane: EvidencePlane | None
+    evidence_source: EvidenceSourceKind | None
     revoked_at: str
     reason_code: str
+    scope: RevocationScope = RevocationScope.TYPED
     schema_version: int = REVOCATION_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -71,7 +86,16 @@ class RevocationEntry:
         if type(self.artifact_schema_version) is not int or self.artifact_schema_version < 1:
             raise ValueError("artifact schema version must be a positive integer")
         _sha(self.artifact_digest, "revoked artifact digest")
-        validate_plane_source(self.evidence_plane, self.evidence_source)
+        object.__setattr__(self, "scope", RevocationScope(self.scope))
+        if self.scope is RevocationScope.LEGACY_UNTYPED:
+            if self.evidence_plane is not None or self.evidence_source is not None:
+                raise ValueError("legacy revocation entries cannot claim evidence provenance")
+        else:
+            if self.evidence_plane is None or self.evidence_source is None:
+                raise ValueError("typed revocation entries require evidence provenance")
+            plane, source = validate_plane_source(self.evidence_plane, self.evidence_source)
+            object.__setattr__(self, "evidence_plane", plane)
+            object.__setattr__(self, "evidence_source", source)
         _timestamp(self.revoked_at, "revocation timestamp")
         if not isinstance(self.reason_code, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", self.reason_code):
             raise ValueError("revocation reason is invalid")
@@ -85,10 +109,15 @@ class RevocationEntry:
             "artifact_id": self.artifact_id,
             "artifact_schema_version": self.artifact_schema_version,
             "artifact_digest": self.artifact_digest,
-            "evidence_plane": EvidencePlane(self.evidence_plane).value,
-            "evidence_source": EvidenceSourceKind(self.evidence_source).value,
+            "evidence_plane": (
+                self.evidence_plane.value if self.evidence_plane is not None else None
+            ),
+            "evidence_source": (
+                self.evidence_source.value if self.evidence_source is not None else None
+            ),
             "revoked_at": self.revoked_at,
             "reason_code": self.reason_code,
+            "scope": self.scope.value,
         }
 
     @classmethod
@@ -98,22 +127,35 @@ class RevocationEntry:
         artifact_id: str,
         artifact_schema_version: int,
         artifact_digest: str,
-        evidence_plane: EvidencePlane | str,
-        evidence_source: EvidenceSourceKind | str,
+        evidence_plane: EvidencePlane | str | None,
+        evidence_source: EvidenceSourceKind | str | None,
         revoked_at: str,
         reason_code: str,
+        scope: RevocationScope | str = RevocationScope.TYPED,
     ) -> "RevocationEntry":
+        resolved_scope = RevocationScope(scope)
+        if resolved_scope is RevocationScope.LEGACY_UNTYPED:
+            if evidence_plane is not None or evidence_source is not None:
+                raise ValueError("legacy revocation entries cannot claim evidence provenance")
+            resolved_plane = None
+            resolved_source = None
+        else:
+            if evidence_plane is None or evidence_source is None:
+                raise ValueError("typed revocation entries require evidence provenance")
+            resolved_plane = EvidencePlane(evidence_plane)
+            resolved_source = EvidenceSourceKind(evidence_source)
         values = {
             "artifact_id": artifact_id,
             "artifact_schema_version": artifact_schema_version,
             "artifact_digest": artifact_digest,
-            "evidence_plane": EvidencePlane(evidence_plane),
-            "evidence_source": EvidenceSourceKind(evidence_source),
+            "evidence_plane": resolved_plane,
+            "evidence_source": resolved_source,
             "revoked_at": revoked_at,
             "reason_code": reason_code,
+            "scope": resolved_scope,
             "schema_version": REVOCATION_SCHEMA_VERSION,
         }
-        return cls(revocation_id=f"revocation.{_digest(values)[:40]}", **values)
+        return cls(revocation_id=f"revocation.{_digest({**values})[:40]}", **values)
 
     def payload(self) -> dict[str, object]:
         return {"schema": REVOCATION_SCHEMA, "revocation_id": self.revocation_id, **self._identity_payload()}
@@ -123,7 +165,7 @@ class RevocationEntry:
         fields = {
             "schema", "revocation_id", "schema_version", "artifact_id",
             "artifact_schema_version", "artifact_digest", "evidence_plane",
-            "evidence_source", "revoked_at", "reason_code",
+            "evidence_source", "revoked_at", "reason_code", "scope",
         }
         if not isinstance(value, Mapping) or set(value) != fields or value.get("schema") != REVOCATION_SCHEMA:
             raise ValueError("malformed revocation entry")
@@ -133,6 +175,7 @@ class RevocationEntry:
                 artifact_schema_version=value["artifact_schema_version"], artifact_digest=value["artifact_digest"],
                 evidence_plane=value["evidence_plane"], evidence_source=value["evidence_source"],
                 revoked_at=value["revoked_at"], reason_code=value["reason_code"],
+                scope=value["scope"],
                 schema_version=value["schema_version"],
             )
         except (KeyError, TypeError, ValueError) as exc:
@@ -215,10 +258,11 @@ class JsonRevocationRegistry:
                 if previous != serialized:
                     raise ValueError("conflicting revocation entry")
                 return False
-            # Artifact IDs are content-addressed identities.  Two entries for
-            # the same artifact/schema must agree on its digest and evidence
-            # plane; otherwise a malformed registry could make one revoked
-            # incarnation look active.
+            # Artifact IDs are content-addressed identities. Two entries for
+            # one artifact/schema must agree on its digest. Typed entries must
+            # also agree on plane/source; a legacy-untyped entry deliberately
+            # applies across all typed lookup surfaces without inventing
+            # provenance for the old artifact.
             for existing_serialized in records.values():
                 existing = RevocationEntry.from_payload(
                     json.loads(existing_serialized)
@@ -229,8 +273,14 @@ class JsonRevocationRegistry:
                     == entry.artifact_schema_version
                     and (
                         existing.artifact_digest != entry.artifact_digest
-                        or existing.evidence_plane != entry.evidence_plane
-                        or existing.evidence_source != entry.evidence_source
+                        or (
+                            existing.scope is RevocationScope.TYPED
+                            and entry.scope is RevocationScope.TYPED
+                            and (
+                                existing.evidence_plane != entry.evidence_plane
+                                or existing.evidence_source != entry.evidence_source
+                            )
+                        )
                     )
                 ):
                     raise ValueError("conflicting revocation identity")
@@ -262,26 +312,39 @@ class JsonRevocationRegistry:
             if (
                 entry.artifact_id == artifact_id
                 and entry.artifact_schema_version == artifact_schema_version
-                and (
-                    entry.artifact_digest != artifact_digest
-                    or entry.evidence_plane != plane
-                    or entry.evidence_source != source
-                )
+                and entry.artifact_digest != artifact_digest
             ):
                 raise ValueError("conflicting revocation identity")
             if (
                 entry.artifact_id == artifact_id
                 and entry.artifact_schema_version == artifact_schema_version
                 and entry.artifact_digest == artifact_digest
-                and entry.evidence_plane == plane
-                and entry.evidence_source == source
+                and (
+                    entry.scope is RevocationScope.LEGACY_UNTYPED
+                    or (
+                        entry.evidence_plane == plane
+                        and entry.evidence_source == source
+                    )
+                )
             ):
                 raise ValueError("artifact is revoked")
+            if (
+                entry.artifact_id == artifact_id
+                and entry.artifact_schema_version == artifact_schema_version
+                and entry.artifact_digest == artifact_digest
+                and entry.scope is RevocationScope.TYPED
+                and (
+                    entry.evidence_plane != plane
+                    or entry.evidence_source != source
+                )
+            ):
+                raise ValueError("conflicting revocation identity")
 
 
 __all__ = [
     "REVOCATION_SCHEMA",
     "REVOCATION_SCHEMA_VERSION",
     "JsonRevocationRegistry",
+    "RevocationScope",
     "RevocationEntry",
 ]

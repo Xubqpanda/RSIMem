@@ -223,6 +223,7 @@ from .revocation import (
     REVOCATION_SCHEMA,
     REVOCATION_SCHEMA_VERSION,
     JsonRevocationRegistry,
+    RevocationScope,
     RevocationEntry,
 )
 from .process_signal import (
@@ -434,6 +435,7 @@ __all__ = [
     "REVOCATION_SCHEMA",
     "REVOCATION_SCHEMA_VERSION",
     "JsonRevocationRegistry",
+    "RevocationScope",
     "RevocationEntry",
     "PROCESS_SIGNAL_SCHEMA",
     "PROCESS_SIGNAL_SCHEMA_VERSION",

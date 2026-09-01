@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
-from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
+from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry, RevocationScope
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -157,11 +157,14 @@ def test_checked_in_historical_denylist_rejects_revoked_identities(tmp_path) -> 
         "evidence_source",
         "revoked_at",
         "reason_code",
+        "scope",
     }
     records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     assert len(records) == 5
     assert all(set(record) == allowed_fields for record in records)
     assert all(record["reason_code"] == "historical_attribution_revoked" for record in records)
+    assert all(record["scope"] == "legacy_untyped" for record in records)
+    assert all(record["evidence_plane"] is None and record["evidence_source"] is None for record in records)
 
     registry_path = tmp_path / "revocations.jsonl"
     registry_path.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
@@ -176,3 +179,54 @@ def test_checked_in_historical_denylist_rejects_revoked_identities(tmp_path) -> 
                 evidence_plane=EvidencePlane.PURE_PROCESS,
                 evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
             )
+
+
+def test_legacy_scope_does_not_invent_provenance_and_matches_typed_lookup(tmp_path) -> None:
+    registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")
+    registry.initialize()
+    entry = RevocationEntry.create(
+        artifact_id="artifact.legacy-untyped.v1",
+        artifact_schema_version=1,
+        artifact_digest="c" * 64,
+        evidence_plane=None,
+        evidence_source=None,
+        revoked_at="2026-09-01T01:02:03Z",
+        reason_code="historical_attribution_revoked",
+        scope=RevocationScope.LEGACY_UNTYPED,
+    )
+    assert entry.evidence_plane is None
+    assert entry.evidence_source is None
+    assert registry.append(entry) is True
+    with pytest.raises(ValueError, match="artifact is revoked"):
+        registry.assert_active(
+            artifact_id=entry.artifact_id,
+            artifact_schema_version=entry.artifact_schema_version,
+            artifact_digest=entry.artifact_digest,
+            evidence_plane=EvidencePlane.PURE_PROCESS,
+            evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+        )
+
+
+def test_revocation_scope_rejects_incomplete_or_misleading_provenance() -> None:
+    with pytest.raises(ValueError, match="typed revocation entries require"):
+        RevocationEntry.create(
+            artifact_id="artifact.typed-missing.v1",
+            artifact_schema_version=1,
+            artifact_digest="d" * 64,
+            evidence_plane=None,
+            evidence_source=None,
+            revoked_at="2026-09-01T01:02:03Z",
+            reason_code="stale_schema",
+            scope=RevocationScope.TYPED,
+        )
+    with pytest.raises(ValueError, match="legacy revocation entries cannot"):
+        RevocationEntry.create(
+            artifact_id="artifact.legacy-claimed.v1",
+            artifact_schema_version=1,
+            artifact_digest="e" * 64,
+            evidence_plane=EvidencePlane.PURE_PROCESS,
+            evidence_source=EvidenceSourceKind.RUNTIME_OBSERVATION,
+            revoked_at="2026-09-01T01:02:03Z",
+            reason_code="historical_attribution_revoked",
+            scope=RevocationScope.LEGACY_UNTYPED,
+        )
