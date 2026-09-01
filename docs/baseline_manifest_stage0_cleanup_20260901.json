@@ -31,7 +31,7 @@
     },
     "dependencyLock": {
       "lockFilePresent": false,
-      "pipFreezeDigest": "d259cd3ce1c05bc0b57757167023b0f3a3cde7999d62ade969cf8ca89cecf836",
+      "pipFreezeDigest": "869c7cf0c5b316440205b86ab1e5af0419dcd06623a704b42aeb34e7b04b1aec",
       "requirementsDigests": {
         "pyproject.toml": "286790b7a44d033eaca51c5abcc74454abff468cd75061007c32684eba216018",
         "benchmarks/past-bench/pyproject.toml": "ab9747819c6a11b6eeb503d757dd39e753cedcac98630c803856eb6fd2e90de5",
