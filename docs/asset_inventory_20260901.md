@@ -20,7 +20,7 @@ after their evidence index remains reachable.
 | `src/rsimem/extraction_experiment_preflight.py` | GENERALIZE | Clean-tree, revision and config preflight is reusable | extraction feedback launcher/tests; future stage preflight |
 | `src/rsimem/extraction_matched_preflight.py` | GENERALIZE | Matched identity and state checks are reusable | matched launcher/tests; future sensitivity runner |
 | `src/rsimem/extraction_preparation.py` | GENERALIZE | Durable observation reload and corpus preparation are generic | feedback launcher/tests; future FeedbackCondition builder |
-| `src/rsimem/extraction_proposal.py` | DELETE | Stopped extraction-only N+1 proposal CLI | proposal tests/console script; replace with MemoryMethodAdapter proposal |
+| `src/rsimem/extraction_proposal.py` | DELETE | Removed in Stage 0C; stopped extraction-only N+1 proposal CLI had no runtime import after launcher cleanup | future MemoryMethodAdapter proposal boundary |
 | `src/rsimem/extraction_split_plan.py` | GENERALIZE | Frozen split and template identity apply to all memory panels | split-plan tests/configs; future protocol manifest |
 | `src/rsimem/extraction_validation_evidence.py` | GENERALIZE | Matched evidence and raw resource joins are reusable | validation tests/launcher; future sensitivity report |
 | `src/rsimem/extraction_validation_runtime.py` | GENERALIZE | Attempt-local trial binding and artifact fingerprints are reusable | validation tests/PAST CLI; future method adapter runtime |
@@ -38,7 +38,7 @@ after their evidence index remains reachable.
 | `src/rsimem/memory/extraction_optimizer_capture.py` | GENERALIZE | Owner-controlled capture separation is reusable | bridge and capture tests; future method corpus capture |
 | `src/rsimem/memory/extraction_optimizer_contracts.py` | GENERALIZE | Candidate safety/lineage fields inform MethodStateArtifact | optimizer/proposal tests; future method contract |
 | `src/rsimem/memory/extraction_optimizer_corpus.py` | GENERALIZE | Pure process corpus and evidence-plane gates are framework assets | process/preparation tests; future feedback corpus |
-| `src/rsimem/memory/extraction_optimizer_provider.py` | DELETE | Provider-specific extraction proposal client | proposal tests/CLI; future method provider adapter |
+| `src/rsimem/memory/extraction_optimizer_provider.py` | GENERALIZE | OpenAI-compatible transport and raw usage projection remain reusable for future method adapters | future MemoryMethodAdapter provider boundary |
 | `src/rsimem/memory/extraction_optimizer_store.py` | GENERALIZE | Restart-safe corpus store and revocation checks are reusable | preparation/store tests; future updater store |
 | `src/rsimem/memory/extraction_policy_artifact.py` | GENERALIZE | Versioned artifact, lineage and binding identity map to method state | policy artifact/store tests; future method artifact |
 | `src/rsimem/memory/extraction_policy_store.py` | GENERALIZE | Immutable artifact store and ACTIVE pointer are reusable | policy store/activation tests |
@@ -87,7 +87,7 @@ after their evidence index remains reachable.
 | `tests/test_extraction_preparation.py` | GENERALIZE | Durable observation preparation fixtures are generic | preparation |
 | `tests/test_extraction_projection.py` | GENERALIZE | Source projection fixtures are generic | projection |
 | `tests/test_extraction_prompt_validation.py` | GENERALIZE | Safety/shortcut fixtures apply to generated artifacts | prompt validation |
-| `tests/test_extraction_proposal.py` | DELETE | Extraction-only proposal generation assertions | stopped proposal CLI |
+| `tests/test_extraction_proposal.py` | DELETE | Removed in Stage 0C with stopped proposal CLI; assertions were extraction-only | future generic proposal contract tests |
 | `tests/test_extraction_source.py` | GENERALIZE | Source provenance fixtures are generic | extraction source |
 | `tests/test_extraction_split_plan.py` | GENERALIZE | Split identity fixtures are generic | split plan |
 | `tests/test_extraction_validation_evidence.py` | GENERALIZE | Matched evidence fixtures are generic | validation evidence |
@@ -128,20 +128,22 @@ after their evidence index remains reachable.
 
 ## 0B decision
 
-No row is deleted by this document.  The next step is a mechanical audit of
-every `DELETE` row against tracked imports, console-script exports, shell
-references, tests, README/docs links, and packaging metadata.  A row moves to
-`DELETE` execution only when that audit has no live dependency and the
+The initial table did not authorize deletion.  Stage 0C now executes a
+mechanical audit of every `DELETE` row against tracked imports, console-script
+exports, shell references, tests, README/docs links, and packaging metadata.
+A row is deleted only when that audit has no live dependency and its
 replacement boundary is identified.
 
 ## Dependency audit snapshot
 
-The first audit was run against `src`, `tests`, `scripts`, `configs`,
+The audit was run against `src`, `tests`, `scripts`, `configs`,
 `pyproject.toml`, `README.md`, `docs`, and the vendored PAST source/tests.
-It found live production imports for the four rows that were reclassified as
-`GENERALIZE` above.  The remaining `DELETE` rows have no production import;
-their current references are limited to stopped console scripts, historical
-documentation, or tests that will be migrated/deleted together with the
-stopped entry point.  No deletion is authorized until a second audit after
-the replacement contracts land reports the same result and the full baseline
-suite remains green.
+The launcher group and extraction proposal entry point had no active runtime
+consumer after the extraction-only path was stopped, so they were removed in
+Stage 0C commits `b1c9970` and the proposal-cleanup commit.  The provider
+transport was reclassified as `GENERALIZE` because its OpenAI-compatible
+usage projection is reusable.  Remaining DELETE rows still have generalized
+preflight/test/config consumers or require the Stage 1 protocol manifest;
+they remain pending until migration is complete.  Historical evidence may
+mention removed paths, but current CLI, packaging, and production imports may
+not.
