@@ -1499,7 +1499,6 @@ class HermesPastBenchBridge:
         if self.semantic_future_recorder is not None:
             for future, step_id in self._semantic_futures:
                 current_input = self._current_input(result)
-                resolution = None
                 audit_observation = None
                 if self.semantic_feedback_resolver is not None:
                     observation = self._semantic_deployment_observation(result)
@@ -1511,10 +1510,6 @@ class HermesPastBenchBridge:
                     audit_observation = self._semantic_audit_observation(
                         observation,
                         current_input=current_input,
-                    )
-                    resolution = self.semantic_feedback_resolver.resolve(
-                        future,
-                        audit_observation,
                     )
                 explicit_used = result.get("rsimem_used_artifact_ids")
                 if isinstance(explicit_used, (list, tuple)):
@@ -1537,9 +1532,13 @@ class HermesPastBenchBridge:
                         )
                     used_artifact_ids = provided_used
                 else:
-                    used_artifact_ids = (
-                        resolution.used_artifact_ids if resolution is not None else ()
-                    )
+                    # A benchmark resolver is an audit-plane classifier.  Its
+                    # inferred used-artifact IDs must never be copied into the
+                    # deployment-visible operation graph.  Without an
+                    # explicit host/provider attribution, pure process use is
+                    # conservatively unknown (empty), even when the audit
+                    # projection can classify the same task.
+                    used_artifact_ids = ()
                 if len(used_artifact_ids) != len(set(used_artifact_ids)):
                     raise ValueError(
                         "memory-use attribution provider returned duplicate artifacts"
@@ -1551,16 +1550,14 @@ class HermesPastBenchBridge:
                         "memory-use attribution provider returned an artifact outside retrieval"
                     )
                 outcome_status = (
-                    resolution.outcome_status
-                    if resolution is not None
-                    else OperationStatus.SUCCESS
+                    OperationStatus.SUCCESS
                     if result.get("completed") is True
                     else OperationStatus.FAILED
                 )
                 outcome_reason = (
-                    resolution.outcome_reason_code
-                    if resolution is not None
-                    else ("task_completed" if result.get("completed") is True else "task_incomplete")
+                    "task_completed"
+                    if result.get("completed") is True
+                    else "task_incomplete"
                 )
                 outcome = self.semantic_future_recorder.record_use_and_outcome(
                     future,

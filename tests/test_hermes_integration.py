@@ -2385,7 +2385,15 @@ def test_live_bridge_records_content_free_sm01_future_feedback(tmp_path: Path) -
         OperationKind.USE,
         OperationKind.DOWNSTREAM_OUTCOME,
     }
-    assert all(operation.status == OperationStatus.SUCCESS for operation in future.values())
+    assert future[OperationKind.FUTURE_QUERY].status == OperationStatus.SUCCESS
+    assert future[OperationKind.RETRIEVAL].status == OperationStatus.SUCCESS
+    assert future[OperationKind.INJECTION].status == OperationStatus.SUCCESS
+    # No application-owned attribution provider is installed in this
+    # fixture.  The benchmark feedback resolver may classify the audit plane,
+    # but it must not mark the pure-process USE operation as successful.
+    assert future[OperationKind.USE].status == OperationStatus.NONE
+    assert future[OperationKind.USE].reason_code == "retrieved_but_unused"
+    assert future[OperationKind.DOWNSTREAM_OUTCOME].status == OperationStatus.SUCCESS
     memory_ids = tuple(
         artifact.artifact_id
         for artifact in graph.artifacts
@@ -2393,9 +2401,8 @@ def test_live_bridge_records_content_free_sm01_future_feedback(tmp_path: Path) -
     )
     assert len(memory_ids) == 1
     injected_ids = set(future[OperationKind.INJECTION].input_artifact_ids)
-    used_ids = set(future[OperationKind.USE].input_artifact_ids)
     assert set(memory_ids).issubset(injected_ids)
-    assert set(memory_ids).issubset(used_ids)
+    assert future[OperationKind.USE].output_artifact_ids == ()
     serialized = operations_path.read_text(encoding="utf-8")
     assert PRIVATE_PREFERENCE not in serialized
 
