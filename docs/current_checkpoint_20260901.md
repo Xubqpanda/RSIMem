@@ -1,21 +1,23 @@
-# Current Checkpoint: Provider Pause
+# Current Checkpoint: Provider Probe Recovered
 
 Date: 2026-09-01
 
 ## Decision
 
-Formal provider-backed experiments are paused. This is an operational pause,
-not a negative task result and not an update to any policy conclusion.
+Formal provider-backed experiments remain paused until a fresh preflight is
+run immediately before a registered batch. This is an operational gate, not a
+negative task result and not an update to any policy conclusion.
 
-The most recent bounded provider diagnostics are unhealthy:
+The latest bounded provider probe (2026-09-01) passed:
 
-- Primary OpenAI-compatible endpoint: HTTP `429`.
-- Backup endpoint: HTTP `200` with an invalid JSON payload.
+- Primary OpenAI-compatible endpoint: HTTP `200`, non-empty content, usage
+  object present.
+- Model: `gpt-5.6-luna`.
 
-No new PAST-Bench batch, process-signal census, proposal request, held-out
-validation, activation, or matched-effect run may be started until a fresh
-provider probe passes under the frozen run profile. Provider diagnostics remain
-outside benchmark accounting and must not enter a process corpus.
+No benchmark was started by this probe. A fresh probe must still pass under the
+exact frozen run profile after batch registration and before the first task.
+Provider diagnostics remain outside benchmark accounting and must not enter a
+process corpus.
 
 ## Implementation Position
 
@@ -78,7 +80,7 @@ artifact identity (ID, schema version, and digest). New revocations must use
 
 The most recent deterministic acceptance baseline is:
 
-- RSIMem: `1099 passed`.
+- RSIMem: `1101 passed`.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when invoked from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`, and
@@ -89,9 +91,9 @@ does not inspect untracked credential files, ignored run outputs, or drafts.
 
 ## Resume Order
 
-After provider recovery, the next authorized action is one fresh,
-pre-registered clean parent batch. It must pass provider preflight and retain
-the current conservative `unresolved`/`censored` semantics. Only after its
+The next authorized action is one fresh, pre-registered clean parent batch. It
+must pass provider preflight immediately before task execution and retain the
+current conservative `unresolved`/`censored` semantics. Only after its
 pure-process corpus yields a valid replicated signal may the proposal gate be
 opened. Cost and token data remain raw accounting fields, never policy input.
 

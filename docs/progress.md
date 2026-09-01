@@ -4,7 +4,7 @@ Last updated: 2026-09-01
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
-The authoritative current operating status, including the provider pause and
+The authoritative current operating status, including the provider gate and
 the boundary between completed runtime work and deferred experiments, is in
 [`current_checkpoint_20260901.md`](current_checkpoint_20260901.md). Historical
 sections below are retained for provenance and may describe superseded attempts
@@ -43,7 +43,7 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1099 passed`.
+- RSIMem: `1101 passed`.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
@@ -62,24 +62,23 @@ Current capability matrix:
 | Procedural adapter projection | complete as read-only/read-through surface | skills list/view materialization and projection tests |
 | Tool call/result and memory-use joins | complete at content-free contract boundary | exact-closure and fail-closed fixtures |
 | Six-layer policy feasibility | deterministic/shadow complete | replayable action variation and mechanism explanations |
-| Real provider process-signal census | not currently runnable | primary `429`, backup `invalid_json` |
+| Real provider process-signal census | preflight-ready, not started | latest primary probe `200`; fresh batch-time probe required |
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
 extraction-owned optimization signal, or a quality improvement.
 
-The configured primary provider probe returned HTTP `429`.  The documented
-backup endpoint returned HTTP `200` but an invalid response payload.  No new
-formal provider batch was started, and no new quality, process-signal, or
-optimizer result was inferred from either failure.  Existing SM02/SM05 clean
-parent reruns remain `STOP_NO_SIGNAL`; no N+1 candidate, held-out validation,
-or adaptive effect batch is authorized.
+The latest bounded probe against the configured primary endpoint returned HTTP
+`200` with non-empty content and a usage object.  No formal provider batch was
+started, and no quality, process-signal, or optimizer result was inferred from
+the probe.  Existing SM02/SM05 clean parent reruns remain `STOP_NO_SIGNAL`;
+no N+1 candidate, held-out validation, or adaptive effect batch is authorized.
 
-Current implementation priority is therefore documentation and deterministic
-acceptance maintenance.  Once provider health is independently restored, the
-next experiment is a fresh, pre-registered clean parent batch; it must pass
-the provider probe and retain the existing conservative unresolved/censored
+Current implementation priority remains documentation and deterministic
+acceptance maintenance.  The next experiment, when explicitly started, is a
+fresh, pre-registered clean parent batch; it must pass the provider probe after
+registration and retain the existing conservative unresolved/censored
 semantics before any proposal generation.
 
 ## Current State
