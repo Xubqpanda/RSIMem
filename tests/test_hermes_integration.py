@@ -1999,7 +1999,10 @@ def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
                 source_surface=OpportunitySurface.APPLICATION_SCHEMA,
                 semantic_requirement=key,
                 observation_time="2026-08-31T00:00:00Z",
-                operation_id="opportunity.fixture.future",
+                operation_id=(
+                    "opportunity.fixture.future."
+                    + str(result.get("boundary") or "initial")
+                ),
                 provenance_id=provenance,
                 source_payload={"tool_name": "fixture_apply"},
                 application_schema=application_schema,
@@ -2188,6 +2191,38 @@ def test_pure_process_runtime_fixture_closes_extraction_to_use_and_tool_outcome(
         and case.extraction_attributable
         for case in joined_cases
     )
+
+    # A later future boundary for the same source must use only the evidence
+    # emitted at that boundary.  Historical opportunity/use rows remain in
+    # the append-only logs for audit, but cannot make the new join ambiguous
+    # or silently reuse an old memory-use observation.
+    future_bridge._record_pure_extraction_feedback(
+        {
+            "completed": True,
+            "boundary": "second",
+            "messages": [
+                {"role": "user", "content": "Apply the saved preference."},
+                {"role": "assistant", "tool_calls": [{
+                    "id": "call.fixture.second",
+                    "function": {"name": "fixture_apply", "arguments": "{}"},
+                }]},
+                {"role": "tool", "tool_call_id": "call.fixture.second",
+                 "id": "result.fixture.second", "content": '{"success": true}'},
+            ],
+        },
+        current_memory_uses=(),
+    )
+    feedback_rows = JsonPureExtractionFeedbackRecordStore(
+        tmp_path / "future" / "rsimem_pure_extraction_feedback.jsonl",
+        schema_registry=JsonApplicationOpportunitySchemaRegistry(
+            home / ".rsimem" / "application_opportunity_schemas.jsonl"
+        ),
+    ).records()
+    assert len(feedback_rows) == 2
+    assert feedback_rows[1].opportunity is not None
+    assert feedback_rows[1].opportunity.operation_id.endswith(".second")
+    assert feedback_rows[1].memory_use is None
+
     pure_events = PureProcessCorpus.create(
         tuple(learn_bridge.process_feedback) + tuple(future_bridge.process_feedback)
     )
