@@ -89,6 +89,12 @@ batch-level `logical_case_v1` census 为：
 `missed` 仅存在于独立 benchmark-audit projection；它们没有进入 pure
 corpus。故本次 2D 决策仍为 `STOP_NO_SIGNAL`，不生成 N+1。
 
+后续的 `s2-sm02-clean-parent-20260901-v2` 尝试不进入上表或任何 signal
+census：replicate 1 audit-clean，replicate 2 首次 provider
+`InternalServerError` 后重试通过，replicate 3 因 fail-closed 的
+`skip/defer extraction` 触发 `incomplete_model_usage`。该批次只保留为
+provider/runtime 诊断，不能按 partial replicate 或 process evidence 使用。
+
 ### 2.2 不能进入语义结论的尝试
 
 SM01 v5/v6/v7/v8 以及 SM02 v2/v3/v4 等失败或不完整尝试只用于定位 provider、reflection boundary、duplicate corpus 和 usage-audit 问题。它们没有完整且合格的 observation window，不能进入 optimizer、resolved denominator、matched validation 或任务质量结论。

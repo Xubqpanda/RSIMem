@@ -71,9 +71,14 @@ extraction-owned optimization signal, or a quality improvement.
 
 The latest bounded probe against the configured primary endpoint returned HTTP
 `200` with non-empty content and a usage object.  The fresh SM02 and SM05
-clean-parent batches then completed with audit-clean manifests and no
-extraction-owned process signal.  No N+1 candidate, held-out validation, or
-adaptive effect batch is authorized.
+clean-parent v1 batches completed with audit-clean manifests and no
+extraction-owned process signal.  A later SM02 v2 retry was registered after
+the boundary-scoped join fix (`a89f7d7`), but only one replicate was clean; the
+remaining attempts failed `incomplete_model_usage` (one after a provider
+`InternalServerError`, one after fail-closed `skip/defer extraction`).  That
+partial batch is retained for infrastructure diagnosis and excluded from the
+process-signal census.  No N+1 candidate, held-out validation, or adaptive
+effect batch is authorized.
 
 Current implementation priority remains documentation, deterministic acceptance
 maintenance, and tightening the general opportunity/use contract.  The finite
