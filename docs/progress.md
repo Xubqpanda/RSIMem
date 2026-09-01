@@ -76,7 +76,9 @@ resolver classifications stay in the audit plane and cannot mark pure
 unresolved by design.
 
 The latest bounded probe against the configured primary endpoint returned HTTP
-`200` with non-empty content and a usage object.  The fresh SM02 and SM05
+`200` with non-empty content and a usage object.  Five consecutive follow-up
+probes on the same endpoint/model also passed.  These are provider diagnostics,
+not benchmark evidence.  The fresh SM02 and SM05
 clean-parent v1 batches completed with audit-clean manifests and no
 extraction-owned process signal.  A later SM02 v2 retry was registered after
 the boundary-scoped join fix (`a89f7d7`), but only one replicate was clean; the
