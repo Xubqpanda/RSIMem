@@ -1,6 +1,6 @@
 # RSIMem Progress
 
-Last updated: 2026-08-30
+Last updated: 2026-09-01
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
@@ -9,6 +9,52 @@ This document tracks implementation progress, the current experimental boundary,
 - [x] Completed and verified.
 - [ ] Not completed.
 - **Current** identifies the milestone that should receive implementation effort next.
+
+## Current Checkpoint (2026-09-01)
+
+This section is the authoritative summary for the current repository state.
+Later sections retain dated implementation history and may contain earlier
+test counts, provider attempts, or superseded experiment descriptions.
+
+The implementation is currently at the end of deterministic/process-signal
+infrastructure work and has not entered a live N+1 experiment.  The runtime
+automatically wires a completed Hermes task into the pure-process path:
+
+```text
+completed task
+  -> source projection and durable pure source record
+  -> future opportunity/retrieval/exposure/use/tool observations
+  -> durable pure feedback record
+  -> replayable process-signal case
+```
+
+The Hermes adapter now reuses the exact semantic hits already retrieved for a
+system-prompt render when creating future evidence.  It does not perform a
+second semantic query, and a native bypass or failed render cannot create a
+synthetic RSIMem exposure/use attribution.  Episodic and procedural adapter
+projections remain read-only/read-through surfaces with explicit projection
+verification; semantic writeback remains the only live policy path.
+
+The deterministic and storage-boundary test baselines are:
+
+- RSIMem: `1089 passed`.
+- Vendored PAST-Bench: `401 passed, 2 skipped` when run from
+  `benchmarks/past-bench`.
+- `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
+  passed.
+
+The configured primary provider probe returned HTTP `429`.  The documented
+backup endpoint returned HTTP `200` but an invalid response payload.  No new
+formal provider batch was started, and no new quality, process-signal, or
+optimizer result was inferred from either failure.  Existing SM02/SM05 clean
+parent reruns remain `STOP_NO_SIGNAL`; no N+1 candidate, held-out validation,
+or adaptive effect batch is authorized.
+
+Current implementation priority is therefore documentation and deterministic
+acceptance maintenance.  Once provider health is independently restored, the
+next experiment is a fresh, pre-registered clean parent batch; it must pass
+the provider probe and retain the existing conservative unresolved/censored
+semantics before any proposal generation.
 
 ## Current State
 
