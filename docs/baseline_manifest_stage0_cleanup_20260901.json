@@ -7,9 +7,9 @@
   "supersedes": "docs/baseline_manifest_20260901.json",
   "repository": {
     "root": "Study/RSIMem",
-    "commit": "5e896a0ac8d8f6d44e8412ed1f46c06854eacab3",
+    "commit": "40436f8563c4501d3a0dce71bcddcab6842e020a",
     "workingTreeClean": true,
-    "trackedFileCount": 2430,
+    "trackedFileCount": 2420,
     "branch": "main",
     "allowedPostBaselinePaths": [
       "docs/baseline_manifest_stage0_cleanup_20260901.json"
@@ -55,11 +55,11 @@
       "gitTreeDigest": "01ff23513bbc5db3063f916333c81c2c31be99e02551b3fe4f4be143be79f9d1"
     },
     "rsimemSource": {
-      "gitTreeDigest": "6b58931c2d8aa4424765ec7670304f7d0d55e0c48f0eeff624b121fe0f93efe1"
+      "gitTreeDigest": "0f5e8fea9dcd0277f3428e87926fe36a03155a6ee71becc3df986b2d7b9a00ae"
     }
   },
   "verification": {
-    "rsimemTests": "1105 passed",
+    "rsimemTests": "1090 passed",
     "pastBenchTests": "401 passed, 2 skipped",
     "compileall": "passed",
     "pipCheck": "No broken requirements found",
