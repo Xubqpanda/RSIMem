@@ -197,6 +197,9 @@ Final evaluation plane 可以在 candidate 冻结、实验完成后读取 offici
 - √ 定义 application-observable outcome contract，例如 tool success、state transition、用户确认或任务 completion；纯字符串匹配默认只能作为 weak hypothesis。
 - √ Use/outcome exact join 缺任何节点时保持 `unresolved`。
 - √ 其他 source 写入的 memory 可以解释行为或阻止 false missed，但不能替当前 extraction 获得 useful/harmful credit。
+- √ Benchmark-family resolver 只属于 audit plane；没有
+  application-owned attribution provider 时，不得把 resolver 推断的 used
+  artifact 写入 pure-process operation graph。
 
 反向验收：
 
@@ -322,6 +325,14 @@ conflict 均继续 fail closed。
 
 2B 的 clean parent evidence 见 [`extraction_stage2_production_reruns_20260831.md`](extraction_stage2_production_reruns_20260831.md) 和本次 fresh rerun 报告 [`extraction_stage2_clean_parent_20260901.md`](extraction_stage2_clean_parent_20260901.md)。两组新 batch 均完成 audit；它们仍只提供 process observability，不提供 extraction-owned signal。
 
+当前正式 PAST-Bench 配置尚未提供可信的 application-owned
+`memory_use_attribution_provider`。因此 Hermes 可以确定性记录 retrieval、
+exposure、tool closure 和 task outcome，但不能仅凭 benchmark resolver 或
+最终文本证明模型使用了哪一个 memory artifact；这类 future use 在
+pure-process plane 必须保持 unknown/unresolved。`b1f9cd1` 将该边界固定在
+runtime，并以 focused regression 验证 audit inference 不会污染 pure
+`USE` operation。
+
 ### 2C：逐 Case 三层分析
 
 每个 logical case 必须回答：
@@ -432,6 +443,7 @@ observation-window 字段，并据此给出三层判定；现有 cases 均未达
 | P0 | 缺少 logical case identity | Physical feedback 被误当作独立样本 | 1F |
 | P0 | 旧 corpus/candidate 未有统一 revocation gate | 失效 evidence 可能被后续脚本误用 | 1G |
 | P1 | 真实 provider runs 没有可信 extraction-owned signal | 不能生成 N+1 | 阶段二 |
+| P1 | 正式 PAST runtime 没有 application-owned memory-use attribution | retrieval/exposure 可观测，但 extraction-owned use 只能保持 unresolved | 2B/2C |
 | P1 | 真实 runs 没有 candidate action variation | Deterministic feasibility 不能证明真实 effect | 阶段三 |
 | P2 | Trigger/Source/Admission/Commit/Exposure 只有 shadow feasibility | 不支持六层联合 claim | 延后 |
 

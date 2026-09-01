@@ -50,6 +50,13 @@ This establishes process observability and replayability. It does not establish
 that an extraction prompt has a generalizable optimization signal, that an N+1
 candidate is valid, that a policy is ACTIVE, or that task quality improved.
 
+The formal PAST-Bench runtime currently has no trusted application-owned
+memory-use attribution callback. Consequently, benchmark-family resolver
+inference remains audit-only: pure-process retrieval and exposure are recorded,
+but pure `USE` stays unknown unless the host explicitly supplies used artifact
+IDs. This boundary is enforced by `b1f9cd1` and prevents audit labels from
+silently becoming optimizer evidence.
+
 ## Evidence Boundary
 
 The following work is complete as deterministic/runtime infrastructure:

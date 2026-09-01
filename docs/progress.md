@@ -69,6 +69,12 @@ The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
 extraction-owned optimization signal, or a quality improvement.
 
+The formal PAST-Bench adapter does not currently expose a trusted
+application-owned memory-use attribution provider.  Since `b1f9cd1`, benchmark
+resolver classifications stay in the audit plane and cannot mark pure
+`USE` operations; retrieval/exposure without explicit attribution remains
+unresolved by design.
+
 The latest bounded probe against the configured primary endpoint returned HTTP
 `200` with non-empty content and a usage object.  The fresh SM02 and SM05
 clean-parent v1 batches completed with audit-clean manifests and no
