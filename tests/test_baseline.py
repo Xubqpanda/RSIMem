@@ -46,6 +46,18 @@ def test_missing_baseline_manifest_fails_closed(tmp_path: Path) -> None:
     assert report.checks[0].code == "baseline manifest is missing or not a regular file"
 
 
+def test_pip_freeze_normalizes_editable_vcs_revision() -> None:
+    first = [
+        "-e git+https://example.invalid/repo.git@0123456789abcdef0123456789abcdef01234567#egg=demo",
+        "PyYAML==6.0.3",
+    ]
+    second = [
+        "PyYAML==6.0.3",
+        "-e git+https://example.invalid/repo.git@fedcba9876543210fedcba9876543210fedcba98#egg=demo",
+    ]
+    assert baseline._normalize_pip_freeze(first) == baseline._normalize_pip_freeze(second)
+
+
 def test_malformed_baseline_shape_fails_closed(tmp_path: Path) -> None:
     path = tmp_path / "baseline.json"
     path.write_text(json.dumps({"schemaVersion": 1}), encoding="utf-8")

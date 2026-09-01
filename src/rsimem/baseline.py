@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, asdict
@@ -72,6 +73,24 @@ def _git_tree_digest(repo_root: Path, path: str) -> str:
     return hashlib.sha256(listing.encode("utf-8")).hexdigest()
 
 
+_EDITABLE_REVISION_RE = re.compile(r"(?<=@)[0-9a-fA-F]{7,40}(?=#)")
+
+
+def _normalize_pip_freeze(lines: Sequence[str]) -> str:
+    """Return a stable, sorted freeze representation.
+
+    Editable VCS installs embed the current repository commit in their
+    ``pip freeze`` URL.  That value changes on every metadata-only commit and
+    is already covered by the source/tree identity checks, so normalize only
+    the revision token while retaining package, repository, and subdirectory
+    identity.
+    """
+
+    normalized_lines = [_EDITABLE_REVISION_RE.sub("<revision>", line) for line in lines]
+    normalized = "\n".join(sorted(normalized_lines))
+    return f"{normalized}\n" if normalized else ""
+
+
 def _pip_freeze_digest() -> str:
     result = subprocess.run(
         [sys.executable, "-m", "pip", "freeze"],
@@ -79,9 +98,7 @@ def _pip_freeze_digest() -> str:
         capture_output=True,
         text=True,
     )
-    normalized = "\n".join(sorted(result.stdout.splitlines()))
-    if normalized:
-        normalized += "\n"
+    normalized = _normalize_pip_freeze(result.stdout.splitlines())
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
