@@ -145,13 +145,14 @@ usage, trace, ledger, and audit evidence is recorded in
 [`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md).
 
 The current Stage 3B/3D process-signal work joins clean parent pilots without
-using evaluation scores. The new SM02 and SM05 reruns use the latest
-family-free process projection and replay-stable logical-case store. They
-confirm lifecycle observability and tool-closure joins, but both remain
-`STOP_NO_SIGNAL`: extraction is shadow `pending`, no artifact/use/outcome
-chain is attributable, and no N+1 candidate is unlocked. Detailed dated
-reports are [`extraction_stage2_sm02_process_signal_final_20260830.md`](extraction_stage2_sm02_process_signal_final_20260830.md) and
-[`extraction_stage2_sm05_process_signal_20260830.md`](extraction_stage2_sm05_process_signal_20260830.md). Extraction remains the first
+using evaluation scores. The latest SM02 and SM05 reruns use the family-free
+process projection and replay-stable logical-case store. They confirm lifecycle
+observability and tool-closure joins, but both remain `STOP_NO_SIGNAL`:
+extraction is shadow `pending`, no artifact/use/outcome chain is attributable,
+and no N+1 candidate is unlocked. Detailed reports are
+[`extraction_stage2_clean_parent_20260901.md`](extraction_stage2_clean_parent_20260901.md);
+the earlier 2026-08-30 reports are retained as historical diagnostics.
+Extraction remains the first
 layer to open only after a signal-ready case; the other five layers stay
 shadow/validation-only.
 
