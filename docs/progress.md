@@ -43,7 +43,7 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1098 passed`.
+- RSIMem: `1099 passed`.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
