@@ -503,7 +503,9 @@ class JsonProcessSignalCaseStore:
         records: dict[str, str] = {}
         for line_number, line in enumerate(self.path.read_text(encoding="utf-8").splitlines(), 1):
             if not line.strip():
-                continue
+                raise ValueError(
+                    f"malformed process-signal case at line {line_number}"
+                )
             try:
                 case = ProcessSignalCase.from_payload(json.loads(line))
             except (json.JSONDecodeError, TypeError, ValueError) as exc:
