@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "manifestId": "rsimem-foundation-baseline-20260901",
+  "capturedAt": "2026-09-01T23:02:08+08:00",
+  "purpose": "Pre-cleanup repository, runtime, interface, and evidence baseline for the revised foundation checklist.",
+  "deletionAuthorized": false,
+  "repository": {
+    "root": "Study/RSIMem",
+    "commit": "250cd28e23c6b563fd6edaa924db210666f1a9c4",
+    "workingTreeClean": true,
+    "trackedFileCount": 2426,
+    "branch": "main"
+  },
+  "runtime": {
+    "python": "3.11.15",
+    "pythonRequirement": ">=3.11,<3.12",
+    "environment": ".venv",
+    "packageVersions": {
+      "rsimem": "0.1.0",
+      "past-bench": "1.0.0",
+      "hermes-agent": "0.4.0",
+      "pytest": "9.1.1",
+      "pydantic": "2.13.4",
+      "openai": "2.54.0",
+      "httpx": "0.28.1",
+      "pyyaml": "6.0.3"
+    },
+    "dependencyLock": {
+      "lockFilePresent": false,
+      "pipFreezeDigest": "ff5a454288e5c494a21db97bdaa1c32c114a6521d3c7476851cb3bf6a2da4bb0",
+      "requirementsDigests": {
+        "benchmarks/past-bench/requirements.txt": "10c13c962c46345c3698e35c56ecc34e0dd7c8775c7f32cf4a7101cf9fb758e0",
+        "benchmarks/past-bench/requirements-sandbox-server.txt": "f11336d3f97239512984ae28bf830bb2e0848c74139bd604850cb2cf06b97147",
+        "pyproject.toml": "ce2440f36324702670bbe014232051d3f6b2d4318b0cead8a1ad317ac5f98ec9",
+        "benchmarks/past-bench/pyproject.toml": "ab9747819c6a11b6eeb503d757dd39e753cedcac98630c803856eb6fd2e90de5"
+      },
+      "editableHermesPath": "benchmarks/past-bench/agents/hermes-agent",
+      "editableHermesPathVerified": true
+    }
+  },
+  "vendoredIdentity": {
+    "hermesAgent": {
+      "packageVersion": "0.4.0",
+      "lastRepositoryCommit": "c79be3a443cfe8118684c307400c6a9b143395b4",
+      "gitTreeDigest": "96bac5d90d7762d36bd1fc43020cac63d21e33ebcf9178c4108ef1b9a7a4b02b",
+      "upstreamCommit": null
+    },
+    "pastBench": {
+      "packageVersion": "1.0.0",
+      "lastRepositoryCommit": "f4cce4814ad402952e462291dbbd2b26c841800b",
+      "gitTreeDigest": "01ff23513bbc5db3063f916333c81c2c31be99e02551b3fe4f4be143be79f9d1"
+    },
+    "rsimemSource": {
+      "gitTreeDigest": "b8fc859041f2fcae742b740daffbfadc50a7f7027dc1543719bd56a65a289105"
+    }
+  },
+  "verification": {
+    "commands": [
+      {
+        "command": ".venv/bin/python -m pytest -q tests",
+        "result": "1101 passed"
+      },
+      {
+        "command": "(cd benchmarks/past-bench && ../../.venv/bin/pytest -q)",
+        "result": "401 passed, 2 skipped"
+      },
+      {
+        "command": ".venv/bin/python -m compileall -q src tests",
+        "result": "passed"
+      },
+      {
+        "command": ".venv/bin/python -m pip check",
+        "result": "No broken requirements found"
+      },
+      {
+        "command": "bash -n scripts/*.sh",
+        "result": "passed"
+      },
+      {
+        "command": ".venv/bin/python -m rsimem.secret_scan",
+        "result": "tracked-secret-scan: clean"
+      },
+      {
+        "command": "git diff --check",
+        "result": "passed"
+      }
+    ],
+    "providerProbe": {
+      "status": "diagnostic_only",
+      "notIncludedInBenchmark": true
+    }
+  },
+  "publicInterfaces": {
+    "consoleScripts": [
+      "rsimem-ledger",
+      "rsimem-audit",
+      "rsimem-preflight",
+      "rsimem-analyze-matched",
+      "rsimem-prepare-adaptive",
+      "rsimem-activate-adaptive",
+      "rsimem-prepare-adaptive-validation",
+      "rsimem-assemble-adaptive-validation",
+      "rsimem-analyze-adaptive",
+      "rsimem-preflight-extraction",
+      "rsimem-analyze-extraction",
+      "rsimem-prepare-extraction",
+      "rsimem-propose-extraction",
+      "rsimem-preflight-extraction-matched",
+      "rsimem-policy-feasibility",
+      "rsimem-final-report",
+      "past-bench"
+    ],
+    "importEntrypoints": [
+      "rsimem.hermes_past_bridge.HermesPastBenchBridge",
+      "rsimem.lifecycle.contracts",
+      "rsimem.lifecycle.snapshot",
+      "rsimem.lifecycle.writeback",
+      "rsimem.memory.process_feedback",
+      "rsimem.memory.process_corpus",
+      "rsimem.memory.pure_process",
+      "rsimem.memory.use_attribution",
+      "rsimem.memory.artifact_set",
+      "past_bench.runtime.adapters.hermes.HermesAdapter",
+      "past_bench.runner.self_evolve"
+    ],
+    "configEntrypoints": [
+      "configs/agents.yaml",
+      "configs/agents_backup.yaml",
+      "configs/past_bench_luna_smoke.yaml",
+      "configs/extraction_feedback_sm01.json",
+      "configs/extraction_feedback_sm02.json",
+      "configs/extraction_feedback_sm05.json",
+      "configs/extraction_split_plan_sm02_sm03_sm04.json",
+      "configs/extraction_split_plan_sm05_sm03_sm04.json",
+      "configs/extraction_validation_sm03.json",
+      "configs/revocations.jsonl"
+    ]
+  },
+  "artifactSchemas": {
+    "lifecycle": "LIFECYCLE_CONTRACT_SCHEMA_VERSION=1",
+    "contextSnapshot": "LIFECYCLE_CONTRACT_SCHEMA_VERSION=1",
+    "ledger": "SCHEMA_VERSION=1",
+    "processFeedback": "PROCESS_FEEDBACK_SCHEMA_VERSION=1",
+    "processCorpus": "PROCESS_CORPUS_SCHEMA_VERSION=1",
+    "memoryUseEvidence": "MEMORY_USE_EVIDENCE_SCHEMA_VERSION=1",
+    "artifactSet": "ARTIFACT_SET_SCHEMA_VERSION=1",
+    "toolExactJoin": "TOOL_EXACT_JOIN_SCHEMA_VERSION=1",
+    "logicalCase": "LOGICAL_CASE_SCHEMA_VERSION=1",
+    "processSignal": "PROCESS_SIGNAL_SCHEMA_VERSION=1",
+    "revocation": "REVOCATION_SCHEMA_VERSION=2",
+    "extractionOptimizerCorpus": "EXTRACTION_OPTIMIZER_CORPUS_SCHEMA_VERSION=6"
+  },
+  "fixtureIdentities": {
+    "rsimemHermesIntegration": "tests/test_hermes_integration.py",
+    "rsimemProcessContracts": "tests/test_process_feedback.py, tests/test_process_corpus.py, tests/test_pure_process.py",
+    "hermesPastAdapter": "benchmarks/past-bench/tests/test_rsimem_hermes_adapter.py",
+    "pastManifestContracts": "benchmarks/past-bench/tests/test_self_evolve_manifest_contract.py",
+    "historicalNoSignalEvidence": [
+      "outputs/extraction_feedback/hermes_luna/s2-sm02-clean-parent-20260901-v1",
+      "outputs/extraction_feedback/hermes_luna/s2-sm05-clean-parent-20260901-v1"
+    ]
+  },
+  "hermesPastBridgeCallGraph": {
+    "entry": "HermesAdapter._run_agent",
+    "edges": [
+      "HermesAdapter._run_agent -> HermesAdapter._activate_rsimem_bridge",
+      "HermesAdapter._activate_rsimem_bridge -> HermesPastBenchBridge.attach",
+      "HermesPastBenchBridge.attach -> _PromptMemoryStore.format_for_system_prompt",
+      "_PromptMemoryStore.format_for_system_prompt -> HermesPastBenchBridge.observe_query",
+      "_PromptMemoryStore.format_for_system_prompt -> HermesPastBenchBridge.record_semantic_prompt",
+      "HermesAdapter._run_agent -> HermesPastBenchBridge.on_task_completed",
+      "HermesPastBenchBridge.on_task_completed -> _record_semantic_outcomes",
+      "_record_semantic_outcomes -> _record_tool_call_results",
+      "_record_semantic_outcomes -> _record_pure_extraction_feedback",
+      "_record_pure_extraction_feedback -> build_joined_process_signal_cases",
+      "rsimem.ledger.main -> ledger event derivation",
+      "rsimem.audit.main -> trace completeness and accounting audit"
+    ],
+    "responsibilitySummary": {
+      "benchmark": "PAST-Bench task/family loading, environment dispatch, grader and final-plane score",
+      "host": "Hermes session/model/tool/native memory/context and usage",
+      "bridge": "compatibility wiring, memory observation and lifecycle boundary forwarding",
+      "frameworkCore": "canonical event, corpus, provenance, attribution, revision and receipt contracts",
+      "semanticFixture": "Mem0-flat extraction/writeback path used by the historical semantic fixture",
+      "reporting": "ledger, audit and final evaluation consumers"
+    }
+  },
+  "baselineLimitations": [
+    "No repository dependency lock file is currently checked in; pip freeze digest is recorded for this environment.",
+    "No real application-owned memory-use attribution provider is present in formal PAST tasks.",
+    "The revised checklist intentionally stops extraction-only N+1 work and does not claim three-type method readiness.",
+    "This manifest authorizes no deletion or behavior-changing cleanup until asset classification and clean-tree review are complete."
+  ]
+}
