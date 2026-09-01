@@ -42,6 +42,8 @@ The deterministic and storage-boundary test baselines are:
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
   passed.
+- `.venv/bin/python -m rsimem.secret_scan`: passed; this scans Git-tracked
+  regular files only and reports content-free path/pattern identities.
 
 Current capability matrix:
 
