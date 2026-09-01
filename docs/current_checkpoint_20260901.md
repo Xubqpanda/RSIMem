@@ -7,12 +7,15 @@ Date: 2026-09-01
 The research execution plan has since been superseded by the revised
 foundation checklist, which broadens the target to semantic, episodic, and
 procedural memory and stops the extraction-only N+1 path.  Stage 0A baseline
-freezing and 0B asset classification are complete; Stage 0C/0D cleanup and the
-new adapter contracts have not started.  The pre-cleanup identity is recorded
+freezing and 0B asset classification are complete; Stage 0C cleanup is in
+progress and the new adapter contracts have not started.  The cleanup pass has
+removed the stopped launcher group, extraction-only proposal entry point, and
+three orphaned configs.  The pre-cleanup identity is recorded
 in [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json), with
 the candidate inventory in [`asset_inventory_20260901.md`](asset_inventory_20260901.md).
-No cleanup deletion is authorized until the baseline gate and dependency audit
-pass.
+Remaining cleanup deletion is held until the baseline gate and dependency
+audit pass for each candidate; completed removals are recorded in commits
+`b1c9970`, `480f77b`, and `3b2cbb4`.
 
 The provider gate is healthy, and the finite Stage 2 clean-parent rerun is now
 complete. Formal proposal, held-out, activation, and matched-effect work
@@ -111,7 +114,7 @@ artifact identity (ID, schema version, and digest). New revocations must use
 
 The most recent deterministic acceptance baseline is:
 
-- RSIMem: `1101 passed`.
+- RSIMem: `1090 passed` after the Stage 0C removals.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when invoked from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`, and

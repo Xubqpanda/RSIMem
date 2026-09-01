@@ -14,8 +14,11 @@ The revised foundation checklist is now being executed from Stage 0.  A clean
 pre-cleanup baseline is frozen in [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json),
 the candidate asset inventory is recorded in [`asset_inventory_20260901.md`](asset_inventory_20260901.md),
 and `python -m rsimem.baseline` provides a fail-closed identity gate before any
-cleanup deletion.  Stage 0C/0D deletion and post-cleanup equivalence remain
-closed until replacement contracts are implemented and audited.
+cleanup deletion.  Stage 0C has removed the stopped launcher group, the
+extraction-only proposal entry point, and three orphaned extraction configs;
+remaining deletion is held until generalized replacement contracts are
+implemented and audited.  The cleanup-ready manifest now passes its complete
+fail-closed preflight.
 
 ## Status Legend
 
@@ -29,8 +32,9 @@ This section is the authoritative summary for the current repository state.
 Later sections retain dated implementation history and may contain earlier
 test counts, provider attempts, or superseded experiment descriptions.
 
-The implementation is currently at the end of deterministic/process-signal
-infrastructure work and has not entered a live N+1 experiment.  The runtime
+The implementation is currently in Stage 0C cleanup after deterministic and
+process-signal infrastructure work; it has not entered a live N+1 experiment.
+The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
 ```text
@@ -50,7 +54,8 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1101 passed`.
+- RSIMem: `1090 passed` after removing stopped extraction-only launchers and
+  proposal tests.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
@@ -95,8 +100,9 @@ partial batch is retained for infrastructure diagnosis and excluded from the
 process-signal census.  No N+1 candidate, held-out validation, or adaptive
 effect batch is authorized.
 
-Current implementation priority remains documentation, deterministic acceptance
-maintenance, and tightening the general opportunity/use contract.  The finite
+Current implementation priority remains completing the Stage 0C dependency
+audit, updating generalized boundaries, and maintaining deterministic
+acceptance.  The finite
 SM02/SM05 family attempt is closed as `STOP_NO_SIGNAL`; any future family must
 be separately pre-registered with a deployment-visible opportunity schema
 before another provider batch is authorized.

@@ -50,10 +50,10 @@ after their evidence index remains reachable.
 | `src/rsimem/memory/pure_extraction_optimizer.py` | GENERALIZE | Pure-process corpus materialization is reusable after renaming | pure optimizer tests; future updater view |
 | `src/rsimem/memory/pure_extraction.py` | GENERALIZE | Delayed feedback and source/future joins are framework evidence | Hermes bridge and pure extraction tests |
 | `configs/extraction_feedback_sm01.json` | DELETE | Stopped SM01 extraction feedback launcher config | old launcher only |
-| `configs/extraction_feedback_sm02.json` | DELETE | Stopped SM02 extraction feedback launcher config | old launcher only |
-| `configs/extraction_feedback_sm05.json` | DELETE | Stopped SM05 extraction feedback launcher config | old launcher only |
+| `configs/extraction_feedback_sm02.json` | DELETE | Removed in Stage 0C; no active consumer after the finite SM02 attempt closed | historical baseline/evidence only |
+| `configs/extraction_feedback_sm05.json` | DELETE | Removed in Stage 0C; no active consumer after the finite SM05 attempt closed | historical baseline/evidence only |
 | `configs/extraction_split_plan_sm02_sm03_sm04.json` | DELETE | Extraction-only split config superseded by new protocol manifest | extraction preflight/launcher |
-| `configs/extraction_split_plan_sm05_sm03_sm04.json` | DELETE | Extraction-only split config superseded by new protocol manifest | extraction preflight/launcher |
+| `configs/extraction_split_plan_sm05_sm03_sm04.json` | DELETE | Removed in Stage 0C; superseded by the forthcoming Stage 1 protocol manifest and had no active consumer | historical split evidence only |
 | `configs/extraction_validation_sm03.json` | DELETE | Stopped extraction validation config | validation launcher only |
 | `scripts/run_luna_adaptive_sm01.sh` | DELETE | Stopped extraction/adaptive experiment launcher | docs and adaptive tests; no new entry point |
 | `scripts/run_luna_adaptive_validation_sm01.sh` | DELETE | Stopped extraction validation launcher | docs and adaptive tests |
