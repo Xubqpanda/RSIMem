@@ -10,6 +10,13 @@ the boundary between completed runtime work and deferred experiments, is in
 sections below are retained for provenance and may describe superseded attempts
 or earlier regression counts.
 
+The revised foundation checklist is now being executed from Stage 0.  A clean
+pre-cleanup baseline is frozen in [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json),
+the candidate asset inventory is recorded in [`asset_inventory_20260901.md`](asset_inventory_20260901.md),
+and `python -m rsimem.baseline` provides a fail-closed identity gate before any
+cleanup deletion.  Stage 0C/0D deletion and post-cleanup equivalence remain
+closed until replacement contracts are implemented and audited.
+
 ## Status Legend
 
 - [x] Completed and verified.

@@ -4,6 +4,16 @@ Date: 2026-09-01
 
 ## Decision
 
+The research execution plan has since been superseded by the revised
+foundation checklist, which broadens the target to semantic, episodic, and
+procedural memory and stops the extraction-only N+1 path.  Stage 0A baseline
+freezing and 0B asset classification are complete; Stage 0C/0D cleanup and the
+new adapter contracts have not started.  The pre-cleanup identity is recorded
+in [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json), with
+the candidate inventory in [`asset_inventory_20260901.md`](asset_inventory_20260901.md).
+No cleanup deletion is authorized until the baseline gate and dependency audit
+pass.
+
 The provider gate is healthy, and the finite Stage 2 clean-parent rerun is now
 complete. Formal proposal, held-out, activation, and matched-effect work
 remains closed because the rerun produced no extraction-owned signal. This is
