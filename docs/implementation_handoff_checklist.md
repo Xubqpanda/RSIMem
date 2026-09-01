@@ -492,9 +492,10 @@ Provider gate、验证基线和下一批恢复顺序的完整记录见
 - 当前状态：primary provider bounded probe 和 SM02/SM05 fresh clean-parent
   batches 均完成；两组结果都是 `STOP_NO_SIGNAL`，未生成 candidate。任何
   后续 batch 仍须在注册后、首个 task 前重新执行 probe。
-- 下一步：provider 恢复后重新执行预注册 clean parent batch，并重新核验
-  source、extraction、persisted memory、retrieval、exposure、tool
-  call/result 和 observable outcome 的完整链路。
+- 下一步：保持 `STOP_NO_SIGNAL`，优先补强 deployment-visible
+  opportunity/use contract；任何新 family 都必须单独预注册并在首个 task
+  前重新执行 provider probe，然后再核验 source、extraction、persisted
+  memory、retrieval、exposure、tool call/result 和 observable outcome。
 
 截至 2026-09-01：
 

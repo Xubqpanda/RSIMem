@@ -55,7 +55,7 @@ source context
 2026-08-30 process-only counts，详见
 [`extraction_stage2_clean_parent_20260901.md`](extraction_stage2_clean_parent_20260901.md)。
 
-### 2.1.1 Clean process rerun（本次更新）
+### 2.1.1 Historical clean process rerun（2026-08-30）
 
 为避免继续使用已撤销的 SM02/SM05 historical labels，使用当前
 process-signal builder 和纯 process projection 在干净 detached worktree
@@ -276,8 +276,9 @@ RSIMem 当前尚未证明：仅依靠现有 pure process evidence 就能稳定�
 
 ## Evidence Index
 
-- [`extraction_stage2_sm02_process_signal_final_20260830.md`](extraction_stage2_sm02_process_signal_final_20260830.md)：当前 SM02 clean parent rerun；9 个 logical case 均为 `observable_only`。
-- [`extraction_stage2_sm05_process_signal_20260830.md`](extraction_stage2_sm05_process_signal_20260830.md)：当前 SM05 clean parent rerun；8 个 logical case 为 `observable_only`，2 个为 `censored`。
+- [`extraction_stage2_clean_parent_20260901.md`](extraction_stage2_clean_parent_20260901.md)：authoritative fresh SM02/SM05 clean-parent rerun；两批均为 `STOP_NO_SIGNAL`。
+- [`extraction_stage2_sm02_process_signal_final_20260830.md`](extraction_stage2_sm02_process_signal_final_20260830.md)：historical SM02 process-only rerun；9 个 logical case 均为 `observable_only`。
+- [`extraction_stage2_sm05_process_signal_20260830.md`](extraction_stage2_sm05_process_signal_20260830.md)：historical SM05 process-only rerun；8 个 logical case 为 `observable_only`，2 个为 `censored`。
 - [`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md)：早期 SM01 no-signal batch。
 - [`extraction_stage3_sm01_feedback_v9a_20260829.md`](extraction_stage3_sm01_feedback_v9a_20260829.md)：当前 SM01 authoritative no-signal batch。
 - [`extraction_stage3_sm02_feedback_v5_20260829.md`](extraction_stage3_sm02_feedback_v5_20260829.md)：历史 SM02 batch；其中 missed 有效性的旧结论已被本文撤销。
