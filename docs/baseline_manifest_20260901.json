@@ -9,7 +9,11 @@
     "commit": "250cd28e23c6b563fd6edaa924db210666f1a9c4",
     "workingTreeClean": true,
     "trackedFileCount": 2426,
-    "branch": "main"
+    "branch": "main",
+    "allowedPostBaselinePaths": [
+      "docs/baseline_manifest_20260901.json",
+      "docs/asset_inventory_20260901.md"
+    ]
   },
   "runtime": {
     "python": "3.11.15",
@@ -27,7 +31,7 @@
     },
     "dependencyLock": {
       "lockFilePresent": false,
-      "pipFreezeDigest": "ff5a454288e5c494a21db97bdaa1c32c114a6521d3c7476851cb3bf6a2da4bb0",
+      "pipFreezeDigest": "5912c8d4bec493b984f14a3a06fa784896372eb2a41baeb30430bc3ff83fadb9",
       "requirementsDigests": {
         "benchmarks/past-bench/requirements.txt": "10c13c962c46345c3698e35c56ecc34e0dd7c8775c7f32cf4a7101cf9fb758e0",
         "benchmarks/past-bench/requirements-sandbox-server.txt": "f11336d3f97239512984ae28bf830bb2e0848c74139bd604850cb2cf06b97147",

@@ -124,21 +124,21 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 
 ### 0A：冻结清理前基线
 
-- □ 记录 Git commit、Python、依赖锁、Hermes commit 和 PAST vendored identity。
-- □ 在 clean tree 运行 RSIMem 全量测试、PAST 测试、compileall、dependency、shell syntax、secret scan 和 diff check。
-- □ 生成 baseline manifest，记录 test count、skips、关键 fixture identity 和验收命令。
-- □ 记录公共 CLI、Python imports、config entry points 和 artifact schemas。
-- □ 记录 `hermes_past_bridge.py` 的职责和调用图，建立阶段 2 拆分基线。
+- √ 记录 Git commit、Python、依赖锁状态、Hermes commit 和 PAST vendored identity，见 [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json)。仓库当前没有 lock file，manifest 固定记录 pip-freeze digest。
+- √ 在 clean tree 运行 RSIMem 全量测试、PAST 测试、compileall、dependency、shell syntax、secret scan 和 diff check。
+- √ 生成 baseline manifest，记录 test count、skips、关键 fixture identity 和验收命令。
+- √ 记录公共 CLI、Python imports、config entry points 和 artifact schemas。
+- √ 记录 `hermes_past_bridge.py` 的职责和调用图，建立阶段 2 拆分基线。
 
 反向验收：
 
-- □ 无 clean baseline manifest 时禁止删除。
-- □ 工作树、依赖或 PAST identity 不一致时 preflight 失败。
-- □ 不得通过修改 baseline 数字掩盖测试失败。
+- √ 无 clean baseline manifest 时禁止删除；manifest 的 `deletionAuthorized` 当前为 `false`。
+- √ 工作树、依赖或 PAST identity 不一致时 preflight 失败；`python -m rsimem.baseline` 校验 manifest、clean tree、commit drift、pip-freeze、requirements、Python/package/import origin 和 vendored tree digest，缺失或漂移均 fail closed。
+- √ 不得通过修改 baseline 数字掩盖测试失败；manifest 保存原始命令结果和固定 source commit。
 
 ### 0B：资产分类
 
-每个候选文件标记为 `KEEP`、`GENERALIZE`、`DELETE` 或 `EVIDENCE_KEEP`，记录理由和依赖者。
+√ 每个候选文件已标记为 `KEEP`、`GENERALIZE`、`DELETE` 或 `EVIDENCE_KEEP`，理由和已知依赖者见 [`asset_inventory_20260901.md`](asset_inventory_20260901.md)。该表只完成初始分类，不授权删除。
 
 优先审计：
 
@@ -449,7 +449,9 @@ Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 
 - √ Extraction-only 主线在研究决策上停止，不再生成 N+1。
 - 部分完成：三类 storage-boundary 和六 surfaces 有 fixture，但未按新 taxonomy/ownership 验收。
 - 部分完成：PAST/Hermes 可运行，但仍集中在大型 `hermes_past_bridge.py`。
-- □ 阶段 0 未完成正式分类和冗余删除。
+- √ 阶段 0A baseline 冻结和 0B 逐文件资产分类已完成；`baseline_preflight`
+  可在 cleanup 前 fail closed。
+- □ 阶段 0C/0D 尚未执行删除、收敛和清理后等价验收。
 - □ 阶段 1 未生成冻结 protocol manifest 和完整 family matrix。
 - □ 阶段 2 未完成四个 adapter contracts 和单体拆分。
 - □ 阶段 3 未运行三类 oracle sensitivity matrix。
@@ -460,6 +462,7 @@ Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 
 RSIMem 根目录：
 
 ```bash
+PYTHONPATH=src .venv/bin/python -m rsimem.baseline --manifest docs/baseline_manifest_20260901.json --repo-root .
 .venv/bin/python -m pytest -q tests
 .venv/bin/python -m compileall -q src tests
 .venv/bin/python -m pip check
