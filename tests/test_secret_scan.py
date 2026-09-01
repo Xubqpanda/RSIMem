@@ -22,12 +22,20 @@ def test_scans_only_repository_relative_regular_files(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("name", "payload", "pattern"),
     (
-        ("openai.txt", b"token = sk-abcdefghijklmnopqrstuvwxyz123456", "openai_style"),
-        ("github.txt", b"token = ghp_abcdefghijklmnopqrstuvwx", "github_pat"),
-        ("aws.txt", b"AKIAABCDEFGHIJKLMNOP", "aws_access_key"),
+        (
+            "openai.txt",
+            b"token = " + b"sk-" + b"abcdefghijklmnopqrstuvwxyz123456",
+            "openai_style",
+        ),
+        (
+            "github.txt",
+            b"token = " + b"ghp_" + b"abcdefghijklmnopqrstuvwx",
+            "github_pat",
+        ),
+        ("aws.txt", b"AK" + b"IA" + b"ABCDEFGHIJKLMNOP", "aws_access_key"),
         (
             "key.pem",
-            b"-----BEGIN PRIVATE KEY-----\nABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=",
+            b"-----BEGIN " + b"PRIVATE KEY-----\n" + b"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789+/=",
             "private_key",
         ),
     ),
