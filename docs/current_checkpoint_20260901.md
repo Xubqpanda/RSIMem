@@ -15,6 +15,11 @@ The latest bounded provider probe (2026-09-01) passed:
   object present.
 - Model: `gpt-5.6-luna`.
 
+After this checkpoint was written, five consecutive provider-only probes against
+the same endpoint/model also returned HTTP `200`, non-empty content, and a usage
+object.  These probes are connectivity diagnostics only; they do not reopen the
+closed SM02/SM05 process-signal census or authorize a repeated no-signal batch.
+
 The probe itself was outside benchmark accounting. Each registered clean-parent
 batch also passed the same completion probe immediately before its first task;
 provider diagnostics do not enter a process corpus.
