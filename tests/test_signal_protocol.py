@@ -6,6 +6,7 @@ import pytest
 
 from rsimem.memory.signal_protocol import (
     JsonProcessSignalAnalysisProtocolStore,
+    PROCESS_SIGNAL_NO_SIGNAL_CASE_ID,
     ProcessSignalAnalysisProtocol,
     protocol_for_extraction_manifest,
     validate_protocol_for_extraction_manifest,
@@ -122,6 +123,7 @@ def test_protocol_manifest_binding_is_deterministic_and_result_independent() -> 
     assert protocol.task_template_group_ids == ("sm02-process-pilot-train-v1",)
     assert protocol.task_manifest_digest == "a" * 64
     assert protocol.provider_model == "https://coding.tu-zi.com/v1/gpt-5.6-luna"
+    assert protocol.no_signal_case_id == PROCESS_SIGNAL_NO_SIGNAL_CASE_ID
 
     changed = dict(manifest)
     changed["replicates"] = 4

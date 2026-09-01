@@ -72,7 +72,7 @@ proposal, validation input, ACTIVE pointer, or paper result.
 
 The most recent deterministic acceptance baseline is:
 
-- RSIMem: `1095 passed`.
+- RSIMem: `1097 passed`.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when invoked from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`, and
