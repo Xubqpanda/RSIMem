@@ -93,7 +93,7 @@ after their evidence index remains reachable.
 | `tests/test_extraction_validation_evidence.py` | GENERALIZE | Matched evidence fixtures are generic | validation evidence |
 | `tests/test_extraction_validation_runtime.py` | GENERALIZE | Runtime binding fixtures are generic | validation runtime |
 | `tests/test_policy_feasibility.py` | GENERALIZE | Surface intervention/replay fixtures inform sensitivity | policy feasibility |
-| `tests/test_policy_feasibility_nplus1.py` | DELETE | Prompt N+1-specific assertions are stopped | old N+1 path |
+| `tests/test_policy_feasibility_nplus1.py` | DELETE | Removed in Stage 0C; prompt N+1-specific assertions are stopped while generic intervention/replay coverage remains in `test_policy_feasibility.py` | old N+1 path |
 | `tests/test_pure_extraction_optimizer.py` | GENERALIZE | Pure process corpus fixtures are reusable | pure optimizer |
 | `tests/test_pure_extraction.py` | GENERALIZE | Delayed feedback and attribution fixtures are reusable | pure extraction |
 | `docs/extraction_stage1_acceptance_20260828.md` | EVIDENCE_KEEP | Historical infrastructure evidence | current checkpoint/case index |
