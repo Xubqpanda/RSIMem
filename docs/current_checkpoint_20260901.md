@@ -83,9 +83,11 @@ semantic SM01 type-matched oracle seed is now registered from the public learn
 input only; its preparation path copies an evaluation-only seed home and passes
 only the opaque case ID to PAST. The semantic catalog also makes native and the
 three declared PAST control slices executable; shortcut and wrong-mechanism
-run without persistence. This makes all five SM01 conditions preparation-ready.
-Other oracle target cases stay non-executable. No real model matched run or
-sensitivity claim has been made.
+run without persistence. A manifest-bound pilot executor completed one
+unseeded SM01 replicate-2 across all five conditions after a passing provider
+probe; a content-free audit reconciled 10 traces and all raw usage buckets.
+This is execution/readiness evidence only. Other oracle target cases stay
+non-executable, and no replicated sensitivity or quality claim has been made.
 The source-level readiness catalog does not read task prompts, graders, or
 answers. It reports that six semantic and all three episodic targets still lack
 case-bound type-matched oracle seeds, while procedural targets additionally
@@ -159,8 +161,10 @@ artifact identity (ID, schema version, and digest). New revocations must use
 
 The most recent deterministic acceptance baseline is:
 
-- RSIMem: `1136 passed` after Stage 1 contracts, Stage 2 adapter contracts,
-  the Stage 3 sensitivity harness, and isolated run registration were added.
+- RSIMem: `1151 passed` before the pilot-audit additions; the focused Stage 3
+  regression suite now passes `26` tests. Stage 1 contracts, Stage 2 adapter
+  contracts, the Stage 3 sensitivity harness, and isolated run registration
+  remain covered.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when invoked from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`, and
