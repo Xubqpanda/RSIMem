@@ -65,7 +65,7 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1127 passed` after runner canonical host-event/projection trace
+- RSIMem: `1128 passed` after runner canonical host-event/projection trace
   export was added to the Stage 2 baseline.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
