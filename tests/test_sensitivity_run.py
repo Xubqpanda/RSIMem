@@ -218,3 +218,28 @@ def test_verified_oracle_registry_upgrades_only_its_case(tmp_path) -> None:
     assert upgraded.episode_selector == "family.eval_only"
     assert upgraded.host_state_digest == oracle_seed_tree_digest(seed)
     assert sum(item.executable for item in resolved) == 1
+
+
+def test_checked_in_sm01_registry_upgrades_only_sm01_oracle_case() -> None:
+    matrix = _matrix()
+    root = Path(__file__).resolve().parents[1]
+    past_root = root / "benchmarks" / "past-bench"
+    catalog = build_past_sensitivity_catalog(matrix=matrix, past_bench_root=past_root)
+    planned = planned_deployments_from_catalog(matrix=matrix, catalog=catalog)
+    from rsimem.oracle_seed_registry import OracleSeedRegistry
+
+    resolved = apply_verified_oracle_seed_registry(
+        matrix=matrix,
+        catalog=catalog,
+        deployments=planned,
+        registry=OracleSeedRegistry.load(root / "configs/sensitivity/oracle_seed_registry_sm01.json"),
+        trusted_root=past_root / "self-evolve-tasks-v2" / "_rsimem_oracles",
+    )
+    executable = tuple(item for item in resolved if item.executable)
+    assert len(executable) == 1
+    assert executable[0].condition is SensitivityCondition.TYPE_MATCHED_ORACLE
+    assert executable[0].case_id == next(
+        case.case_id for case in matrix.cases
+        if case.family_id == "SM01_preference_adoption"
+        and case.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
+    )
