@@ -92,13 +92,15 @@ executable; registry payloads contain no memory text. The checked-in SM01
 semantic panel's seven seeds and all three episodic seeds are manually authored
 from their public learn or update inputs. All ten procedural oracle seeds and
 all five procedural deployment conditions are registered and
-preparation-verified; PC01 replicate-1 and all three episodic replicate-1 pilots
-have passed content-free audit, while remaining procedural and episodic
-replicates and families are pending. The first PC02 replicate-1 attempt is
+preparation-verified; PC01 and PC02 replicate-1 and all three episodic
+replicate-1 pilots have passed content-free audit, while remaining procedural
+and episodic replicates and families are pending. The first PC02 replicate-1 attempt is
 retained as an infrastructure audit but excluded: its `native_static` condition
 had incomplete usage and its control conditions exhausted provider retries
 without usage. It is documented in
-`docs/sensitivity_pc02_attempt_20260902.md` and does not count as a pilot.
+`docs/sensitivity_pc02_attempt_20260902.md` and does not count as a pilot. The
+accepted PC02 retry-2 pilot is recorded in
+`docs/sensitivity_pc02_pilot_20260902.md`.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
