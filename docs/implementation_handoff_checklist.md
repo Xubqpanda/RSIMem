@@ -454,7 +454,7 @@ Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 
 - √ 阶段 0C 已删除无活动依赖的旧 launcher、proposal 入口、dead tests 和三个 orphaned config；仍在使用的 extraction-named configs 已明确为 generalized deterministic fixtures。
 - √ 阶段 1 已冻结 taxonomy、surface、26-family matrix 与 protocol manifest。
 - 部分完成：阶段 2 的四类 adapter contracts、deterministic harness、Hermes host boundary 与三类 projection 已完成；真实 runner 的 host trace 和 terminal method binding 已接线，正式 full-lifecycle method flow/golden trace 尚待实现。
-- 部分完成：阶段 3 已完成 SM/EP/PC result-independent five-condition oracle harness；尚未运行真实模型 sensitivity matrix，因此没有任何 panel sensitivity 结论。
+- 部分完成：阶段 3 已完成 SM/EP/PC result-independent five-condition oracle harness，以及将每个 `family x condition x replicate` 展开为独立 state/Hermes-home/trace 的 immutable run manifest。PAST CLI 只接受注册的 opaque `rsimem_method_task_id` 进入 method boundary。`type_matched_oracle`、`shortcut_current_input` 和 `wrong_mechanism` 尚无真实 host deployment，manifest 因而 fail closed、不可执行；尚未运行真实模型 sensitivity matrix，因此没有任何 panel sensitivity 结论。
 - □ AdaMem、MemQ、Recuris 未接入；这是阶段 4，不是当前缺陷。
 
 ## 9. 标准验收命令
