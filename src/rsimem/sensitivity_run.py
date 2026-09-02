@@ -398,12 +398,12 @@ def planned_deployments_from_catalog(
     matrix: SensitivityMatrix,
     catalog: object,
 ) -> tuple[SensitivityDeployment, ...]:
-    """Translate audit availability into non-executable registered deployments.
+    """Translate verified family-level availability into deployments.
 
-    Availability says that a family exposes a named control episode.  It is
-    not proof that the host deployment, especially an oracle seed, has been
-    materialized.  Therefore this function keeps every returned deployment
-    non-executable until a launcher writes a concrete, verified deployment.
+    Availability is sufficient for native and named control task slices: the
+    launcher can resolve their immutable task selector directly from the
+    checked-in family manifest. Correct-type oracle artifacts remain
+    non-executable until a case-bound seed registry verifies their host state.
     """
 
     from .past_sensitivity_catalog import PastSensitivityCatalog
@@ -437,7 +437,10 @@ def planned_deployments_from_catalog(
             "state_mode": state_modes[case.condition],
             "host_state_digest": _digest({"availability": entry.payload()}),
             "launcher_config_digest": _digest({"availability": entry.payload(), "mode": state_modes[case.condition]}),
-            "executable": False,
+            "executable": (
+                entry.available
+                and case.condition is not SensitivityCondition.TYPE_MATCHED_ORACLE
+            ),
         }
         deployments.append(SensitivityDeployment(
             deployment_id="sensitivity-deployment." + _digest(values)[:40],

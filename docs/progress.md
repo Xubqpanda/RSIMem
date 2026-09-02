@@ -51,12 +51,14 @@ family/task ID cannot enter the method boundary.  Stage 3 has a result-independe
 no real-model sensitivity results.  Its new immutable run-manifest contract
 expands every `family x condition x replicate` into isolated state,
 Hermes-home, and trace directories, and the PAST launcher accepts only the
-registered opaque method case ID. The three non-native condition deployment
-mechanisms (`type_matched_oracle`, `shortcut_current_input`, and
-`wrong_mechanism`) are not generally implemented yet, so a full Stage 3
-manifest fails closed as non-executable. A single case-bound SM01 semantic
-oracle seed is registered and can be prepared as an evaluation-only sequence;
-this does not open the full matrix or enter a live N+1 experiment.
+registered opaque method case ID. Semantic native, no-persistence, shortcut,
+and wrong-mechanism task slices are now catalog-backed executable deployments;
+shortcut and wrong-mechanism explicitly disable persistence. A single
+case-bound SM01 semantic oracle seed is registered and can be prepared as an
+evaluation-only sequence, making all five SM01 conditions preparation-ready.
+The full Stage 3 matrix remains fail-closed because other oracle assets and a
+formal execution runner are still absent; this does not enter a live N+1
+experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: six semantic and all three episodic target
 families expose the named non-oracle control slots but lack a registered

@@ -81,9 +81,11 @@ generally implemented, so the manifest correctly rejects an incomplete matrix
 rather than treating five conditions as one runtime path. A case-bound
 semantic SM01 type-matched oracle seed is now registered from the public learn
 input only; its preparation path copies an evaluation-only seed home and passes
-only the opaque case ID to PAST. The remaining controls and target cases stay
-non-executable. These artifacts prove deployment readiness for that one oracle
-case only; no real model matched run or sensitivity claim has been made.
+only the opaque case ID to PAST. The semantic catalog also makes native and the
+three declared PAST control slices executable; shortcut and wrong-mechanism
+run without persistence. This makes all five SM01 conditions preparation-ready.
+Other oracle target cases stay non-executable. No real model matched run or
+sensitivity claim has been made.
 The source-level readiness catalog does not read task prompts, graders, or
 answers. It reports that six semantic and all three episodic targets still lack
 case-bound type-matched oracle seeds, while procedural targets additionally

@@ -183,7 +183,11 @@ def prepare_past_sensitivity_launch(
     digest = _digest(document)
     persistence = (
         "without_persistence"
-        if run.condition is SensitivityCondition.NO_PERSISTENCE
+        if run.condition in {
+            SensitivityCondition.NO_PERSISTENCE,
+            SensitivityCondition.SHORTCUT_CURRENT_INPUT,
+            SensitivityCondition.WRONG_MECHANISM,
+        }
         else "with_persistence"
     )
     command = (
