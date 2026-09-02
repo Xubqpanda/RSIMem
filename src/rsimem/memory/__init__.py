@@ -20,6 +20,14 @@ from .contracts import (
     MemoryQuery,
     MemoryResource,
 )
+from .taxonomy import (
+    MEMORY_TAXONOMY_SCHEMA,
+    MEMORY_TAXONOMY_SCHEMA_VERSION,
+    MemoryControlDescriptor,
+    MemoryControlKind,
+    MemoryTransform,
+    MemoryUnitDescriptor,
+)
 from .runtime import MemoryBackendRegistry, MemoryRuntime
 from .backends import (
     HermesEpisodicBackend,
@@ -278,6 +286,12 @@ __all__ = [
     "MemoryObserver",
     "MemoryQuery",
     "MemoryResource",
+    "MEMORY_TAXONOMY_SCHEMA",
+    "MEMORY_TAXONOMY_SCHEMA_VERSION",
+    "MemoryControlDescriptor",
+    "MemoryControlKind",
+    "MemoryTransform",
+    "MemoryUnitDescriptor",
     "MemoryRuntime",
     "HermesEpisodicBackend",
     "HermesProceduralBackend",
