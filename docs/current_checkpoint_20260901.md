@@ -1,6 +1,6 @@
-# Current Checkpoint: Provider Probe Recovered
+# Current Checkpoint: EP01 Pilot Audited
 
-Date: 2026-09-01
+Date: 2026-09-02
 
 ## Decision
 
@@ -84,22 +84,17 @@ input only; its preparation path copies an evaluation-only seed home and passes
 only the opaque case ID to PAST. The semantic catalog also makes native and the
 three declared PAST control slices executable; shortcut and wrong-mechanism
 run without persistence. A manifest-bound pilot executor completed SM01
-replicate-2 and SM02 replicate-1 across all five conditions after passing
-provider probes; each content-free audit reconciled all traces and raw usage
-buckets. A procedural PC01 replicate-1 pilot has also completed all five
-conditions with a clean content-free audit. This is execution/readiness evidence only. The full semantic panel now has
-seven case-bound oracle seeds prepared from public learn/update input and
-verified as evaluation-only fresh-state slices. Ten procedural oracle seeds are
-also now registered and layout-verified. Episodic target cases remain without
-oracle seeds. Procedural controls and oracle deployments are preparation-ready;
-no procedural provider pilot or replicated sensitivity claim has been made.
-The source-level readiness catalog does not read task prompts, graders, or
-answers. It reports that all three episodic targets still lack case-bound
-type-matched oracle seeds. Procedural oracle and control assets are complete,
-with all five conditions preparation-verified; provider execution remains
-pending. A named PAST task control remains audit evidence, not an executable
-host deployment, until its artifact/state and launcher configuration are
-registered.
+replicate-2, SM02 replicate-1, EP01 replicate-1, and PC01 replicate-1 across
+all five conditions after passing provider probes; each content-free audit
+reconciled all traces and raw usage buckets. This is execution/readiness
+evidence only. The full semantic, episodic, and procedural panels now have 7,
+3, and 10 case-bound oracle seeds, respectively, prepared from public
+learn/update input and verified as evaluation-only fresh-state slices. The
+source-level readiness catalog does not read task prompts, graders, or answers.
+Remaining family pilots and replicates are pending, and no panel sensitivity
+claim has been made. A named PAST task control remains audit evidence, not an
+executable host deployment, until its artifact/state and launcher configuration
+are registered.
 The launcher can prepare a case-specific PAST sequence slice and passes only
 the opaque method case ID, alongside registered isolated state, Hermes-home,
 and trace locations. It rejects non-executable deployments before forming any
@@ -166,8 +161,8 @@ artifact identity (ID, schema version, and digest). New revocations must use
 
 The most recent deterministic acceptance baseline is:
 
-- RSIMem: `1151 passed` before the pilot-audit additions; the focused Stage 3
-  regression suite now passes `26` tests. Stage 1 contracts, Stage 2 adapter
+- RSIMem: `1169 passed`; the focused launcher/catalog/registry/prepare/run
+  regression suite passes `33` tests. Stage 1 contracts, Stage 2 adapter
   contracts, the Stage 3 sensitivity harness, and isolated run registration
   remain covered.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when invoked from
