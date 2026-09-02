@@ -178,7 +178,7 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 - √ Tracked imports、可用 CLI、配置引用与 packaging 入口已由 baseline preflight 和全量测试覆盖。
 - √ 已审计删除入口的残留引用；已删除 launcher/proposal/config 不再是可调用路径。
 - √ Generic corpus 和 `STOP_NO_SIGNAL` evidence 仍可读；停止的 proposal CLI 已移除，不会静默恢复旧协议。
-- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；Stage 0 后续回归基线为 RSIMem `1130 passed`、PAST-Bench `401 passed, 2 skipped`。
+- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；Stage 0 后续回归基线为 RSIMem `1133 passed`、PAST-Bench `401 passed, 2 skipped`。
 - √ 清理提交均通过对应测试，cleanup manifest 在 `07695ef` 上完成 12 项 clean-tree preflight。
 
 ## 4. 阶段 1：研究协议冻结
@@ -262,7 +262,7 @@ Mechanism：formation/retention coverage、retrieval、exposure、attributable u
 职责：枚举 case/split、重置和推进环境、提供 public capability schema、在 final plane 评分、生成 audit-only annotation。
 
 - √ 定义 host-neutral request/response/event contract，不引用 Hermes 类，见 `adapter_contracts.py`。
-- 部分完成：`PastBenchAdapter` 已封装 PAST task layout、split/family identity、公开 digest 和 content-free `PastExecutionTrace`；`AdapterHarness.bind_runtime_terminal()` 可将真实 terminal event 交给任意 method adapter，正式 launcher 尚未编排完整 method lifecycle。
+- 部分完成：`PastBenchAdapter` 已封装 PAST task layout、split/family identity、公开 digest 和 content-free `PastExecutionTrace`；`PastRuntimeTerminalCoordinator` 可从 runner response 重放 immutable terminal host 并通过 `AdapterHarness.bind_runtime_terminal()` 交给任意 method adapter。正式 launcher 尚未编排完整 method lifecycle。
 - √ 区分 public task state、audit-only contract 和 final-only score；final score 只能由显式 final-plane callback 提供。
 - □ 保持 raw prompt、grader 和 reference 不变。
 - □ Hidden answer、grader field 或 family-derived key 进入 Host/method 时 fail closed。
@@ -344,7 +344,7 @@ rollback_update
 - √ deterministic fake semantic/episodic/procedural methods 可在同一 host-neutral harness 独立运行；真实 PAST/Hermes harness 待接线。
 - √ F0-F5 有字段 allowlist 和 contamination tests。
 - □ Grader 无法经 Host、method、metadata 或 pointer 泄漏。
-- 部分完成：Hermes-PAST bridge 已抽出 host projections 和 host operations；真实 PAST runner 已自动产生并导出 canonical host trace，`PastExecutionTrace` 可比较终态/usage/process/host digest，`AdapterHarness.bind_runtime_terminal()` 对 case/run/event/revision/state 做 fail-closed binding。正式 launcher 的完整 method lifecycle 和跨 condition event/outcome/usage golden trace equivalence 仍未完成。
+- 部分完成：Hermes-PAST bridge 已抽出 host projections 和 host operations；真实 PAST runner 已自动产生并导出 canonical host trace，`PastExecutionTrace` 可比较终态/usage/process/host digest，`PastRuntimeTerminalCoordinator` 对 case/run/event/revision/state 做 fail-closed terminal binding。formal run 必须通过 `rsimem_method_task_id` 传入 opaque case ID，禁止 PAST task/family ID 进入 method。正式 launcher 的完整 method lifecycle 和跨 condition event/outcome/usage golden trace equivalence 仍未完成。
 - √ Restart、revision、idempotency、rollback、secret scan 和 telemetry 的现有 contract/fixture 验收通过；真实 runner 的端到端 restart/golden trace 仍属于上一项。
 - □ 本阶段不要求真实三种方法，不用 fake method 分数声明效果。
 
