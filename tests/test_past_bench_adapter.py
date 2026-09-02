@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 
 import pytest
 
@@ -52,6 +53,8 @@ def test_past_adapter_enumerates_only_frozen_split_families(tmp_path) -> None:
     assert step_result.status.value == "supported"
     assert event.attributes == {}
     assert "grader" not in str(event)
+    with pytest.raises(ValueError, match="not registered"):
+        adapter.reset(replace(train[0], seed="past-seed.tampered"))
 
 
 def test_past_adapter_requires_explicit_final_score_callback(tmp_path) -> None:

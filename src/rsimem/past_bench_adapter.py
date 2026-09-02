@@ -113,7 +113,7 @@ class PastBenchAdapter:
     def _find_request_path(self, request: BenchmarkTaskRequest) -> Path:
         # Re-enumeration is deterministic and avoids carrying a mutable path
         # through the host/method boundary.
-        matches = [item for item in self.enumerate_cases(request.split) if item.case_id == request.case_id]
+        matches = [item for item in self.enumerate_cases(request.split) if item == request]
         if len(matches) != 1:
             raise ValueError("benchmark case is not registered in the matrix")
         # The adapter intentionally does not expose task path in the request;
