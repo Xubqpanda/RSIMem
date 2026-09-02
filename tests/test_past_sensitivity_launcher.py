@@ -151,6 +151,8 @@ def test_oracle_preparation_requires_verified_registry_and_copies_seed(tmp_path:
     assert document["episodes"]
     assert all(item["bucket"] == "evaluation" for item in document["episodes"])
     assert all(item["oracle_home_seed_dir"] == "oracle-home" for item in document["episodes"])
+    assert all(item["history_mode"] == "fresh" for item in document["episodes"])
+    assert all(not item["history_load_anchor"] for item in document["episodes"])
     assert (prepared.sequence_path.parent / "oracle-home" / "memories" / "MEMORY.md").exists()
     with pytest.raises(ValueError, match="run/deployment mismatch"):
         prepare_past_sensitivity_launch(
