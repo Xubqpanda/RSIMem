@@ -271,3 +271,33 @@ def test_checked_in_semantic_registry_upgrades_every_semantic_oracle_case() -> N
         item.executable and item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
         for item in resolved
     ) == 7
+
+
+def test_checked_in_procedural_registry_upgrades_every_procedural_oracle_case() -> None:
+    root = Path(__file__).resolve().parents[1]
+    past_root = root / "benchmarks" / "past-bench"
+    base = default_research_protocol()
+    family_matrix = PastFamilyMatrix.create_default()
+    protocol = ResearchProtocol.create(
+        memory_units=base.memory_units,
+        family_matrix=family_matrix,
+        split=base.split,
+        sensitivity_target_kind=MemoryKind.PROCEDURAL,
+    )
+    matrix = SensitivityMatrix.create_for_panel(
+        panel=SensitivityPanel.PROCEDURAL,
+        protocol=protocol,
+        family_matrix=family_matrix,
+    )
+    catalog = build_past_sensitivity_catalog(matrix=matrix, past_bench_root=past_root)
+    resolved = apply_verified_oracle_seed_registry(
+        matrix=matrix,
+        catalog=catalog,
+        deployments=planned_deployments_from_catalog(matrix=matrix, catalog=catalog),
+        registry=OracleSeedRegistry.load(root / "configs/sensitivity/oracle_seed_registry_procedural.json"),
+        trusted_root=past_root / "self-evolve-tasks-v2" / "_rsimem_oracles",
+    )
+    assert sum(
+        item.executable and item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
+        for item in resolved
+    ) == 10
