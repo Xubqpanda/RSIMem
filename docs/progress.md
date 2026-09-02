@@ -17,8 +17,12 @@ and `python -m rsimem.baseline` provides a fail-closed identity gate before any
 cleanup deletion.  Stage 0C has removed the stopped launcher group, the
 extraction-only proposal entry point, and three orphaned extraction configs;
 remaining deletion is held until generalized replacement contracts are
-implemented and audited.  The cleanup-ready manifest now passes its complete
-fail-closed preflight.
+implemented and audited.  The cleanup-ready manifest passed its complete
+fail-closed preflight before the latest cleanup edits.  The second call-site
+audit and exact removal boundary are recorded in
+[`stage0_cleanup_audit_20260902.md`](stage0_cleanup_audit_20260902.md); three
+configs remain only as deterministic preflight fixtures pending Stage 1
+migration.
 
 ## Status Legend
 
@@ -100,9 +104,9 @@ partial batch is retained for infrastructure diagnosis and excluded from the
 process-signal census.  No N+1 candidate, held-out validation, or adaptive
 effect batch is authorized.
 
-Current implementation priority remains completing the Stage 0C dependency
-audit, updating generalized boundaries, and maintaining deterministic
-acceptance.  The finite
+Current implementation priority remains closing Stage 0D with a clean-tree
+acceptance after the recorded removals, then freezing the Stage 1 taxonomy and
+protocol.  The finite
 SM02/SM05 family attempt is closed as `STOP_NO_SIGNAL`; any future family must
 be separately pre-registered with a deployment-visible opportunity schema
 before another provider batch is authorized.

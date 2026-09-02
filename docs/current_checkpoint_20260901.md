@@ -10,7 +10,10 @@ procedural memory and stops the extraction-only N+1 path.  Stage 0A baseline
 freezing and 0B asset classification are complete; Stage 0C cleanup is in
 progress and the new adapter contracts have not started.  The cleanup pass has
 removed the stopped launcher group, extraction-only proposal entry point, and
-three orphaned configs.  The pre-cleanup identity is recorded
+three orphaned configs.  The second call-site audit is recorded in
+[`stage0_cleanup_audit_20260902.md`](stage0_cleanup_audit_20260902.md); three
+configs remain only as deterministic preflight fixtures pending Stage 1
+migration.  The pre-cleanup identity is recorded
 in [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json), with
 the candidate inventory in [`asset_inventory_20260901.md`](asset_inventory_20260901.md).
 Remaining cleanup deletion is held until the baseline gate and dependency
