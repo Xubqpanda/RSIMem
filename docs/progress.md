@@ -67,9 +67,9 @@ not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic and all ten procedural target
 families now have registered type-matched oracle seeds; all three episodic
-target families still lack one. The procedural panel additionally lacks a
-compatible `wrong_mechanism` slot and PC03 additionally lacks a
-no-persistence slot. Existing task controls are not treated as host
+target families still lack one. All procedural families now have explicit
+`wrong_mechanism` and `no_persistence` task assets; existing diagnostic controls
+remain distinct and are not relabeled. Existing task controls are not treated as host
 deployments until their state/artifact and launcher configuration are
 registered and verified.
 The Stage 3 launcher can now materialize a case-specific PAST sequence slice,
@@ -83,9 +83,9 @@ symlink absence, and target memory-kind layout before a deployment becomes
 executable; registry payloads contain no memory text. The checked-in SM01
 semantic panel's seven seeds are manually authored from their public learn or
 update inputs. The remaining three episodic target cases still lack an oracle
-seed; all ten procedural oracle seeds are registered, while their full
-five-condition panel remains closed until the missing controls are authored
-and verified.
+seed. All ten procedural oracle seeds and all five procedural deployment
+conditions are registered and preparation-verified; no procedural provider pilot
+has run yet.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
@@ -130,7 +130,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 10 procedural oracle seeds), catalog-backed SM01 five-condition preparation, manifest-bound pilot executor, and content-free audit; episodic seeds, procedural controls, and broader matched replicates pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 10 procedural oracle seeds), catalog-backed semantic/procedural five-condition preparation, manifest-bound pilot executor, and content-free audit; episodic seeds, provider pilots, and broader matched replicates pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an

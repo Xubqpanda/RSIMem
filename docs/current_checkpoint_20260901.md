@@ -90,13 +90,13 @@ usage buckets. This is execution/readiness evidence only. The full semantic pane
 seven case-bound oracle seeds prepared from public learn/update input and
 verified as evaluation-only fresh-state slices. Ten procedural oracle seeds are
 also now registered and layout-verified. Episodic target cases remain without
-oracle seeds; procedural controls remain incomplete, so no replicated
-sensitivity or quality claim has been made.
+oracle seeds. Procedural controls and oracle deployments are preparation-ready;
+no procedural provider pilot or replicated sensitivity claim has been made.
 The source-level readiness catalog does not read task prompts, graders, or
 answers. It reports that all three episodic targets still lack case-bound
-type-matched oracle seeds. Procedural oracle seeds are complete, but the panel
-lacks a compatible wrong-mechanism control and PC03 lacks a no-persistence
-control. A named PAST task control remains audit evidence, not an executable
+type-matched oracle seeds. Procedural oracle and control assets are complete,
+with all five conditions preparation-verified; provider execution remains
+pending. A named PAST task control remains audit evidence, not an executable
 host deployment, until its artifact/state and launcher configuration are
 registered.
 The launcher can prepare a case-specific PAST sequence slice and passes only
