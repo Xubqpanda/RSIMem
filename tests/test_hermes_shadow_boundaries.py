@@ -9,6 +9,7 @@ from rsimem.hermes_past_bridge import HermesPastBenchBridge
 from rsimem.hermes_integration import HermesExecutionMode, HermesExperimentConfig
 from rsimem.lifecycle import HermesLifecycleConfig, TaskLifecycleState
 from rsimem.memory.tool_exact_join import ToolJoinResolutionStatus, resolve_tool_call_result
+from rsimem.adapter_contracts import HostEventKind
 
 
 def _home(tmp_path):
@@ -69,6 +70,29 @@ def test_real_shadow_boundaries_are_observed_without_evaluator_or_mutation(tmp_p
     assert all(item.shadow_only for item in bridge.trigger_observations)
     assert all(item.decision.action.value == "SKIP" for item in bridge.trigger_observations)
     assert bridge.static_results == ()
+
+
+def test_task_completion_automatically_projects_a_canonical_host_event(tmp_path) -> None:
+    rows = [
+        {"id": 1, "role": "user", "content": "turn", "token_count": 1},
+        {"id": 2, "role": "assistant", "content": "done", "token_count": 1},
+    ]
+    bridge = _bridge(tmp_path, rows)
+    try:
+        bridge.on_task_completed({"completed": True})
+        first = bridge.canonical_host_events
+        bridge.on_task_completed({"completed": True})
+        second = bridge.canonical_host_events
+    finally:
+        bridge.close()
+
+    assert len(first) == len(second) == 1
+    event = second[0]
+    assert event.kind is HostEventKind.TASK_COMPLETED
+    assert event.session_id == "session-shadow-boundaries"
+    assert event.task_id == "task-shadow-boundaries"
+    assert event.input_ids and event.output_ids
+    assert bridge.canonical_host_event_failures == ()
 
 
 def test_tool_boundary_preserves_open_closure_and_cannot_run_source_selection(tmp_path) -> None:
