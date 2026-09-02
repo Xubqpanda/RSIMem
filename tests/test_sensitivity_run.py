@@ -8,7 +8,12 @@ import pytest
 from rsimem.memory import MemoryKind
 from rsimem.memory.family_matrix import PastFamilyMatrix
 from rsimem.past_sensitivity_catalog import build_past_sensitivity_catalog
-from rsimem.oracle_seed_registry import create_oracle_seed_registration, create_oracle_seed_registry, oracle_seed_tree_digest
+from rsimem.oracle_seed_registry import (
+    OracleSeedRegistry,
+    create_oracle_seed_registration,
+    create_oracle_seed_registry,
+    oracle_seed_tree_digest,
+)
 from rsimem.research_protocol import (
     ResearchProtocol,
     SensitivityCondition,
@@ -231,8 +236,6 @@ def test_checked_in_sm01_registry_upgrades_only_sm01_oracle_case() -> None:
     past_root = root / "benchmarks" / "past-bench"
     catalog = build_past_sensitivity_catalog(matrix=matrix, past_bench_root=past_root)
     planned = planned_deployments_from_catalog(matrix=matrix, catalog=catalog)
-    from rsimem.oracle_seed_registry import OracleSeedRegistry
-
     resolved = apply_verified_oracle_seed_registry(
         matrix=matrix,
         catalog=catalog,
@@ -250,3 +253,21 @@ def test_checked_in_sm01_registry_upgrades_only_sm01_oracle_case() -> None:
         if case.family_id == "SM01_preference_adoption"
         and case.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
     )
+
+
+def test_checked_in_semantic_registry_upgrades_every_semantic_oracle_case() -> None:
+    matrix = _matrix()
+    root = Path(__file__).resolve().parents[1]
+    past_root = root / "benchmarks" / "past-bench"
+    catalog = build_past_sensitivity_catalog(matrix=matrix, past_bench_root=past_root)
+    resolved = apply_verified_oracle_seed_registry(
+        matrix=matrix,
+        catalog=catalog,
+        deployments=planned_deployments_from_catalog(matrix=matrix, catalog=catalog),
+        registry=OracleSeedRegistry.load(root / "configs/sensitivity/oracle_seed_registry_semantic.json"),
+        trusted_root=past_root / "self-evolve-tasks-v2" / "_rsimem_oracles",
+    )
+    assert sum(
+        item.executable and item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
+        for item in resolved
+    ) == 7

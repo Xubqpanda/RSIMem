@@ -1,0 +1,84 @@
+{
+  "registry_id": "oracle-seed-registry.c6a85b4e98392c44a7998be4f6ca37fb3af3ae14",
+  "registrations": [
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.6afbbc1f125a1107a7f37550e78cdb5300235fb1",
+      "family_source_digest": "665d7de8a7c116291be0fa7b47369c10871899614a5df2745cd12bb639c18a6c",
+      "oracle_artifact_id": "oracle.semantic.f6b4fbca7c5c3d5b5348159bde2ed0f7",
+      "panel": "semantic",
+      "registration_id": "oracle-seed-registration.be1abf5882da14f4f6c454b48789352e4b6dc8b9",
+      "seed_home": "semantic/SM01_preference_adoption",
+      "seed_tree_digest": "ed54a619f94cf793f7b666f989e93c038ce42e7a71f8d7fb49267985d7f979f7",
+      "target_kind": "semantic"
+    },
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.5fa833ee2726e6a68c41debca3fe0e30231b0896",
+      "family_source_digest": "afbdebd7479137c45590fcc03739fe9daf8aa4baaa476a21ead467bf12bb3637",
+      "oracle_artifact_id": "oracle.semantic.f6b4fbca7c5c3d5b5348159bde2ed0f7",
+      "panel": "semantic",
+      "registration_id": "oracle-seed-registration.474bf6bcbc5893c05cc0933b9b7f9e7e8e50b0be",
+      "seed_home": "semantic/SM02_constraint_retention",
+      "seed_tree_digest": "8cbdd0821006840f20f8e26cbcd231758825d0a464238694fa84776a8c4f867e",
+      "target_kind": "semantic"
+    },
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.dd1488d4b636abc07220d13ea4b31b2c79a9b0e8",
+      "family_source_digest": "ec435d673525a53c43e64a055b638372e9070c606540b85176b9fef233d950da",
+      "oracle_artifact_id": "oracle.semantic.f6b4fbca7c5c3d5b5348159bde2ed0f7",
+      "panel": "semantic",
+      "registration_id": "oracle-seed-registration.1155642011cd2d4dae536e2838dd0994a6f41a8c",
+      "seed_home": "semantic/SM03_fact_correction",
+      "seed_tree_digest": "4915409e40f15f4ae479ea9ade7d01303d71a396a408778f1ad06760dd1c6d0f",
+      "target_kind": "semantic"
+    },
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.437429c95501997af226ac9821bab53b328fef19",
+      "family_source_digest": "d7b2f0c89b8310076a092d499a97bb1fc71c40523b399956f3003e09e64f8ed0",
+      "oracle_artifact_id": "oracle.semantic.f6b4fbca7c5c3d5b5348159bde2ed0f7",
+      "panel": "semantic",
+      "registration_id": "oracle-seed-registration.278f79dfc5a491db32232c5784305fe0ef1d803d",
+      "seed_home": "semantic/SM04_rule_migration",
+      "seed_tree_digest": "77a996959c341c6e121ef534e0a278b2e4b11b3228cea781eaf9dcbb5c754447",
+      "target_kind": "semantic"
+    },
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.78be44b5e2b3c2ef565b93e8db920aebc2ceae99",
+      "family_source_digest": "abf94c5d79c81313dde18a04c1e9eebacbbfe2df6d802bc4b6e6c21892df8743",
+      "oracle_artifact_id": "oracle.semantic.f6b4fbca7c5c3d5b5348159bde2ed0f7",
+      "panel": "semantic",
+      "registration_id": "oracle-seed-registration.22dab8b1ae85d8ca9731ffaacae28305e19ec2b0",
+      "seed_home": "semantic/SM05_weak_trigger_preference_adoption",
+      "seed_tree_digest": "84900d2cc388a989fdea9903baedca0a20ad5c88c4f0b33f1adb407cebb0e161",
+      "target_kind": "semantic"
+    },
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.ee0ba02591cb57978004421f50b2d591648a3e8a",
+      "family_source_digest": "1f5d938d3eb85b9dfd7267dc19709a1ffa431ce52addc7aa105752ee799fa75f",
+      "oracle_artifact_id": "oracle.semantic.f6b4fbca7c5c3d5b5348159bde2ed0f7",
+      "panel": "semantic",
+      "registration_id": "oracle-seed-registration.026f101e26292acb0bb461f4fb1d8706e9d021fb",
+      "seed_home": "semantic/SM06_temporary_exception_pollution",
+      "seed_tree_digest": "0fb81365f85936f98a329654e973a680b74dde13760bf07318d68fc5b5944dec",
+      "target_kind": "semantic"
+    },
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.01dfbb271c2b76cfe7a62fccb5fe0adf32ba61a6",
+      "family_source_digest": "0b764559bcc416d3630dcf1215f6cf0c4456068f3e7842f8fc1b3c72c828d3f7",
+      "oracle_artifact_id": "oracle.semantic.f6b4fbca7c5c3d5b5348159bde2ed0f7",
+      "panel": "semantic",
+      "registration_id": "oracle-seed-registration.ae10c2e4562e8c081c226a0069cfd113ad892a77",
+      "seed_home": "semantic/SM07_scoped_rule_migration",
+      "seed_tree_digest": "ee8fbb67cf7c3d667f26f6b9f32e490d134bc6333ca556b488d862fcaeedc51f",
+      "target_kind": "semantic"
+    }
+  ],
+  "schema": "rsimem-oracle-seed-registry-v1",
+  "schema_version": 1
+}
