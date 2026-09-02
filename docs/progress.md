@@ -63,6 +63,11 @@ type-matched oracle seed and a `wrong_mechanism` slot, and PC03 additionally
 lacks a no-persistence slot. Existing task controls are not treated as host
 deployments until their state/artifact and launcher configuration are
 registered and verified.
+The Stage 3 launcher can now materialize a case-specific PAST sequence slice,
+preserving only the selected control or its required history-anchor prefix.
+Its generated command passes the registered state, Hermes-home, and trace
+directories together with only the opaque method case ID. It refuses a
+non-executable deployment and does not invoke a provider itself.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
@@ -107,7 +112,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated five-condition/oracle harness, case-bound source readiness census, and immutable isolated run registration; oracle/control deployments and matched model runs pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, registered directory handoff, and fail-closed case-slice launcher; oracle/control assets and matched model runs pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an

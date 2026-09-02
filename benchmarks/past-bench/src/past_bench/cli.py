@@ -1912,6 +1912,30 @@ def _resolve_episode_oracle_home_seed_dir(sequence, episode) -> Path | None:
     return path
 
 
+def _resolve_rsimem_sensitivity_paths(args, persistence_backend) -> tuple[Path, Path] | None:
+    """Return registered state/home paths for one isolated sensitivity run."""
+    # Tests and programmatic callers commonly supply a partial Namespace. Do
+    # not treat dynamically supplied attributes as an opt-in launcher flag.
+    argument_values = vars(args)
+    state_value = argument_values.get("rsimem_sensitivity_state_dir")
+    home_value = argument_values.get("rsimem_sensitivity_hermes_home_dir")
+    if state_value is None and home_value is None:
+        return None
+    if not state_value or not home_value:
+        raise SystemExit(
+            "RSIMem sensitivity execution requires both state and Hermes-home directories"
+        )
+    if persistence_backend is None:
+        raise SystemExit("RSIMem sensitivity state isolation requires a persistence backend")
+    if persistence_backend.__class__.__name__ != "HermesPersistenceBackend":
+        raise SystemExit("RSIMem sensitivity state isolation requires the Hermes backend")
+    state_path = Path(state_value).expanduser().resolve()
+    home_path = Path(home_value).expanduser().resolve()
+    if state_path == home_path:
+        raise SystemExit("RSIMem sensitivity state and Hermes-home directories must differ")
+    return state_path, home_path
+
+
 def _copy_named_home_entries(src_dir: Path | None, dst_dir: Path, names: tuple[str, ...]) -> None:
     if src_dir is None or not src_dir.exists():
         return
@@ -2300,6 +2324,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     shared_cold_variant = (
         variants[0][0] if len(variants) == 1 else "with_persistence"
     )
+    sensitivity_paths = _resolve_rsimem_sensitivity_paths(args, persistence_backend)
+    if sensitivity_paths is not None and len(variants) != 1:
+        raise SystemExit("RSIMem sensitivity state isolation requires one persistence variant")
+    if sensitivity_paths is not None and any(ep.shared_cold_run for ep in sequence.episodes):
+        raise SystemExit("RSIMem sensitivity slices must not include shared-cold episodes")
 
     # §15 reflection_off control: flip the sequence's reflection_enabled flag
     # for this run so PC04 / failure_reflection families can measure
@@ -2946,7 +2975,13 @@ def cmd_evolve(args: argparse.Namespace) -> None:
         variant_dir.mkdir(parents=True, exist_ok=True)
         family_homes_root = variant_dir / "family_homes"
         history_anchors_by_family: dict[str, dict[str, Path]] = {}
-        if persistence_backend is not None:
+        if sensitivity_paths is not None:
+            state_dir, hermes_home_dir = sensitivity_paths
+            _reset_runtime_dir(state_dir)
+            _reset_runtime_dir(hermes_home_dir)
+            state_dir.mkdir(parents=True, exist_ok=True)
+            hermes_home_dir.mkdir(parents=True, exist_ok=True)
+        elif persistence_backend is not None:
             _reset_runtime_dir(family_homes_root)
         episode_results: list[dict] = []
 
@@ -2964,7 +2999,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
             episode_dir.mkdir(parents=True, exist_ok=True)
             artifacts_dir = episode_dir / "artifacts"
             if persistence_backend is not None:
-                state_root, anchors_dir = persistence_backend.family_paths(variant_dir, episode.family_id)
+                if sensitivity_paths is not None:
+                    state_root = sensitivity_paths[1]
+                    anchors_dir = sensitivity_paths[0] / "history_anchors"
+                else:
+                    state_root, anchors_dir = persistence_backend.family_paths(variant_dir, episode.family_id)
                 history_anchors = history_anchors_by_family.setdefault(episode.family_id, {})
             else:
                 state_root = variant_dir / "runtime_state"
@@ -3669,6 +3708,16 @@ def main(argv: list[str] | None = None) -> None:
             "Opaque RSIMem method task ID. Sensitivity launchers set this to "
             "their registered case ID; it must not be a PAST family/task ID."
         ),
+    )
+    p_evolve.add_argument(
+        "--rsimem-sensitivity-state-dir",
+        default=None,
+        help="Registered isolated state directory for one Hermes sensitivity run",
+    )
+    p_evolve.add_argument(
+        "--rsimem-sensitivity-hermes-home-dir",
+        default=None,
+        help="Registered isolated Hermes-home directory for one sensitivity run",
     )
     p_evolve.add_argument(
         "--rsimem-adapter-failure-policy",
