@@ -57,16 +57,17 @@ registered opaque method case ID. Semantic native, no-persistence, shortcut,
 and wrong-mechanism task slices are now catalog-backed executable deployments;
 shortcut and wrong-mechanism explicitly disable persistence. Seven semantic,
 three episodic, and ten procedural case-bound oracle seeds are registered and
-can be prepared as evaluation-only sequences; SM01, SM02, and EP01 have
+can be prepared as evaluation-only sequences; SM01, SM02, EP01, and EP02 have
 completed five-condition pilots.
 The full Stage 3 matrix remains fail-closed because replicated panel coverage is
 still incomplete. A manifest-bound pilot executor and content-free sensitivity audit now
 run one selected family/replicate only. The 2026-09-02 SM01 replicate-2, SM02
-replicate-1, EP01 replicate-1, and PC01 replicate-1 pilots each completed all
+replicate-1, EP01 replicate-1, EP02 replicate-1, and PC01 replicate-1 pilots each completed all
 five conditions and are recorded in
 `docs/sensitivity_sm01_pilot_20260902.md` and
 `docs/sensitivity_sm02_pilot_20260902.md`,
-`docs/sensitivity_ep01_pilot_20260902.md`, and
+`docs/sensitivity_ep01_pilot_20260902.md`,
+`docs/sensitivity_ep02_pilot_20260902.md`, and
 `docs/sensitivity_pc01_pilot_20260902.md`. This is execution/readiness evidence,
 not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
@@ -89,9 +90,9 @@ executable; registry payloads contain no memory text. The checked-in SM01
 semantic panel's seven seeds and all three episodic seeds are manually authored
 from their public learn or update inputs. All ten procedural oracle seeds and
 all five procedural deployment conditions are registered and
-preparation-verified; PC01 replicate-1 and EP01 replicate-1 have passed
-content-free audit, while remaining procedural and episodic replicates and
-families are pending.
+preparation-verified; PC01 replicate-1, EP01 replicate-1, and EP02 replicate-1
+have passed content-free audit, while remaining procedural and episodic
+replicates and families are pending.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
