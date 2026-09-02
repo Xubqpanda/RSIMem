@@ -7,7 +7,7 @@
   "supersedes": "docs/baseline_manifest_20260901.json",
   "repository": {
     "root": "Study/RSIMem",
-    "commit": "40436f8563c4501d3a0dce71bcddcab6842e020a",
+    "commit": "f0ce58cbd95cd5ba73215dc14698d935dc2e9f3e",
     "workingTreeClean": true,
     "trackedFileCount": 2420,
     "branch": "main",
