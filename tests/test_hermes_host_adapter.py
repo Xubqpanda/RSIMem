@@ -14,6 +14,7 @@ class _Bridge:
 
     def __init__(self) -> None:
         self.wrapped = False
+        self._tool_handlers = {}
 
     def _wrap_skill_handlers(self) -> None:
         self.wrapped = True
@@ -33,7 +34,7 @@ def test_hermes_host_adapter_attaches_and_declares_capabilities() -> None:
     host = HermesHostAdapter(bridge)
     agent = SimpleNamespace(_memory_store=None, _session_db=None)
     host.attach(agent)
-    assert bridge.wrapped is True
+    assert set(bridge._tool_handlers) == {"skills_list", "skill_view"}
     assert host.capabilities.native_bypass is True
     assert host.capabilities.context_snapshot is True
 

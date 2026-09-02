@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from tempfile import TemporaryDirectory
 from typing import Any, TYPE_CHECKING
 
 from .adapter_contracts import (
@@ -23,6 +24,7 @@ from .adapter_contracts import (
 )
 from .memory.contracts import MemoryKind, MemoryQuery
 from .memory.process_feedback import ProcessEventKind, ProcessEventStatus
+from .hermes_integration import _bound_hermes_skills_dir, _materialize_procedural_hits
 
 if TYPE_CHECKING:
     from .hermes_past_bridge import HermesPastBenchBridge
@@ -66,7 +68,7 @@ class HermesHostAdapter:
                 session_db,
                 str(getattr(agent, "session_id", "") or "") or None,
             )
-        self._bridge._wrap_skill_handlers()
+        wrap_skill_handlers(self._bridge)
 
     def prepare_session(self, run: MethodRunIdentity) -> AdapterResult:
         expected = (
@@ -389,4 +391,89 @@ class _SessionDb:
         return result
 
 
-__all__ = ["HermesHostAdapter", "_PromptMemoryStore", "_SessionDb"]
+def wrap_skill_handlers(bridge: "HermesPastBenchBridge") -> None:
+    """Install the procedural projection at the Hermes tool boundary."""
+
+    from tools.registry import registry
+
+    for tool_name in ("skills_list", "skill_view"):
+        entry = registry._tools.get(tool_name)
+        if entry is None or tool_name in bridge._tool_handlers:
+            continue
+        original = entry.handler
+        bridge._tool_handlers[tool_name] = original
+
+        def handler(
+            args: dict[str, Any],
+            _tool_name: str = tool_name,
+            _original: Any = original,
+            **kwargs: Any,
+        ) -> str:
+            query = "" if _tool_name == "skills_list" else str(args.get("name") or "")
+            native_call = lambda: _original(args, **kwargs)
+            if not bridge.uses_adapter:
+                result = native_call()
+                bridge.observe_query(
+                    MemoryKind.PROCEDURAL,
+                    query,
+                    limit=100 if _tool_name == "skills_list" else 5,
+                    surface=_tool_name,
+                )
+                bridge._record_skill_process(_tool_name, query, result)
+                return result
+
+            def adapter_read() -> str:
+                hits = bridge.runtime.query(MemoryQuery(
+                    MemoryKind.PROCEDURAL,
+                    query,
+                    limit=100 if _tool_name == "skills_list" else 5,
+                ))
+                query_digest = hashlib.sha256(
+                    json.dumps(
+                        {"kind": "procedural", "query": query, "limit": 100 if _tool_name == "skills_list" else 5},
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                ).hexdigest()
+                bridge._record_process_observation(
+                    kind=ProcessEventKind.RETRIEVAL,
+                    status=ProcessEventStatus.SUCCESS if hits else ProcessEventStatus.FAILED,
+                    host_event_id=bridge._last_host_event_id or f"event.procedural-query.{query_digest[:40]}",
+                    source_revision=bridge._last_host_source_revision or bridge._exposure_context_revision(),
+                    input_payload={"query_digest": query_digest, "tool": _tool_name},
+                    output_payload={"hit_count": len(hits)},
+                    reason_codes=("decision_observed",) if hits else ("retrieval_miss",),
+                    execution_receipt_ids=(f"receipt.procedural-query.{query_digest[:24]}",),
+                )
+                projected_hits = hits
+                if _tool_name == "skill_view" and not projected_hits:
+                    projected_hits = bridge.runtime.query(MemoryQuery(
+                        MemoryKind.PROCEDURAL,
+                        "",
+                        limit=100,
+                    ))
+                with TemporaryDirectory(prefix="rsimem-hermes-live-skills-") as directory:
+                    skills_dir = Path(directory) / "skills"
+                    _materialize_procedural_hits(skills_dir, projected_hits)
+                    with _bound_hermes_skills_dir(skills_dir):
+                        result = _original(args, **kwargs)
+                payload = json.loads(result)
+                if hits and payload.get("success") is True:
+                    bridge.runtime.mark_injected(hits, surface=_tool_name)
+                return result
+
+            adapter_result = bridge.adapter_call(_tool_name, adapter_read, native_call)
+            bridge.verify_projection(
+                MemoryKind.PROCEDURAL,
+                "hermes-native-procedural",
+                _tool_name,
+                adapter_result,
+                native_call,
+            )
+            bridge._record_skill_process(_tool_name, query, adapter_result)
+            return adapter_result
+
+        entry.handler = handler
+
+
+__all__ = ["HermesHostAdapter", "_PromptMemoryStore", "_SessionDb", "wrap_skill_handlers"]
