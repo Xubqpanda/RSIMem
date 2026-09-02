@@ -460,6 +460,52 @@ class HostAdapter(Protocol):
     def restart(self, run: MethodRunIdentity) -> AdapterResult: ...
 
 
+class DeterministicHostAdapter:
+    """Content-free host fixture shared by semantic/episodic/procedural tests."""
+
+    def __init__(self, capabilities: HostCapabilities) -> None:
+        self._capabilities = capabilities
+        self._run: MethodRunIdentity | None = None
+        self._events: dict[str, CanonicalHostEvent] = {}
+
+    @property
+    def capabilities(self) -> HostCapabilities:
+        return self._capabilities
+
+    def prepare_session(self, run: MethodRunIdentity) -> AdapterResult:
+        if self._run is not None and self._run != run:
+            return AdapterResult(AdapterStatus.UNSUPPORTED, "operation.host.prepare", "active_run")
+        self._run = run
+        return AdapterResult(AdapterStatus.SUPPORTED, "operation.host.prepare")
+
+    def observe_event(self, event: CanonicalHostEvent) -> AdapterResult:
+        if self._run is not None and (event.session_id != self._run.session_id or event.task_id != self._run.task_id):
+            return AdapterResult(AdapterStatus.REJECTED, "operation.host.observe", "session_task_mismatch")
+        if event.event_id in self._events:
+            return AdapterResult(AdapterStatus.REJECTED, "operation.host.observe", "duplicate_event")
+        self._events[event.event_id] = event
+        return AdapterResult(AdapterStatus.SUPPORTED, "operation.host.observe")
+
+    def snapshot_state(self) -> MethodStateSnapshot:
+        digest = content_digest({
+            "events": [event.event_id for event in sorted(self._events.values(), key=lambda item: item.event_id)],
+        })
+        return MethodStateSnapshot(
+            state_id="state.host.fixture.v1",
+            revision=f"revision.host.{digest[:24]}",
+            state_schema="host.state.fixture.v1",
+            state_digest=digest,
+            active=self._run is not None,
+        )
+
+    def restart(self, run: MethodRunIdentity) -> AdapterResult:
+        if not self._capabilities.restart:
+            return AdapterResult(AdapterStatus.UNSUPPORTED, "operation.host.restart", "restart_unsupported")
+        if self._run != run:
+            return AdapterResult(AdapterStatus.REJECTED, "operation.host.restart", "run_not_prepared")
+        return AdapterResult(AdapterStatus.SUPPORTED, "operation.host.restart")
+
+
 @runtime_checkable
 class MemoryMethodAdapter(Protocol):
     def describe_capabilities(self) -> MethodCapabilities: ...
@@ -611,6 +657,7 @@ __all__ = [
     "BenchmarkSplit",
     "BenchmarkTaskRequest",
     "CanonicalHostEvent",
+    "DeterministicHostAdapter",
     "FeedbackCondition",
     "FeedbackView",
     "FinalEvaluationRecord",
