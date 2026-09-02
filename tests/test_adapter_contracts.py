@@ -12,6 +12,7 @@ from rsimem.adapter_contracts import (
     BenchmarkSplit,
     BenchmarkTaskRequest,
     CanonicalHostEvent,
+    DeterministicHostAdapter,
     DeterministicMemoryMethodAdapter,
     FeedbackCondition,
     FeedbackView,
@@ -269,3 +270,36 @@ def test_deterministic_method_adapter_is_kind_scoped_and_revision_safe() -> None
     assert method.activate_update(update).reason_code == "duplicate_activation"
     assert method.validate_update(update).status is AdapterStatus.STALE
     assert method.rollback_update(update).status is AdapterStatus.ACCEPTED
+
+
+def test_deterministic_host_adapter_preserves_restart_identity_and_rejects_cross_session() -> None:
+    host = DeterministicHostAdapter(HostCapabilities(
+        memory_kinds=tuple(MemoryKind),
+        tool_call_result_closure=True,
+        usage_accounting=True,
+        restart=True,
+        context_snapshot=True,
+        native_bypass=True,
+    ))
+    run = MethodRunIdentity("run.host.v1", "session.host.v1", "task.host.v1", "revision.initial")
+    assert host.prepare_session(run).status is AdapterStatus.SUPPORTED
+    event = CanonicalHostEvent(
+        event_id="host-event.turn.v1",
+        session_id=run.session_id,
+        task_id=run.task_id,
+        kind=HostEventKind.TURN_COMPLETED,
+        revision="revision.initial",
+    )
+    assert host.observe_event(event).status is AdapterStatus.SUPPORTED
+    before = host.snapshot_state()
+    assert host.restart(run).status is AdapterStatus.SUPPORTED
+    assert host.snapshot_state() == before
+    assert host.observe_event(event).reason_code == "duplicate_event"
+    cross = CanonicalHostEvent(
+        event_id="host-event.cross.v1",
+        session_id="session.other.v1",
+        task_id=run.task_id,
+        kind=HostEventKind.TURN_COMPLETED,
+        revision="revision.initial",
+    )
+    assert host.observe_event(cross).reason_code == "session_task_mismatch"
