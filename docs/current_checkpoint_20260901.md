@@ -84,7 +84,7 @@ input only; its preparation path copies an evaluation-only seed home and passes
 only the opaque case ID to PAST. The semantic catalog also makes native and the
 three declared PAST control slices executable; shortcut and wrong-mechanism
 run without persistence. A manifest-bound pilot executor completed SM01
-replicate-2, SM02 replicate-1, EP01 replicate-1, EP02 replicate-1, and PC01 replicate-1 across
+replicate-2, SM02 replicate-1, EP01 replicate-1, EP02 replicate-1, EP03 replicate-1, and PC01 replicate-1 across
 all five conditions after passing provider probes; each content-free audit
 reconciled all traces and raw usage buckets. This is execution/readiness
 evidence only. The full semantic, episodic, and procedural panels now have 7,
@@ -92,8 +92,8 @@ evidence only. The full semantic, episodic, and procedural panels now have 7,
 learn/update input and verified as evaluation-only fresh-state slices. The
 source-level readiness catalog does not read task prompts, graders, or answers.
 Remaining family pilots and replicates are pending, and no panel sensitivity
-claim has been made. EP01 and EP02 are recorded in the episodic pilot reports;
-EP03 remains pending. A named PAST task control remains audit evidence, not an
+claim has been made. EP01, EP02, and EP03 are recorded in the episodic pilot
+reports. A named PAST task control remains audit evidence, not an
 executable host deployment, until its artifact/state and launcher configuration
 are registered.
 The launcher can prepare a case-specific PAST sequence slice and passes only
