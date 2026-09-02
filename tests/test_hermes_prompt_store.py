@@ -4,6 +4,10 @@ from rsimem.hermes_past_bridge import _PromptMemoryStore
 from rsimem.memory.contracts import MemoryArtifact, MemoryHit, MemoryKind
 
 
+def test_projection_wrapper_is_owned_by_host_adapter_module() -> None:
+    assert _PromptMemoryStore.__module__ == "rsimem.hermes_host_adapter"
+
+
 class _NativeStore:
     def format_for_system_prompt(self, target: str) -> str:
         return f"native:{target}"
