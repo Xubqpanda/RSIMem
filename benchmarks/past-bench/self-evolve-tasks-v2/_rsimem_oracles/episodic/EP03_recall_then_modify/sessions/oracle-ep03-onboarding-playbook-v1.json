@@ -1,0 +1,15 @@
+{
+  "session_id": "oracle-ep03-onboarding-playbook-v1",
+  "model": "oracle",
+  "platform": "rsimem-oracle",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Settled onboarding playbook: HR emails the welcome packet, the manager books the kickoff call, IT provisions the laptop, and the mentor handoff SLA is 24 hours. Preserve every other approved playbook field."
+    },
+    {
+      "role": "assistant",
+      "content": "Recorded the approved onboarding playbook with the mentor handoff SLA updated from 48 hours to 24 hours; all other fields remain unchanged."
+    }
+  ]
+}

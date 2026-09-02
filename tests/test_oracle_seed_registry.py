@@ -138,3 +138,41 @@ def test_checked_in_semantic_registry_resolves_every_semantic_oracle_case() -> N
             seed_root, case, hashlib.sha256(family_file.read_bytes()).hexdigest()
         )
         assert resolved == seed_root / "semantic" / case.family_id
+
+
+def test_checked_in_episodic_registry_resolves_and_searches_each_oracle_case() -> None:
+    from rsimem.memory.backends.hermes_native import HermesEpisodicBackend
+    from rsimem.memory import MemoryQuery
+
+    root = Path(__file__).resolve().parents[1]
+    registry = OracleSeedRegistry.load(root / "configs/sensitivity/oracle_seed_registry_episodic.json")
+    base = default_research_protocol()
+    family_matrix = PastFamilyMatrix.create_default()
+    protocol = ResearchProtocol.create(
+        memory_units=base.memory_units,
+        family_matrix=family_matrix,
+        split=base.split,
+        sensitivity_target_kind=MemoryKind.EPISODIC,
+    )
+    matrix = SensitivityMatrix.create_for_panel(
+        panel=SensitivityPanel.EPISODIC,
+        protocol=protocol,
+        family_matrix=family_matrix,
+    )
+    seed_root = root / "benchmarks/past-bench/self-evolve-tasks-v2/_rsimem_oracles"
+    queries = {
+        "EP01_prior_case_recall": "Vendor X production",
+        "EP02_exception_list_recall": "Wave Cedar",
+        "EP03_recall_then_modify": "mentor handoff SLA",
+    }
+    cases = tuple(case for case in matrix.cases if case.condition is SensitivityCondition.TYPE_MATCHED_ORACLE)
+    assert len(registry.registrations) == len(cases) == 3
+    for case in cases:
+        family_file = root / "benchmarks/past-bench" / family_matrix.spec_for(case.family_id).task_root / "family.yaml"
+        resolved = registry.for_case(case.case_id).resolve(
+            seed_root, case, hashlib.sha256(family_file.read_bytes()).hexdigest()
+        )
+        hits = HermesEpisodicBackend(resolved / "state.db").query(
+            MemoryQuery(kind=MemoryKind.EPISODIC, text=queries[case.family_id], limit=1)
+        )
+        assert hits
