@@ -51,12 +51,14 @@ family/task ID cannot enter the method boundary.  Stage 3 has a result-independe
 no real-model sensitivity results.  Its new immutable run-manifest contract
 expands every `family x condition x replicate` into isolated state,
 Hermes-home, and trace directories, and the PAST launcher accepts only the
-registered opaque method case ID.  The three non-native condition deployments
-(`type_matched_oracle`, `shortcut_current_input`, and `wrong_mechanism`) are
-not implemented yet, so a full Stage 3 manifest fails closed as
-non-executable.  The project has not entered a live N+1 experiment.
+registered opaque method case ID. The three non-native condition deployment
+mechanisms (`type_matched_oracle`, `shortcut_current_input`, and
+`wrong_mechanism`) are not generally implemented yet, so a full Stage 3
+manifest fails closed as non-executable. A single case-bound SM01 semantic
+oracle seed is registered and can be prepared as an evaluation-only sequence;
+this does not open the full matrix or enter a live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
-prompts, graders, or answers: all seven semantic and all three episodic target
+prompts, graders, or answers: six semantic and all three episodic target
 families expose the named non-oracle control slots but lack a registered
 type-matched oracle seed; the ten procedural families also lack a
 type-matched oracle seed and a `wrong_mechanism` slot, and PC03 additionally
@@ -71,8 +73,9 @@ non-executable deployment and does not invoke a provider itself.
 Type-matched oracle activation now has a separate case-bound seed registry.
 Each entry verifies family-source provenance, complete trusted-home tree digest,
 symlink absence, and target memory-kind layout before a deployment becomes
-executable; registry payloads contain no memory text. No oracle seed has yet
-been authored for the 20 target cases, so the provider matrix remains closed.
+executable; registry payloads contain no memory text. The checked-in SM01
+semantic seed is manually authored from its public learn input, while 19 target
+cases remain without an oracle seed; the provider matrix remains closed.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
