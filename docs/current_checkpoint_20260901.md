@@ -80,6 +80,13 @@ boundary.  The three non-native condition deployments are not implemented, so
 the manifest correctly rejects execution rather than treating five conditions
 as one runtime path.  These artifacts prove contract coverage only; no real
 model matched run or sensitivity claim has been made.
+The source-level readiness catalog does not read task prompts, graders, or
+answers. It reports that semantic and episodic targets each lack only their
+case-bound type-matched oracle seeds, while procedural targets additionally
+lack a compatible wrong-mechanism control and PC03 lacks a no-persistence
+control. A named PAST task control remains audit evidence, not an executable
+host deployment, until its artifact/state and launcher configuration are
+registered.
 
 The completed implementation components include:
 
