@@ -6,6 +6,7 @@ from pathlib import Path
 from rsimem.provider_probe import ProviderProbeResult
 from rsimem.sensitivity import SensitivityPanel
 from rsimem.sensitivity_pilot import run_sensitivity_pilot
+from rsimem.sensitivity_pilot_audit import _usage
 
 
 def _kwargs(tmp_path: Path) -> dict[str, object]:
@@ -71,3 +72,24 @@ def test_execute_runs_only_registered_commands_after_probe(tmp_path: Path) -> No
     assert {item["run_id"] for item in completed} == set(plan.run_ids)
     probe = json.loads((tmp_path / "provider_probe.json").read_text(encoding="utf-8"))
     assert probe["ok"] is True
+
+
+def test_usage_audit_matches_mixed_trace_end_field_names() -> None:
+    events = [
+        {"type": "model_call_usage", "usage": {
+            "input_tokens": 10, "output_tokens": 3, "cache_read_tokens": 2,
+            "cache_write_tokens": 0, "reasoning_tokens": 1,
+        }, "attempt": 1},
+        {"type": "trace_end", "trace_id": "trace-1",
+         "model_input_tokens": 10, "model_output_tokens": 3,
+         "cache_read_tokens": 2, "cache_write_tokens": 0,
+         "reasoning_tokens": 1, "model_request_count": 1,
+         "model_retry_count": 0, "model_usage_complete": True},
+    ]
+    totals, issues = _usage(events, "trace-1")
+    assert issues == []
+    assert totals == {
+        "input_tokens": 10, "output_tokens": 3, "cache_read_tokens": 2,
+        "cache_write_tokens": 0, "reasoning_tokens": 1, "requests": 1,
+        "retries": 0,
+    }

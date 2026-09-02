@@ -47,8 +47,9 @@ content-free terminal/usage/process/host digest for that comparison, and
 drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
-family/task ID cannot enter the method boundary.  Stage 3 has a result-independent oracle harness but
-no real-model sensitivity results.  Its new immutable run-manifest contract
+family/task ID cannot enter the method boundary. Stage 3 has a
+result-independent oracle harness and one audited real-model SM01 execution
+pilot, but no replicated sensitivity results. Its new immutable run-manifest contract
 expands every `family x condition x replicate` into isolated state,
 Hermes-home, and trace directories, and the PAST launcher accepts only the
 registered opaque method case ID. Semantic native, no-persistence, shortcut,
@@ -56,9 +57,12 @@ and wrong-mechanism task slices are now catalog-backed executable deployments;
 shortcut and wrong-mechanism explicitly disable persistence. A single
 case-bound SM01 semantic oracle seed is registered and can be prepared as an
 evaluation-only sequence, making all five SM01 conditions preparation-ready.
-The full Stage 3 matrix remains fail-closed because other oracle assets and a
-formal execution runner are still absent; this does not enter a live N+1
-experiment.
+The full Stage 3 matrix remains fail-closed because other oracle assets are
+absent. A manifest-bound pilot executor and content-free sensitivity audit now
+run one selected family/replicate only; the 2026-09-02 SM01 replicate-2 pilot
+completed all five conditions and is recorded in
+`docs/sensitivity_sm01_pilot_20260902.md`. This is execution/readiness evidence,
+not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: six semantic and all three episodic target
 families expose the named non-oracle control slots but lack a registered
@@ -122,7 +126,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified oracle-seed registry, registered directory handoff, and fail-closed case-slice launcher; oracle/control assets and matched model runs pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified oracle-seed registry, catalog-backed SM01 five-condition preparation, manifest-bound pilot executor, and content-free audit; 19 oracle assets and broader matched replicates pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
