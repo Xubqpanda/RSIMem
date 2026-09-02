@@ -48,8 +48,8 @@ drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
 family/task ID cannot enter the method boundary. Stage 3 has a
-result-independent oracle harness and two audited real-model semantic execution
-pilots (SM01 and SM02), but no replicated sensitivity results. Its new immutable run-manifest contract
+result-independent oracle harness and three audited real-model execution pilots
+(semantic SM01/SM02 and procedural PC01), but no replicated sensitivity results. Its new immutable run-manifest contract
 expands every `family x condition x replicate` into isolated state,
 Hermes-home, and trace directories, and the PAST launcher accepts only the
 registered opaque method case ID. Semantic native, no-persistence, shortcut,
@@ -57,12 +57,13 @@ and wrong-mechanism task slices are now catalog-backed executable deployments;
 shortcut and wrong-mechanism explicitly disable persistence. Seven semantic
 case-bound oracle seeds are registered and can be prepared as evaluation-only
 sequences; SM01 and SM02 have completed five-condition pilots.
-The full Stage 3 matrix remains fail-closed because executable controls are
+The full Stage 3 matrix remains fail-closed because replicated panel coverage is
 still incomplete. A manifest-bound pilot executor and content-free sensitivity audit now
-run one selected family/replicate only. The 2026-09-02 SM01 replicate-2 and
-SM02 replicate-1 pilots each completed all five conditions and are recorded in
+run one selected family/replicate only. The 2026-09-02 SM01 replicate-2, SM02
+replicate-1, and PC01 replicate-1 pilots each completed all five conditions and are recorded in
 `docs/sensitivity_sm01_pilot_20260902.md` and
-`docs/sensitivity_sm02_pilot_20260902.md`. This is execution/readiness evidence,
+`docs/sensitivity_sm02_pilot_20260902.md` and
+`docs/sensitivity_pc01_pilot_20260902.md`. This is execution/readiness evidence,
 not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic and all ten procedural target
@@ -84,8 +85,8 @@ executable; registry payloads contain no memory text. The checked-in SM01
 semantic panel's seven seeds are manually authored from their public learn or
 update inputs. The remaining three episodic target cases still lack an oracle
 seed. All ten procedural oracle seeds and all five procedural deployment
-conditions are registered and preparation-verified; no procedural provider pilot
-has run yet.
+conditions are registered and preparation-verified; PC01 replicate-1 has passed
+content-free audit, while remaining procedural replicates and families are pending.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
@@ -130,7 +131,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 10 procedural oracle seeds), catalog-backed semantic/procedural five-condition preparation, manifest-bound pilot executor, and content-free audit; episodic seeds, provider pilots, and broader matched replicates pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 10 procedural oracle seeds), catalog-backed semantic/procedural five-condition preparation, manifest-bound pilot executor, and content-free audits for SM01/SM02/PC01; episodic seeds, remaining provider pilots, and broader matched replicates pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
