@@ -8,6 +8,7 @@ import pytest
 from rsimem.memory import MemoryKind
 from rsimem.memory.family_matrix import PastFamilyMatrix
 from rsimem.past_sensitivity_catalog import build_past_sensitivity_catalog
+from rsimem.oracle_seed_registry import create_oracle_seed_registration, create_oracle_seed_registry, oracle_seed_tree_digest
 from rsimem.research_protocol import (
     ResearchProtocol,
     SensitivityCondition,
@@ -18,6 +19,7 @@ from rsimem.sensitivity_run import (
     SensitivityDeployment,
     SensitivityRunManifestStore,
     build_sensitivity_run_manifest,
+    apply_verified_oracle_seed_registry,
     planned_deployments_from_catalog,
 )
 
@@ -181,3 +183,38 @@ def test_catalog_planning_preserves_per_case_unavailability() -> None:
     assert all(not item.executable for item in deployments)
     oracle = next(item for item in deployments if item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE)
     assert oracle.episode_selector == "unavailable.type_matched_oracle"
+
+
+def test_verified_oracle_registry_upgrades_only_its_case(tmp_path) -> None:
+    matrix = _matrix()
+    root = Path(__file__).resolve().parents[1] / "benchmarks" / "past-bench"
+    catalog = build_past_sensitivity_catalog(matrix=matrix, past_bench_root=root)
+    planned = planned_deployments_from_catalog(matrix=matrix, catalog=catalog)
+    oracle_case = next(case for case in matrix.cases if case.condition is SensitivityCondition.TYPE_MATCHED_ORACLE)
+    seed_root = tmp_path / "seeds"
+    seed = seed_root / "semantic"
+    (seed / "memories").mkdir(parents=True)
+    (seed / "memories" / "MEMORY.md").write_text("registered fact", encoding="utf-8")
+    family_digest = next(
+        entry.family_source_digest
+        for entry in catalog.entries
+        if entry.case_id == oracle_case.case_id
+    )
+    registry = create_oracle_seed_registry((create_oracle_seed_registration(
+        case=oracle_case,
+        family_source_digest=family_digest,
+        seed_home="semantic",
+        seed_tree_digest=oracle_seed_tree_digest(seed),
+    ),))
+    resolved = apply_verified_oracle_seed_registry(
+        matrix=matrix,
+        catalog=catalog,
+        deployments=planned,
+        registry=registry,
+        trusted_root=seed_root,
+    )
+    upgraded = next(item for item in resolved if item.case_id == oracle_case.case_id)
+    assert upgraded.executable is True
+    assert upgraded.episode_selector == "family.eval_only"
+    assert upgraded.host_state_digest == oracle_seed_tree_digest(seed)
+    assert sum(item.executable for item in resolved) == 1

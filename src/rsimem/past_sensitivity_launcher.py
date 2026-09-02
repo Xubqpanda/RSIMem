@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -17,7 +18,9 @@ import yaml
 
 from .memory.family_matrix import PastFamilyMatrix
 from .research_protocol import SensitivityCondition
+from .sensitivity import SensitivityCase
 from .sensitivity_run import SensitivityDeployment, SensitivityRunSpec
+from .oracle_seed_registry import OracleSeedRegistry
 
 
 def _canonical(value: object) -> str:
@@ -60,6 +63,11 @@ def _select_episodes(document: Mapping[str, object], deployment: SensitivityDepl
         if not selected:
             raise ValueError("native-static sensitivity slice has no learn/evaluation episodes")
         return selected
+    if selector == "family.eval_only":
+        selected = [item for item in episodes if item.get("bucket") == "evaluation"]
+        if not selected:
+            raise ValueError("oracle sensitivity slice has no evaluation episode")
+        return selected
     matches = [
         (index, item)
         for index, item in enumerate(episodes)
@@ -91,6 +99,9 @@ def prepare_past_sensitivity_launch(
     output_directory: Path,
     past_bench_binary: str = "past-bench",
     agent: str = "hermes-luna",
+    oracle_seed_registry: OracleSeedRegistry | None = None,
+    oracle_trusted_root: Path | None = None,
+    oracle_case: SensitivityCase | None = None,
 ) -> PreparedPastSensitivityLaunch:
     """Write a case slice and return, but do not execute, its PAST command."""
 
@@ -104,6 +115,20 @@ def prepare_past_sensitivity_launch(
         raise ValueError("sensitivity deployment identity mismatch")
     if not deployment.executable:
         raise ValueError("sensitivity deployment is not executable")
+    oracle_registration = None
+    if run.condition is SensitivityCondition.TYPE_MATCHED_ORACLE:
+        if oracle_seed_registry is None or oracle_trusted_root is None or oracle_case is None:
+            raise ValueError("oracle sensitivity launch requires a verified seed registry")
+        if (
+            oracle_case.case_id != run.case_id
+            or oracle_case.condition is not SensitivityCondition.TYPE_MATCHED_ORACLE
+            or oracle_case.panel.value != run.panel
+            or oracle_case.target_kind.value != deployment.target_kind
+        ):
+            raise ValueError("oracle sensitivity case does not match run identity")
+        oracle_registration = oracle_seed_registry.for_case(run.case_id)
+        if oracle_registration.panel.value != run.panel or oracle_registration.target_kind.value != deployment.target_kind:
+            raise ValueError("oracle seed registration does not match run kind")
     root = Path(past_bench_root).expanduser().resolve()
     if not (root / "pyproject.toml").is_file():
         raise ValueError("PAST-Bench root is invalid")
@@ -111,11 +136,19 @@ def prepare_past_sensitivity_launch(
     family_dir = root / spec.task_root
     family_file = family_dir / "family.yaml"
     try:
-        source = yaml.safe_load(family_file.read_text(encoding="utf-8")) or {}
+        family_bytes = family_file.read_bytes()
+        source = yaml.safe_load(family_bytes) or {}
     except (OSError, yaml.YAMLError) as exc:
         raise ValueError("PAST family manifest is unreadable") from exc
     if not isinstance(source, Mapping) or source.get("family_id") != run.family_id:
         raise ValueError("PAST family identity mismatch")
+    oracle_seed_source: Path | None = None
+    if oracle_registration is not None:
+        oracle_seed_source = oracle_registration.resolve(
+            Path(oracle_trusted_root),
+            oracle_case,
+            hashlib.sha256(family_bytes).hexdigest(),
+        )
     from past_bench.self_evolve_v2 import generate_manifest
 
     output = Path(output_directory).expanduser().resolve()
@@ -131,6 +164,13 @@ def prepare_past_sensitivity_launch(
     if not isinstance(base, Mapping):
         raise ValueError("generated PAST family manifest is invalid")
     selected = _select_episodes(base, deployment)
+    if oracle_seed_source is not None:
+        oracle_target = run_root / "oracle-home"
+        if oracle_target.exists():
+            shutil.rmtree(oracle_target)
+        shutil.copytree(oracle_seed_source, oracle_target, symlinks=False)
+        for episode in selected:
+            episode["oracle_home_seed_dir"] = "oracle-home"
     document = {
         "name": f"sensitivity.{run.run_id}",
         "description": "Registered RSIMem Stage 3 condition slice.",

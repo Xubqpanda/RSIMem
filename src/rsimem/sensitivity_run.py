@@ -446,6 +446,71 @@ def planned_deployments_from_catalog(
     return tuple(deployments)
 
 
+def apply_verified_oracle_seed_registry(
+    *,
+    matrix: SensitivityMatrix,
+    catalog: object,
+    deployments: Sequence[SensitivityDeployment],
+    registry: object,
+    trusted_root: Path,
+) -> tuple[SensitivityDeployment, ...]:
+    """Upgrade only oracle deployments backed by verified, case-bound seeds."""
+
+    from .oracle_seed_registry import OracleSeedRegistry
+    from .past_sensitivity_catalog import PastSensitivityCatalog
+
+    if not isinstance(catalog, PastSensitivityCatalog) or not isinstance(registry, OracleSeedRegistry):
+        raise TypeError("oracle deployment upgrade requires catalog and seed registry")
+    if catalog.matrix_id != matrix.matrix_id or catalog.matrix_digest != matrix.matrix_digest:
+        raise ValueError("oracle deployment catalog does not match matrix")
+    by_case = {(item.case_id, item.condition): item for item in catalog.entries}
+    result: list[SensitivityDeployment] = []
+    for deployment in deployments:
+        if deployment.condition is not SensitivityCondition.TYPE_MATCHED_ORACLE:
+            result.append(deployment)
+            continue
+        case_matches = [case for case in matrix.cases if case.case_id == deployment.case_id]
+        if len(case_matches) != 1:
+            raise ValueError("oracle deployment case is not in matrix")
+        case = case_matches[0]
+        availability = by_case.get((case.case_id, case.condition))
+        if availability is None:
+            raise ValueError("oracle deployment catalog entry is missing")
+        try:
+            registration = registry.for_case(case.case_id)
+            seed = registration.resolve(trusted_root, case, availability.family_source_digest)
+        except ValueError:
+            # Missing or invalid registrations cannot silently make a case runnable.
+            result.append(deployment)
+            continue
+        values = {
+            "case_id": deployment.case_id,
+            "panel": deployment.panel,
+            "target_kind": deployment.target_kind,
+            "condition": deployment.condition,
+            "mechanism": deployment.mechanism,
+            "episode_selector": "family.eval_only",
+            "state_mode": deployment.state_mode,
+            "host_state_digest": registration.seed_tree_digest,
+            "launcher_config_digest": _digest({
+                "previous": deployment.launcher_config_digest,
+                "registration": registration.payload(),
+            }),
+            "executable": True,
+        }
+        result.append(SensitivityDeployment(
+            deployment_id="sensitivity-deployment." + _digest({
+                **values,
+                "panel": deployment.panel.value,
+                "condition": deployment.condition.value,
+            })[:40],
+            **values,
+        ))
+        if not seed.is_dir():  # resolve already verifies this; preserve explicit contract.
+            raise ValueError("verified oracle seed is not a directory")
+    return tuple(result)
+
+
 class SensitivityRunManifestStore:
     """Append-once registration for an immutable Stage 3 run manifest."""
 
@@ -488,5 +553,6 @@ __all__ = [
     "SensitivityRunManifestStore",
     "SensitivityRunSpec",
     "build_sensitivity_run_manifest",
+    "apply_verified_oracle_seed_registry",
     "planned_deployments_from_catalog",
 ]

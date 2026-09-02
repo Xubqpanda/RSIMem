@@ -11,6 +11,7 @@ from rsimem.memory import MemoryKind
 from rsimem.memory.family_matrix import PastFamilyMatrix
 from rsimem.past_sensitivity_catalog import build_past_sensitivity_catalog
 from rsimem.past_sensitivity_launcher import prepare_past_sensitivity_launch
+from rsimem.oracle_seed_registry import create_oracle_seed_registration, create_oracle_seed_registry, oracle_seed_tree_digest
 from rsimem.research_protocol import ResearchProtocol, SensitivityCondition, default_research_protocol
 from rsimem.sensitivity import SensitivityMatrix, SensitivityPanel
 from rsimem.sensitivity_run import build_sensitivity_run_manifest, planned_deployments_from_catalog
@@ -23,7 +24,7 @@ def _digest(value: str) -> str:
     return hashlib.sha256(value.encode("ascii")).hexdigest()
 
 
-def _manifest():
+def _matrix():
     base = default_research_protocol()
     protocol = ResearchProtocol.create(
         memory_units=base.memory_units,
@@ -31,11 +32,15 @@ def _manifest():
         split=base.split,
         sensitivity_target_kind=MemoryKind.SEMANTIC,
     )
-    matrix = SensitivityMatrix.create_for_panel(
+    return SensitivityMatrix.create_for_panel(
         panel=SensitivityPanel.SEMANTIC,
         protocol=protocol,
         family_matrix=PastFamilyMatrix.create_default(),
     )
+
+
+def _manifest():
+    matrix = _matrix()
     catalog = build_past_sensitivity_catalog(matrix=matrix, past_bench_root=ROOT)
     deployments = planned_deployments_from_catalog(matrix=matrix, catalog=catalog)
     manifest = build_sensitivity_run_manifest(
@@ -89,6 +94,46 @@ def test_preparation_rejects_unregistered_or_nonexecutable_deployment(tmp_path: 
             past_bench_root=ROOT,
             output_directory=tmp_path,
         )
+
+
+def test_oracle_preparation_requires_verified_registry_and_copies_seed(tmp_path: Path) -> None:
+    manifest = _manifest()
+    run = next(item for item in manifest.runs if item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE)
+    deployment = next(item for item in manifest.deployments if item.deployment_id == run.deployment_id)
+    with pytest.raises(ValueError, match="verified seed registry"):
+        prepare_past_sensitivity_launch(
+            run=run,
+            deployment=replace(deployment, executable=True, episode_selector="family.eval_only"),
+            past_bench_root=ROOT,
+            output_directory=tmp_path,
+        )
+    trusted = tmp_path / "trusted"
+    seed = trusted / "oracle"
+    (seed / "memories").mkdir(parents=True)
+    (seed / "memories" / "MEMORY.md").write_text("oracle fact", encoding="utf-8")
+    oracle_case = next(item for item in _matrix().cases if item.case_id == run.case_id)
+    family_file = ROOT / PastFamilyMatrix.create_default().spec_for(run.family_id).task_root / "family.yaml"
+    registration = create_oracle_seed_registration(
+        case=oracle_case,
+        family_source_digest=hashlib.sha256(family_file.read_bytes()).hexdigest(),
+        seed_home="oracle",
+        seed_tree_digest=oracle_seed_tree_digest(seed),
+    )
+    registry = create_oracle_seed_registry((registration,))
+    prepared = prepare_past_sensitivity_launch(
+        run=run,
+        deployment=replace(deployment, executable=True, episode_selector="family.eval_only"),
+        past_bench_root=ROOT,
+        output_directory=tmp_path / "prepared",
+        oracle_seed_registry=registry,
+        oracle_trusted_root=trusted,
+        oracle_case=oracle_case,
+    )
+    document = yaml.safe_load(prepared.sequence_path.read_text(encoding="utf-8"))
+    assert document["episodes"]
+    assert all(item["bucket"] == "evaluation" for item in document["episodes"])
+    assert all(item["oracle_home_seed_dir"] == "oracle-home" for item in document["episodes"])
+    assert (prepared.sequence_path.parent / "oracle-home" / "memories" / "MEMORY.md").exists()
     with pytest.raises(ValueError, match="run/deployment mismatch"):
         prepare_past_sensitivity_launch(
             run=run,
