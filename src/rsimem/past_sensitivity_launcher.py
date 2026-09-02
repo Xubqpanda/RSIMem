@@ -88,7 +88,15 @@ def _select_episodes(document: Mapping[str, object], deployment: SensitivityDepl
     # The source sequence defines the anchor state by executing its complete
     # prefix. Retaining that prefix preserves native state transitions while
     # excluding unrelated future controls.
-    return episodes[: anchors[0] + 1] + [target]
+    selected = episodes[: anchors[0] + 1] + [target]
+    # Shared-cold is a cross-run optimization used by the ordinary matched
+    # launcher.  A sensitivity slice owns its isolated state, so retained
+    # history prefixes must execute normally rather than triggering the
+    # runner's shared-cold fast path (which is forbidden for sensitivity).
+    for item in selected:
+        if item.get("shared_cold_run"):
+            item["shared_cold_run"] = False
+    return selected
 
 
 def prepare_past_sensitivity_launch(

@@ -101,6 +101,21 @@ def test_control_slices_disable_persistence(condition: SensitivityCondition, tmp
     assert prepared.command[prepared.command.index("--persistence-variant") + 1] == "without_persistence"
 
 
+def test_from_anchor_control_prefix_disables_shared_cold_fast_path(tmp_path: Path) -> None:
+    manifest = _manifest()
+    run = next(item for item in manifest.runs if item.condition is SensitivityCondition.WRONG_MECHANISM)
+    deployment = next(item for item in manifest.deployments if item.deployment_id == run.deployment_id)
+    prepared = prepare_past_sensitivity_launch(
+        run=run,
+        deployment=deployment,
+        past_bench_root=ROOT,
+        output_directory=tmp_path,
+    )
+    document = yaml.safe_load(prepared.sequence_path.read_text(encoding="utf-8"))
+    assert document["episodes"]
+    assert not any(item.get("shared_cold_run") for item in document["episodes"])
+
+
 def test_preparation_rejects_unregistered_or_nonexecutable_deployment(tmp_path: Path) -> None:
     manifest = _manifest()
     run = next(item for item in manifest.runs if item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE)
