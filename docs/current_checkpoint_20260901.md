@@ -87,6 +87,11 @@ lack a compatible wrong-mechanism control and PC03 lacks a no-persistence
 control. A named PAST task control remains audit evidence, not an executable
 host deployment, until its artifact/state and launcher configuration are
 registered.
+The launcher can prepare a case-specific PAST sequence slice and passes only
+the opaque method case ID, alongside registered isolated state, Hermes-home,
+and trace locations. It rejects non-executable deployments before forming any
+provider command. This is execution plumbing, not an oracle artifact or a
+model sensitivity result.
 
 The completed implementation components include:
 

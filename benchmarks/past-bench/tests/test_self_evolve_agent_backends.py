@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import threading
@@ -10,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from past_bench.models.tool import ToolEndpoint, ToolSpec
+from past_bench.cli import _resolve_rsimem_sensitivity_paths
 from past_bench.runner.self_evolve import (
     HermesPersistenceBackend,
     NanobotPersistenceBackend,
@@ -109,6 +111,32 @@ def test_full_oracle_home_seed_is_hermes_only_and_preserves_native_state(tmp_pat
             state_root=tmp_path / "zeroclaw",
             oracle_home_seed_dir=oracle,
         )
+
+
+def test_sensitivity_paths_require_explicit_distinct_hermes_directories(tmp_path: Path):
+    backend = HermesPersistenceBackend()
+    assert _resolve_rsimem_sensitivity_paths(argparse.Namespace(), backend) is None
+    with pytest.raises(SystemExit, match="both state and Hermes-home"):
+        _resolve_rsimem_sensitivity_paths(
+            argparse.Namespace(rsimem_sensitivity_state_dir=str(tmp_path / "state")),
+            backend,
+        )
+    with pytest.raises(SystemExit, match="must differ"):
+        _resolve_rsimem_sensitivity_paths(
+            argparse.Namespace(
+                rsimem_sensitivity_state_dir=str(tmp_path / "same"),
+                rsimem_sensitivity_hermes_home_dir=str(tmp_path / "same"),
+            ),
+            backend,
+        )
+    paths = _resolve_rsimem_sensitivity_paths(
+        argparse.Namespace(
+            rsimem_sensitivity_state_dir=str(tmp_path / "state"),
+            rsimem_sensitivity_hermes_home_dir=str(tmp_path / "home"),
+        ),
+        backend,
+    )
+    assert paths == ((tmp_path / "state").resolve(), (tmp_path / "home").resolve())
 
 
 def test_nanobot_backend_history_and_artifact_snapshot(tmp_path: Path):
