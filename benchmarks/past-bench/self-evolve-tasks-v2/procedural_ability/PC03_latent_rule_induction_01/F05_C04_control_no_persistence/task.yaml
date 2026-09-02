@@ -1,42 +1,35 @@
-task_id: SE_FM03_C01
-task_name: FM03 Control — No Persistence (Data-Sharing Exception Registry)
+task_id: V2_F05_C04
+task_name: F05 Control — No Persistence
 version: '1.0'
 category: self_evolve
 difficulty: hard
-requires_fresh_session: true
 control_type: no_persistence
 persistence_disabled: true
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+requires_fresh_session: true
 services:
 - name: helpdesk
   command: python mock_services/helpdesk/server.py
-  port: 9107
-  health_check: http://localhost:9107/helpdesk/tickets
+  port: 9200
+  health_check: http://localhost:9200/helpdesk/tickets
   health_check_method: POST
   ready_timeout: 10
-  reset_endpoint: http://localhost:9107/helpdesk/reset
+  reset_endpoint: http://localhost:9200/helpdesk/reset
   env:
-    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm03_helpdesk/eval_near.json
+    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/f05_helpdesk/eval_near.json
+    PORT: '9200'
 - name: kb
   command: python mock_services/kb/server.py
-  port: 9106
-  health_check: http://localhost:9106/kb/search
+  port: 9201
+  health_check: http://localhost:9201/kb/search
   health_check_method: POST
   ready_timeout: 10
-  reset_endpoint: http://localhost:9106/kb/reset
+  reset_endpoint: http://localhost:9201/kb/reset
   env:
-    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm03_kb/brief.json
-prompt:
-  text: 'The KB only has a brief overview. If you have a saved exception registry
-    skill, open its full contents before processing.
-
-    Process the open data export tickets in the helpdesk system. Apply the appropriate
-    rules to each ticket and output: TICKET_ID|priority|category|tags
-
-    You MUST use helpdesk_list_tickets, helpdesk_get_ticket, and helpdesk_update_ticket
-    tools to process and update tickets.
-
-    '
-  language: en
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/f05_kb/brief.json
+    PORT: '9201'
 tools:
 - name: helpdesk_list_tickets
   description: List helpdesk tickets
@@ -70,10 +63,6 @@ tools:
           type: string
       category:
         type: string
-      status:
-        type: string
-      internal_note:
-        type: string
     required:
     - ticket_id
 - name: kb_search
@@ -98,25 +87,33 @@ tools:
         type: string
     required:
     - article_id
+prompt:
+  text: |
+    No saved skill or cross-task memory is available in this control. Use only the current task details.
+    Do not create or read a skill artifact. Do not close tickets.
+    Output one line per updated ticket: TICKET_ID|priority|category|tags
+
+    Use the available task tools to inspect and update the current tickets.
+  language: en
+judge_rubric: 'Control (no_persistence): Cross-task skill and memory state are disabled.
+  Expect partial or incorrect triage from current task details alone. Reward any
+  reasonable attempt; the key metric is whether this scores lower than eval_near,
+  which had the full learn sequence and durable state.
+
+  '
 tool_endpoints:
 - tool_name: helpdesk_list_tickets
-  url: http://localhost:9107/helpdesk/tickets
+  url: http://localhost:9200/helpdesk/tickets
   method: POST
 - tool_name: helpdesk_get_ticket
-  url: http://localhost:9107/helpdesk/tickets/get
+  url: http://localhost:9200/helpdesk/tickets/get
   method: POST
 - tool_name: helpdesk_update_ticket
-  url: http://localhost:9107/helpdesk/tickets/update
+  url: http://localhost:9200/helpdesk/tickets/update
   method: POST
 - tool_name: kb_search
-  url: http://localhost:9106/kb/search
+  url: http://localhost:9201/kb/search
   method: POST
 - tool_name: kb_get_article
-  url: http://localhost:9106/kb/articles/get
+  url: http://localhost:9201/kb/articles/get
   method: POST
-environment:
-  timeout_seconds: 300
-  max_turns: 25
-judge_rubric: 'Control (no_persistence): Same eval_near task but with all persistence
-  disabled. Agent cannot retrieve saved skills/memories. Measures whether the brief
-  KB alone is sufficient.'

@@ -18,8 +18,8 @@ instances_per_bucket:
   update_or_stabilize: 1
   eval_near: 1
   eval_far: 1
-  control: 3
-total_episodes: 8
+  control: 4
+total_episodes: 9
 episode_order:
 - FM03_I01_datashare_cold
 - FM03_I02_datashare_learn_a
@@ -29,6 +29,7 @@ episode_order:
 - FM03_C02_control_shortcut
 - FM03_C03_control_surface_memorization
 - FM03_C01_control_no_persistence
+- FM03_C04_control_wrong_mechanism
 history_plan:
   anchors:
   - name: pc01_04_post_learn
@@ -49,10 +50,18 @@ history_plan:
     - FM03_C02_control_shortcut
     - FM03_C03_control_surface_memorization
     - FM03_C01_control_no_persistence
+    - FM03_C04_control_wrong_mechanism
 control_set:
 - no_persistence
 - shortcut
 - surface_memorization
+- wrong_mechanism
+episode_overrides:
+  FM03_C04_control_wrong_mechanism:
+    stage: control
+    mechanism: mixed
+    expected_persistence_signal: skill
+    persistence_allowed: false
 status: v2_architecture_aligned
 latent_rule_id: fm03_datashare_exception_registry_v1
 saturation_ceiling: 0.85
@@ -91,12 +100,13 @@ cold_design: same datashare task before any SOP is introduced
 expected_cold_result: partial solve; no stable reusable procedure
 
 # Control Design
-control_design: no_persistence, shortcut, surface_memorization
-expected_control_result: transfer gain shrinks without persisted procedure; template reuse alone should not pass
+control_design: no_persistence, shortcut, surface_memorization, wrong_mechanism
+expected_control_result: transfer gain shrinks without persisted procedure; current-reference text must not be mistaken for reusable skill persistence
 
 # Episodes
 legacy_source: previous PC split, architecture-aligned
 legacy_episodes:
+- FM03_C04_control_wrong_mechanism
 - FM03_C01_control_no_persistence
 - FM03_C02_control_shortcut
 - FM03_C03_control_surface_memorization

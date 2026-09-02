@@ -1,10 +1,10 @@
-task_id: SE_FX01_C01
-task_name: Self-Evolve X Engagement Protocol — Control No Persistence
+task_id: V2_FX01_C04
+task_name: Procedural Control - Wrong Mechanism
 version: '1.0'
 category: self_evolve
 difficulty: hard
 requires_fresh_session: true
-control_type: no_persistence
+control_type: wrong_mechanism
 persistence_disabled: true
 services:
 - name: x_mock
@@ -24,20 +24,15 @@ services:
   ready_timeout: 10
   reset_endpoint: http://localhost:9106/kb/reset
   env:
-    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fx01_x/kb_brief.json
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fx01_x/kb_full.json
 prompt:
-  text: 'If you previously saved a skill for the X engagement protocol, retrieve and
-    apply it now.
+  text: |
+    Read the current X operations knowledge-base article and apply the engagement
+    procedure it describes to the current timeline and mentions. The procedure is
+    deliberately available as plain current reference text, not as a reusable skill
+    artifact. Do not create or read a skill artifact for this control.
 
-
-    You are the social media agent for @corp_x. Review the latest mentions and timeline,
-
-    then take the appropriate action for each post.
-
-
-    Use getMentions, getTimeline, and getUserProfile as needed.
-
-    '
+    Use kb_search and kb_get_article before using the X tools.
   language: en
 tools:
 - name: x_action
@@ -113,8 +108,9 @@ tool_endpoints:
 environment:
   timeout_seconds: 300
   max_turns: 25
-judge_rubric: 'Control (no_persistence): Same as eval_near but persistence disabled.
-  Agent has no access to saved skills or memory. Must solve from scratch with only
-  brief KB index. Measures baseline without any persistence mechanism.
+judge_rubric: 'Control (surface_memorization): Only surface keywords provided (replyToTweet,
+  sendDM, quoteTweet, ignore, #CorpX, 1000). No procedure structure or decision logic.
+  Tests whether keyword exposure alone enables correct execution. Success here is
+  a false positive — it means the task can be solved from keyword hints alone.
 
   '

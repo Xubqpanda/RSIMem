@@ -18,8 +18,8 @@ instances_per_bucket:
   update_or_stabilize: 1
   eval_near: 1
   eval_far: 1
-  control: 3
-total_episodes: 8
+  control: 4
+total_episodes: 9
 episode_order:
 - F01_I01_skill_baseline_cold
 - F01_I02_skill_learn_a
@@ -29,6 +29,7 @@ episode_order:
 - F01_C02_control_shortcut
 - F01_C03_control_surface_memorization
 - F01_C01_control_no_persistence
+- F01_C04_control_wrong_mechanism
 history_plan:
   anchors:
   - name: pc01_01_post_learn
@@ -49,10 +50,18 @@ history_plan:
     - F01_C02_control_shortcut
     - F01_C03_control_surface_memorization
     - F01_C01_control_no_persistence
+    - F01_C04_control_wrong_mechanism
 control_set:
 - no_persistence
 - shortcut
 - surface_memorization
+- wrong_mechanism
+episode_overrides:
+  F01_C04_control_wrong_mechanism:
+    stage: control
+    mechanism: mixed
+    expected_persistence_signal: skill
+    persistence_allowed: false
 status: v2_architecture_aligned
 latent_rule_id: f01_shared_incident_sop_v1
 saturation_ceiling: 0.85
@@ -91,8 +100,8 @@ cold_design: same-workflow task before any SOP or KB is introduced
 expected_cold_result: partial solve without stable reusable procedure
 
 # Control Design
-control_design: no_persistence, shortcut, surface_memorization
-expected_control_result: transfer gain shrinks without persisted procedure; template reuse alone should not pass
+control_design: no_persistence, shortcut, surface_memorization, wrong_mechanism
+expected_control_result: transfer gain shrinks without persisted procedure; current-reference text must not be mistaken for reusable skill persistence
 
 # Episodes
 legacy_source: previous PC split, architecture-aligned

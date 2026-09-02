@@ -1,10 +1,10 @@
-task_id: SE_FP01_C01
-task_name: Self-Evolve Plonk Incident SOP — Control No Persistence
+task_id: V2_FP01_C04
+task_name: Procedural Control - Wrong Mechanism
 version: '2.0'
 category: self_evolve
 difficulty: hard
 requires_fresh_session: true
-control_type: no_persistence
+control_type: wrong_mechanism
 persistence_disabled: true
 services:
 - name: plonk
@@ -24,18 +24,16 @@ services:
   ready_timeout: 10
   reset_endpoint: http://localhost:9106/kb/reset
   env:
-    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fp01_kb/incident_brief.json
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fp01_kb/incident_sop_full.json
 prompt:
-  text: 'If you have previously saved a skill for the Plonk incident response procedure, please retrieve and use it first.
+  text: |
+    Read the current Plonk knowledge-base article and apply the incident-response
+    procedure it describes to the current incident. The procedure is deliberately
+    available as plain current reference text, not as a reusable skill artifact.
+    Do not create or read a skill artifact for this control. Complete the Plonk
+    actions and output: DONE|<pinned message ID>|<incident channel>
 
-
-    Infrastructure incident: The NetGuard network routing fabric is experiencing severe degradation and multiple services are affected.
-
-    Please handle this according to the standard procedure.
-
-    Output a single line: DONE|<pinned message ID>|<incident channel>
-
-    '
+    Use kb_search and kb_get_article before using plonk_action.
   language: en
 tools:
 - name: plonk_action
@@ -104,8 +102,9 @@ tool_endpoints:
 environment:
   timeout_seconds: 300
   max_turns: 20
-judge_rubric: 'Control (no_persistence): Same as eval_near but persistence disabled.
-  Agent has no access to saved skills or memory. Must solve from scratch with only
-  brief KB index. Measures baseline without any persistence mechanism.
+judge_rubric: 'Control (surface_memorization): Only surface keywords provided (nexobi,
+  felura, zubefa, plk-incidents). No procedure structure or parameter details. Tests
+  whether keyword exposure alone enables correct execution. Success here is a false
+  positive — it means the task can be solved from keyword hints alone.
 
   '

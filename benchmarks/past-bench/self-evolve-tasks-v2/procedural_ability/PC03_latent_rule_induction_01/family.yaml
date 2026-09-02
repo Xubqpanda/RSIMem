@@ -17,8 +17,8 @@ instances_per_bucket:
   learn: 2
   eval_near: 1
   eval_far: 1
-  control: 2
-total_episodes: 7
+  control: 4
+total_episodes: 9
 episode_order:
 - F05_I01_hidden_baseline_cold
 - F05_I02_hidden_learn_case_a
@@ -27,6 +27,8 @@ episode_order:
 - F05_I05_hidden_eval_far
 - F05_C01_control_shortcut
 - F05_C02_control_too_few_examples
+- F05_C03_control_wrong_mechanism
+- F05_C04_control_no_persistence
 history_plan:
   anchors:
   - name: pc03_01_post_learn
@@ -46,15 +48,29 @@ history_plan:
     episodes:
     - F05_C01_control_shortcut
     - F05_C02_control_too_few_examples
+    - F05_C03_control_wrong_mechanism
+    - F05_C04_control_no_persistence
 control_set:
 - shortcut
 - too_few_examples
+- wrong_mechanism
+- no_persistence
 episode_overrides:
   F05_C01_control_shortcut:
     stage: control
     persistence_allowed: false
   F05_C02_control_too_few_examples:
     stage: control
+    persistence_allowed: false
+  F05_C03_control_wrong_mechanism:
+    stage: control
+    mechanism: mixed
+    expected_persistence_signal: skill
+    persistence_allowed: false
+  F05_C04_control_no_persistence:
+    stage: control
+    mechanism: skill
+    expected_persistence_signal: skill
     persistence_allowed: false
 status: v2_architecture_aligned
 latent_rule_id: f05_db_migration_risk_correlation_v1
@@ -94,8 +110,8 @@ cold_design: first task exposes the latent workflow before enough cases exist to
 expected_cold_result: low-to-mid score; no rule abstraction yet
 
 # Control Design
-control_design: shortcut and too_few_examples controls
-expected_control_result: without enough learn examples, transfer collapses; surface matching alone is rejected
+control_design: shortcut, too_few_examples, wrong_mechanism, no_persistence
+expected_control_result: without enough learn examples or durable skill state, transfer collapses; current-reference text and surface matching are separate controls
 
 # Episodes
 legacy_source: previous PC split, architecture-aligned

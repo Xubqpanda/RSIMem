@@ -19,8 +19,8 @@ instances_per_bucket:
   confirmation: 1
   eval_near: 1
   eval_far: 1
-  control: 3
-total_episodes: 9
+  control: 4
+total_episodes: 10
 episode_order:
 - F07_I01_failure_baseline
 - F07_I02_failure_attempt
@@ -31,6 +31,7 @@ episode_order:
 - F07_C01_control_reflection_off
 - F07_C02_control_no_persistence
 - F07_C03_control_shortcut
+- F07_C04_control_wrong_mechanism
 history_plan:
   anchors:
   - name: pc04_01_post_learn
@@ -52,10 +53,12 @@ history_plan:
     - F07_C01_control_reflection_off
     - F07_C02_control_no_persistence
     - F07_C03_control_shortcut
+    - F07_C04_control_wrong_mechanism
 control_set:
 - reflection_off
 - no_persistence
 - shortcut
+- wrong_mechanism
 episode_overrides:
   F07_C01_control_reflection_off:
     stage: control
@@ -65,6 +68,11 @@ episode_overrides:
     persistence_allowed: false
   F07_C03_control_shortcut:
     stage: control
+    persistence_allowed: false
+  F07_C04_control_wrong_mechanism:
+    stage: control
+    mechanism: mixed
+    expected_persistence_signal: skill
     persistence_allowed: false
 status: v2_architecture_aligned
 latent_rule_id: f07_deployment_rollback_grouping_v1
@@ -104,8 +112,8 @@ cold_design: same-structure task without any reflection opportunity
 expected_cold_result: weak procedure fails or remains unstable; no reusable post-failure rule
 
 # Control Design
-control_design: reflection_off and no_persistence controls
-expected_control_result: if reflection is the real driver, gains weaken sharply when reflection path is disabled
+control_design: reflection_off, no_persistence, shortcut, wrong_mechanism
+expected_control_result: if reflection or durable skill state is the real driver, gains weaken when either path is disabled; current-reference text remains a separate mechanism control
 
 # Episodes
 legacy_source: previous PC split, architecture-aligned

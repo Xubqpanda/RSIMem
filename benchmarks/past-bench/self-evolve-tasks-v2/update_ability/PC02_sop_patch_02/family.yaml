@@ -17,8 +17,8 @@ instances_per_bucket:
   update_or_stabilize: 1
   eval_near: 1
   eval_far: 1
-  control: 3
-total_episodes: 7
+  control: 4
+total_episodes: 8
 episode_order:
 - FC04_I01_errcorr_cold
 - FC04_I02b_errcorr_update_or_stabilize
@@ -27,6 +27,7 @@ episode_order:
 - FC04_C01_control_no_persistence
 - FC04_C02_control_shortcut
 - FC04_C03_control_stale_procedure
+- FC04_C04_control_wrong_mechanism
 history_plan:
   anchors:
   - name: pc02_02_post_update
@@ -38,6 +39,7 @@ history_plan:
     - FC04_C01_control_no_persistence
     - FC04_C02_control_shortcut
     - FC04_C03_control_stale_procedure
+    - FC04_C04_control_wrong_mechanism
   - mode: continue
     episodes:
     - FC04_I02b_errcorr_update_or_stabilize
@@ -56,10 +58,16 @@ episode_overrides:
     mechanism: skill
     expected_persistence_signal: skill
     persistence_allowed: true
+  FC04_C04_control_wrong_mechanism:
+    stage: control
+    mechanism: mixed
+    expected_persistence_signal: skill
+    persistence_allowed: false
 control_set:
 - no_persistence
 - shortcut
 - stale_procedure
+- wrong_mechanism
 status: v2_architecture_aligned
 latent_rule_id: fc04_error_correction_procedure_v1
 saturation_ceiling: 0.85
@@ -98,12 +106,13 @@ cold_design: "Run the same skill-retrieval workflow as eval from the stale nativ
 expected_cold_result: "Cold should provide the pre-correction baseline against the same post-correction target that eval uses, with the stale skill already seeded in Hermes home."
 
 # Control Design
-control_design: no_persistence, shortcut, stale_procedure
-expected_control_result: without persistence, agent reverts to stale procedure
+control_design: no_persistence, shortcut, stale_procedure, wrong_mechanism
+expected_control_result: without persistence, agent reverts to stale procedure; current-reference text must not be mistaken for reusable skill persistence
 
 # Episodes
 legacy_source: previous PC split, architecture-aligned
 legacy_episodes:
+- FC04_C04_control_wrong_mechanism
 - FC04_C01_control_no_persistence
 - FC04_C02_control_shortcut
 - FC04_C03_control_stale_procedure
