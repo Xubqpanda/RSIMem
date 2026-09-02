@@ -85,8 +85,9 @@ only the opaque case ID to PAST. The semantic catalog also makes native and the
 three declared PAST control slices executable; shortcut and wrong-mechanism
 run without persistence. A manifest-bound pilot executor completed SM01
 replicate-2 and SM02 replicate-1 across all five conditions after passing
-provider probes; each content-free audit reconciled 10 traces and all raw
-usage buckets. This is execution/readiness evidence only. The full semantic panel now has
+provider probes; each content-free audit reconciled all traces and raw usage
+buckets. A procedural PC01 replicate-1 pilot has also completed all five
+conditions with a clean content-free audit. This is execution/readiness evidence only. The full semantic panel now has
 seven case-bound oracle seeds prepared from public learn/update input and
 verified as evaluation-only fresh-state slices. Ten procedural oracle seeds are
 also now registered and layout-verified. Episodic target cases remain without
