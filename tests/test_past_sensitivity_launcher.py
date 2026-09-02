@@ -83,9 +83,27 @@ def test_prepared_native_slice_keeps_learn_eval_and_opaque_method_id(tmp_path: P
     ].endswith(run.hermes_home_directory)
 
 
+@pytest.mark.parametrize(
+    "condition",
+    [SensitivityCondition.NO_PERSISTENCE, SensitivityCondition.SHORTCUT_CURRENT_INPUT, SensitivityCondition.WRONG_MECHANISM],
+)
+def test_control_slices_disable_persistence(condition: SensitivityCondition, tmp_path: Path) -> None:
+    manifest = _manifest()
+    run = next(item for item in manifest.runs if item.condition is condition)
+    deployment = next(item for item in manifest.deployments if item.deployment_id == run.deployment_id)
+    assert deployment.executable is True
+    prepared = prepare_past_sensitivity_launch(
+        run=run,
+        deployment=deployment,
+        past_bench_root=ROOT,
+        output_directory=tmp_path,
+    )
+    assert prepared.command[prepared.command.index("--persistence-variant") + 1] == "without_persistence"
+
+
 def test_preparation_rejects_unregistered_or_nonexecutable_deployment(tmp_path: Path) -> None:
     manifest = _manifest()
-    run = manifest.runs[0]
+    run = next(item for item in manifest.runs if item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE)
     deployment = next(item for item in manifest.deployments if item.deployment_id == run.deployment_id)
     with pytest.raises(ValueError, match="not executable"):
         prepare_past_sensitivity_launch(

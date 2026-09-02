@@ -180,9 +180,10 @@ def test_catalog_planning_preserves_per_case_unavailability() -> None:
     )
     deployments = planned_deployments_from_catalog(matrix=matrix, catalog=catalog)
     assert len(deployments) == len(matrix.cases)
-    assert all(not item.executable for item in deployments)
+    assert sum(item.executable for item in deployments) == 4 * 7
     oracle = next(item for item in deployments if item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE)
     assert oracle.episode_selector == "unavailable.type_matched_oracle"
+    assert not oracle.executable
 
 
 def test_verified_oracle_registry_upgrades_only_its_case(tmp_path) -> None:
@@ -217,7 +218,11 @@ def test_verified_oracle_registry_upgrades_only_its_case(tmp_path) -> None:
     assert upgraded.executable is True
     assert upgraded.episode_selector == "family.eval_only"
     assert upgraded.host_state_digest == oracle_seed_tree_digest(seed)
-    assert sum(item.executable for item in resolved) == 1
+    assert sum(item.executable for item in resolved) == 7 * 4 + 1
+    assert sum(
+        item.executable and item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
+        for item in resolved
+    ) == 1
 
 
 def test_checked_in_sm01_registry_upgrades_only_sm01_oracle_case() -> None:
@@ -235,10 +240,12 @@ def test_checked_in_sm01_registry_upgrades_only_sm01_oracle_case() -> None:
         registry=OracleSeedRegistry.load(root / "configs/sensitivity/oracle_seed_registry_sm01.json"),
         trusted_root=past_root / "self-evolve-tasks-v2" / "_rsimem_oracles",
     )
-    executable = tuple(item for item in resolved if item.executable)
-    assert len(executable) == 1
-    assert executable[0].condition is SensitivityCondition.TYPE_MATCHED_ORACLE
-    assert executable[0].case_id == next(
+    executable_oracles = tuple(
+        item for item in resolved
+        if item.executable and item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
+    )
+    assert len(executable_oracles) == 1
+    assert executable_oracles[0].case_id == next(
         case.case_id for case in matrix.cases
         if case.family_id == "SM01_preference_adoption"
         and case.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
