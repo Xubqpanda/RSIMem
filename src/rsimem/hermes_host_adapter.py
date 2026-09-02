@@ -11,11 +11,107 @@ import hashlib
 import json
 from typing import Any, TYPE_CHECKING
 
+from .adapter_contracts import (
+    AdapterResult,
+    AdapterStatus,
+    CanonicalHostEvent,
+    HostCapabilities,
+    HostAdapter,
+    MethodRunIdentity,
+    MethodStateSnapshot,
+    content_digest,
+)
 from .memory.contracts import MemoryKind, MemoryQuery
 from .memory.process_feedback import ProcessEventKind, ProcessEventStatus
 
 if TYPE_CHECKING:
     from .hermes_past_bridge import HermesPastBenchBridge
+
+
+class HermesHostAdapter:
+    """Typed host boundary around one live Hermes bridge.
+
+    The bridge still owns lifecycle/evidence policy; this object owns the
+    host-facing attachment and identity checks so a future host implementation
+    can replace Hermes without changing method or benchmark contracts.
+    """
+
+    def __init__(self, bridge: "HermesPastBenchBridge") -> None:
+        self._bridge = bridge
+        self._run: MethodRunIdentity | None = None
+        self._events: set[str] = set()
+
+    @property
+    def capabilities(self) -> HostCapabilities:
+        return HostCapabilities(
+            memory_kinds=tuple(MemoryKind),
+            tool_call_result_closure=True,
+            usage_accounting=True,
+            restart=False,
+            context_snapshot=True,
+            native_bypass=(
+                str(self._bridge.config.adapter_failure_policy.value)
+                == "bypass_native"
+            ),
+        )
+
+    def attach(self, agent: object) -> None:
+        memory_store = getattr(agent, "_memory_store", None)
+        if memory_store is not None:
+            agent._memory_store = _PromptMemoryStore(self._bridge, memory_store)
+        session_db = getattr(agent, "_session_db", None)
+        if session_db is not None:
+            agent._session_db = _SessionDb(
+                self._bridge,
+                session_db,
+                str(getattr(agent, "session_id", "") or "") or None,
+            )
+        self._bridge._wrap_skill_handlers()
+
+    def prepare_session(self, run: MethodRunIdentity) -> AdapterResult:
+        expected = (
+            self._bridge._run_id,
+            self._bridge._session_id,
+            self._bridge._task_id,
+        )
+        if (run.run_id, run.session_id, run.task_id) != expected:
+            return AdapterResult(AdapterStatus.REJECTED, "operation.hermes.prepare", "identity_mismatch")
+        self._run = run
+        return AdapterResult(AdapterStatus.SUPPORTED, "operation.hermes.prepare")
+
+    def observe_event(self, event: CanonicalHostEvent) -> AdapterResult:
+        if self._run is None:
+            return AdapterResult(AdapterStatus.REJECTED, "operation.hermes.observe", "run_not_prepared")
+        if event.session_id != self._run.session_id or event.task_id != self._run.task_id:
+            return AdapterResult(AdapterStatus.REJECTED, "operation.hermes.observe", "identity_mismatch")
+        if event.event_id in self._events:
+            return AdapterResult(AdapterStatus.REJECTED, "operation.hermes.observe", "duplicate_event")
+        self._events.add(event.event_id)
+        return AdapterResult(AdapterStatus.SUPPORTED, "operation.hermes.observe")
+
+    def snapshot_state(self) -> MethodStateSnapshot:
+        snapshot = self._bridge._collect_completed_snapshot()
+        digest = content_digest({
+            "snapshot_id": snapshot.snapshot_id,
+            "context_revision": snapshot.context_revision,
+            "segment_ids": [segment.segment_id for segment in snapshot.segments],
+            "active_segment_ids": list(snapshot.active_segment_ids),
+            "current_turn_id": snapshot.current_turn_id,
+        })
+        return MethodStateSnapshot(
+            state_id=f"state.hermes.{snapshot.snapshot_id}",
+            revision=snapshot.context_revision,
+            state_schema="hermes.context.snapshot.v1",
+            state_digest=digest,
+            active=True,
+        )
+
+    def restart(self, run: MethodRunIdentity) -> AdapterResult:
+        return AdapterResult(
+            AdapterStatus.UNSUPPORTED,
+            "operation.hermes.restart",
+            "restart_requires_new_bridge",
+        )
 
 
 class _PromptMemoryStore:
@@ -293,4 +389,4 @@ class _SessionDb:
         return result
 
 
-__all__ = ["_PromptMemoryStore", "_SessionDb"]
+__all__ = ["HermesHostAdapter", "_PromptMemoryStore", "_SessionDb"]
