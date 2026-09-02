@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
 from rsimem.adapter_contracts import BenchmarkSplit
 from rsimem.memory.family_matrix import PastFamilyMatrix
-from rsimem.past_bench_adapter import PastBenchAdapter
+from rsimem.past_bench_adapter import PastBenchAdapter, PastExecutionTrace
 
 
 def _fixture_root(tmp_path):
@@ -101,3 +102,52 @@ def test_past_adapter_rejects_incomplete_split_or_unknown_family(tmp_path) -> No
                 BenchmarkSplit.FINAL: ("PC01_sop_bootstrap_01",),
             },
         )
+
+
+def test_past_execution_trace_is_content_free_and_variant_neutral(tmp_path) -> None:
+    matrix = _fixture_root(tmp_path)
+    adapter = PastBenchAdapter(
+        tmp_path,
+        matrix,
+        split_family_ids={
+            BenchmarkSplit.TRAIN: ("SM01_preference_adoption",),
+            BenchmarkSplit.VALIDATION: ("EP01_prior_case_recall",),
+            BenchmarkSplit.FINAL: ("PC01_sop_bootstrap_01",),
+        },
+    )
+    request = adapter.enumerate_cases(BenchmarkSplit.TRAIN)[0]
+    response = SimpleNamespace(
+        status="finished",
+        final_output="private result text",
+        usage=SimpleNamespace(
+            input_tokens=11,
+            output_tokens=7,
+            cache_read_tokens=3,
+            cache_write_tokens=0,
+            reasoning_tokens=2,
+            request_count=1,
+            retry_count=0,
+            usage_complete=True,
+        ),
+        process_feedback_event_ids=("process-event.1",),
+        process_feedback_digest="a" * 64,
+        host_event_ids=("host-event.1",),
+        host_state_digest="b" * 64,
+        host_projection_digest="c" * 64,
+    )
+    trace = PastExecutionTrace.from_runtime_response(request, response)
+    assert trace.case_id == request.case_id
+    assert trace.host_event_count == 1
+    assert trace.matched_projection_digest != trace.trace_id
+    assert "private result text" not in str(trace.identity_payload())
+
+    equivalent = PastExecutionTrace.from_runtime_response(request, response)
+    assert equivalent.matched_projection_digest == trace.matched_projection_digest
+    changed = SimpleNamespace(**{
+        **response.__dict__,
+        "final_output": "other result text",
+    })
+    assert (
+        PastExecutionTrace.from_runtime_response(request, changed).matched_projection_digest
+        != trace.matched_projection_digest
+    )

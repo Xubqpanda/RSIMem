@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 import yaml
 
@@ -20,6 +22,147 @@ from .adapter_contracts import (
     content_digest,
 )
 from .memory.family_matrix import PastFamilyMatrix
+
+
+_TRACE_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+
+
+@dataclass(frozen=True, slots=True)
+class PastExecutionTrace:
+    """Content-free trace exported by one completed PAST runtime response.
+
+    This contract is intentionally independent of Pydantic's runtime protocol
+    classes so the benchmark runtime can evolve without becoming an RSIMem
+    dependency.  It retains only digests and counters needed to compare a
+    matched execution; raw final output, prompts, memory content, and scores
+    remain outside the adapter boundary.
+    """
+
+    trace_id: str
+    case_id: str
+    terminal_status: str
+    final_output_digest: str
+    usage_digest: str
+    process_event_count: int
+    process_feedback_digest: str | None
+    host_event_count: int
+    host_state_digest: str | None
+    host_projection_digest: str | None
+
+    def __post_init__(self) -> None:
+        if self.trace_id != (
+            "past-execution-trace."
+            + content_digest(self.identity_payload())[:40]
+        ):
+            raise ValueError("PAST execution trace ID mismatch")
+        if self.terminal_status not in {"acting", "finished", "error"}:
+            raise ValueError("PAST execution trace status is invalid")
+        for value, name in (
+            (self.final_output_digest, "final output"),
+            (self.usage_digest, "usage"),
+        ):
+            if not isinstance(value, str) or _TRACE_DIGEST.fullmatch(value) is None:
+                raise ValueError(f"PAST execution trace {name} digest is invalid")
+        for value, name in (
+            (self.process_event_count, "process event count"),
+            (self.host_event_count, "host event count"),
+        ):
+            if type(value) is not int or value < 0:
+                raise ValueError(f"PAST execution trace {name} is invalid")
+        for value, name in (
+            (self.process_feedback_digest, "process feedback"),
+            (self.host_state_digest, "host state"),
+            (self.host_projection_digest, "host projection"),
+        ):
+            if value is not None and (
+                not isinstance(value, str) or _TRACE_DIGEST.fullmatch(value) is None
+            ):
+                raise ValueError(f"PAST execution trace {name} digest is invalid")
+        if self.host_event_count == 0 and any((
+            self.host_state_digest is not None,
+            self.host_projection_digest is not None,
+        )):
+            raise ValueError("host digests require host events")
+        if self.host_event_count and (
+            self.host_state_digest is None or self.host_projection_digest is None
+        ):
+            raise ValueError("host events require host digests")
+
+    def identity_payload(self) -> dict[str, object]:
+        return {
+            "case_id": self.case_id,
+            "terminal_status": self.terminal_status,
+            "final_output_digest": self.final_output_digest,
+            "usage_digest": self.usage_digest,
+            "process_event_count": self.process_event_count,
+            "process_feedback_digest": self.process_feedback_digest,
+            "host_event_count": self.host_event_count,
+            "host_state_digest": self.host_state_digest,
+            "host_projection_digest": self.host_projection_digest,
+        }
+
+    @property
+    def matched_projection_digest(self) -> str:
+        """Variant-neutral identity for output, raw usage, and host projection."""
+
+        return content_digest({
+            "case_id": self.case_id,
+            "terminal_status": self.terminal_status,
+            "final_output_digest": self.final_output_digest,
+            "usage_digest": self.usage_digest,
+            "host_event_count": self.host_event_count,
+            "host_projection_digest": self.host_projection_digest,
+        })
+
+    @classmethod
+    def from_runtime_response(
+        cls,
+        request: BenchmarkTaskRequest,
+        response: object,
+    ) -> "PastExecutionTrace":
+        status = getattr(response, "status", None)
+        if not isinstance(status, str):
+            raise TypeError("PAST runtime response status must be text")
+        final_output = getattr(response, "final_output", None)
+        if final_output is not None and not isinstance(final_output, str):
+            raise TypeError("PAST runtime final output must be text or null")
+        usage = getattr(response, "usage", None)
+        usage_payload = {
+            name: getattr(usage, name, None)
+            for name in (
+                "input_tokens", "output_tokens", "cache_read_tokens",
+                "cache_write_tokens", "reasoning_tokens", "request_count",
+                "retry_count", "usage_complete",
+            )
+        }
+        for name, value in usage_payload.items():
+            if name == "usage_complete":
+                if type(value) is not bool:
+                    raise TypeError("PAST runtime usage completeness must be bool")
+            elif value is not None and (type(value) is not int or value < 0):
+                raise ValueError("PAST runtime usage value is invalid")
+        process_ids = tuple(getattr(response, "process_feedback_event_ids", ()))
+        host_ids = tuple(getattr(response, "host_event_ids", ()))
+        for values, name in ((process_ids, "process event IDs"), (host_ids, "host event IDs")):
+            if len(values) != len(set(values)) or any(
+                not isinstance(value, str) or not value.strip() for value in values
+            ):
+                raise ValueError(f"PAST runtime {name} are invalid")
+        values: dict[str, Any] = {
+            "case_id": request.case_id,
+            "terminal_status": status,
+            "final_output_digest": content_digest(final_output),
+            "usage_digest": content_digest(usage_payload),
+            "process_event_count": len(process_ids),
+            "process_feedback_digest": getattr(response, "process_feedback_digest", None),
+            "host_event_count": len(host_ids),
+            "host_state_digest": getattr(response, "host_state_digest", None),
+            "host_projection_digest": getattr(response, "host_projection_digest", None),
+        }
+        return cls(
+            trace_id="past-execution-trace." + content_digest(values)[:40],
+            **values,
+        )
 
 
 class PastBenchAdapter:
@@ -152,4 +295,4 @@ class PastBenchAdapter:
         )
 
 
-__all__ = ["PastBenchAdapter"]
+__all__ = ["PastBenchAdapter", "PastExecutionTrace"]
