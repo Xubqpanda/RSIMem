@@ -28,6 +28,17 @@ from .taxonomy import (
     MemoryTransform,
     MemoryUnitDescriptor,
 )
+from .lifecycle_surfaces import (
+    LIFECYCLE_SURFACE_SCHEMA,
+    LIFECYCLE_SURFACE_SCHEMA_VERSION,
+    LifecycleAttribution,
+    LifecycleEvent,
+    LifecycleOwnership,
+    MemoryLifecycleSurface,
+    MethodLifecycleDescriptor,
+    classify_event_ownership,
+    surface_for_policy_layer,
+)
 from .runtime import MemoryBackendRegistry, MemoryRuntime
 from .backends import (
     HermesEpisodicBackend,
@@ -292,6 +303,15 @@ __all__ = [
     "MemoryControlKind",
     "MemoryTransform",
     "MemoryUnitDescriptor",
+    "LIFECYCLE_SURFACE_SCHEMA",
+    "LIFECYCLE_SURFACE_SCHEMA_VERSION",
+    "LifecycleAttribution",
+    "LifecycleEvent",
+    "LifecycleOwnership",
+    "MemoryLifecycleSurface",
+    "MethodLifecycleDescriptor",
+    "classify_event_ownership",
+    "surface_for_policy_layer",
     "MemoryRuntime",
     "HermesEpisodicBackend",
     "HermesProceduralBackend",
