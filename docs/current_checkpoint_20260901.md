@@ -72,8 +72,14 @@ metadata-only and contains no API key, grader field, answer, or official score.
 Stage 3 now has a result-independent sensitivity harness.  It builds isolated
 semantic (7 families), episodic (3 families), and procedural (10 families)
 matrices with five conditions each and audit-only type-matched oracle digests.
-These artifacts prove contract coverage only; no real model matched run or
-sensitivity claim has been made.
+An immutable Stage 3 run manifest now expands each
+`family x condition x replicate` into independent state, Hermes-home, and
+trace directories.  It provides only its opaque case ID through
+`rsimem_method_task_id`; PAST family/task identity remains outside the method
+boundary.  The three non-native condition deployments are not implemented, so
+the manifest correctly rejects execution rather than treating five conditions
+as one runtime path.  These artifacts prove contract coverage only; no real
+model matched run or sensitivity claim has been made.
 
 The completed implementation components include:
 
@@ -135,8 +141,8 @@ artifact identity (ID, schema version, and digest). New revocations must use
 
 The most recent deterministic acceptance baseline is:
 
-- RSIMem: `1120 passed` after Stage 1 contracts, Stage 2 adapter contracts,
-  and Stage 3 sensitivity harness were added.
+- RSIMem: `1136 passed` after Stage 1 contracts, Stage 2 adapter contracts,
+  the Stage 3 sensitivity harness, and isolated run registration were added.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when invoked from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`, and
