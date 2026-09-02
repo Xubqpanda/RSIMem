@@ -97,6 +97,10 @@ EP02, and EP03 are recorded in the episodic pilot reports. A named PAST task
 control remains audit evidence, not an
 executable host deployment, until its artifact/state and launcher configuration
 are registered.
+The first PC02 procedural replicate-1 attempt is excluded after the
+content-free audit found incomplete usage and retry-accounting mismatches; its
+diagnostic report is retained in
+[`sensitivity_pc02_attempt_20260902.md`](sensitivity_pc02_attempt_20260902.md).
 The launcher can prepare a case-specific PAST sequence slice and passes only
 the opaque method case ID, alongside registered isolated state, Hermes-home,
 and trace locations. It rejects non-executable deployments before forming any
