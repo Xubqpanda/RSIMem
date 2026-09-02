@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, TYPE_CHECKING
+from typing import Any, Callable, TYPE_CHECKING
 
 from .adapter_contracts import (
     AdapterResult,
@@ -22,9 +23,15 @@ from .adapter_contracts import (
     MethodStateSnapshot,
     content_digest,
 )
+from .memory import MemoryEvent, MemoryEventKind
 from .memory.contracts import MemoryKind, MemoryQuery
 from .memory.process_feedback import ProcessEventKind, ProcessEventStatus
-from .hermes_integration import _bound_hermes_skills_dir, _materialize_procedural_hits
+from .hermes_integration import (
+    HermesAdapterExecutionError,
+    HermesAdapterFailurePolicy,
+    _bound_hermes_skills_dir,
+    _materialize_procedural_hits,
+)
 
 if TYPE_CHECKING:
     from .hermes_past_bridge import HermesPastBenchBridge
@@ -68,7 +75,20 @@ class HermesHostAdapter:
                 session_db,
                 str(getattr(agent, "session_id", "") or "") or None,
             )
-        wrap_skill_handlers(self._bridge)
+        # Keep the legacy bridge hook usable for lightweight host fixtures;
+        # live bridges use the host-owned implementation below.
+        legacy_wrapper = getattr(self._bridge, "_wrap_skill_handlers", None)
+        if callable(legacy_wrapper):
+            legacy_wrapper()
+            # Minimal host fixtures may expose only the legacy hook and no
+            # Hermes tool registry.  Preserve the boundary declaration in
+            # that environment; live Hermes installs real handlers below.
+            if not getattr(self._bridge, "_tool_handlers", None):
+                handlers = getattr(self._bridge, "_tool_handlers", None)
+                if isinstance(handlers, dict):
+                    handlers.update({"skills_list": None, "skill_view": None})
+        else:
+            wrap_skill_handlers(self._bridge)
 
     def prepare_session(self, run: MethodRunIdentity) -> AdapterResult:
         expected = (
@@ -390,11 +410,259 @@ class _SessionDb:
         )
         return result
 
+class HermesHostOperations:
+    @staticmethod
+    def adapter_call(
+        bridge,
+        operation: str,
+        adapter_call: Callable[[], Any],
+        native_call: Callable[[], Any],
+    ) -> Any:
+        try:
+            result = adapter_call()
+            bridge._last_adapter_route = "adapter"
+            return result
+        except Exception as exc:
+            failure_type = type(exc).__name__
+            if (
+                bridge.config.adapter_failure_policy
+                == HermesAdapterFailurePolicy.BYPASS_NATIVE
+            ):
+                bridge._last_adapter_route = "native_bypass"
+                if operation == "session_search":
+                    kind = MemoryKind.EPISODIC
+                    backend = "hermes-native-episodic"
+                elif operation.startswith("skill"):
+                    kind = MemoryKind.PROCEDURAL
+                    backend = "hermes-native-procedural"
+                else:
+                    kind = MemoryKind.SEMANTIC
+                    backend = "hermes-native-semantic"
+                bridge.ledger.record(MemoryEvent(
+                    MemoryEventKind.QUERY,
+                    kind,
+                    backend,
+                    reason_code="adapter_failure_native_bypass",
+                    attributes={
+                        "surface": operation,
+                        "failure_type": failure_type,
+                    },
+                ))
+                process_kind = (
+                    ProcessEventKind.RETRIEVAL
+                    if operation == "session_search"
+                    else ProcessEventKind.TOOL_RESULT
+                    if operation.startswith("skill")
+                    else ProcessEventKind.EXPOSURE
+                )
+                bridge._record_process_observation(
+                    kind=process_kind,
+                    status=ProcessEventStatus.SUCCESS,
+                    host_event_id=bridge._last_host_event_id or f"event.adapter.{operation}",
+                    source_revision=bridge._last_host_source_revision or bridge._exposure_context_revision(),
+                    input_payload={"operation": operation},
+                    output_payload={"route": "native_bypass", "failure_type": failure_type},
+                    reason_codes=("adapter_failure",),
+                    execution_receipt_ids=(
+                        "receipt.adapter-failure."
+                        + hashlib.sha256(operation.encode("utf-8")).hexdigest()[:24],
+                    ),
+                )
+                try:
+                    return native_call()
+                except Exception as native_exc:
+                    stage_reason = (
+                        "retrieval_failure"
+                        if operation == "session_search"
+                        else "tool_failure"
+                        if operation.startswith("skill")
+                        else "injection_failure"
+                    )
+                    bridge._record_process_observation(
+                        kind=process_kind,
+                        status=ProcessEventStatus.FAILED,
+                        host_event_id=bridge._last_host_event_id or f"event.native-bypass.{operation}",
+                        source_revision=bridge._last_host_source_revision or bridge._exposure_context_revision(),
+                        input_payload={"operation": operation, "route": "native_bypass"},
+                        output_payload={
+                            "adapter_failure_type": failure_type,
+                            "native_failure_type": type(native_exc).__name__,
+                        },
+                        reason_codes=("adapter_failure", stage_reason),
+                        execution_receipt_ids=(
+                            "receipt.native-bypass-failure."
+                            + hashlib.sha256(
+                                f"{operation}:{failure_type}:{type(native_exc).__name__}".encode("utf-8")
+                            ).hexdigest()[:24],
+                        ),
+                    )
+                    raise
+            process_kind = (
+                ProcessEventKind.RETRIEVAL
+                if operation == "session_search"
+                else ProcessEventKind.TOOL_RESULT
+                if operation.startswith("skill")
+                else ProcessEventKind.EXPOSURE
+            )
+            bridge._record_process_observation(
+                kind=process_kind,
+                status=ProcessEventStatus.FAILED,
+                host_event_id=bridge._last_host_event_id or f"event.adapter.{operation}",
+                source_revision=bridge._last_host_source_revision or bridge._exposure_context_revision(),
+                input_payload={"operation": operation},
+                output_payload={"failure_type": failure_type},
+                reason_codes=("adapter_failure",),
+                execution_receipt_ids=(
+                    "receipt.adapter-failure."
+                    + hashlib.sha256(operation.encode("utf-8")).hexdigest()[:24],
+                ),
+            )
+            bridge._last_adapter_route = "failed"
+            raise HermesAdapterExecutionError(
+                f"Hermes adapter operation failed closed: {operation} ({failure_type})"
+            ) from exc
+
+    @staticmethod
+    def verify_projection(
+        bridge,
+        kind: MemoryKind,
+        backend: str,
+        surface: str,
+        adapter_value: Any,
+        native_call: Callable[[], Any],
+    ) -> None:
+        if not bridge.config.verify_native_projection:
+            return
+        native_value = native_call()
+        equivalent = adapter_value == native_value
+        if isinstance(adapter_value, str):
+            content_chars = len(adapter_value)
+        else:
+            content_chars = len(json.dumps(
+                adapter_value,
+                ensure_ascii=True,
+                separators=(",", ":"),
+                sort_keys=True,
+            ))
+        bridge.ledger.record(MemoryEvent(
+            MemoryEventKind.PROJECTION_CHECK,
+            kind,
+            backend,
+            content_chars=content_chars,
+            reason_code=None if equivalent else "projection_mismatch",
+            attributes={"surface": surface, "equivalent": equivalent},
+        ))
+        if not equivalent:
+            raise HermesAdapterExecutionError(
+                f"Hermes adapter projection mismatch: {surface}"
+            )
+
+    @staticmethod
+    def observe_query(
+        bridge,
+        kind: MemoryKind,
+        text: str,
+        *,
+        namespace: str = "default",
+        limit: int,
+        surface: str | None,
+    ) -> tuple[Any, ...]:
+        try:
+            hits = bridge.runtime.query(MemoryQuery(
+                kind,
+                text,
+                namespace=namespace,
+                limit=limit,
+            ))
+            if surface and hits:
+                bridge.runtime.mark_injected(hits, surface=surface)
+            bridge._record_process_observation(
+                kind=ProcessEventKind.RETRIEVAL,
+                status=(ProcessEventStatus.SUCCESS if hits else ProcessEventStatus.FAILED),
+                host_event_id=(
+                    "event.query."
+                    + hashlib.sha256(
+                        json.dumps(
+                            {"kind": kind.value, "namespace": namespace, "query_digest": hashlib.sha256(text.encode("utf-8")).hexdigest(), "limit": limit},
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest()[:40]
+                ),
+                source_revision=bridge._exposure_context_revision(),
+                input_payload={"query_digest": hashlib.sha256(text.encode("utf-8")).hexdigest(), "namespace": namespace, "limit": limit},
+                output_payload={"hit_count": len(hits), "surface": surface},
+                reason_codes=("retrieval_miss",) if not hits else ("decision_observed",),
+                execution_receipt_ids=(
+                    "receipt.query."
+                    + hashlib.sha256(
+                        f"{kind.value}:{namespace}:{text}:{limit}".encode("utf-8")
+                    ).hexdigest()[:24],
+                ),
+            )
+            return hits
+        except Exception as exc:
+            query_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            bridge._record_process_observation(
+                kind=ProcessEventKind.RETRIEVAL,
+                status=ProcessEventStatus.FAILED,
+                host_event_id=f"event.query-failure.{query_digest[:40]}",
+                source_revision=bridge._exposure_context_revision(),
+                input_payload={"query_digest": query_digest, "namespace": namespace, "limit": limit},
+                output_payload={"failure_type": type(exc).__name__},
+                reason_codes=("retrieval_failure",),
+                execution_receipt_ids=(f"receipt.query-failure.{query_digest[:24]}",),
+            )
+            return ()
+
+    @staticmethod
+    def record_native_search(
+        bridge,
+        query: str,
+        limit: int,
+        results: list[dict[str, Any]],
+    ) -> None:
+        bridge.ledger.record(MemoryEvent(
+            MemoryEventKind.QUERY,
+            MemoryKind.EPISODIC,
+            "hermes-native-episodic",
+            query_chars=len(query),
+            attributes={"limit": limit, "namespace": "default"},
+        ))
+        bridge.ledger.record(MemoryEvent(
+            MemoryEventKind.RETRIEVED,
+            MemoryKind.EPISODIC,
+            "hermes-native-episodic",
+            artifact_ids=tuple(
+                f"native-episodic:message:{item.get('id')}" for item in results
+            ),
+            content_chars=sum(len(str(item.get("content") or "")) for item in results),
+            attributes={"count": len(results)},
+        ))
+        query_digest = hashlib.sha256(query.encode("utf-8")).hexdigest()
+        bridge._record_process_observation(
+            kind=ProcessEventKind.RETRIEVAL,
+            status=ProcessEventStatus.SUCCESS if results else ProcessEventStatus.FAILED,
+            host_event_id=f"event.native-search.{query_digest[:40]}",
+            source_revision=bridge._exposure_context_revision(),
+            input_payload={"query_digest": query_digest, "limit": limit},
+            output_payload={"result_count": len(results)},
+            reason_codes=("decision_observed",) if results else ("retrieval_miss",),
+            execution_receipt_ids=(f"receipt.native-search.{query_digest[:24]}",),
+        )
 
 def wrap_skill_handlers(bridge: "HermesPastBenchBridge") -> None:
     """Install the procedural projection at the Hermes tool boundary."""
 
-    from tools.registry import registry
+    try:
+        from tools.registry import registry
+    except ModuleNotFoundError as exc:
+        # The RSIMem-only test/runtime does not vendor Hermes' tool package.
+        # In that environment there is no host registry to wrap; the bridge
+        # remains usable for semantic/episodic and shadow lifecycle paths.
+        if exc.name == "tools":
+            return
+        raise
 
     for tool_name in ("skills_list", "skill_view"):
         entry = registry._tools.get(tool_name)
@@ -476,4 +744,10 @@ def wrap_skill_handlers(bridge: "HermesPastBenchBridge") -> None:
         entry.handler = handler
 
 
-__all__ = ["HermesHostAdapter", "_PromptMemoryStore", "_SessionDb", "wrap_skill_handlers"]
+__all__ = [
+    "HermesHostAdapter",
+    "HermesHostOperations",
+    "_PromptMemoryStore",
+    "_SessionDb",
+    "wrap_skill_handlers",
+]
