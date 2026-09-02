@@ -178,7 +178,7 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 - √ Tracked imports、可用 CLI、配置引用与 packaging 入口已由 baseline preflight 和全量测试覆盖。
 - √ 已审计删除入口的残留引用；已删除 launcher/proposal/config 不再是可调用路径。
 - √ Generic corpus 和 `STOP_NO_SIGNAL` evidence 仍可读；停止的 proposal CLI 已移除，不会静默恢复旧协议。
-- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；Stage 0 后续回归基线为 RSIMem `1127 passed`、PAST-Bench `401 passed, 2 skipped`。
+- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；Stage 0 后续回归基线为 RSIMem `1128 passed`、PAST-Bench `401 passed, 2 skipped`。
 - √ 清理提交均通过对应测试，cleanup manifest 在 `07695ef` 上完成 12 项 clean-tree preflight。
 
 ## 4. 阶段 1：研究协议冻结
