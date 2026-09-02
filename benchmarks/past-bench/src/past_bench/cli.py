@@ -2164,6 +2164,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
     """Run a sequence benchmark for cross-task self-evolve evaluation."""
     _apply_proxy(getattr(args, "proxy", None))
 
+    method_task_id = getattr(args, "rsimem_method_task_id", None)
+    if method_task_id is not None and (
+        not isinstance(method_task_id, str) or not method_task_id.strip()
+    ):
+        raise SystemExit("--rsimem-method-task-id must be non-empty text")
+
     if not getattr(args, "agent", None):
         raise SystemExit("--agent is required for evolve runs")
 
@@ -2464,6 +2470,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         "family_id": sequence.name,
                         "stage": bucket,
                         "experiment_variant": experiment_variant,
+                        **(
+                            {"rsimem_method_task_id": method_task_id}
+                            if method_task_id is not None
+                            else {}
+                        ),
                     },
                 )
 
@@ -3614,6 +3625,14 @@ def main(argv: list[str] | None = None) -> None:
         choices=["native", "native+ledger", "native+adapter+ledger"],
         default=None,
         help="Explicitly override the Hermes RSIMem execution mode for this sequence",
+    )
+    p_evolve.add_argument(
+        "--rsimem-method-task-id",
+        default=None,
+        help=(
+            "Opaque RSIMem method task ID. Sensitivity launchers set this to "
+            "their registered case ID; it must not be a PAST family/task ID."
+        ),
     )
     p_evolve.add_argument(
         "--rsimem-adapter-failure-policy",
