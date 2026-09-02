@@ -88,13 +88,14 @@ unseeded SM01 replicate-2 across all five conditions after a passing provider
 probe; a content-free audit reconciled 10 traces and all raw usage buckets.
 This is execution/readiness evidence only. The full semantic panel now has
 seven case-bound oracle seeds prepared from public learn/update input and
-verified as evaluation-only fresh-state slices. Episodic and procedural oracle
-target cases stay non-executable, and no replicated sensitivity or quality
-claim has been made.
+verified as evaluation-only fresh-state slices. Ten procedural oracle seeds are
+also now registered and layout-verified. Episodic target cases remain without
+oracle seeds; procedural controls remain incomplete, so no replicated
+sensitivity or quality claim has been made.
 The source-level readiness catalog does not read task prompts, graders, or
-answers. It reports that six semantic and all three episodic targets still lack
-case-bound type-matched oracle seeds, while procedural targets additionally
-lack a compatible wrong-mechanism control and PC03 lacks a no-persistence
+answers. It reports that all three episodic targets still lack case-bound
+type-matched oracle seeds. Procedural oracle seeds are complete, but the panel
+lacks a compatible wrong-mechanism control and PC03 lacks a no-persistence
 control. A named PAST task control remains audit evidence, not an executable
 host deployment, until its artifact/state and launcher configuration are
 registered.
