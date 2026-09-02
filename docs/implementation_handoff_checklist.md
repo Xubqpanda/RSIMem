@@ -261,22 +261,22 @@ Mechanism：formation/retention coverage、retrieval、exposure、attributable u
 
 职责：枚举 case/split、重置和推进环境、提供 public capability schema、在 final plane 评分、生成 audit-only annotation。
 
-- □ 定义 host-neutral request/response/event contract，不引用 Hermes 类。
-- □ 将 PAST loader、family/stage、environment 和 grader 封装到 PAST adapter。
-- □ 区分 public task state、audit-only contract 和 final-only score。
+- √ 定义 host-neutral request/response/event contract，不引用 Hermes 类，见 `adapter_contracts.py`。
+- 部分完成：`PastBenchAdapter` 已封装 PAST task layout、split/family identity 和公开 digest；实际 runner execution 仍待 bridge split。
+- √ 区分 public task state、audit-only contract 和 final-only score；final score 只能由显式 final-plane callback 提供。
 - □ 保持 raw prompt、grader 和 reference 不变。
 - □ Hidden answer、grader field 或 family-derived key 进入 Host/method 时 fail closed。
-- □ Adapter 前后环境 transition 和 official score 等价。
+- □ Adapter 前后环境 transition 和 official score 等价（需 Stage 2 bridge/golden trace）。
 
 ### 2B：HostAdapter
 
 职责：Hermes session、模型、工具、native memory、context、usage、restart 和 state isolation。
 
-- □ 定义 `HostCapabilities`，声明 memory surface、tool closure、usage、restart 和 snapshot。
-- □ Hermes payload 转 canonical event，原生内容不进入 content-free ledger。
-- □ BenchmarkAdapter 不读取 Hermes state，MethodAdapter 不调用 PAST grader。
-- □ Native bypass、method-managed 和 no-persistence 有独立 identity。
-- □ 缺失/重复/跨 session tool result 和 restart drift fail closed 或 censored。
+- √ 定义 `HostCapabilities`，声明 memory surface、tool closure、usage、restart 和 snapshot；提供 deterministic host fixture。
+- 部分完成：Hermes projection wrapper 已迁入 `hermes_host_adapter.py`，canonical event 接口和真实 bridge callback 接线仍待完成。
+- √ BenchmarkAdapter contract 不读取 Hermes state，MemoryMethodAdapter contract 不调用 PAST grader。
+- 部分完成：native bypass、method-managed 和 no-persistence identity 已有旧 bridge/runtime 语义，需在 golden trace 中统一。
+- √ deterministic host fixture 对重复/跨 session event 和 restart drift fail closed；真实 tool closure 接线待 bridge split。
 
 ### 2C：MemoryMethodAdapter
 
@@ -295,13 +295,13 @@ activate_update
 rollback_update
 ```
 
-- □ Descriptor 声明 primary/secondary kind、owned surfaces、required feedback、Host capabilities、state schema、lineage、online update、validation 和 rollback。
-- □ Method state 与 memory content 分离。
-- □ Update 声明 target surface、affected artifacts、base revision、cutoff 和 expected behavior change。
-- □ Unsupported capability 明确返回 unsupported，不静默改算法。
-- □ Semantic fake method 不得修改 episodic/procedural state。
-- □ Method 不得读取 final score、hidden expectation 或 cutoff 后 evidence。
-- □ Stale revision、duplicate activation 和 invalid rollback fail closed。
+- √ `MethodCapabilities` 声明 primary/secondary kind、owned surfaces、required feedback、Host capabilities、state schema、lineage、online update、validation 和 rollback。
+- √ Method state 与 memory content 分离；`MethodStateSnapshot` 只保存 digest。
+- √ `MethodUpdate` 声明 target surface、affected artifacts、base revision、cutoff 和 expected behavior change。
+- √ Unsupported capability 明确返回 unsupported，不静默改算法。
+- √ deterministic semantic fake method 不得修改 episodic/procedural state。
+- √ Method contract 不读取 final score、hidden expectation 或 cutoff 后 evidence。
+- √ Stale revision、duplicate activation 和 invalid rollback fail closed。
 
 ### 2D：FeedbackCondition
 
@@ -314,15 +314,15 @@ rollback_update
 | F4 | Artifact-grounded | F3 加 exact provenance/use/outcome joins |
 | F5 | Counterfactual | F4 加预注册 replay/intervention |
 
-- □ 每个 condition 通过 allowlist 构造 updater view。
-- □ 低 condition 不能经 nested metadata、raw payload 或 pointer 读取高 condition。
-- □ Feedback artifact 记录 condition、schema、cutoff、plane 和 digest。
-- □ F5 只使用 train/development cases，不反复查询 final held-out。
+- √ 每个 condition 通过 `FeedbackView` allowlist 构造 updater view。
+- √ 低 condition 不能经 nested metadata、raw payload、pointer、answer 或 grader 读取高 condition。
+- √ Feedback view 记录 condition、schema、cutoff、plane 和 digest。
+- 部分完成：F5 contract 限定为 replay/intervention 字段；实际 train/development runner 绑定待 Stage 3。
 
 ### 2E：Canonical Evidence 与 Ownership
 
-- □ Event 覆盖 candidate、constructed memory、admission、commit、retrieval、exposure、use、tool、outcome、proposal 和 activation。
-- □ Event 包含 run/session/task、kind、surface、owner、revision、parents、cutoff 和 plane。
+- 部分完成：既有 process/lifecycle ledgers 覆盖 candidate、constructed memory、admission、commit、retrieval、exposure、use、tool、outcome、proposal 和 activation；新 `LifecycleEvent` 提供统一 surface identity。
+- 部分完成：新 event contract 包含 kind/surface/owner/revision/parents/cutoff/plane；run/session/task join 仍由 framework core 接入。
 - □ Exposure、behavioral consistency 和 attributable use 严格区分。
 - □ Native/其他 method 可以阻止 false attribution，但不能替目标 method 获得 credit。
 - □ Semantic set、episode provenance 和 skill invocation 复用统一 parent/child contract。
@@ -331,8 +331,8 @@ rollback_update
 
 当前 `src/rsimem/hermes_past_bridge.py` 约 3853 行，同时承担 benchmark、Hermes、memory、evidence、feedback 和 report 职责。
 
-- □ PAST task/family/grader 迁入 BenchmarkAdapter。
-- □ Hermes session/tool/native memory 迁入 HostAdapter。
+- 部分完成：PAST task/family public identity 已迁入 `PastBenchAdapter`，grader 仍留在 final evaluation plane。
+- 部分完成：semantic/episodic projection wrappers 已迁入 `hermes_host_adapter.py`，完整 session/tool/native memory 仍在 bridge。
 - □ Canonical event、corpus 和 attribution join 留在 framework core。
 - □ Mem0/extraction path 迁入 semantic fixture/backend。
 - □ 旧入口提供兼容层或明确迁移错误，不静默运行旧协议。
@@ -340,9 +340,9 @@ rollback_update
 
 ### 2G：阶段 2 完成条件
 
-- □ 四个边界有 typed contract、capability descriptor 和反向测试。
-- □ Fake semantic/episodic/procedural methods 可在同一 PAST/Hermes harness 独立运行。
-- □ F0-F5 有字段 allowlist 和 contamination tests。
+- √ 四个边界有 typed contract、capability descriptor 和反向测试；Benchmark/Host/Method/Feedback contract 已落地。
+- √ deterministic fake semantic/episodic/procedural methods 可在同一 host-neutral harness 独立运行；真实 PAST/Hermes harness 待接线。
+- √ F0-F5 有字段 allowlist 和 contamination tests。
 - □ Grader 无法经 Host、method、metadata 或 pointer 泄漏。
 - □ Hermes-PAST bridge 完成职责拆分且 golden trace 等价。
 - □ Restart、revision、idempotency、rollback、secret scan 和 telemetry 验收通过。
@@ -354,12 +354,12 @@ rollback_update
 
 ### 3A：Family Eligibility
 
-- □ 验证 26 个 family 的 learn -> persistence -> future opportunity -> evaluation 时间顺序。
+- 部分完成：26 个 family 的 sequence/stage/target/opportunity 已冻结；真实 on-disk learn -> persistence -> future -> evaluation eligibility 仍待 PAST runner 接入。
 - □ Future input 完整重述目标 memory 时标记 `current_input_confounded`。
 - □ Target memory 必须存在可干预的结果路径，不能只影响无关格式。
-- □ Control 必须真正隔离 persistence、shortcut 和 wrong mechanism。
-- □ Split 不共享答案、特定值、文件名或可直接记忆的 surface token。
-- □ Exclusion 在结果前冻结并记录理由。
+- √ Control contract 隔离 persistence、shortcut 和 wrong mechanism。
+- √ Split contract 禁止答案/值跨 split，并禁止 family ID 进入 method view；surface token audit 待真实 run。
+- √ Exclusion/auxiliary role 在 matrix 结果前冻结并记录理由。
 
 ### 3B：五个 Sensitivity Conditions
 
@@ -373,17 +373,17 @@ rollback_update
 
 Oracle 要求：
 
-- □ 在 run 前由 audit plane 生成、冻结并标记 `oracle_only`。
-- □ 只含目标机制需要的最小信息，不含标准答案、grader 指令和输出模板。
-- □ Semantic oracle 是事实/偏好/规则；episodic oracle 保留 episode identity；procedural oracle 是 SOP/skill。
-- □ Oracle 不进入 pure corpus、method updater、retrieval learning 或后续 proposal。
+- √ `SensitivityMatrix.create_for_panel()` 在 run 前生成并冻结 `oracle_only` audit artifacts。
+- √ Oracle 只含目标机制最小 field IDs/digest，不含标准答案、grader 指令和输出模板。
+- √ Semantic oracle 是 fact/scope/validity；episodic oracle 保留 episode/context/outcome/provenance；procedural oracle 是 applicability/steps/version/validation。
+- √ Oracle artifact plane 是 `benchmark_audit`，不进入 pure corpus、method updater、retrieval learning 或 proposal。
 
 ### 3C：Matched Execution
 
-- □ 相同 task、seed、model、provider、budget、tool environment 和 retry 下配对。
-- □ 每个 condition 使用全新 state directory，并验证无残留 memory。
-- □ Replicates、failure exclusion 和 incomplete usage 规则预先冻结。
-- □ 记录 source、state、retrieval、exposure、tool closure、outcome 和 final plane。
+- 部分完成：protocol/condition contract 固定 task/seed/model/provider/budget/tool/retry 字段；真实 matched launcher 尚待 Stage 2 bridge 接线。
+- √ 每个 condition contract 要求独立 state identity；残留检查待真实 runner。
+- √ Replicates、failure exclusion 和 incomplete usage 规则由 protocol/raw audit boundary 预先冻结。
+- 部分完成：canonical host/event contract 可记录 source/state/retrieval/exposure/tool/outcome/final plane，真实 trace 汇总待 runner。
 - □ Provider/infrastructure failure 不进入质量 denominator，但保留 attempts audit。
 - □ 平衡或随机化执行顺序，避免 condition 与时间/provider drift 固定相关。
 
@@ -395,8 +395,8 @@ Episodic：分 prior-case、exception-list、recall-then-modify；验证 context
 
 Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 skill selection/invocation；固定 semantic 和 episodic。
 
-- □ 三个 panel 均报告 official metric、paired delta、oracle coverage、retrieval、exposure、use 和 unknown use。
-- □ 不把三个 panel 的异构 raw metric 直接平均。
+- 部分完成：matrix 已按 semantic 7、episodic 3、procedural 10 个 target families 隔离，并冻结 panel target kind；official metric/paired delta 等报告待真实 run。
+- √ 不把三个 panel 的异构 raw metric 直接平均。
 
 ### 3E：Sensitivity Gate
 

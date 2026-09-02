@@ -58,8 +58,8 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1090 passed` after removing stopped extraction-only launchers and
-  proposal tests.
+- RSIMem: `1120 passed` after Stage 1 contracts, Stage 2 adapter contracts,
+  and Stage 3 sensitivity harness were added.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
@@ -81,8 +81,8 @@ Current capability matrix:
 | Real provider process-signal census | complete for SM02/SM05 train attempt | both fresh batches completed; `STOP_NO_SIGNAL` |
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
-| Stage 2 adapter boundaries and bridge split | pending | requires Benchmark/Host/Method/Feedback contracts |
-| Stage 3 SM/EP/PC sensitivity matrix | pending | requires Stage 2 adapter harness |
+| Stage 2 adapter boundaries and bridge split | partial | typed contracts, PAST boundary, deterministic host/method fixtures, and Hermes projection split; full bridge/golden trace pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated five-condition/oracle harness; real matched model runs pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
