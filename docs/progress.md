@@ -48,20 +48,21 @@ drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
 family/task ID cannot enter the method boundary. Stage 3 has a
-result-independent oracle harness and one audited real-model SM01 execution
-pilot, but no replicated sensitivity results. Its new immutable run-manifest contract
+result-independent oracle harness and two audited real-model semantic execution
+pilots (SM01 and SM02), but no replicated sensitivity results. Its new immutable run-manifest contract
 expands every `family x condition x replicate` into isolated state,
 Hermes-home, and trace directories, and the PAST launcher accepts only the
 registered opaque method case ID. Semantic native, no-persistence, shortcut,
 and wrong-mechanism task slices are now catalog-backed executable deployments;
 shortcut and wrong-mechanism explicitly disable persistence. Seven semantic
 case-bound oracle seeds are registered and can be prepared as evaluation-only
-sequences; SM01 remains the only completed five-condition pilot.
+sequences; SM01 and SM02 have completed five-condition pilots.
 The full Stage 3 matrix remains fail-closed because executable controls are
 still incomplete. A manifest-bound pilot executor and content-free sensitivity audit now
-run one selected family/replicate only; the 2026-09-02 SM01 replicate-2 pilot
-completed all five conditions and is recorded in
-`docs/sensitivity_sm01_pilot_20260902.md`. This is execution/readiness evidence,
+run one selected family/replicate only. The 2026-09-02 SM01 replicate-2 and
+SM02 replicate-1 pilots each completed all five conditions and are recorded in
+`docs/sensitivity_sm01_pilot_20260902.md` and
+`docs/sensitivity_sm02_pilot_20260902.md`. This is execution/readiness evidence,
 not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic and all ten procedural target
