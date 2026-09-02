@@ -329,10 +329,10 @@ rollback_update
 
 ### 2F：拆分 Hermes-PAST 单体
 
-当前 `src/rsimem/hermes_past_bridge.py` 约 3853 行，同时承担 benchmark、Hermes、memory、evidence、feedback 和 report 职责。
+当前 `src/rsimem/hermes_past_bridge.py` 约 3580 行，同时承担 benchmark、Hermes、memory、evidence、feedback 和 report 职责；semantic/episodic projection wrappers 已迁出约 296 行到 `hermes_host_adapter.py`。
 
 - 部分完成：PAST task/family public identity 已迁入 `PastBenchAdapter`，grader 仍留在 final evaluation plane。
-- 部分完成：semantic/episodic projection wrappers 已迁入 `hermes_host_adapter.py`，完整 session/tool/native memory 仍在 bridge。
+- 部分完成：semantic/episodic projection wrappers 已迁入 `hermes_host_adapter.py` 并由 module-identity test 验证，完整 session/tool/native memory 仍在 bridge。
 - □ Canonical event、corpus 和 attribution join 留在 framework core。
 - □ Mem0/extraction path 迁入 semantic fixture/backend。
 - □ 旧入口提供兼容层或明确迁移错误，不静默运行旧协议。
