@@ -8,7 +8,7 @@
 
 RSIMem 当前研究问题是：
 
-> 在冻结基础模型参数的条件下，什么类型、什么粒度的反馈，足以驱动 semantic、episodic 和 procedural memory 产生可靠、可归因且能够泛化的自我改进？
+> 在 Memory 自进化过程中，什么类型、什么粒度的反馈，足以驱动 semantic、episodic 和 procedural memory 产生可靠、可归因且能够泛化的自我改进？
 
 当前只执行四个串行阶段：
 
@@ -454,7 +454,7 @@ Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 
 - √ 阶段 0C 已删除无活动依赖的旧 launcher、proposal 入口、dead tests 和三个 orphaned config；仍在使用的 extraction-named configs 已明确为 generalized deterministic fixtures。
 - √ 阶段 1 已冻结 taxonomy、surface、26-family matrix 与 protocol manifest。
 - 部分完成：阶段 2 的四类 adapter contracts、deterministic harness、Hermes host boundary 与三类 projection 已完成；真实 runner 的 host trace 和 terminal method binding 已接线，正式 full-lifecycle method flow/golden trace 尚待实现。
-- 部分完成：阶段 3 已完成 SM/EP/PC result-independent five-condition oracle harness、case-bound source readiness census、verified oracle-seed registry，以及将每个 `family x condition x replicate` 展开为独立 state/Hermes-home/trace 的 immutable run manifest。registry 要求 case/panel/kind、family source digest、完整 trusted-home tree digest 和严格 memory layout；只有 registry 验证通过才会把 deployment 标为 executable，且不保存 memory text。PAST catalog 已使 semantic 7 个 family 的 native、no-persistence、shortcut 与 wrong-mechanism slice 可执行；shortcut/wrong-mechanism 固定使用无持久化 variant。semantic 7 个与 procedural 10 个 oracle seed 均只从公开 learn/update input 人工编写、case-bound 注册，并已通过 evaluation-only fresh-state slice preparation；SM01 replicate-2 与 SM02 replicate-1 的五 condition pilot 均已完成且通过 content-free audit。episodic 3 个 target family 仍缺 oracle seed；procedural panel 仍缺 compatible wrong-mechanism control，PC03 另缺 no-persistence control。正式矩阵 replicates 与任何 panel sensitivity 结论仍未完成。
+- 部分完成：阶段 3 已完成 SM/EP/PC result-independent five-condition oracle harness、case-bound source readiness census、verified oracle-seed registry，以及将每个 `family x condition x replicate` 展开为独立 state/Hermes-home/trace 的 immutable run manifest。registry 要求 case/panel/kind、family source digest、完整 trusted-home tree digest 和严格 memory layout；只有 registry 验证通过才会把 deployment 标为 executable，且不保存 memory text。PAST catalog 已使 semantic 7 个和 procedural 10 个 family 的 native、no-persistence、shortcut 与 wrong-mechanism slice 可执行；shortcut/wrong-mechanism 固定使用无持久化 variant。semantic 7 个与 procedural 10 个 oracle seed 均只从公开 learn/update input 人工编写、case-bound 注册，并已通过 evaluation-only fresh-state slice preparation；procedural 10 个 family 的五条件 deployment 已全部 preparation-verified。SM01 replicate-2 与 SM02 replicate-1 的 semantic 五 condition pilot 均已完成且通过 content-free audit；episodic oracle seed、procedural provider pilot、正式矩阵 replicates 与任何 panel sensitivity 结论仍未完成。
 - □ AdaMem、MemQ、Recuris 未接入；这是阶段 4，不是当前缺陷。
 
 ## 9. 标准验收命令
