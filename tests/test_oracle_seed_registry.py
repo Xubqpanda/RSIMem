@@ -111,3 +111,30 @@ def test_checked_in_sm01_registration_resolves_against_real_family_source() -> N
     family_digest = hashlib.sha256(family_file.read_bytes()).hexdigest()
     seed_root = root / "benchmarks/past-bench/self-evolve-tasks-v2/_rsimem_oracles"
     assert registry.for_case(case.case_id).resolve(seed_root, case, family_digest).is_dir()
+
+
+def test_checked_in_semantic_registry_resolves_every_semantic_oracle_case() -> None:
+    root = Path(__file__).resolve().parents[1]
+    registry = OracleSeedRegistry.load(root / "configs/sensitivity/oracle_seed_registry_semantic.json")
+    base = default_research_protocol()
+    family_matrix = PastFamilyMatrix.create_default()
+    protocol = ResearchProtocol.create(
+        memory_units=base.memory_units,
+        family_matrix=family_matrix,
+        split=base.split,
+        sensitivity_target_kind=MemoryKind.SEMANTIC,
+    )
+    matrix = SensitivityMatrix.create_for_panel(
+        panel=SensitivityPanel.SEMANTIC,
+        protocol=protocol,
+        family_matrix=family_matrix,
+    )
+    seed_root = root / "benchmarks/past-bench/self-evolve-tasks-v2/_rsimem_oracles"
+    cases = tuple(case for case in matrix.cases if case.condition is SensitivityCondition.TYPE_MATCHED_ORACLE)
+    assert len(registry.registrations) == len(cases) == 7
+    for case in cases:
+        family_file = root / "benchmarks/past-bench" / family_matrix.spec_for(case.family_id).task_root / "family.yaml"
+        resolved = registry.for_case(case.case_id).resolve(
+            seed_root, case, hashlib.sha256(family_file.read_bytes()).hexdigest()
+        )
+        assert resolved == seed_root / "semantic" / case.family_id

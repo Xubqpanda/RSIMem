@@ -64,3 +64,38 @@ def test_prepares_all_sm01_conditions_without_provider_execution(
         if case.family_id == "SM01_preference_adoption"
         and case.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
     )
+
+
+def test_prepares_every_semantic_oracle_slice_without_provider_execution(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    past_root = root / "benchmarks" / "past-bench"
+    from rsimem.research_protocol import SensitivityCondition
+    from rsimem.sensitivity_prepare import _matrix
+
+    _, matrix = _matrix(SensitivityPanel.SEMANTIC)
+    oracle_cases = tuple(
+        case for case in matrix.cases
+        if case.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
+    )
+    prepared = []
+    for case in oracle_cases:
+        batch = prepare_registered_sensitivity_batch(
+            panel=SensitivityPanel.SEMANTIC,
+            case_id=case.case_id,
+            replicate=1,
+            batch_id="stage3-semantic-oracle-" + case.family_id,
+            rsimem_root=root,
+            past_bench_root=past_root,
+            registry_path=root / "configs/sensitivity/oracle_seed_registry_semantic.json",
+            trusted_seed_root=past_root / "self-evolve-tasks-v2" / "_rsimem_oracles",
+            output_root=tmp_path / case.family_id,
+            past_bench_binary="past-bench",
+        )
+        document = yaml.safe_load(batch.launch.sequence_path.read_text(encoding="utf-8"))
+        assert document["episodes"]
+        assert all(item["bucket"] == "evaluation" for item in document["episodes"])
+        assert all(item["history_mode"] == "fresh" for item in document["episodes"])
+        assert all(item["oracle_home_seed_dir"] == "oracle-home" for item in document["episodes"])
+        assert (batch.launch.sequence_path.parent / "oracle-home" / "memories" / "MEMORY.md").is_file()
+        prepared.append(batch.launch.run_id)
+    assert len(prepared) == len(set(prepared)) == 7
