@@ -139,12 +139,20 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
     fake_run_agent = types.ModuleType("run_agent")
 
     class FixtureAgent:
+        session_ordinal = 0
+
         def __init__(self, **kwargs):
             self._session_db = kwargs["session_db"]
-            self.session_id = "current-session"
+            type(self).session_ordinal += 1
+            self.session_id = f"current-session-{type(self).session_ordinal}"
             self.session_log_file = None
             self._memory_store = memory_tool.MemoryStore()
             self._memory_store.load_from_disk()
+            self._session_db.create_session(
+                self.session_id,
+                "past_bench",
+                model="fixture-model",
+            )
 
         def _execute_recorded_model_call(self, *args, **kwargs):
             return None
@@ -165,6 +173,8 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
             )
             skills = registry.dispatch("skills_list", {})
             skill = registry.dispatch("skill_view", {"name": "task-table"})
+            self._session_db.append_message(self.session_id, "user", "finish")
+            self._session_db.append_message(self.session_id, "assistant", "done")
             final = json.dumps({
                 "memory": memory,
                 "user": user,
@@ -173,7 +183,12 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
                 "skills": json.loads(skills),
                 "skill": json.loads(skill),
             }, ensure_ascii=True, sort_keys=True)
-            return {"final_response": final, "input_tokens": 0, "output_tokens": 0}
+            return {
+                "final_response": final,
+                "completed": True,
+                "input_tokens": 0,
+                "output_tokens": 0,
+            }
 
         def wait_for_background_reviews(self, timeout=0):
             return True
@@ -253,6 +268,24 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
         if mode == "native":
             assert response.host_event_ids == []
             assert response.host_state_digest is None
+            assert response.host_projection_digest is None
+        else:
+            assert len(response.host_event_ids) == 1
+            assert response.host_event_ids[0].startswith("host-event.hermes-task.")
+            assert isinstance(response.host_state_digest, str)
+            assert len(response.host_state_digest) == 64
+            assert isinstance(response.host_projection_digest, str)
+            assert len(response.host_projection_digest) == 64
+            assert "score" not in str(response.host_event_ids)
+    assert responses["native+ledger"].host_event_ids != (
+        responses["native+adapter+ledger"].host_event_ids
+    )
+    assert responses["native+ledger"].host_state_digest != (
+        responses["native+adapter+ledger"].host_state_digest
+    )
+    assert responses["native+ledger"].host_projection_digest == (
+        responses["native+adapter+ledger"].host_projection_digest
+    )
     assert not any(
         (tmp_path / mode.replace("+", "_") / "rsimem_lifecycle_events.jsonl").exists()
         for mode in ("native+ledger", "native+adapter+ledger")

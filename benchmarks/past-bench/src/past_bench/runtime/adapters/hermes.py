@@ -693,6 +693,9 @@ class HermesAdapter(RuntimeAdapter):
             response.host_state_digest = getattr(
                 self._rsimem_bridge, "canonical_host_state_digest", None
             )
+            response.host_projection_digest = getattr(
+                self._rsimem_bridge, "canonical_host_projection_digest", None
+            )
         response.model_time_s = time.monotonic() - started
         self._completed_response = response
         return response
@@ -889,6 +892,7 @@ class HermesAdapter(RuntimeAdapter):
         process_digest: str | None = None
         host_event_ids: list[str] = []
         host_state_digest: str | None = None
+        host_projection_digest: str | None = None
         if self._rsimem_bridge is not None:
             process_event_ids = list(self._rsimem_bridge.process_feedback_event_ids)
             process_digest = self._rsimem_bridge.process_feedback_digest
@@ -897,6 +901,9 @@ class HermesAdapter(RuntimeAdapter):
             )
             host_state_digest = getattr(
                 self._rsimem_bridge, "canonical_host_state_digest", None
+            )
+            host_projection_digest = getattr(
+                self._rsimem_bridge, "canonical_host_projection_digest", None
             )
         return StepResponse(
             status="finished",
@@ -908,6 +915,7 @@ class HermesAdapter(RuntimeAdapter):
             process_feedback_digest=process_digest,
             host_event_ids=host_event_ids,
             host_state_digest=host_state_digest,
+            host_projection_digest=host_projection_digest,
         )
 
     @staticmethod

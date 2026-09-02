@@ -303,6 +303,7 @@ class HermesPastBenchBridge:
         self._canonical_host_events: dict[str, CanonicalHostEvent] = {}
         self._canonical_host_event_failures: list[str] = []
         self._canonical_host_state_digest: str | None = None
+        self._canonical_host_projection_digest: str | None = None
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
         self._trigger_adapter = HermesTriggerEventAdapter()
@@ -660,6 +661,12 @@ class HermesPastBenchBridge:
     @property
     def canonical_host_state_digest(self) -> str | None:
         return self._canonical_host_state_digest
+
+    @property
+    def canonical_host_projection_digest(self) -> str | None:
+        """Variant-neutral digest for matched host-trace comparisons."""
+
+        return self._canonical_host_projection_digest
 
     @property
     def canonical_host_event_failures(self) -> tuple[str, ...]:
@@ -1115,10 +1122,71 @@ class HermesPastBenchBridge:
                 )
             self._canonical_host_events.setdefault(event.event_id, event)
             self._canonical_host_state_digest = self.host_adapter.snapshot_state().state_digest
+            self._canonical_host_projection_digest = self._host_projection_digest(
+                snapshot,
+                event,
+            )
             self._last_host_event_id = event.event_id
             self._last_host_source_revision = snapshot.context_revision
         except Exception as exc:
             self._canonical_host_event_failures.append(type(exc).__name__)
+
+    @staticmethod
+    def _host_projection_digest(
+        snapshot: ContextSnapshot,
+        event: CanonicalHostEvent,
+    ) -> str:
+        """Digest a host trace without run/session/provenance identities."""
+
+        segment_index = {
+            segment.segment_id: index
+            for index, segment in enumerate(snapshot.segments)
+        }
+        payload = {
+            "event_kind": event.kind.value,
+            "completed": bool(event.attributes["completed"]),
+            "partial": bool(event.attributes["partial"]),
+            "interrupted": bool(event.attributes["interrupted"]),
+            "segments": [
+                {
+                    "position": index,
+                    "role": segment.role,
+                    "kind": segment.kind.value,
+                    "token_count": segment.token_count,
+                    "completed": segment.completed,
+                    "content_digest": hashlib.sha256(
+                        segment.content.encode("utf-8")
+                    ).hexdigest(),
+                }
+                for index, segment in enumerate(snapshot.segments)
+            ],
+            "active_positions": [
+                segment_index[segment_id]
+                for segment_id in snapshot.active_segment_ids
+            ],
+            "tool_closures": [
+                {
+                    "tool_call_id": closure.tool_call_id,
+                    "call_position": segment_index[
+                        closure.call_segment_id
+                    ],
+                    "result_position": (
+                        segment_index[closure.result_segment_id]
+                        if closure.result_segment_id is not None
+                        else None
+                    ),
+                }
+                for closure in snapshot.tool_closures
+            ],
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
 
     def on_session_end(self, *, task_state: TaskLifecycleState = TaskLifecycleState.COMPLETED) -> None:
         """Observe a real session-end boundary without opening writeback."""
