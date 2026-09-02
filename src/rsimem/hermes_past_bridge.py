@@ -302,6 +302,7 @@ class HermesPastBenchBridge:
         self.host_adapter: HermesHostAdapter | None = None
         self._canonical_host_events: dict[str, CanonicalHostEvent] = {}
         self._canonical_host_event_failures: list[str] = []
+        self._canonical_host_state_digest: str | None = None
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
         self._trigger_adapter = HermesTriggerEventAdapter()
@@ -651,6 +652,14 @@ class HermesPastBenchBridge:
             self._canonical_host_events[event_id]
             for event_id in sorted(self._canonical_host_events)
         )
+
+    @property
+    def canonical_host_event_ids(self) -> tuple[str, ...]:
+        return tuple(event.event_id for event in self.canonical_host_events)
+
+    @property
+    def canonical_host_state_digest(self) -> str | None:
+        return self._canonical_host_state_digest
 
     @property
     def canonical_host_event_failures(self) -> tuple[str, ...]:
@@ -1105,6 +1114,7 @@ class HermesPastBenchBridge:
                     f"{observed.reason_code or 'unknown'}"
                 )
             self._canonical_host_events.setdefault(event.event_id, event)
+            self._canonical_host_state_digest = self.host_adapter.snapshot_state().state_digest
             self._last_host_event_id = event.event_id
             self._last_host_source_revision = snapshot.context_revision
         except Exception as exc:
