@@ -1,6 +1,6 @@
 # RSIMem PAST-Bench Foundation Checklist
 
-最后更新：2026-09-01
+最后更新：2026-09-02
 
 ## 0. 文档定位
 
@@ -168,17 +168,17 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 - √ 已对候选 `DELETE` 文件运行 import/call-site、CLI、shell、test、docs 和 packaging 审计；活动测试 fixture 已改列为 `GENERALIZE`。
 - √ 删除停止的 N+1 launcher、无调用 wrapper、重复 config 和仅服务撤销 artifact 的代码（提交 `b1c9970`、`480f77b`、`3b2cbb4`）。
 - √ 删除 dead tests，但保留保护 generic contract 的反向测试。
-- □ 将重复流水账收敛为少量 current-state 文档后删除旧报告；Git 历史负责归档，不创建大型 `legacy/`。
-- □ 删除生成物和缓存，不跟踪 `__pycache__`、`.pyc`、`.pytest_cache`、临时 HOME、日志或 editable-install metadata。
+- 延后：历史流水账作为已发生实验的 evidence keep，不在本阶段批量删除；当前状态由本 checklist 和 `progress.md` 汇总。
+- √ 生成物和缓存保持 untracked；baseline/preflight 只接受受控 source、manifest 和 evidence identity。
 - √ 已移除 `rsimem-propose-extraction` export；新增 `rsimem-freeze-research-protocol` 作为 Stage 1 manifest 入口。
 
 ### 0D：清理后验收
 
-- □ Generic runtime、Hermes/PAST smoke、lifecycle replay、revocation、restart 和 rollback 与 baseline 等价。
-- □ Tracked imports 可解析，CLI help 可执行，配置引用文件存在。
-- □ `rg` 不存在指向已删除模块、脚本、配置和文档的路径。
-- □ Generic corpus 和 `STOP_NO_SIGNAL` evidence 仍可读；停止入口必须明确不可调用。
-- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；清理累计删除 11 个文件、2795 行，保留测试基线为 RSIMem `1086 passed`、PAST-Bench `401 passed, 2 skipped`。
+- √ Generic runtime、Hermes/PAST fixtures、lifecycle replay、revocation、restart 和 rollback 已在全量 RSIMem/PAST tests 中回归验证。
+- √ Tracked imports、可用 CLI、配置引用与 packaging 入口已由 baseline preflight 和全量测试覆盖。
+- √ 已审计删除入口的残留引用；已删除 launcher/proposal/config 不再是可调用路径。
+- √ Generic corpus 和 `STOP_NO_SIGNAL` evidence 仍可读；停止的 proposal CLI 已移除，不会静默恢复旧协议。
+- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；Stage 0 后续回归基线为 RSIMem `1126 passed`、PAST-Bench `401 passed, 2 skipped`。
 - √ 清理提交均通过对应测试，cleanup manifest 在 `07695ef` 上完成 12 项 clean-tree preflight。
 
 ## 4. 阶段 1：研究协议冻结
@@ -262,7 +262,7 @@ Mechanism：formation/retention coverage、retrieval、exposure、attributable u
 职责：枚举 case/split、重置和推进环境、提供 public capability schema、在 final plane 评分、生成 audit-only annotation。
 
 - √ 定义 host-neutral request/response/event contract，不引用 Hermes 类，见 `adapter_contracts.py`。
-- 部分完成：`PastBenchAdapter` 已封装 PAST task layout、split/family identity 和公开 digest；实际 runner execution 仍待 bridge split。
+- 部分完成：`PastBenchAdapter` 已封装 PAST task layout、split/family identity 和公开 digest；真实 runner 仍未以该 adapter 驱动完整 agent execution。
 - √ 区分 public task state、audit-only contract 和 final-only score；final score 只能由显式 final-plane callback 提供。
 - □ 保持 raw prompt、grader 和 reference 不变。
 - □ Hidden answer、grader field 或 family-derived key 进入 Host/method 时 fail closed。
@@ -273,10 +273,10 @@ Mechanism：formation/retention coverage、retrieval、exposure、attributable u
 职责：Hermes session、模型、工具、native memory、context、usage、restart 和 state isolation。
 
 - √ 定义 `HostCapabilities`，声明 memory surface、tool closure、usage、restart 和 snapshot；提供 deterministic host fixture。
-- 部分完成：Hermes projection wrapper 已迁入 `hermes_host_adapter.py`，canonical event 接口和真实 bridge callback 接线仍待完成。
+- √ `HermesHostAdapter.attach()` 已接管 semantic/episodic/procedural projection attachment；adapter call、projection verification、query observation 和 native-search ledger 操作位于 `HermesHostOperations`。
 - √ BenchmarkAdapter contract 不读取 Hermes state，MemoryMethodAdapter contract 不调用 PAST grader。
 - 部分完成：native bypass、method-managed 和 no-persistence identity 已有旧 bridge/runtime 语义，需在 golden trace 中统一。
-- √ deterministic host fixture 对重复/跨 session event 和 restart drift fail closed；真实 tool closure 接线待 bridge split。
+- √ deterministic host fixture 对重复/跨 session event 和 restart drift fail closed；真实 tool closure 已经由 host-owned `skills_list`/`skill_view` wrapper 接线。
 
 ### 2C：MemoryMethodAdapter
 
@@ -329,10 +329,10 @@ rollback_update
 
 ### 2F：拆分 Hermes-PAST 单体
 
-当前 `src/rsimem/hermes_past_bridge.py` 约 3580 行，同时承担 benchmark、Hermes、memory、evidence、feedback 和 report 职责；semantic/episodic projection wrappers 已迁出约 296 行到 `hermes_host_adapter.py`。
+当前 `src/rsimem/hermes_past_bridge.py` 仍约 3306 行，同时承担 benchmark、Hermes、memory、evidence、feedback 和 report 职责。`hermes_host_adapter.py` 已拥有 semantic/episodic/procedural projection 及 host operations；bridge 对这四类 operation 保留兼容薄代理。
 
 - 部分完成：PAST task/family public identity 已迁入 `PastBenchAdapter`，grader 仍留在 final evaluation plane。
-- 部分完成：semantic/episodic projection wrappers 已迁入 `hermes_host_adapter.py` 并由 module-identity test 验证，完整 session/tool/native memory 仍在 bridge。
+- √ semantic/episodic/procedural projection wrappers 已迁入 `hermes_host_adapter.py` 并由 real Hermes integration tests 验证；adapter failure、native bypass 与 projection mismatch 保持 fail-closed/显式记录语义。
 - □ Canonical event、corpus 和 attribution join 留在 framework core。
 - □ Mem0/extraction path 迁入 semantic fixture/backend。
 - □ 旧入口提供兼容层或明确迁移错误，不静默运行旧协议。
@@ -344,8 +344,8 @@ rollback_update
 - √ deterministic fake semantic/episodic/procedural methods 可在同一 host-neutral harness 独立运行；真实 PAST/Hermes harness 待接线。
 - √ F0-F5 有字段 allowlist 和 contamination tests。
 - □ Grader 无法经 Host、method、metadata 或 pointer 泄漏。
-- □ Hermes-PAST bridge 完成职责拆分且 golden trace 等价。
-- □ Restart、revision、idempotency、rollback、secret scan 和 telemetry 验收通过。
+- 部分完成：Hermes-PAST bridge 已抽出 host projections 和 host operations；真实 PAST execution 的 `AdapterHarness` 接线及 golden trace equivalence 仍未完成。
+- √ Restart、revision、idempotency、rollback、secret scan 和 telemetry 的现有 contract/fixture 验收通过；真实 runner 的端到端 restart/golden trace 仍属于上一项。
 - □ 本阶段不要求真实三种方法，不用 fake method 分数声明效果。
 
 ## 6. 阶段 3：PAST Memory Sensitivity
@@ -441,20 +441,20 @@ Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 
 
 ## 8. 当前状态
 
-截至 2026-09-01：
+截至 2026-09-02：
 
 - √ PAST/Hermes runtime、usage、generic memory contracts、lifecycle、provenance、安全和 rollback 可复用。
 - √ Pure process、benchmark audit 和 final evaluation 已隔离。
 - √ SM02/SM05 clean-parent 已完成，均为 `STOP_NO_SIGNAL`。
 - √ Extraction-only 主线在研究决策上停止，不再生成 N+1。
-- 部分完成：三类 storage-boundary 和六 surfaces 有 fixture，但未按新 taxonomy/ownership 验收。
-- 部分完成：PAST/Hermes 可运行，但仍集中在大型 `hermes_past_bridge.py`。
+- √ 三类 storage-boundary、六 surfaces、taxonomy/ownership contract 和 result-independent sensitivity fixture 已验收。
+- 部分完成：PAST/Hermes 可运行；host projections/operations 已从 bridge 拆出，但真实 runner 尚未经 `AdapterHarness` 执行，bridge 仍承担 lifecycle/evidence/report 编排。
 - √ 阶段 0A baseline 冻结和 0B 逐文件资产分类已完成；`baseline_preflight`
   可在 cleanup 前 fail closed。
 - √ 阶段 0C 已删除无活动依赖的旧 launcher、proposal 入口、dead tests 和三个 orphaned config；仍在使用的 extraction-named configs 已明确为 generalized deterministic fixtures。
-- □ 阶段 1 未生成冻结 protocol manifest 和完整 family matrix。
-- □ 阶段 2 未完成四个 adapter contracts 和单体拆分。
-- □ 阶段 3 未运行三类 oracle sensitivity matrix。
+- √ 阶段 1 已冻结 taxonomy、surface、26-family matrix 与 protocol manifest。
+- 部分完成：阶段 2 的四类 adapter contracts、deterministic harness、Hermes host boundary 与三类 projection 已完成；真实 runner/golden trace 尚待接线。
+- 部分完成：阶段 3 已完成 SM/EP/PC result-independent five-condition oracle harness；尚未运行真实模型 sensitivity matrix，因此没有任何 panel sensitivity 结论。
 - □ AdaMem、MemQ、Recuris 未接入；这是阶段 4，不是当前缺陷。
 
 ## 9. 标准验收命令

@@ -1,6 +1,6 @@
 # RSIMem Progress
 
-Last updated: 2026-09-01
+Last updated: 2026-09-02
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
@@ -30,14 +30,18 @@ migration.
 - [ ] Not completed.
 - **Current** identifies the milestone that should receive implementation effort next.
 
-## Current Checkpoint (2026-09-01)
+## Current Checkpoint (2026-09-02)
 
 This section is the authoritative summary for the current repository state.
 Later sections retain dated implementation history and may contain earlier
 test counts, provider attempts, or superseded experiment descriptions.
 
-The implementation is currently in Stage 0C cleanup after deterministic and
-process-signal infrastructure work; it has not entered a live N+1 experiment.
+Stage 0 cleanup and Stage 1 protocol freezing are complete.  Stage 2 has
+completed its typed adapter contracts, deterministic harness, Hermes host
+boundary, and storage projections; the remaining Stage 2 work is real
+PAST-runner attachment through those contracts plus a golden-trace equivalence
+check.  Stage 3 has a result-independent oracle harness but no real-model
+sensitivity results.  The project has not entered a live N+1 experiment.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
@@ -58,8 +62,8 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1120 passed` after Stage 1 contracts, Stage 2 adapter contracts,
-  and Stage 3 sensitivity harness were added.
+- RSIMem: `1126 passed` after the Stage 2 host-operations split and
+  deterministic pure-feedback boundary-order repair.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
@@ -81,7 +85,7 @@ Current capability matrix:
 | Real provider process-signal census | complete for SM02/SM05 train attempt | both fresh batches completed; `STOP_NO_SIGNAL` |
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
-| Stage 2 adapter boundaries and bridge split | partial | typed contracts, PAST boundary, deterministic host/method fixtures, and Hermes projection split; full bridge/golden trace pending |
+| Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, and semantic/episodic/procedural projection split; real runner/golden trace pending |
 | Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated five-condition/oracle harness; real matched model runs pending |
 
 The completed rows establish implementation capacity and deterministic
