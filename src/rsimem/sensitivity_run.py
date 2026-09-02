@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .research_protocol import SensitivityCondition
-from .sensitivity import SensitivityMatrix
+from .sensitivity import SensitivityMatrix, SensitivityPanel
 
 
 SENSITIVITY_RUN_SCHEMA = "rsimem-past-sensitivity-run-v1"
@@ -58,11 +58,21 @@ def _relative_path(value: object, name: str) -> str:
 
 @dataclass(frozen=True, slots=True)
 class SensitivityDeployment:
-    """One host-owned condition deployment, represented without content."""
+    """One case-bound, host-owned condition deployment without content.
+
+    The deployment is deliberately more specific than a condition label.  A
+    semantic preseed or a shortcut task for one PAST family is not evidence
+    that an episodic or procedural family has the same condition available.
+    """
 
     deployment_id: str
+    case_id: str
+    panel: SensitivityPanel
+    target_kind: str
     condition: SensitivityCondition
     mechanism: str
+    episode_selector: str
+    state_mode: str
     host_state_digest: str
     launcher_config_digest: str
     executable: bool
@@ -73,8 +83,19 @@ class SensitivityDeployment:
         if self.schema != SENSITIVITY_RUN_SCHEMA or self.schema_version != SENSITIVITY_RUN_SCHEMA_VERSION:
             raise ValueError("unsupported sensitivity deployment schema")
         _id(self.deployment_id, "sensitivity deployment ID")
+        _id(self.case_id, "sensitivity deployment case ID")
+        object.__setattr__(self, "panel", SensitivityPanel(self.panel))
+        _id(self.target_kind, "sensitivity deployment target kind")
+        if self.target_kind != self.panel.memory_kind.value:
+            raise ValueError("sensitivity deployment target kind must match panel")
         object.__setattr__(self, "condition", SensitivityCondition(self.condition))
         _id(self.mechanism, "sensitivity deployment mechanism")
+        _id(self.episode_selector, "sensitivity deployment episode selector")
+        if self.state_mode not in {
+            "no_persistence", "native_static", "oracle_seed",
+            "shortcut_task", "wrong_mechanism_task",
+        }:
+            raise ValueError("sensitivity deployment state mode is invalid")
         _sha(self.host_state_digest, "sensitivity deployment host-state digest")
         _sha(self.launcher_config_digest, "sensitivity deployment launcher-config digest")
         if type(self.executable) is not bool:
@@ -85,8 +106,13 @@ class SensitivityDeployment:
             "schema": self.schema,
             "schema_version": self.schema_version,
             "deployment_id": self.deployment_id,
+            "case_id": self.case_id,
+            "panel": self.panel.value,
+            "target_kind": self.target_kind,
             "condition": self.condition.value,
             "mechanism": self.mechanism,
+            "episode_selector": self.episode_selector,
+            "state_mode": self.state_mode,
             "host_state_digest": self.host_state_digest,
             "launcher_config_digest": self.launcher_config_digest,
             "executable": self.executable,
@@ -215,9 +241,11 @@ class SensitivityRunManifest:
         _sha(self.matrix_digest, "sensitivity matrix digest")
         _sha(self.protocol_digest, "sensitivity protocol digest")
         deployments = tuple(self.deployments)
-        if len(deployments) != len(SensitivityCondition):
-            raise ValueError("sensitivity manifest requires one deployment per condition")
-        if {item.condition for item in deployments} != set(SensitivityCondition):
+        expected_case_conditions = {
+            (run.case_id, run.condition)
+            for run in self.runs
+        }
+        if {(item.case_id, item.condition) for item in deployments} != expected_case_conditions:
             raise ValueError("sensitivity deployments are incomplete or duplicated")
         if len({item.deployment_id for item in deployments}) != len(deployments):
             raise ValueError("sensitivity deployment IDs must be unique")
@@ -227,8 +255,17 @@ class SensitivityRunManifest:
             raise ValueError("sensitivity manifest requires unique runs")
         if any(run.matrix_digest != self.matrix_digest or run.protocol_digest != self.protocol_digest for run in runs):
             raise ValueError("sensitivity run matrix/protocol identity mismatch")
-        if {run.deployment_id for run in runs} - {item.deployment_id for item in deployments}:
+        deployment_by_id = {item.deployment_id: item for item in deployments}
+        if {run.deployment_id for run in runs} - set(deployment_by_id):
             raise ValueError("sensitivity run references an unknown deployment")
+        for run in runs:
+            deployment = deployment_by_id[run.deployment_id]
+            if (
+                deployment.case_id != run.case_id
+                or deployment.condition is not run.condition
+                or deployment.panel.value != run.panel
+            ):
+                raise ValueError("sensitivity run deployment does not match case identity")
         directories = [
             value
             for run in runs
@@ -287,14 +324,23 @@ def build_sensitivity_run_manifest(
 
     _id(batch_id, "sensitivity batch ID")
     _sha(protocol_digest, "sensitivity protocol digest")
-    deployment_by_condition = {item.condition: item for item in deployments}
-    if len(deployment_by_condition) != len(tuple(deployments)):
-        raise ValueError("sensitivity deployment conditions must be unique")
-    if set(deployment_by_condition) != set(SensitivityCondition):
-        raise ValueError("sensitivity deployment conditions are incomplete")
+    deployment_by_case_condition = {(item.case_id, item.condition): item for item in deployments}
+    if len(deployment_by_case_condition) != len(tuple(deployments)):
+        raise ValueError("sensitivity deployment case conditions must be unique")
+    expected_case_conditions = {
+        (case.case_id, case.condition)
+        for case in matrix.cases
+    }
+    if set(deployment_by_case_condition) != expected_case_conditions:
+        raise ValueError("sensitivity deployment case conditions are incomplete")
     runs: list[SensitivityRunSpec] = []
     for case in matrix.cases:
-        deployment = deployment_by_condition[case.condition]
+        deployment = deployment_by_case_condition[(case.case_id, case.condition)]
+        if (
+            deployment.panel is not case.panel
+            or deployment.target_kind != case.target_kind.value
+        ):
+            raise ValueError("sensitivity deployment panel/kind does not match case")
         for replicate in range(1, matrix.replicate_count + 1):
             directory_root = f"runs/{case.case_id}/replicate-{replicate:02d}"
             values = {
@@ -347,6 +393,59 @@ def build_sensitivity_run_manifest(
     )
 
 
+def planned_deployments_from_catalog(
+    *,
+    matrix: SensitivityMatrix,
+    catalog: object,
+) -> tuple[SensitivityDeployment, ...]:
+    """Translate audit availability into non-executable registered deployments.
+
+    Availability says that a family exposes a named control episode.  It is
+    not proof that the host deployment, especially an oracle seed, has been
+    materialized.  Therefore this function keeps every returned deployment
+    non-executable until a launcher writes a concrete, verified deployment.
+    """
+
+    from .past_sensitivity_catalog import PastSensitivityCatalog
+
+    if not isinstance(catalog, PastSensitivityCatalog):
+        raise TypeError("sensitivity deployment planning requires a PAST catalog")
+    if catalog.matrix_id != matrix.matrix_id or catalog.matrix_digest != matrix.matrix_digest:
+        raise ValueError("sensitivity catalog does not match matrix identity")
+    entries = {(entry.case_id, entry.condition): entry for entry in catalog.entries}
+    expected = {(case.case_id, case.condition) for case in matrix.cases}
+    if set(entries) != expected:
+        raise ValueError("sensitivity catalog entries are incomplete")
+    state_modes = {
+        SensitivityCondition.NO_PERSISTENCE: "no_persistence",
+        SensitivityCondition.NATIVE_STATIC: "native_static",
+        SensitivityCondition.TYPE_MATCHED_ORACLE: "oracle_seed",
+        SensitivityCondition.SHORTCUT_CURRENT_INPUT: "shortcut_task",
+        SensitivityCondition.WRONG_MECHANISM: "wrong_mechanism_task",
+    }
+    deployments: list[SensitivityDeployment] = []
+    for case in matrix.cases:
+        entry = entries[(case.case_id, case.condition)]
+        selector = entry.episode_selector or f"unavailable.{case.condition.value}"
+        values = {
+            "case_id": case.case_id,
+            "panel": case.panel,
+            "target_kind": case.target_kind.value,
+            "condition": case.condition,
+            "mechanism": case.mechanism,
+            "episode_selector": selector,
+            "state_mode": state_modes[case.condition],
+            "host_state_digest": _digest({"availability": entry.payload()}),
+            "launcher_config_digest": _digest({"availability": entry.payload(), "mode": state_modes[case.condition]}),
+            "executable": False,
+        }
+        deployments.append(SensitivityDeployment(
+            deployment_id="sensitivity-deployment." + _digest(values)[:40],
+            **values,
+        ))
+    return tuple(deployments)
+
+
 class SensitivityRunManifestStore:
     """Append-once registration for an immutable Stage 3 run manifest."""
 
@@ -389,4 +488,5 @@ __all__ = [
     "SensitivityRunManifestStore",
     "SensitivityRunSpec",
     "build_sensitivity_run_manifest",
+    "planned_deployments_from_catalog",
 ]

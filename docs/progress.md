@@ -55,6 +55,14 @@ registered opaque method case ID.  The three non-native condition deployments
 (`type_matched_oracle`, `shortcut_current_input`, and `wrong_mechanism`) are
 not implemented yet, so a full Stage 3 manifest fails closed as
 non-executable.  The project has not entered a live N+1 experiment.
+The source-only Stage 3 census now makes this concrete without reading task
+prompts, graders, or answers: all seven semantic and all three episodic target
+families expose the named non-oracle control slots but lack a registered
+type-matched oracle seed; the ten procedural families also lack a
+type-matched oracle seed and a `wrong_mechanism` slot, and PC03 additionally
+lacks a no-persistence slot. Existing task controls are not treated as host
+deployments until their state/artifact and launcher configuration are
+registered and verified.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
@@ -99,7 +107,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated five-condition/oracle harness plus immutable isolated run registration; real condition deployments and matched model runs pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated five-condition/oracle harness, case-bound source readiness census, and immutable isolated run registration; oracle/control deployments and matched model runs pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
