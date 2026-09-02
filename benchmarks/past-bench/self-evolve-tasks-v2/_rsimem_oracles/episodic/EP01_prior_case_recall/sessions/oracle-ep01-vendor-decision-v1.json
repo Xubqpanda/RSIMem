@@ -1,0 +1,15 @@
+{
+  "session_id": "oracle-ep01-vendor-decision-v1",
+  "model": "oracle",
+  "platform": "rsimem-oracle",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Vendor X Contract Decision: after review, Vendor X is not approved for production until SOC2 is complete. A staging-only pilot is allowed through 2026-05-31."
+    },
+    {
+      "role": "assistant",
+      "content": "Recorded the Vendor X decision for future reference: production is not approved; only the staging pilot through 2026-05-31 is allowed."
+    }
+  ]
+}

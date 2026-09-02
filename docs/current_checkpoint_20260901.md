@@ -86,8 +86,11 @@ three declared PAST control slices executable; shortcut and wrong-mechanism
 run without persistence. A manifest-bound pilot executor completed one
 unseeded SM01 replicate-2 across all five conditions after a passing provider
 probe; a content-free audit reconciled 10 traces and all raw usage buckets.
-This is execution/readiness evidence only. Other oracle target cases stay
-non-executable, and no replicated sensitivity or quality claim has been made.
+This is execution/readiness evidence only. The full semantic panel now has
+seven case-bound oracle seeds prepared from public learn/update input and
+verified as evaluation-only fresh-state slices. Episodic and procedural oracle
+target cases stay non-executable, and no replicated sensitivity or quality
+claim has been made.
 The source-level readiness catalog does not read task prompts, graders, or
 answers. It reports that six semantic and all three episodic targets still lack
 case-bound type-matched oracle seeds, while procedural targets additionally

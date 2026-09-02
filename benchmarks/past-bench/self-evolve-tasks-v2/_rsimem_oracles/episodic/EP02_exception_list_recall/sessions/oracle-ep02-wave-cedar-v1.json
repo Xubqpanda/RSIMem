@@ -1,0 +1,15 @@
+{
+  "session_id": "oracle-ep02-wave-cedar-v1",
+  "model": "oracle",
+  "platform": "rsimem-oracle",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Wave Cedar session-bounded restart exception: activate and approve INTG-EU-002, INTG-US-004, and INTG-AP-006 only. Keep INTG-EU-013, INTG-US-014, and INTG-AP-015 suspended."
+    },
+    {
+      "role": "assistant",
+      "content": "Recorded the Wave Cedar carry-forward subset as a session-bounded restart exception only; the remaining listed connectors stay suspended."
+    }
+  ]
+}

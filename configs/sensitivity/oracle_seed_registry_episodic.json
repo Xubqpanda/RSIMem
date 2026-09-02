@@ -1,0 +1,40 @@
+{
+  "registry_id": "oracle-seed-registry.144fd16f3617214678a60f63a1249c22495b83cd",
+  "registrations": [
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.9ee7269e0d56674aff36459bd9113786f1517a93",
+      "family_source_digest": "dd3b158a48bb329375e87083056d261490f4c818ba5bc36a114f4d8572b3aaf0",
+      "oracle_artifact_id": "oracle.episodic.0f8e89ca60bd7c96bb7e8653dbcfe34b",
+      "panel": "episodic",
+      "registration_id": "oracle-seed-registration.5bbaeb82a03f32bd43b46c4baa095cd76d041571",
+      "seed_home": "episodic/EP01_prior_case_recall",
+      "seed_tree_digest": "5765737ce654eb613f91f0462d5d6a9e45d6c4c9d364748054eeb8f3c3b8a2a7",
+      "target_kind": "episodic"
+    },
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.77a26651e7902353d22eb315dd454fc489cc6e41",
+      "family_source_digest": "744a0295e23371bef0c2348465ffd4862ff5b7d5b93c618e57e91464974a3afa",
+      "oracle_artifact_id": "oracle.episodic.0f8e89ca60bd7c96bb7e8653dbcfe34b",
+      "panel": "episodic",
+      "registration_id": "oracle-seed-registration.74614468225a4f3cd5a531f29d7a6da7f492cacf",
+      "seed_home": "episodic/EP02_exception_list_recall",
+      "seed_tree_digest": "01a4ee1796d3af5e3c06c68e634b65bb906653a7fd7841b7f82a2d0998d0dc86",
+      "target_kind": "episodic"
+    },
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.610a1709885e2488107b1e366d0c94ca13515758",
+      "family_source_digest": "21b293f9027f39f51c5c6e281892f1170bd954107d2b20390b91a3b3096733f6",
+      "oracle_artifact_id": "oracle.episodic.0f8e89ca60bd7c96bb7e8653dbcfe34b",
+      "panel": "episodic",
+      "registration_id": "oracle-seed-registration.9906e8c7e65c1a58155d93da3ae0e1d9f7865a1d",
+      "seed_home": "episodic/EP03_recall_then_modify",
+      "seed_tree_digest": "8d13ca156c0646e71a8eea8a361cad051333c4d356a7b6654b1a282be0707c02",
+      "target_kind": "episodic"
+    }
+  ],
+  "schema": "rsimem-oracle-seed-registry-v1",
+  "schema_version": 1
+}

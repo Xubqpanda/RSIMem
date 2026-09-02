@@ -80,8 +80,9 @@ Type-matched oracle activation now has a separate case-bound seed registry.
 Each entry verifies family-source provenance, complete trusted-home tree digest,
 symlink absence, and target memory-kind layout before a deployment becomes
 executable; registry payloads contain no memory text. The checked-in SM01
-semantic seed is manually authored from its public learn input, while 19 target
-cases remain without an oracle seed; the provider matrix remains closed.
+semantic panel's seven seeds are manually authored from their public learn or
+update inputs. The remaining 13 episodic/procedural target cases still lack an
+oracle seed; the full provider matrix remains closed.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
