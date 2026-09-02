@@ -68,6 +68,11 @@ preserving only the selected control or its required history-anchor prefix.
 Its generated command passes the registered state, Hermes-home, and trace
 directories together with only the opaque method case ID. It refuses a
 non-executable deployment and does not invoke a provider itself.
+Type-matched oracle activation now has a separate case-bound seed registry.
+Each entry verifies family-source provenance, complete trusted-home tree digest,
+symlink absence, and target memory-kind layout before a deployment becomes
+executable; registry payloads contain no memory text. No oracle seed has yet
+been authored for the 20 target cases, so the provider matrix remains closed.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
@@ -112,7 +117,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, registered directory handoff, and fail-closed case-slice launcher; oracle/control assets and matched model runs pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified oracle-seed registry, registered directory handoff, and fail-closed case-slice launcher; oracle/control assets and matched model runs pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
