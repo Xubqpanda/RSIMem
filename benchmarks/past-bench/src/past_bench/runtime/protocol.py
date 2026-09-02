@@ -92,6 +92,7 @@ class StepResponse(BaseModel):
     # adapter.  These fields are audit joins only; they never carry prompt,
     # memory, grader, or score content.
     host_event_ids: list[str] = Field(default_factory=list)
+    host_events: list[dict[str, Any]] = Field(default_factory=list)
     host_state_digest: str | None = None
     host_projection_digest: str | None = None
 

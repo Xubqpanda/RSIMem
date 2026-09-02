@@ -659,6 +659,10 @@ class HermesPastBenchBridge:
         return tuple(event.event_id for event in self.canonical_host_events)
 
     @property
+    def canonical_host_event_payloads(self) -> tuple[dict[str, object], ...]:
+        return tuple(event.payload() for event in self.canonical_host_events)
+
+    @property
     def canonical_host_state_digest(self) -> str | None:
         return self._canonical_host_state_digest
 

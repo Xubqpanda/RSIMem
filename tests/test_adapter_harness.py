@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -10,8 +11,10 @@ from rsimem.adapter_contracts import (
     BenchmarkPublicEvent,
     BenchmarkSplit,
     BenchmarkTaskRequest,
+    CanonicalHostEvent,
     DeterministicHostAdapter,
     DeterministicMemoryMethodAdapter,
+    HostEventKind,
     HostCapabilities,
     MemoryMethodAdapter,
     MethodCapabilities,
@@ -20,6 +23,7 @@ from rsimem.adapter_contracts import (
 from rsimem.adapter_harness import AdapterHarness
 from rsimem.memory import MemoryKind
 from rsimem.memory.lifecycle_surfaces import MemoryLifecycleSurface
+from rsimem.past_bench_adapter import PastExecutionTrace
 
 
 class _Benchmark:
@@ -113,3 +117,84 @@ def test_harness_rejects_case_task_identity_mismatch() -> None:
     run = MethodRunIdentity("run.harness.mismatch.v1", "session.harness.v1", "task.other.v1", "revision.initial")
     with pytest.raises(ValueError, match="identity disagree"):
         AdapterHarness(_Benchmark(), _host(), _method()).run_case(request, run)
+
+
+def _terminal_trace(request, event, host_state_digest: str) -> PastExecutionTrace:
+    return PastExecutionTrace.from_runtime_response(
+        request,
+        SimpleNamespace(
+            status="finished",
+            final_output="private terminal output",
+            usage=SimpleNamespace(
+                input_tokens=3,
+                output_tokens=2,
+                cache_read_tokens=0,
+                cache_write_tokens=0,
+                reasoning_tokens=1,
+                request_count=1,
+                retry_count=0,
+                usage_complete=True,
+            ),
+            process_feedback_event_ids=(),
+            process_feedback_digest=None,
+            host_event_ids=(event.event_id,),
+            host_state_digest=host_state_digest,
+            host_projection_digest="a" * 64,
+        ),
+    )
+
+
+def test_harness_binds_already_observed_runtime_terminal_event() -> None:
+    request = _request()
+    run = MethodRunIdentity(
+        "run.runtime.v1",
+        "session.runtime.v1",
+        request.case_id,
+        "revision.runtime.v1",
+    )
+    event = CanonicalHostEvent(
+        event_id="host-event.runtime.v1",
+        session_id=run.session_id,
+        task_id=run.task_id,
+        kind=HostEventKind.TASK_COMPLETED,
+        revision=run.state_revision,
+        attributes={"completed": True},
+    )
+    host = _host()
+    assert host.prepare_session(run).status is AdapterStatus.SUPPORTED
+    assert host.observe_event(event).status is AdapterStatus.SUPPORTED
+    trace = _terminal_trace(request, event, host.snapshot_state().state_digest)
+
+    result = AdapterHarness(_Benchmark(), host, _method()).bind_runtime_terminal(
+        request, run, event, trace
+    )
+    assert result.status is AdapterStatus.ACCEPTED
+    assert result.host_result.reason_code == "duplicate_event"
+    assert result.method_result.status is AdapterStatus.SUPPORTED
+    assert result.host_state_digest == trace.host_state_digest
+
+
+def test_harness_rejects_runtime_trace_with_stale_host_state() -> None:
+    request = _request()
+    run = MethodRunIdentity(
+        "run.runtime-stale.v1",
+        "session.runtime-stale.v1",
+        request.case_id,
+        "revision.runtime-stale.v1",
+    )
+    event = CanonicalHostEvent(
+        event_id="host-event.runtime-stale.v1",
+        session_id=run.session_id,
+        task_id=run.task_id,
+        kind=HostEventKind.TASK_COMPLETED,
+        revision=run.state_revision,
+        attributes={"completed": True},
+    )
+    result = AdapterHarness(_Benchmark(), _host(), _method()).bind_runtime_terminal(
+        request,
+        run,
+        event,
+        _terminal_trace(request, event, "f" * 64),
+    )
+    assert result.status is AdapterStatus.STALE
+    assert result.host_result.reason_code == "state_digest_mismatch"

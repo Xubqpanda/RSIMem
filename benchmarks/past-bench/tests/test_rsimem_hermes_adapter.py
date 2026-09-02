@@ -267,10 +267,15 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
         assert "grader" not in response.model_dump()
         if mode == "native":
             assert response.host_event_ids == []
+            assert response.host_events == []
             assert response.host_state_digest is None
             assert response.host_projection_digest is None
         else:
             assert len(response.host_event_ids) == 1
+            assert len(response.host_events) == 1
+            assert response.host_events[0]["event_id"] == response.host_event_ids[0]
+            assert "score" not in str(response.host_events)
+            assert "grader" not in str(response.host_events)
             assert response.host_event_ids[0].startswith("host-event.hermes-task.")
             assert isinstance(response.host_state_digest, str)
             assert len(response.host_state_digest) == 64
