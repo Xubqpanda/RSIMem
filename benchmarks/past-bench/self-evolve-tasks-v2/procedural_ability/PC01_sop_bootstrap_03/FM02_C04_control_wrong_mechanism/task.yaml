@@ -1,11 +1,14 @@
-task_id: SE_FM03_C01
-task_name: FM03 Control — No Persistence (Data-Sharing Exception Registry)
+task_id: V2_FM02_C04
+task_name: Procedural Control - Wrong Mechanism
 version: '1.0'
 category: self_evolve
 difficulty: hard
-requires_fresh_session: true
-control_type: no_persistence
+control_type: wrong_mechanism
 persistence_disabled: true
+environment:
+  timeout_seconds: 300
+  max_turns: 25
+requires_fresh_session: true
 services:
 - name: helpdesk
   command: python mock_services/helpdesk/server.py
@@ -15,7 +18,7 @@ services:
   ready_timeout: 10
   reset_endpoint: http://localhost:9107/helpdesk/reset
   env:
-    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm03_helpdesk/eval_near.json
+    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm02_v2_helpdesk/eval_near.json
 - name: kb
   command: python mock_services/kb/server.py
   port: 9106
@@ -24,18 +27,15 @@ services:
   ready_timeout: 10
   reset_endpoint: http://localhost:9106/kb/reset
   env:
-    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm03_kb/brief.json
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm02_v2_kb/sop_full.json
 prompt:
-  text: 'The KB only has a brief overview. If you have a saved exception registry
-    skill, open its full contents before processing.
+  text: |
+    Read the current knowledge-base article and apply the operating procedure it describes to the current task data.
+    The procedure is deliberately available as plain current reference text, not as a reusable skill artifact.
+    Do not create or read a skill artifact for this control. Do not close tickets.
+    Output one line per updated ticket: TICKET_ID|priority|category|why
 
-    Process the open data export tickets in the helpdesk system. Apply the appropriate
-    rules to each ticket and output: TICKET_ID|priority|category|tags
-
-    You MUST use helpdesk_list_tickets, helpdesk_get_ticket, and helpdesk_update_ticket
-    tools to process and update tickets.
-
-    '
+    Use the available task tools after reading the article to complete the task.
   language: en
 tools:
 - name: helpdesk_list_tickets
@@ -114,9 +114,12 @@ tool_endpoints:
 - tool_name: kb_get_article
   url: http://localhost:9106/kb/articles/get
   method: POST
-environment:
-  timeout_seconds: 300
-  max_turns: 25
-judge_rubric: 'Control (no_persistence): Same eval_near task but with all persistence
-  disabled. Agent cannot retrieve saved skills/memories. Measures whether the brief
-  KB alone is sufficient.'
+judge_rubric: 'Control (surface_memorization): The prompt gives only surface keywords
+  (zone-related, outage patterns, infrastructure failures) without explaining the
+  actual SOP procedure (specific tag names like zone-correlated/shared-outage-confirmed,
+  the 3+ distinct reporters threshold, priority=critical rule, category=outage-investigation,
+  or exclusion list). If the agent scores high just from keyword cues, the eval is
+  not testing real procedure understanding. Reward correct triage of TK-FM02-N01,
+  N02, N03.
+
+  '

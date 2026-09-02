@@ -301,3 +301,4 @@ def test_checked_in_procedural_registry_upgrades_every_procedural_oracle_case() 
         item.executable and item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
         for item in resolved
     ) == 10
+    assert all(item.executable for item in resolved)

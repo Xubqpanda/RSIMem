@@ -1,0 +1,30 @@
+{
+  "latent_rule_id": "fc04_error_correction_procedure_v1",
+  "expected_mechanism": "skill",
+  "bucket_role": "control",
+  "control_type": "wrong_mechanism",
+  "artifact_contract": {
+    "type": "skill",
+    "require_rule_keywords": [],
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "mode": "helpdesk_kb",
+  "required_ticket_ids": ["TK-E401", "TK-E403"],
+  "excluded_ticket_ids": ["TK-E404"],
+  "expected_priority": "medium",
+  "expected_category": "code-review",
+  "required_tags": ["deprecated-api", "needs-migration"],
+  "min_ticket_reads": 3,
+  "required_summary_keywords": ["TK-E401", "TK-E402", "TK-E403"],
+  "skill_artifact_weight": 0.0,
+  "stale_leakage_penalty": {
+    "penalize_tags": ["api-compliant"],
+    "on_ticket_ids": ["TK-E401", "TK-E403"],
+    "penalty_weight": 0.15,
+    "description": "This control embeds the OLD v1 rule. Agent SHOULD apply it wrongly, scoring low — demonstrating stale procedure damage."
+  }
+}

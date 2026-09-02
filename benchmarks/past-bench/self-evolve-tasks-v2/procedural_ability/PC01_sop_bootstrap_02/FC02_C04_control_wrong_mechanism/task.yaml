@@ -1,11 +1,14 @@
-task_id: SE_FM03_C01
-task_name: FM03 Control — No Persistence (Data-Sharing Exception Registry)
+task_id: V2_FC02_C04
+task_name: Procedural Control - Wrong Mechanism
 version: '1.0'
 category: self_evolve
 difficulty: hard
 requires_fresh_session: true
-control_type: no_persistence
+control_type: wrong_mechanism
 persistence_disabled: true
+environment:
+  timeout_seconds: 300
+  max_turns: 25
 services:
 - name: helpdesk
   command: python mock_services/helpdesk/server.py
@@ -15,7 +18,8 @@ services:
   ready_timeout: 10
   reset_endpoint: http://localhost:9107/helpdesk/reset
   env:
-    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm03_helpdesk/eval_near.json
+    HELPDESK_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fc02_helpdesk/eval_near.json
+    PORT: '9107'
 - name: kb
   command: python mock_services/kb/server.py
   port: 9106
@@ -24,19 +28,8 @@ services:
   ready_timeout: 10
   reset_endpoint: http://localhost:9106/kb/reset
   env:
-    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm03_kb/brief.json
-prompt:
-  text: 'The KB only has a brief overview. If you have a saved exception registry
-    skill, open its full contents before processing.
-
-    Process the open data export tickets in the helpdesk system. Apply the appropriate
-    rules to each ticket and output: TICKET_ID|priority|category|tags
-
-    You MUST use helpdesk_list_tickets, helpdesk_get_ticket, and helpdesk_update_ticket
-    tools to process and update tickets.
-
-    '
-  language: en
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fc02_kb/sop_full.json
+    PORT: '9106'
 tools:
 - name: helpdesk_list_tickets
   description: List helpdesk tickets
@@ -70,10 +63,6 @@ tools:
           type: string
       category:
         type: string
-      status:
-        type: string
-      internal_note:
-        type: string
     required:
     - ticket_id
 - name: kb_search
@@ -98,6 +87,23 @@ tools:
         type: string
     required:
     - article_id
+prompt:
+  text: |
+    Read the current knowledge-base article and apply the operating procedure it describes to the current task data.
+    The procedure is deliberately available as plain current reference text, not as a reusable skill artifact.
+    Do not create or read a skill artifact for this control. Do not close tickets.
+    Output one line per updated ticket: TICKET_ID|priority|category|why
+
+    Use the available task tools after reading the article to complete the task.
+  language: en
+judge_rubric: 'Control (surface_memorization): The prompt gives only surface keywords
+  (pipeline, data analysis, data quality) without explaining the actual SOP procedure
+  rules (five-step pipeline, specific tag names pipeline-complete/data-sev-medium,
+  category=data-analysis, priority=medium). If the agent scores high just from keyword
+  cues, the eval is not testing real procedure understanding. Reward correct pipeline
+  tagging of TK-R401-R403. Penalize including non-analysis distractor TK-R404.
+
+  '
 tool_endpoints:
 - tool_name: helpdesk_list_tickets
   url: http://localhost:9107/helpdesk/tickets
@@ -114,9 +120,3 @@ tool_endpoints:
 - tool_name: kb_get_article
   url: http://localhost:9106/kb/articles/get
   method: POST
-environment:
-  timeout_seconds: 300
-  max_turns: 25
-judge_rubric: 'Control (no_persistence): Same eval_near task but with all persistence
-  disabled. Agent cannot retrieve saved skills/memories. Measures whether the brief
-  KB alone is sufficient.'

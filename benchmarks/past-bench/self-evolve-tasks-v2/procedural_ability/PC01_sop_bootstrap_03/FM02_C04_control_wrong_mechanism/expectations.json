@@ -1,0 +1,23 @@
+{
+  "latent_rule_id": "fm02_shared_outage_sop_v2",
+  "expected_mechanism": "skill",
+  "bucket_role": "control",
+  "control_type": "wrong_mechanism",
+  "mode": "helpdesk_kb",
+  "artifact_contract": {
+    "type": "skill",
+    "min_count_delta": 0
+  },
+  "retrieval_contract": {
+    "evaluation_only": false,
+    "min_skill_reads": 0
+  },
+  "required_ticket_ids": ["TK-FM02-N01", "TK-FM02-N02", "TK-FM02-N03"],
+  "excluded_ticket_ids": ["TK-FM02-N04", "TK-FM02-N05"],
+  "expected_priority": "critical",
+  "expected_category": "outage-investigation",
+  "required_tags": ["zone-correlated", "shared-outage-confirmed"],
+  "min_ticket_reads": 3,
+  "required_summary_keywords": ["TK-FM02-N01", "TK-FM02-N02", "TK-FM02-N03"],
+  "skill_artifact_weight": 0.0
+}

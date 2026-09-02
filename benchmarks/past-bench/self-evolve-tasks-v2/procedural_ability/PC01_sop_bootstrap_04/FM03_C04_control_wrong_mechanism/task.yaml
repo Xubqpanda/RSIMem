@@ -1,10 +1,10 @@
-task_id: SE_FM03_C01
-task_name: FM03 Control — No Persistence (Data-Sharing Exception Registry)
+task_id: V2_FM03_C04
+task_name: Procedural Control - Wrong Mechanism
 version: '1.0'
 category: self_evolve
 difficulty: hard
 requires_fresh_session: true
-control_type: no_persistence
+control_type: wrong_mechanism
 persistence_disabled: true
 services:
 - name: helpdesk
@@ -24,18 +24,15 @@ services:
   ready_timeout: 10
   reset_endpoint: http://localhost:9106/kb/reset
   env:
-    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm03_kb/brief.json
+    KB_FIXTURES: self-evolve-tasks-v2/_shared/fixtures/fm03_kb/exception_registry.json
 prompt:
-  text: 'The KB only has a brief overview. If you have a saved exception registry
-    skill, open its full contents before processing.
+  text: |
+    Read the current knowledge-base article and apply the operating procedure it describes to the current task data.
+    The procedure is deliberately available as plain current reference text, not as a reusable skill artifact.
+    Do not create or read a skill artifact for this control. Do not close tickets.
+    Output one line per updated ticket: TICKET_ID|priority|category|why
 
-    Process the open data export tickets in the helpdesk system. Apply the appropriate
-    rules to each ticket and output: TICKET_ID|priority|category|tags
-
-    You MUST use helpdesk_list_tickets, helpdesk_get_ticket, and helpdesk_update_ticket
-    tools to process and update tickets.
-
-    '
+    Use the available task tools after reading the article to complete the task.
   language: en
 tools:
 - name: helpdesk_list_tickets
@@ -117,6 +114,6 @@ tool_endpoints:
 environment:
   timeout_seconds: 300
   max_turns: 25
-judge_rubric: 'Control (no_persistence): Same eval_near task but with all persistence
-  disabled. Agent cannot retrieve saved skills/memories. Measures whether the brief
-  KB alone is sufficient.'
+judge_rubric: 'Control (surface_memorization): Only surface keywords (data export,
+  approval, exception) are given without specific rules. Measures whether surface
+  pattern matching alone can solve the task.'

@@ -18,8 +18,8 @@ instances_per_bucket:
   update_or_stabilize: 1
   eval_near: 1
   eval_far: 1
-  control: 3
-total_episodes: 8
+  control: 4
+total_episodes: 9
 episode_order:
 - FP01_I01_plonk_cold
 - FP01_I02_plonk_learn_a
@@ -29,6 +29,7 @@ episode_order:
 - FP01_C02_control_shortcut
 - FP01_C03_control_surface_memorization
 - FP01_C01_control_no_persistence
+- FP01_C04_control_wrong_mechanism
 history_plan:
   anchors:
   - name: pc01_05_post_learn
@@ -49,10 +50,18 @@ history_plan:
     - FP01_C02_control_shortcut
     - FP01_C03_control_surface_memorization
     - FP01_C01_control_no_persistence
+    - FP01_C04_control_wrong_mechanism
 control_set:
 - no_persistence
 - shortcut
 - surface_memorization
+- wrong_mechanism
+episode_overrides:
+  FP01_C04_control_wrong_mechanism:
+    stage: control
+    mechanism: mixed
+    expected_persistence_signal: skill
+    persistence_allowed: false
 status: v2_architecture_aligned
 latent_rule_id: fp01_plonk_incident_response_sop_v1
 saturation_ceiling: 0.85
@@ -92,12 +101,13 @@ cold_design: same plonk workflow before any SOP or KB exposure
 expected_cold_result: partial solve; no stable reusable procedure
 
 # Control Design
-control_design: no_persistence, shortcut, surface_memorization
-expected_control_result: transfer gain shrinks without persisted procedure
+control_design: no_persistence, shortcut, surface_memorization, wrong_mechanism
+expected_control_result: transfer gain shrinks without persisted procedure; current-reference text must not be mistaken for reusable skill persistence
 
 # Episodes
 legacy_source: previous PC split, architecture-aligned
 legacy_episodes:
+- FP01_C04_control_wrong_mechanism
 - FP01_C01_control_no_persistence
 - FP01_C02_control_shortcut
 - FP01_C03_control_surface_memorization

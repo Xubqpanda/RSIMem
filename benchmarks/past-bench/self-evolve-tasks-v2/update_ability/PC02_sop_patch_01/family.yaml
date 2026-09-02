@@ -17,8 +17,8 @@ instances_per_bucket:
   update_or_stabilize: 1
   eval_near: 1
   eval_far: 1
-  control: 3
-total_episodes: 7
+  control: 4
+total_episodes: 8
 episode_order:
 - F02_I01_patch_seed_old_sop
 - F02_I03_patch_update_or_stabilize
@@ -27,6 +27,7 @@ episode_order:
 - F02_C01_control_no_persistence
 - F02_C02_control_shortcut
 - F02_C03_control_stale_procedure
+- F02_C04_control_wrong_mechanism
 history_plan:
   anchors:
   - name: pc02_01_post_update
@@ -38,6 +39,7 @@ history_plan:
     - F02_C01_control_no_persistence
     - F02_C02_control_shortcut
     - F02_C03_control_stale_procedure
+    - F02_C04_control_wrong_mechanism
   - mode: continue
     episodes:
     - F02_I03_patch_update_or_stabilize
@@ -62,10 +64,16 @@ episode_overrides:
     expected_persistence_signal: skill
     persistence_allowed: true
     stage: eval_far
+  F02_C04_control_wrong_mechanism:
+    stage: control
+    mechanism: mixed
+    expected_persistence_signal: skill
+    persistence_allowed: false
 control_set:
 - no_persistence
 - shortcut
 - stale_procedure
+- wrong_mechanism
 status: v2_architecture_aligned
 latent_rule_id: f02_billing_incident_sop_v2
 saturation_ceiling: 0.85
@@ -105,12 +113,13 @@ cold_design: "Run the same skill-retrieval workflow as eval from the stale nativ
 expected_cold_result: "Cold should expose how much of the eval score is unavailable before the patch lands, even though the stale SOP is already present in Hermes home."
 
 # Control Design
-control_design: no_persistence, shortcut, stale_procedure
-expected_control_result: without persistence or patch uptake, agent regresses toward stale procedure
+control_design: no_persistence, shortcut, stale_procedure, wrong_mechanism
+expected_control_result: without persistence or patch uptake, agent regresses toward stale procedure; current-reference text must not be mistaken for reusable skill persistence
 
 # Episodes
 legacy_source: previous PC split, architecture-aligned
 legacy_episodes:
+- F02_C04_control_wrong_mechanism
 - F02_C01_control_no_persistence
 - F02_C02_control_shortcut
 - F02_C03_control_stale_procedure
