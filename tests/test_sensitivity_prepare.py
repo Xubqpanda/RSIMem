@@ -47,6 +47,7 @@ def test_prepares_all_sm01_conditions_without_provider_execution(
     elif condition is SensitivityCondition.TYPE_MATCHED_ORACLE:
         assert all(item["bucket"] == "evaluation" for item in document["episodes"])
         assert all(item["oracle_home_seed_dir"] == "oracle-home" for item in document["episodes"])
+        assert all(item["history_mode"] == "fresh" for item in document["episodes"])
         assert (prepared.launch.sequence_path.parent / "oracle-home" / "memories" / "MEMORY.md").is_file()
         assert persistence == "with_persistence"
     else:

@@ -171,6 +171,13 @@ def prepare_past_sensitivity_launch(
         shutil.copytree(oracle_seed_source, oracle_target, symlinks=False)
         for episode in selected:
             episode["oracle_home_seed_dir"] = "oracle-home"
+            # The full verified oracle home is the sole initial state for an
+            # evaluation. Source-family anchors describe learn->eval replay
+            # and are unavailable by design in an evaluation-only oracle
+            # slice.
+            episode["history_mode"] = "fresh"
+            episode["history_save_anchor"] = ""
+            episode["history_load_anchor"] = ""
     document = {
         "name": f"sensitivity.{run.run_id}",
         "description": "Registered RSIMem Stage 3 condition slice.",
