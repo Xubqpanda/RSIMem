@@ -26,19 +26,18 @@ The removal commits are `b1c9970`, `480f77b`, `3b2cbb4`, and `e7e214e`.
 OpenAI-compatible optimizer transport was retained as a generalized provider
 boundary; it is no longer reachable through an extraction-specific CLI.
 
-## Retained pending migration
+## Retained generalized fixtures
 
-Three checked-in extraction configs remain because current generalized
+Three checked-in extraction-named configs remain because current generalized
 preflight and split-contract tests still use them as deterministic fixtures:
 
 - `configs/extraction_feedback_sm01.json`;
 - `configs/extraction_split_plan_sm02_sm03_sm04.json`;
 - `configs/extraction_validation_sm03.json`.
 
-They are not production launch entry points.  They remain `DELETE` candidates
-until Stage 1 supplies a versioned protocol manifest and the tests migrate to
-temporary or generic fixtures.  Deleting them now would remove active test
-coverage rather than remove dead runtime behavior.
+They are not production launch entry points and are classified `GENERALIZE` in
+the inventory.  Stage 1 may later migrate tests to temporary protocol fixtures,
+but retaining these files does not preserve a stopped runtime path.
 
 ## Audit scope and results
 
@@ -65,8 +64,7 @@ evidence paths.
 
 ## Remaining Stage 0D work
 
-Stage 0D is not closed until the retained fixture configs are either migrated
-to the Stage 1 protocol boundary or explicitly recorded as generalized test
-fixtures, the current-reference scan is clean, and the full acceptance matrix
-is rerun from a clean tree.  No provider benchmark run is required for this
-cleanup gate.
+Stage 0D is closed for the removal boundary once the retained fixtures are
+explicitly recorded as generalized test fixtures, the current-reference scan
+is clean, and the full acceptance matrix is rerun from a clean tree.  No
+provider benchmark run is required for this cleanup gate.

@@ -165,12 +165,12 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 
 ### 0C：删除与收敛
 
-- 部分完成：已对候选 `DELETE` 文件运行 import/call-site、CLI、shell、test、docs 和 packaging 审计；仍有活动 generalized consumer 的行暂不删除。
+- √ 已对候选 `DELETE` 文件运行 import/call-site、CLI、shell、test、docs 和 packaging 审计；活动测试 fixture 已改列为 `GENERALIZE`。
 - √ 删除停止的 N+1 launcher、无调用 wrapper、重复 config 和仅服务撤销 artifact 的代码（提交 `b1c9970`、`480f77b`、`3b2cbb4`）。
 - √ 删除 dead tests，但保留保护 generic contract 的反向测试。
 - □ 将重复流水账收敛为少量 current-state 文档后删除旧报告；Git 历史负责归档，不创建大型 `legacy/`。
 - □ 删除生成物和缓存，不跟踪 `__pycache__`、`.pyc`、`.pytest_cache`、临时 HOME、日志或 editable-install metadata。
-- 部分完成：已移除 `rsimem-propose-extraction` export；Stage 1 protocol manifest 落地后再清理剩余旧 config/test 引用。
+- √ 已移除 `rsimem-propose-extraction` export；新增 `rsimem-freeze-research-protocol` 作为 Stage 1 manifest 入口。
 
 ### 0D：清理后验收
 
@@ -178,8 +178,8 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 - □ Tracked imports 可解析，CLI help 可执行，配置引用文件存在。
 - □ `rg` 不存在指向已删除模块、脚本、配置和文档的路径。
 - □ Generic corpus 和 `STOP_NO_SIGNAL` evidence 仍可读；停止入口必须明确不可调用。
-- 部分完成：当前已记录 launcher、proposal 和 orphaned config 的删除提交；待 0C 收敛结束后补齐总文件数、净行数和公共接口清单。
-- 部分完成：每个清理提交均通过对应测试，最终 0D 仍需一次 clean-tree 全量验收。
+- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；清理累计删除 11 个文件、2795 行，保留测试基线为 RSIMem `1086 passed`、PAST-Bench `401 passed, 2 skipped`。
+- √ 清理提交均通过对应测试，cleanup manifest 在 `07695ef` 上完成 12 项 clean-tree preflight。
 
 ## 4. 阶段 1：研究协议冻结
 
@@ -187,19 +187,19 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 
 ### 1A：Memory Taxonomy Contract
 
-- □ 实现版本化 `MemoryKind` 和 `MemoryUnitDescriptor`。
-- □ Descriptor 包含 kind、content schema、scope、source provenance、temporal identity、applicability、version 和 owner method。
-- □ 支持 `primary_kind + secondary_kind/transform`，但主表实验只能指定一个 target kind。
-- □ Feedback、Q-value、quality、policy state 与 memory content 分离建模。
-- □ 为事实、具体 episode、SOP、混合 profile 和 condition-strategy rule 建立正反 fixture。
+- √ 实现版本化 `MemoryKind` 和 `MemoryUnitDescriptor`，见 `memory/taxonomy.py`。
+- √ Descriptor 包含 kind、content schema、scope、source provenance、temporal identity、applicability、version 和 owner method。
+- √ 支持 `primary_kind + secondary_kind/transform`，主表实验可按单一 target kind 冻结。
+- √ Feedback、Q-value、quality、policy state 与 memory content 由 `MemoryControlDescriptor` 分离建模。
+- √ taxonomy 反向测试覆盖事实、episode、SOP、混合 descriptor 和非法字段。
 
 ### 1B：Lifecycle Surface Contract
 
-- □ 实现版本化六类 `MemoryLifecycleSurface`。
-- □ Event 声明 producer、owner、memory kind、surface、input/output IDs、revision、cutoff 和 plane。
-- □ Method descriptor 声明读取、修改和仅观察哪些 surface。
-- □ 非方法拥有的 surface 失败不得给该 updater 错误 credit。
-- □ 旧 extraction operation 只映射为 Construction，不伪造其他 surface。
+- √ 实现版本化六类 `MemoryLifecycleSurface` 和 content-free `LifecycleEvent`。
+- √ Event 声明 producer、owner、memory kind、surface、input/output IDs、revision、cutoff 和 plane/source。
+- √ `MethodLifecycleDescriptor` 声明读取、修改和仅观察哪些 surface。
+- √ foreign owner、unowned surface 和 kind mismatch 都 fail closed，不给 updater credit。
+- √ 旧 extraction operation 只映射为 Construction，不伪造其他 surface。
 
 ### 1C：PAST Family Applicability Matrix
 
@@ -212,10 +212,10 @@ PAST 当前 26 个 family 预注册如下：
 | Procedural | `PC01_sop_bootstrap_01..06`、`PC02_sop_patch_01..02`、`PC03_latent_rule_induction_01`、`PC04_failure_to_rule_01` | 10 | procedural sensitivity |
 | Auxiliary | `PG01..PG06` proactive information gathering | 6 | process-feedback 辅助分析 |
 
-- □ 记录每个 family 的 task sequence、stages、metric、memory opportunity、target kind 和 confounders。
-- □ Family ID 只用于 audit、split 和报告，不进入 method-visible payload。
-- □ Inclusion/exclusion 在运行前冻结，不能根据分数改变。
-- □ SM、EP、PC 分 panel 报告，不直接平均异构原始分数。
+- √ `memory/family_matrix.py` 冻结 26 个 family 的 task sequence、stages、metric、memory opportunity、target kind、confounders 和 role reason。
+- √ Family ID 只用于 audit、split 和报告；`method_visible_payload()` 不包含 family/root/role identity。
+- √ Inclusion/role 在运行前由 matrix digest 冻结，不能根据分数改变。
+- √ SM、EP、PC 分 panel 报告，不直接平均异构原始分数。
 
 ### 1D：比较层级与隔离
 
@@ -227,11 +227,11 @@ Level 2: Existing method                 [阶段 4，延后]
 Level 3: Existing method w/ RSIMem       [阶段 6，延后]
 ```
 
-- □ 每次只允许一个 target kind 改变，其他两类冻结。
-- □ 每个 condition 使用独立 state directory，禁止跨 condition 污染。
-- □ Learn/validation/final 按 task-template/family group 隔离。
-- □ 固定 model、provider、wrapper、tool budget、turns、sampling 和 retry。
-- □ Oracle 只用于 sensitivity 上界，不进入 updater corpus。
+- √ 每次只允许一个 target kind 改变，其他两类冻结；protocol 支持按 target kind 派生 panel manifest。
+- √ 每个 condition 声明独立 state directory，禁止跨 condition 污染。
+- √ Learn/validation/final 由 `ExperimentSplit` 按 family/template group 隔离。
+- √ protocol 固定 model、provider、wrapper、tool budget、turns、sampling 和 retry。
+- √ oracle 只用于 sensitivity 上界，condition 标记 `oracle_only` 且不进入 updater corpus。
 
 ### 1E：指标与解释规则
 
@@ -239,19 +239,19 @@ Primary：PAST official metric 和 paired delta，按三类 panel 报告。
 
 Mechanism：formation/retention coverage、retrieval、exposure、attributable use、unknown use、correct/harmful update、abstention、negative transfer 和 surface failure distribution。
 
-- □ 正式运行前冻结 practical improvement threshold、replicates 和 paired statistical procedure。
-- □ 总分变化不能单独证明目标 surface 改进。
-- □ 无提升不能直接判方法失败，必须先验证 oracle、activation 和 exposure。
-- □ Unknown usage 单独报告，不并入 useful/harmful。
-- □ Raw resource vector 只报告，不作为 learning reward。
+- √ protocol 冻结 practical improvement threshold、replicates 和 paired statistical procedure。
+- √ metric contract 明确总分变化不能单独证明目标 surface 改进。
+- √ protocol 要求先验证 oracle、activation 和 exposure，禁止由无提升直接判方法失败。
+- √ metric contract 将 unknown usage 单独列为 mechanism field，不并入 useful/harmful。
+- √ raw resource vector 只记录 input/output/cache/reasoning/latency/storage/API/retry，不作为 learning reward。
 
 ### 1F：阶段 1 完成条件
 
-- □ Taxonomy、surface、family matrix、comparison、split 和指标已版本化冻结。
-- □ 三类 fixture 和混合系统反向 fixture 通过。
-- □ 26 个 family 均有 target/auxiliary/excluded 身份和理由。
-- □ Protocol manifest 在首个 run 前生成 digest，后续修改创建新版本。
-- □ 论文 abstract/introduction/background 与该协议一致，不再以 extraction prompt 为主线。
+- √ Taxonomy、surface、family matrix、comparison、split 和指标已版本化冻结。
+- √ 三类 fixture 和混合系统反向 fixture 通过 focused contract tests。
+- √ 26 个 family 均有 target/auxiliary/excluded role contract 和理由字段；当前 matrix 的 PG families 为 auxiliary，未预注册 excluded family。
+- √ 首个 protocol manifest 已生成 digest（`docs/research_protocol_v1.json`），后续修改创建新 protocol ID。
+- 部分完成：实验仓库文档已与新 protocol 对齐；论文草稿尚待最终设计稳定后同步，不在 provider 实验前修改历史论述。
 
 ## 5. 阶段 2：通用实验架构
 
@@ -451,7 +451,7 @@ Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 
 - 部分完成：PAST/Hermes 可运行，但仍集中在大型 `hermes_past_bridge.py`。
 - √ 阶段 0A baseline 冻结和 0B 逐文件资产分类已完成；`baseline_preflight`
   可在 cleanup 前 fail closed。
-- 部分完成：阶段 0C 已删除无活动依赖的旧 launcher、proposal 入口和三个 orphaned config；其余清理与 0D 等价验收待 Stage 1 replacement boundary。
+- √ 阶段 0C 已删除无活动依赖的旧 launcher、proposal 入口、dead tests 和三个 orphaned config；仍在使用的 extraction-named configs 已明确为 generalized deterministic fixtures。
 - □ 阶段 1 未生成冻结 protocol manifest 和完整 family matrix。
 - □ 阶段 2 未完成四个 adapter contracts 和单体拆分。
 - □ 阶段 3 未运行三类 oracle sensitivity matrix。

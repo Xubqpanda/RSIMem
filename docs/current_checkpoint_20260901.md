@@ -18,7 +18,9 @@ in [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json), with
 the candidate inventory in [`asset_inventory_20260901.md`](asset_inventory_20260901.md).
 Remaining cleanup deletion is held until the baseline gate and dependency
 audit pass for each candidate; completed removals are recorded in commits
-`b1c9970`, `480f77b`, and `3b2cbb4`.
+`b1c9970`, `480f77b`, `3b2cbb4`, and `e7e214e`.  Stage 1 contracts are now
+frozen in [`research_protocol_v1.json`](research_protocol_v1.json), and the
+next implementation boundary is the four-adapter Stage 2 split.
 
 The provider gate is healthy, and the finite Stage 2 clean-parent rerun is now
 complete. Formal proposal, held-out, activation, and matched-effect work
@@ -56,6 +58,12 @@ acceptance. At a trusted completed-task boundary, the runtime persists a pure
 extraction source record. On later task activity it collects opportunity,
 retrieval/exposure/use, artifact-set, and exact tool call/result evidence;
 then persists feedback and constructs replayable process-signal cases.
+
+Stage 1 is frozen as a result-independent protocol: versioned memory taxonomy
+and control-state separation, six lifecycle surfaces with ownership gates, all
+26 PAST family roles and confounders, five sensitivity conditions, isolated
+split rules, and raw resource accounting.  The checked-in manifest is
+metadata-only and contains no API key, grader field, answer, or official score.
 
 The completed implementation components include:
 
