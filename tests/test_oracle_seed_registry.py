@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 
 import pytest
+from pathlib import Path
 
 from rsimem.memory import MemoryKind
 from rsimem.memory.family_matrix import PastFamilyMatrix
@@ -84,3 +85,29 @@ def test_registry_rejects_layout_drift_and_digest_drift(tmp_path) -> None:
     (home / "memories" / "MEMORY.md").write_text("changed", encoding="utf-8")
     with pytest.raises(ValueError, match="digest mismatch"):
         registration.resolve(root, case, _digest("family"))
+
+
+def test_checked_in_sm01_registration_resolves_against_real_family_source() -> None:
+    root = Path(__file__).resolve().parents[1]
+    registry = OracleSeedRegistry.load(root / "configs/sensitivity/oracle_seed_registry_sm01.json")
+    base = default_research_protocol()
+    protocol = ResearchProtocol.create(
+        memory_units=base.memory_units,
+        family_matrix=PastFamilyMatrix.create_default(),
+        split=base.split,
+        sensitivity_target_kind=MemoryKind.SEMANTIC,
+    )
+    matrix = SensitivityMatrix.create_for_panel(
+        panel=SensitivityPanel.SEMANTIC,
+        protocol=protocol,
+        family_matrix=PastFamilyMatrix.create_default(),
+    )
+    case = next(
+        item for item in matrix.cases
+        if item.family_id == "SM01_preference_adoption"
+        and item.condition is SensitivityCondition.TYPE_MATCHED_ORACLE
+    )
+    family_file = root / "benchmarks/past-bench" / PastFamilyMatrix.create_default().spec_for(case.family_id).task_root / "family.yaml"
+    family_digest = hashlib.sha256(family_file.read_bytes()).hexdigest()
+    seed_root = root / "benchmarks/past-bench/self-evolve-tasks-v2/_rsimem_oracles"
+    assert registry.for_case(case.case_id).resolve(seed_root, case, family_digest).is_dir()

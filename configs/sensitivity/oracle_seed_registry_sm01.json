@@ -1,0 +1,18 @@
+{
+  "registry_id": "oracle-seed-registry.8aa6fe88cfe60a4a2adaa4faae77ce27b0c8d627",
+  "registrations": [
+    {
+      "authoring_basis": "learn_input_manual_authoring.v1",
+      "case_id": "sensitivity-case.6afbbc1f125a1107a7f37550e78cdb5300235fb1",
+      "family_source_digest": "665d7de8a7c116291be0fa7b47369c10871899614a5df2745cd12bb639c18a6c",
+      "oracle_artifact_id": "oracle.semantic.f6b4fbca7c5c3d5b5348159bde2ed0f7",
+      "panel": "semantic",
+      "registration_id": "oracle-seed-registration.be1abf5882da14f4f6c454b48789352e4b6dc8b9",
+      "seed_home": "semantic/SM01_preference_adoption",
+      "seed_tree_digest": "ed54a619f94cf793f7b666f989e93c038ce42e7a71f8d7fb49267985d7f979f7",
+      "target_kind": "semantic"
+    }
+  ],
+  "schema": "rsimem-oracle-seed-registry-v1",
+  "schema_version": 1
+}
