@@ -483,6 +483,124 @@ class MemoryMethodAdapter(Protocol):
     def rollback_update(self, update: MethodUpdate) -> AdapterResult: ...
 
 
+class DeterministicMemoryMethodAdapter:
+    """Small stateful adapter used by the Stage 2 contract harness.
+
+    It records only event identities and digests.  The implementation is
+    intentionally method-neutral: one instance owns one memory kind and never
+    mutates another kind's state.
+    """
+
+    def __init__(self, capabilities: MethodCapabilities) -> None:
+        self._capabilities = capabilities
+        self._run: MethodRunIdentity | None = None
+        self._events: set[str] = set()
+        self._revision = "revision.initial"
+        self._active_update: str | None = None
+        self._updates: dict[str, MethodUpdate] = {}
+
+    def describe_capabilities(self) -> MethodCapabilities:
+        return self._capabilities
+
+    def _operation(self, name: str) -> str:
+        return f"operation.{self._capabilities.method_id}.{name}"
+
+    def _state_digest(self) -> str:
+        return content_digest({
+            "method_id": self._capabilities.method_id,
+            "primary_kind": self._capabilities.primary_kind.value,
+            "revision": self._revision,
+            "events": sorted(self._events),
+            "active_update": self._active_update,
+        })
+
+    def prepare_run(self, run: MethodRunIdentity) -> AdapterResult:
+        if self._run is not None and self._run != run:
+            return AdapterResult(AdapterStatus.UNSUPPORTED, self._operation("prepare"), "active_run")
+        self._run = run
+        return AdapterResult(AdapterStatus.SUPPORTED, self._operation("prepare"))
+
+    def start_episode(self, run: MethodRunIdentity) -> AdapterResult:
+        if self._run != run:
+            return AdapterResult(AdapterStatus.REJECTED, self._operation("start"), "run_not_prepared")
+        return AdapterResult(AdapterStatus.SUPPORTED, self._operation("start"))
+
+    def observe_event(self, event: CanonicalHostEvent) -> AdapterResult:
+        if event.memory_kind is not None and event.memory_kind != self._capabilities.primary_kind:
+            return AdapterResult(AdapterStatus.UNSUPPORTED, self._operation("observe"), "kind_mismatch")
+        if event.event_id in self._events:
+            return AdapterResult(AdapterStatus.REJECTED, self._operation("observe"), "duplicate_event")
+        self._events.add(event.event_id)
+        return AdapterResult(AdapterStatus.SUPPORTED, self._operation("observe"))
+
+    def finalize_episode(self, run: MethodRunIdentity) -> AdapterResult:
+        if self._run != run:
+            return AdapterResult(AdapterStatus.REJECTED, self._operation("finalize"), "run_not_prepared")
+        return AdapterResult(AdapterStatus.SUPPORTED, self._operation("finalize"), output_digest=self._state_digest())
+
+    def snapshot_state(self) -> MethodStateSnapshot:
+        return MethodStateSnapshot(
+            state_id=f"state.{self._capabilities.method_id}",
+            revision=self._revision,
+            state_schema=self._capabilities.state_schema,
+            state_digest=self._state_digest(),
+            active=self._active_update is not None,
+        )
+
+    def propose_update(self, feedback: FeedbackView) -> tuple[AdapterResult, MethodUpdate | None]:
+        if not self._capabilities.owned_surfaces:
+            return AdapterResult(AdapterStatus.UNSUPPORTED, self._operation("propose"), "surface_not_owned"), None
+        if self._capabilities.required_feedback:
+            required = max(self._capabilities.required_feedback, key=lambda item: list(FeedbackCondition).index(item))
+            if list(FeedbackCondition).index(feedback.condition) < list(FeedbackCondition).index(required):
+                return AdapterResult(AdapterStatus.REJECTED, self._operation("propose"), "insufficient_feedback"), None
+        digest = content_digest({
+            "method_id": self._capabilities.method_id,
+            "feedback_digest": feedback.value_digest,
+            "base_revision": self._revision,
+        })
+        update = MethodUpdate(
+            update_id=f"update.{self._capabilities.method_id}.{digest[:32]}",
+            target_surface=self._capabilities.owned_surfaces[0],
+            affected_artifact_ids=(f"artifact.{digest[:32]}",),
+            base_revision=self._revision,
+            observation_cutoff=feedback.observation_cutoff,
+            expected_behavior_change=f"method_state.{digest[:24]}",
+            state_digest=self._state_digest(),
+        )
+        self._updates[update.update_id] = update
+        return AdapterResult(AdapterStatus.ACCEPTED, self._operation("propose"), output_digest=digest), update
+
+    def validate_update(self, update: MethodUpdate) -> AdapterResult:
+        if update.target_surface not in self._capabilities.owned_surfaces:
+            return AdapterResult(AdapterStatus.UNSUPPORTED, self._operation("validate"), "surface_not_owned")
+        if update.base_revision != self._revision:
+            return AdapterResult(AdapterStatus.STALE, self._operation("validate"), "stale_revision")
+        if update.update_id not in self._updates:
+            return AdapterResult(AdapterStatus.REJECTED, self._operation("validate"), "unknown_update")
+        return AdapterResult(AdapterStatus.ACCEPTED, self._operation("validate"))
+
+    def activate_update(self, update: MethodUpdate) -> AdapterResult:
+        if self._active_update == update.update_id:
+            return AdapterResult(AdapterStatus.ACCEPTED, self._operation("activate"), "duplicate_activation")
+        validation = self.validate_update(update)
+        if validation.status is AdapterStatus.STALE or validation.status is AdapterStatus.UNSUPPORTED:
+            return validation
+        if validation.status is not AdapterStatus.ACCEPTED:
+            return AdapterResult(AdapterStatus.REJECTED, self._operation("activate"), validation.reason_code)
+        self._revision = f"revision.{content_digest(update.update_id)[:32]}"
+        self._active_update = update.update_id
+        self._updates[update.update_id] = update
+        return AdapterResult(AdapterStatus.ACCEPTED, self._operation("activate"), output_digest=self._state_digest())
+
+    def rollback_update(self, update: MethodUpdate) -> AdapterResult:
+        if self._active_update != update.update_id:
+            return AdapterResult(AdapterStatus.REJECTED, self._operation("rollback"), "update_not_active")
+        self._revision = f"revision.rollback.{content_digest(update.update_id)[:24]}"
+        self._active_update = None
+        return AdapterResult(AdapterStatus.ACCEPTED, self._operation("rollback"), output_digest=self._state_digest())
+
+
 __all__ = [
     "ADAPTER_CONTRACT_SCHEMA",
     "ADAPTER_CONTRACT_SCHEMA_VERSION",
@@ -500,6 +618,7 @@ __all__ = [
     "HostCapabilities",
     "HostEventKind",
     "MemoryMethodAdapter",
+    "DeterministicMemoryMethodAdapter",
     "MethodCapabilities",
     "MethodRunIdentity",
     "MethodStateSnapshot",
