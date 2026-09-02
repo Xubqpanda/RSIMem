@@ -390,6 +390,7 @@ def test_rsimem_bridge_receives_automatic_task_completion_boundary(
         "mode": "static",
         "feedback_contract": "disabled",
     }
+    request.runtime_config.metadata["rsimem_method_task_id"] = "past-case.opaque-v1"
     adapter = HermesAdapter(AgentSpec(name="hermes", adapter="hermes"), request)
     try:
         response = adapter.step(StepRequest(session_id=request.session_id, step_id=0))
@@ -402,6 +403,7 @@ def test_rsimem_bridge_receives_automatic_task_completion_boundary(
     assert callable(bridge_kwargs["opportunity_evidence_provider"])
     assert callable(bridge_kwargs["artifact_set_binding_provider"])
     assert callable(bridge_kwargs["pure_extraction_fact_semantic_keys_provider"])
+    assert bridge_kwargs["task_id"] == "past-case.opaque-v1"
     assert calls["completed"] == [{
         "completed": True,
         "final_response": "done",

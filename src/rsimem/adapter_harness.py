@@ -179,8 +179,8 @@ class AdapterHarness:
         trace drift, and method failures remain explicit.
         """
 
-        if request.case_id != run.task_id or trace.case_id != request.case_id:
-            raise ValueError("runtime trace, benchmark request, and method run disagree")
+        if trace.case_id != request.case_id:
+            raise ValueError("runtime trace and benchmark request disagree")
         if event.session_id != run.session_id or event.task_id != run.task_id:
             raise ValueError("runtime terminal event identity disagrees with method run")
         if event.revision != run.state_revision:
