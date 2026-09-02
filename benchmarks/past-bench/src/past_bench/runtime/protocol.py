@@ -88,6 +88,11 @@ class StepResponse(BaseModel):
     # runner and reporter rather than the policy learner.
     process_feedback_event_ids: list[str] = Field(default_factory=list)
     process_feedback_digest: str | None = None
+    # Content-free host-boundary identity emitted by an attached RSIMem host
+    # adapter.  These fields are audit joins only; they never carry prompt,
+    # memory, grader, or score content.
+    host_event_ids: list[str] = Field(default_factory=list)
+    host_state_digest: str | None = None
 
 
 class InterruptRequest(BaseModel):

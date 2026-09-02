@@ -687,6 +687,12 @@ class HermesAdapter(RuntimeAdapter):
                 self._rsimem_bridge.process_feedback_event_ids
             )
             response.process_feedback_digest = self._rsimem_bridge.process_feedback_digest
+            response.host_event_ids = list(
+                getattr(self._rsimem_bridge, "canonical_host_event_ids", ())
+            )
+            response.host_state_digest = getattr(
+                self._rsimem_bridge, "canonical_host_state_digest", None
+            )
         response.model_time_s = time.monotonic() - started
         self._completed_response = response
         return response
@@ -881,9 +887,17 @@ class HermesAdapter(RuntimeAdapter):
         assistant = Message(role="assistant", content=[TextBlock(text=final_text or "(no response)")])
         process_event_ids: list[str] = []
         process_digest: str | None = None
+        host_event_ids: list[str] = []
+        host_state_digest: str | None = None
         if self._rsimem_bridge is not None:
             process_event_ids = list(self._rsimem_bridge.process_feedback_event_ids)
             process_digest = self._rsimem_bridge.process_feedback_digest
+            host_event_ids = list(
+                getattr(self._rsimem_bridge, "canonical_host_event_ids", ())
+            )
+            host_state_digest = getattr(
+                self._rsimem_bridge, "canonical_host_state_digest", None
+            )
         return StepResponse(
             status="finished",
             assistant_message=assistant,
@@ -892,6 +906,8 @@ class HermesAdapter(RuntimeAdapter):
             final_output=final_text,
             process_feedback_event_ids=process_event_ids,
             process_feedback_digest=process_digest,
+            host_event_ids=host_event_ids,
+            host_state_digest=host_state_digest,
         )
 
     @staticmethod

@@ -250,6 +250,9 @@ def test_past_bench_agent_loop_matches_native_ledger_and_adapter(
         assert response.process_feedback_digest == expected_digest
         assert "score" not in response.model_dump()
         assert "grader" not in response.model_dump()
+        if mode == "native":
+            assert response.host_event_ids == []
+            assert response.host_state_digest is None
     assert not any(
         (tmp_path / mode.replace("+", "_") / "rsimem_lifecycle_events.jsonl").exists()
         for mode in ("native+ledger", "native+adapter+ledger")
@@ -689,6 +692,11 @@ def test_past_bench_static_writeback_disables_native_writer_and_persists(
     assert response.usage.request_count == 2
     assert response.usage.input_tokens == 22
     assert response.usage.output_tokens == 10
+    assert len(response.host_event_ids) == 1
+    assert response.host_event_ids[0].startswith("host-event.hermes-task.")
+    assert isinstance(response.host_state_digest, str)
+    assert len(response.host_state_digest) == 64
+    assert "score" not in str(response.host_event_ids)
     assert PRIVATE_MEMORY in (home / "memories" / "USER.md").read_text(
         encoding="utf-8"
     )
