@@ -135,7 +135,7 @@ from .memory.pure_extraction import (
 from .memory.pure_process import JsonPureProcessEventArchive, PureProcessCorpus
 from .memory.revocation import JsonRevocationRegistry
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
-from .hermes_host_adapter import _PromptMemoryStore, _SessionDb
+from .hermes_host_adapter import HermesHostAdapter, _PromptMemoryStore, _SessionDb
 
 
 
@@ -288,6 +288,7 @@ class HermesPastBenchBridge:
         self._tool_result_ids_seen: set[str] = set()
         self._skill_invocation_counts: dict[tuple[str, str, str], int] = {}
         self._agent: object | None = None
+        self.host_adapter: HermesHostAdapter | None = None
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
         self._trigger_adapter = HermesTriggerEventAdapter()
@@ -626,17 +627,8 @@ class HermesPastBenchBridge:
 
     def attach(self, agent: object) -> None:
         self._agent = agent
-        memory_store = getattr(agent, "_memory_store", None)
-        if memory_store is not None:
-            agent._memory_store = _PromptMemoryStore(self, memory_store)
-        session_db = getattr(agent, "_session_db", None)
-        if session_db is not None:
-            agent._session_db = _SessionDb(
-                self,
-                session_db,
-                str(getattr(agent, "session_id", "") or "") or None,
-            )
-        self._wrap_skill_handlers()
+        self.host_adapter = HermesHostAdapter(self)
+        self.host_adapter.attach(agent)
 
     @property
     def lifecycle_results(self) -> tuple[HermesLifecycleDryRunResult, ...]:
@@ -3573,6 +3565,7 @@ class HermesPastBenchBridge:
             self._tool_handlers.clear()
         finally:
             self._agent = None
+            self.host_adapter = None
             try:
                 if self.static_writeback is not None:
                     self.static_writeback.close()
