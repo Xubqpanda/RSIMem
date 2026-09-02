@@ -782,6 +782,15 @@ class PersistenceBackend:
     ) -> None:
         raise NotImplementedError
 
+    def materialize_oracle_home(
+        self,
+        *,
+        state_root: Path,
+        oracle_home_seed_dir: Path | None,
+    ) -> None:
+        if oracle_home_seed_dir is not None:
+            raise ValueError("full Hermes oracle home seeds require the Hermes backend")
+
     def build_extra_body(
         self,
         *,
@@ -823,6 +832,24 @@ class HermesPersistenceBackend(PersistenceBackend):
             state_root,
             ("memories", "skills"),
             overlay=True,
+        )
+
+    def materialize_oracle_home(
+        self,
+        *,
+        state_root: Path,
+        oracle_home_seed_dir: Path | None,
+    ) -> None:
+        if oracle_home_seed_dir is None:
+            return
+        if not oracle_home_seed_dir.is_dir():
+            raise ValueError("oracle home seed must be a directory")
+        self.reset_state(state_root)
+        _copy_named_entries(
+            oracle_home_seed_dir,
+            state_root,
+            ("memories", "skills", "sessions", "state.db", "state.db-wal", "state.db-shm"),
+            overlay=False,
         )
 
     def build_extra_body(

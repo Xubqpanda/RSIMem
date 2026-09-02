@@ -346,6 +346,9 @@ class SelfEvolveEpisode(BaseModel):
     persistence_allowed: bool = True
     preseed_artifacts_dir: str = ""
     initial_home_fixture_dir: str = ""
+    # Full native state is reserved for an audit-registered type-matched
+    # oracle. Ordinary preseeds must remain limited to memory/skill overlays.
+    oracle_home_seed_dir: str = ""
     shared_cold_run: bool = False
     history_mode: Literal["continue", "fresh", "from_anchor"] | str = ""
     history_save_anchor: str = ""

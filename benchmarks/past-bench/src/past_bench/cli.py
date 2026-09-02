@@ -1899,6 +1899,19 @@ def _resolve_episode_initial_home_fixture_dir(sequence, episode) -> Path | None:
     return path
 
 
+def _resolve_episode_oracle_home_seed_dir(sequence, episode) -> Path | None:
+    """Resolve a complete Hermes-home seed for a registered oracle only."""
+    value = getattr(episode, "oracle_home_seed_dir", "")
+    if not value:
+        return None
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = (sequence.manifest_path.parent / path).resolve()
+    if not path.is_dir():
+        raise ValueError("oracle_home_seed_dir must reference an existing directory")
+    return path
+
+
 def _copy_named_home_entries(src_dir: Path | None, dst_dir: Path, names: tuple[str, ...]) -> None:
     if src_dir is None or not src_dir.exists():
         return
@@ -2792,6 +2805,10 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 initial_home_fixture_dir=_resolve_episode_initial_home_fixture_dir(sequence, _sc_episode),
                 preseed_artifacts_dir=_resolve_episode_preseed_dir(sequence, _sc_episode),
             )
+            persistence_backend.materialize_oracle_home(
+                state_root=_sc_state_root,
+                oracle_home_seed_dir=_resolve_episode_oracle_home_seed_dir(sequence, _sc_episode),
+            )
             _sc_artifact_before = persistence_backend.snapshot_before(_sc_state_root, include_contents=True)
 
             _sc_review_wait = (
@@ -2861,6 +2878,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         "family_id": _sc_episode.family_id,
                         "stage": _sc_episode.stage,
                         "experiment_variant": shared_cold_variant,
+                        **(
+                            {"rsimem_method_task_id": method_task_id}
+                            if method_task_id is not None
+                            else {}
+                        ),
                     },
                 )
 
@@ -2991,6 +3013,10 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     initial_home_fixture_dir=_resolve_episode_initial_home_fixture_dir(sequence, episode),
                     preseed_artifacts_dir=_resolve_episode_preseed_dir(sequence, episode),
                 )
+                persistence_backend.materialize_oracle_home(
+                    state_root=state_root,
+                    oracle_home_seed_dir=_resolve_episode_oracle_home_seed_dir(sequence, episode),
+                )
             artifact_before = (
                 persistence_backend.snapshot_before(state_root, include_contents=True)
                 if persistence_backend is not None
@@ -3067,6 +3093,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                             "family_id": episode.family_id,
                             "stage": episode.stage,
                             "experiment_variant": variant_label,
+                            **(
+                                {"rsimem_method_task_id": method_task_id}
+                                if method_task_id is not None
+                                else {}
+                            ),
                         },
                     )
 
@@ -3249,6 +3280,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                         "family_id": episode.family_id,
                         "stage": "reflection",
                         "experiment_variant": variant_label,
+                        **(
+                            {"rsimem_method_task_id": method_task_id}
+                            if method_task_id is not None
+                            else {}
+                        ),
                     },
                 )
                 reflection_artifacts = persistence_backend.snapshot_after(reflection_artifacts_dir)
