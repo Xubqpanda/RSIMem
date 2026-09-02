@@ -135,6 +135,12 @@ from .memory.pure_extraction import (
 from .memory.pure_process import JsonPureProcessEventArchive, PureProcessCorpus
 from .memory.revocation import JsonRevocationRegistry
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
+from .adapter_contracts import (
+    AdapterStatus,
+    CanonicalHostEvent,
+    HostEventKind,
+    MethodRunIdentity,
+)
 from .hermes_host_adapter import (
     HermesHostAdapter,
     HermesHostOperations,
@@ -294,6 +300,8 @@ class HermesPastBenchBridge:
         self._skill_invocation_counts: dict[tuple[str, str, str], int] = {}
         self._agent: object | None = None
         self.host_adapter: HermesHostAdapter | None = None
+        self._canonical_host_events: dict[str, CanonicalHostEvent] = {}
+        self._canonical_host_event_failures: list[str] = []
         self._lifecycle_results: list[HermesLifecycleDryRunResult] = []
         self._lifecycle_failures: list[tuple[str, str]] = []
         self._trigger_adapter = HermesTriggerEventAdapter()
@@ -636,6 +644,21 @@ class HermesPastBenchBridge:
         self.host_adapter.attach(agent)
 
     @property
+    def canonical_host_events(self) -> tuple[CanonicalHostEvent, ...]:
+        """Content-free host events emitted from the live Hermes boundary."""
+
+        return tuple(
+            self._canonical_host_events[event_id]
+            for event_id in sorted(self._canonical_host_events)
+        )
+
+    @property
+    def canonical_host_event_failures(self) -> tuple[str, ...]:
+        """Observation failures that must not change the completed task result."""
+
+        return tuple(self._canonical_host_event_failures)
+
+    @property
     def lifecycle_results(self) -> tuple[HermesLifecycleDryRunResult, ...]:
         return tuple(self._lifecycle_results)
 
@@ -933,6 +956,7 @@ class HermesPastBenchBridge:
 
         self._record_semantic_outcomes(result)
         completed = result.get("completed") is True
+        self._observe_canonical_task_event(result, completed=completed)
         if not completed:
             return
         # PAST-Bench reflection is a separate review episode.  It has no
@@ -992,6 +1016,99 @@ class HermesPastBenchBridge:
         # operation is idempotent and also closes a delayed source/future join
         # when this boundary produced feedback for an earlier extraction.
         self._record_unbound_process_signal_case()
+
+    def _observe_canonical_task_event(
+        self,
+        result: Mapping[str, Any],
+        *,
+        completed: bool,
+    ) -> None:
+        """Project the live terminal Hermes boundary through ``HostAdapter``.
+
+        The PAST runner already calls ``on_task_completed`` after the real
+        conversation.  This bridge-local projection supplies the missing
+        host-neutral event without exposing task text, grader material, or a
+        final score.  Snapshot collection remains observational: an invalid
+        host snapshot is recorded for diagnosis but cannot turn a completed
+        benchmark task into a host failure.
+        """
+
+        if self.host_adapter is None:
+            return
+        try:
+            snapshot = self._collect_completed_snapshot()
+            run = MethodRunIdentity(
+                self._run_id,
+                self._session_id,
+                self._task_id,
+                snapshot.context_revision,
+            )
+            prepared = self.host_adapter.prepare_session(run)
+            if prepared.status is not AdapterStatus.SUPPORTED:
+                raise ValueError(
+                    "Hermes host adapter rejected canonical task event: "
+                    f"{prepared.reason_code or prepared.status.value}"
+                )
+            user_ids = tuple(
+                segment.segment_id
+                for segment in snapshot.segments
+                if segment.role == "user"
+            )
+            assistant_ids = tuple(
+                segment.segment_id
+                for segment in snapshot.segments
+                if segment.role == "assistant"
+            )
+            identity = {
+                "run_id": self._run_id,
+                "session_id": self._session_id,
+                "task_id": self._task_id,
+                "snapshot_id": snapshot.snapshot_id,
+                "revision": snapshot.context_revision,
+                "completed": completed,
+            }
+            event_id = "host-event.hermes-task." + hashlib.sha256(
+                json.dumps(
+                    identity,
+                    ensure_ascii=True,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            ).hexdigest()[:40]
+            event = CanonicalHostEvent(
+                event_id=event_id,
+                session_id=self._session_id,
+                task_id=self._task_id,
+                kind=(
+                    HostEventKind.TASK_COMPLETED
+                    if completed
+                    else HostEventKind.TASK_FAILED
+                ),
+                revision=snapshot.context_revision,
+                input_ids=user_ids,
+                output_ids=assistant_ids,
+                attributes={
+                    "completed": completed,
+                    "partial": result.get("partial") is True,
+                    "interrupted": result.get("interrupted") is True,
+                },
+            )
+            observed = self.host_adapter.observe_event(event)
+            if observed.status not in {AdapterStatus.SUPPORTED, AdapterStatus.REJECTED}:
+                raise ValueError(
+                    "Hermes host adapter did not accept canonical task event: "
+                    f"{observed.reason_code or observed.status.value}"
+                )
+            if observed.status is AdapterStatus.REJECTED and observed.reason_code != "duplicate_event":
+                raise ValueError(
+                    "Hermes host adapter rejected canonical task event: "
+                    f"{observed.reason_code or 'unknown'}"
+                )
+            self._canonical_host_events.setdefault(event.event_id, event)
+            self._last_host_event_id = event.event_id
+            self._last_host_source_revision = snapshot.context_revision
+        except Exception as exc:
+            self._canonical_host_event_failures.append(type(exc).__name__)
 
     def on_session_end(self, *, task_state: TaskLifecycleState = TaskLifecycleState.COMPLETED) -> None:
         """Observe a real session-end boundary without opening writeback."""
