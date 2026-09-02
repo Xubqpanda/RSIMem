@@ -38,10 +38,12 @@ test counts, provider attempts, or superseded experiment descriptions.
 
 Stage 0 cleanup and Stage 1 protocol freezing are complete.  Stage 2 has
 completed its typed adapter contracts, deterministic harness, Hermes host
-boundary, and storage projections; the remaining Stage 2 work is real
-PAST-runner attachment through those contracts plus a golden-trace equivalence
-check.  Stage 3 has a result-independent oracle harness but no real-model
-sensitivity results.  The project has not entered a live N+1 experiment.
+boundary, storage projections, and the real runner's content-free canonical
+host-trace export.  The remaining Stage 2 work is a full
+`PastBenchAdapter`/`AdapterHarness` method flow plus event/outcome/usage
+golden-trace equivalence.  Stage 3 has a result-independent oracle harness but
+no real-model sensitivity results.  The project has not entered a live N+1
+experiment.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
@@ -62,8 +64,8 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1126 passed` after the Stage 2 host-operations split and
-  deterministic pure-feedback boundary-order repair.
+- RSIMem: `1127 passed` after runner canonical host-event/projection trace
+  export was added to the Stage 2 baseline.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
@@ -85,7 +87,7 @@ Current capability matrix:
 | Real provider process-signal census | complete for SM02/SM05 train attempt | both fresh batches completed; `STOP_NO_SIGNAL` |
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
-| Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, and semantic/episodic/procedural projection split; real runner/golden trace pending |
+| Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, and live runner host-trace export; full method flow/event-outcome-usage golden trace pending |
 | Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated five-condition/oracle harness; real matched model runs pending |
 
 The completed rows establish implementation capacity and deterministic

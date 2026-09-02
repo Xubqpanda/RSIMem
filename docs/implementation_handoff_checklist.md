@@ -178,7 +178,7 @@ Evidence 必须带 plane、source identity、observation cutoff 和 provenance�
 - √ Tracked imports、可用 CLI、配置引用与 packaging 入口已由 baseline preflight 和全量测试覆盖。
 - √ 已审计删除入口的残留引用；已删除 launcher/proposal/config 不再是可调用路径。
 - √ Generic corpus 和 `STOP_NO_SIGNAL` evidence 仍可读；停止的 proposal CLI 已移除，不会静默恢复旧协议。
-- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；Stage 0 后续回归基线为 RSIMem `1126 passed`、PAST-Bench `401 passed, 2 skipped`。
+- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；Stage 0 后续回归基线为 RSIMem `1127 passed`、PAST-Bench `401 passed, 2 skipped`。
 - √ 清理提交均通过对应测试，cleanup manifest 在 `07695ef` 上完成 12 项 clean-tree preflight。
 
 ## 4. 阶段 1：研究协议冻结
@@ -275,7 +275,7 @@ Mechanism：formation/retention coverage、retrieval、exposure、attributable u
 - √ 定义 `HostCapabilities`，声明 memory surface、tool closure、usage、restart 和 snapshot；提供 deterministic host fixture。
 - √ `HermesHostAdapter.attach()` 已接管 semantic/episodic/procedural projection attachment；adapter call、projection verification、query observation 和 native-search ledger 操作位于 `HermesHostOperations`。
 - √ BenchmarkAdapter contract 不读取 Hermes state，MemoryMethodAdapter contract 不调用 PAST grader。
-- 部分完成：native bypass、method-managed 和 no-persistence identity 已有旧 bridge/runtime 语义，需在 golden trace 中统一。
+- 部分完成：native bypass、method-managed 和 no-persistence identity 已有 bridge/runtime 语义；native+ledger 与 native+adapter+ledger 的 persisted-session fixture 已验证 variant-neutral host projection digest，完整 event/outcome/usage golden trace 仍待完成。
 - √ deterministic host fixture 对重复/跨 session event 和 restart drift fail closed；真实 tool closure 已经由 host-owned `skills_list`/`skill_view` wrapper 接线。
 
 ### 2C：MemoryMethodAdapter
@@ -336,7 +336,7 @@ rollback_update
 - □ Canonical event、corpus 和 attribution join 留在 framework core。
 - □ Mem0/extraction path 迁入 semantic fixture/backend。
 - □ 旧入口提供兼容层或明确迁移错误，不静默运行旧协议。
-- □ 拆分前后用 golden trace 比较 events、outcome、usage 和 state digest。
+- 部分完成：真实 Hermes runner 已向 `StepResponse` 导出 content-free canonical host event IDs、per-run state digest 和 variant-neutral host projection digest；persisted-session fixture 验证 native+ledger/native+adapter+ledger projection 一致。完整 events/outcome/usage golden trace 仍待完成。
 
 ### 2G：阶段 2 完成条件
 
@@ -344,7 +344,7 @@ rollback_update
 - √ deterministic fake semantic/episodic/procedural methods 可在同一 host-neutral harness 独立运行；真实 PAST/Hermes harness 待接线。
 - √ F0-F5 有字段 allowlist 和 contamination tests。
 - □ Grader 无法经 Host、method、metadata 或 pointer 泄漏。
-- 部分完成：Hermes-PAST bridge 已抽出 host projections 和 host operations；真实 PAST execution 的 `AdapterHarness` 接线及 golden trace equivalence 仍未完成。
+- 部分完成：Hermes-PAST bridge 已抽出 host projections 和 host operations；真实 PAST runner 已自动产生并导出 canonical host trace。`AdapterHarness` 驱动的完整执行和 event/outcome/usage golden trace equivalence 仍未完成。
 - √ Restart、revision、idempotency、rollback、secret scan 和 telemetry 的现有 contract/fixture 验收通过；真实 runner 的端到端 restart/golden trace 仍属于上一项。
 - □ 本阶段不要求真实三种方法，不用 fake method 分数声明效果。
 
@@ -354,7 +354,7 @@ rollback_update
 
 ### 3A：Family Eligibility
 
-- 部分完成：26 个 family 的 sequence/stage/target/opportunity 已冻结；真实 on-disk learn -> persistence -> future -> evaluation eligibility 仍待 PAST runner 接入。
+- 部分完成：26 个 family 的 sequence/stage/target/opportunity 已冻结；真实 Hermes runner 已导出 canonical host trace，但 formal on-disk learn -> persistence -> future -> evaluation eligibility 仍待 sensitivity launcher 接入。
 - □ Future input 完整重述目标 memory 时标记 `current_input_confounded`。
 - □ Target memory 必须存在可干预的结果路径，不能只影响无关格式。
 - √ Control contract 隔离 persistence、shortcut 和 wrong mechanism。
@@ -380,10 +380,10 @@ Oracle 要求：
 
 ### 3C：Matched Execution
 
-- 部分完成：protocol/condition contract 固定 task/seed/model/provider/budget/tool/retry 字段；真实 matched launcher 尚待 Stage 2 bridge 接线。
+- 部分完成：protocol/condition contract 固定 task/seed/model/provider/budget/tool/retry 字段；真实 runner host trace 已接线，正式 matched launcher 与 provider execution 尚待实现。
 - √ 每个 condition contract 要求独立 state identity；残留检查待真实 runner。
 - √ Replicates、failure exclusion 和 incomplete usage 规则由 protocol/raw audit boundary 预先冻结。
-- 部分完成：canonical host/event contract 可记录 source/state/retrieval/exposure/tool/outcome/final plane，真实 trace 汇总待 runner。
+- 部分完成：canonical host event/state identity 已由真实 runner 输出，现有 lifecycle/process ledger 可记录 retrieval/exposure/tool/outcome；跨 condition 的完整 trace 汇总仍待 matched launcher。
 - □ Provider/infrastructure failure 不进入质量 denominator，但保留 attempts audit。
 - □ 平衡或随机化执行顺序，避免 condition 与时间/provider drift 固定相关。
 
@@ -448,12 +448,12 @@ Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 
 - √ SM02/SM05 clean-parent 已完成，均为 `STOP_NO_SIGNAL`。
 - √ Extraction-only 主线在研究决策上停止，不再生成 N+1。
 - √ 三类 storage-boundary、六 surfaces、taxonomy/ownership contract 和 result-independent sensitivity fixture 已验收。
-- 部分完成：PAST/Hermes 可运行；host projections/operations 已从 bridge 拆出，但真实 runner 尚未经 `AdapterHarness` 执行，bridge 仍承担 lifecycle/evidence/report 编排。
+- 部分完成：PAST/Hermes 可运行；host projections/operations 已从 bridge 拆出，真实 runner 自动输出 canonical host trace，但尚未经 `AdapterHarness` 执行完整 method flow，bridge 仍承担 lifecycle/evidence/report 编排。
 - √ 阶段 0A baseline 冻结和 0B 逐文件资产分类已完成；`baseline_preflight`
   可在 cleanup 前 fail closed。
 - √ 阶段 0C 已删除无活动依赖的旧 launcher、proposal 入口、dead tests 和三个 orphaned config；仍在使用的 extraction-named configs 已明确为 generalized deterministic fixtures。
 - √ 阶段 1 已冻结 taxonomy、surface、26-family matrix 与 protocol manifest。
-- 部分完成：阶段 2 的四类 adapter contracts、deterministic harness、Hermes host boundary 与三类 projection 已完成；真实 runner/golden trace 尚待接线。
+- 部分完成：阶段 2 的四类 adapter contracts、deterministic harness、Hermes host boundary 与三类 projection 已完成；真实 runner 的 host trace baseline 已接线，完整 method flow/golden trace 尚待实现。
 - 部分完成：阶段 3 已完成 SM/EP/PC result-independent five-condition oracle harness；尚未运行真实模型 sensitivity matrix，因此没有任何 panel sensitivity 结论。
 - □ AdaMem、MemQ、Recuris 未接入；这是阶段 4，不是当前缺陷。
 
