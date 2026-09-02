@@ -690,6 +690,9 @@ class HermesAdapter(RuntimeAdapter):
             response.host_event_ids = list(
                 getattr(self._rsimem_bridge, "canonical_host_event_ids", ())
             )
+            response.host_events = list(
+                getattr(self._rsimem_bridge, "canonical_host_event_payloads", ())
+            )
             response.host_state_digest = getattr(
                 self._rsimem_bridge, "canonical_host_state_digest", None
             )
@@ -891,6 +894,7 @@ class HermesAdapter(RuntimeAdapter):
         process_event_ids: list[str] = []
         process_digest: str | None = None
         host_event_ids: list[str] = []
+        host_events: list[dict[str, Any]] = []
         host_state_digest: str | None = None
         host_projection_digest: str | None = None
         if self._rsimem_bridge is not None:
@@ -898,6 +902,9 @@ class HermesAdapter(RuntimeAdapter):
             process_digest = self._rsimem_bridge.process_feedback_digest
             host_event_ids = list(
                 getattr(self._rsimem_bridge, "canonical_host_event_ids", ())
+            )
+            host_events = list(
+                getattr(self._rsimem_bridge, "canonical_host_event_payloads", ())
             )
             host_state_digest = getattr(
                 self._rsimem_bridge, "canonical_host_state_digest", None
@@ -914,6 +921,7 @@ class HermesAdapter(RuntimeAdapter):
             process_feedback_event_ids=process_event_ids,
             process_feedback_digest=process_digest,
             host_event_ids=host_event_ids,
+            host_events=host_events,
             host_state_digest=host_state_digest,
             host_projection_digest=host_projection_digest,
         )

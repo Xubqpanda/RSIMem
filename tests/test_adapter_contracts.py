@@ -104,6 +104,11 @@ def test_host_contract_declares_three_memory_kinds_and_content_free_event() -> N
         attributes={"artifact_ids": ["artifact.1"]},
     )
     assert event.memory_kind is MemoryKind.SEMANTIC
+    assert CanonicalHostEvent.from_payload(event.payload()) == event
+    payload = event.payload()
+    payload["attributes"] = {"nested": {"grader": "hidden"}}
+    with pytest.raises(ValueError, match="malformed|forbidden"):
+        CanonicalHostEvent.from_payload(payload)
     with pytest.raises(ValueError, match="forbidden"):
         CanonicalHostEvent(
             event_id="host-event.2",

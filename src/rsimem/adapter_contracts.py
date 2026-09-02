@@ -233,6 +233,51 @@ class CanonicalHostEvent:
         validate_public_payload(self.attributes)
         object.__setattr__(self, "attributes", _frozen(self.attributes))
 
+    def payload(self) -> dict[str, object]:
+        return {
+            "event_id": self.event_id,
+            "session_id": self.session_id,
+            "task_id": self.task_id,
+            "kind": self.kind.value,
+            "revision": self.revision,
+            "input_ids": list(self.input_ids),
+            "output_ids": list(self.output_ids),
+            "memory_kind": self.memory_kind.value if self.memory_kind else None,
+            "surface": self.surface.value if self.surface else None,
+            "attributes": dict(self.attributes),
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "CanonicalHostEvent":
+        fields = {
+            "event_id", "session_id", "task_id", "kind", "revision",
+            "input_ids", "output_ids", "memory_kind", "surface", "attributes",
+        }
+        if not isinstance(value, Mapping) or set(value) != fields:
+            raise ValueError("malformed canonical host event")
+        if not isinstance(value["input_ids"], list) or not isinstance(value["output_ids"], list):
+            raise ValueError("canonical host event IDs must be lists")
+        if not isinstance(value["attributes"], Mapping):
+            raise ValueError("canonical host event attributes must be an object")
+        try:
+            event = cls(
+                event_id=value["event_id"],
+                session_id=value["session_id"],
+                task_id=value["task_id"],
+                kind=value["kind"],
+                revision=value["revision"],
+                input_ids=tuple(value["input_ids"]),
+                output_ids=tuple(value["output_ids"]),
+                memory_kind=value["memory_kind"],
+                surface=value["surface"],
+                attributes=dict(value["attributes"]),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError("malformed canonical host event") from exc
+        if event.payload() != dict(value):
+            raise ValueError("non-canonical host event")
+        return event
+
 
 @dataclass(frozen=True, slots=True)
 class MethodCapabilities:
