@@ -135,7 +135,12 @@ from .memory.pure_extraction import (
 from .memory.pure_process import JsonPureProcessEventArchive, PureProcessCorpus
 from .memory.revocation import JsonRevocationRegistry
 from .memory_systems.mem0_flat import CompletionClient, FrozenMem0UtilityGate
-from .hermes_host_adapter import HermesHostAdapter, _PromptMemoryStore, _SessionDb
+from .hermes_host_adapter import (
+    HermesHostAdapter,
+    HermesHostOperations,
+    _PromptMemoryStore,
+    _SessionDb,
+)
 
 
 
@@ -3147,109 +3152,9 @@ class HermesPastBenchBridge:
         adapter_call: Callable[[], Any],
         native_call: Callable[[], Any],
     ) -> Any:
-        try:
-            result = adapter_call()
-            self._last_adapter_route = "adapter"
-            return result
-        except Exception as exc:
-            failure_type = type(exc).__name__
-            if (
-                self.config.adapter_failure_policy
-                == HermesAdapterFailurePolicy.BYPASS_NATIVE
-            ):
-                self._last_adapter_route = "native_bypass"
-                if operation == "session_search":
-                    kind = MemoryKind.EPISODIC
-                    backend = "hermes-native-episodic"
-                elif operation.startswith("skill"):
-                    kind = MemoryKind.PROCEDURAL
-                    backend = "hermes-native-procedural"
-                else:
-                    kind = MemoryKind.SEMANTIC
-                    backend = "hermes-native-semantic"
-                self.ledger.record(MemoryEvent(
-                    MemoryEventKind.QUERY,
-                    kind,
-                    backend,
-                    reason_code="adapter_failure_native_bypass",
-                    attributes={
-                        "surface": operation,
-                        "failure_type": failure_type,
-                    },
-                ))
-                process_kind = (
-                    ProcessEventKind.RETRIEVAL
-                    if operation == "session_search"
-                    else ProcessEventKind.TOOL_RESULT
-                    if operation.startswith("skill")
-                    else ProcessEventKind.EXPOSURE
-                )
-                self._record_process_observation(
-                    kind=process_kind,
-                    status=ProcessEventStatus.SUCCESS,
-                    host_event_id=self._last_host_event_id or f"event.adapter.{operation}",
-                    source_revision=self._last_host_source_revision or self._exposure_context_revision(),
-                    input_payload={"operation": operation},
-                    output_payload={"route": "native_bypass", "failure_type": failure_type},
-                    reason_codes=("adapter_failure",),
-                    execution_receipt_ids=(
-                        "receipt.adapter-failure."
-                        + hashlib.sha256(operation.encode("utf-8")).hexdigest()[:24],
-                    ),
-                )
-                try:
-                    return native_call()
-                except Exception as native_exc:
-                    stage_reason = (
-                        "retrieval_failure"
-                        if operation == "session_search"
-                        else "tool_failure"
-                        if operation.startswith("skill")
-                        else "injection_failure"
-                    )
-                    self._record_process_observation(
-                        kind=process_kind,
-                        status=ProcessEventStatus.FAILED,
-                        host_event_id=self._last_host_event_id or f"event.native-bypass.{operation}",
-                        source_revision=self._last_host_source_revision or self._exposure_context_revision(),
-                        input_payload={"operation": operation, "route": "native_bypass"},
-                        output_payload={
-                            "adapter_failure_type": failure_type,
-                            "native_failure_type": type(native_exc).__name__,
-                        },
-                        reason_codes=("adapter_failure", stage_reason),
-                        execution_receipt_ids=(
-                            "receipt.native-bypass-failure."
-                            + hashlib.sha256(
-                                f"{operation}:{failure_type}:{type(native_exc).__name__}".encode("utf-8")
-                            ).hexdigest()[:24],
-                        ),
-                    )
-                    raise
-            process_kind = (
-                ProcessEventKind.RETRIEVAL
-                if operation == "session_search"
-                else ProcessEventKind.TOOL_RESULT
-                if operation.startswith("skill")
-                else ProcessEventKind.EXPOSURE
-            )
-            self._record_process_observation(
-                kind=process_kind,
-                status=ProcessEventStatus.FAILED,
-                host_event_id=self._last_host_event_id or f"event.adapter.{operation}",
-                source_revision=self._last_host_source_revision or self._exposure_context_revision(),
-                input_payload={"operation": operation},
-                output_payload={"failure_type": failure_type},
-                reason_codes=("adapter_failure",),
-                execution_receipt_ids=(
-                    "receipt.adapter-failure."
-                    + hashlib.sha256(operation.encode("utf-8")).hexdigest()[:24],
-                ),
-            )
-            self._last_adapter_route = "failed"
-            raise HermesAdapterExecutionError(
-                f"Hermes adapter operation failed closed: {operation} ({failure_type})"
-            ) from exc
+        return HermesHostOperations.adapter_call(
+            self, operation, adapter_call, native_call
+        )
 
     def verify_projection(
         self,
@@ -3259,31 +3164,9 @@ class HermesPastBenchBridge:
         adapter_value: Any,
         native_call: Callable[[], Any],
     ) -> None:
-        if not self.config.verify_native_projection:
-            return
-        native_value = native_call()
-        equivalent = adapter_value == native_value
-        if isinstance(adapter_value, str):
-            content_chars = len(adapter_value)
-        else:
-            content_chars = len(json.dumps(
-                adapter_value,
-                ensure_ascii=True,
-                separators=(",", ":"),
-                sort_keys=True,
-            ))
-        self.ledger.record(MemoryEvent(
-            MemoryEventKind.PROJECTION_CHECK,
-            kind,
-            backend,
-            content_chars=content_chars,
-            reason_code=None if equivalent else "projection_mismatch",
-            attributes={"surface": surface, "equivalent": equivalent},
-        ))
-        if not equivalent:
-            raise HermesAdapterExecutionError(
-                f"Hermes adapter projection mismatch: {surface}"
-            )
+        return HermesHostOperations.verify_projection(
+            self, kind, backend, surface, adapter_value, native_call
+        )
 
     def observe_query(
         self,
@@ -3294,53 +3177,14 @@ class HermesPastBenchBridge:
         limit: int,
         surface: str | None,
     ) -> tuple[Any, ...]:
-        try:
-            hits = self.runtime.query(MemoryQuery(
-                kind,
-                text,
-                namespace=namespace,
-                limit=limit,
-            ))
-            if surface and hits:
-                self.runtime.mark_injected(hits, surface=surface)
-            self._record_process_observation(
-                kind=ProcessEventKind.RETRIEVAL,
-                status=(ProcessEventStatus.SUCCESS if hits else ProcessEventStatus.FAILED),
-                host_event_id=(
-                    "event.query."
-                    + hashlib.sha256(
-                        json.dumps(
-                            {"kind": kind.value, "namespace": namespace, "query_digest": hashlib.sha256(text.encode("utf-8")).hexdigest(), "limit": limit},
-                            sort_keys=True,
-                            separators=(",", ":"),
-                        ).encode("utf-8")
-                    ).hexdigest()[:40]
-                ),
-                source_revision=self._exposure_context_revision(),
-                input_payload={"query_digest": hashlib.sha256(text.encode("utf-8")).hexdigest(), "namespace": namespace, "limit": limit},
-                output_payload={"hit_count": len(hits), "surface": surface},
-                reason_codes=("retrieval_miss",) if not hits else ("decision_observed",),
-                execution_receipt_ids=(
-                    "receipt.query."
-                    + hashlib.sha256(
-                        f"{kind.value}:{namespace}:{text}:{limit}".encode("utf-8")
-                    ).hexdigest()[:24],
-                ),
-            )
-            return hits
-        except Exception as exc:
-            query_digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-            self._record_process_observation(
-                kind=ProcessEventKind.RETRIEVAL,
-                status=ProcessEventStatus.FAILED,
-                host_event_id=f"event.query-failure.{query_digest[:40]}",
-                source_revision=self._exposure_context_revision(),
-                input_payload={"query_digest": query_digest, "namespace": namespace, "limit": limit},
-                output_payload={"failure_type": type(exc).__name__},
-                reason_codes=("retrieval_failure",),
-                execution_receipt_ids=(f"receipt.query-failure.{query_digest[:24]}",),
-            )
-            return ()
+        return HermesHostOperations.observe_query(
+            self,
+            kind,
+            text,
+            namespace=namespace,
+            limit=limit,
+            surface=surface,
+        )
 
     def record_native_search(
         self,
@@ -3348,34 +3192,7 @@ class HermesPastBenchBridge:
         limit: int,
         results: list[dict[str, Any]],
     ) -> None:
-        self.ledger.record(MemoryEvent(
-            MemoryEventKind.QUERY,
-            MemoryKind.EPISODIC,
-            "hermes-native-episodic",
-            query_chars=len(query),
-            attributes={"limit": limit, "namespace": "default"},
-        ))
-        self.ledger.record(MemoryEvent(
-            MemoryEventKind.RETRIEVED,
-            MemoryKind.EPISODIC,
-            "hermes-native-episodic",
-            artifact_ids=tuple(
-                f"native-episodic:message:{item.get('id')}" for item in results
-            ),
-            content_chars=sum(len(str(item.get("content") or "")) for item in results),
-            attributes={"count": len(results)},
-        ))
-        query_digest = hashlib.sha256(query.encode("utf-8")).hexdigest()
-        self._record_process_observation(
-            kind=ProcessEventKind.RETRIEVAL,
-            status=ProcessEventStatus.SUCCESS if results else ProcessEventStatus.FAILED,
-            host_event_id=f"event.native-search.{query_digest[:40]}",
-            source_revision=self._exposure_context_revision(),
-            input_payload={"query_digest": query_digest, "limit": limit},
-            output_payload={"result_count": len(results)},
-            reason_codes=("decision_observed",) if results else ("retrieval_miss",),
-            execution_receipt_ids=(f"receipt.native-search.{query_digest[:24]}",),
-        )
+        return HermesHostOperations.record_native_search(self, query, limit, results)
 
     def _record_skill_process(self, tool_name: str, query: str, result: str) -> None:
         """Record a skill call/result closure without persisting skill text.
