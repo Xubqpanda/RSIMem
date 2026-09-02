@@ -262,7 +262,7 @@ Mechanism：formation/retention coverage、retrieval、exposure、attributable u
 职责：枚举 case/split、重置和推进环境、提供 public capability schema、在 final plane 评分、生成 audit-only annotation。
 
 - √ 定义 host-neutral request/response/event contract，不引用 Hermes 类，见 `adapter_contracts.py`。
-- 部分完成：`PastBenchAdapter` 已封装 PAST task layout、split/family identity 和公开 digest；真实 runner 仍未以该 adapter 驱动完整 agent execution。
+- 部分完成：`PastBenchAdapter` 已封装 PAST task layout、split/family identity、公开 digest 和 content-free `PastExecutionTrace`；真实 runner 仍未以该 adapter 驱动完整 method execution。
 - √ 区分 public task state、audit-only contract 和 final-only score；final score 只能由显式 final-plane callback 提供。
 - □ 保持 raw prompt、grader 和 reference 不变。
 - □ Hidden answer、grader field 或 family-derived key 进入 Host/method 时 fail closed。
@@ -344,7 +344,7 @@ rollback_update
 - √ deterministic fake semantic/episodic/procedural methods 可在同一 host-neutral harness 独立运行；真实 PAST/Hermes harness 待接线。
 - √ F0-F5 有字段 allowlist 和 contamination tests。
 - □ Grader 无法经 Host、method、metadata 或 pointer 泄漏。
-- 部分完成：Hermes-PAST bridge 已抽出 host projections 和 host operations；真实 PAST runner 已自动产生并导出 canonical host trace。`AdapterHarness` 驱动的完整执行和 event/outcome/usage golden trace equivalence 仍未完成。
+- 部分完成：Hermes-PAST bridge 已抽出 host projections 和 host operations；真实 PAST runner 已自动产生并导出 canonical host trace，`PastExecutionTrace` 可比较终态/usage/process/host digest。`AdapterHarness` 驱动的完整 method execution 和跨 condition event/outcome/usage golden trace equivalence 仍未完成。
 - √ Restart、revision、idempotency、rollback、secret scan 和 telemetry 的现有 contract/fixture 验收通过；真实 runner 的端到端 restart/golden trace 仍属于上一项。
 - □ 本阶段不要求真实三种方法，不用 fake method 分数声明效果。
 
