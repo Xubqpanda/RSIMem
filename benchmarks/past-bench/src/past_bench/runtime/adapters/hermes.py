@@ -1028,6 +1028,11 @@ class HermesAdapter(RuntimeAdapter):
             raise ValueError(
                 "RSIMem Hermes execution requires experiment_variant metadata"
             )
+        method_task_id = metadata.get("rsimem_method_task_id")
+        if method_task_id is not None and (
+            not isinstance(method_task_id, str) or not method_task_id.strip()
+        ):
+            raise ValueError("RSIMem method task ID must be non-empty text")
         lifecycle_config = HermesLifecycleConfig.from_mapping(
             rsimem_cfg.get("lifecycle")
         )
@@ -1112,7 +1117,9 @@ class HermesAdapter(RuntimeAdapter):
             trace_id=str(metadata.get("trace_id") or self.request.session_id),
             episode_id=str(metadata.get("episode_id") or self.request.session_id),
             session_id=self.request.session_id,
-            task_id=self.request.task_id,
+            # Formal adapter runs supply an opaque case ID here so the method
+            # boundary cannot infer a PAST family from the benchmark task ID.
+            task_id=method_task_id or self.request.task_id,
             experiment_variant=experiment_variant,
             family_id=(str(metadata["family_id"]) if metadata.get("family_id") else None),
             stage=(str(metadata["stage"]) if metadata.get("stage") else None),
