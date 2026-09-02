@@ -1900,6 +1900,27 @@ class JsonPureExtractionFeedbackRecordStore(_JsonPureExtractionStore):
             application_schema=application_schema,
         )
 
+    def records(self) -> tuple[object, ...]:
+        """Return feedback in deterministic logical observation order.
+
+        Feedback is a delayed stream: one source can receive several future
+        boundary observations.  Hash ordering is stable but has no temporal
+        meaning, so order those records by their source and boundary
+        operation identity while retaining the record ID as a final tie-break.
+        """
+
+        with self._lock(fcntl.LOCK_SH):
+            values = self._read_unlocked()
+        return tuple(sorted(
+            values,
+            key=lambda value: (
+                value.source_record_id,
+                value.opportunity.operation_id if value.opportunity is not None else "",
+                value.observation_window,
+                value.record_id,
+            ),
+        ))
+
 
 # Verbose aliases make the evidence plane explicit at call sites while
 # retaining the shorter names used by the implementation.
