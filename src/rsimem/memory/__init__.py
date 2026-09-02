@@ -39,6 +39,16 @@ from .lifecycle_surfaces import (
     classify_event_ownership,
     surface_for_policy_layer,
 )
+from .family_matrix import (
+    EXPECTED_PAST_FAMILY_IDS,
+    FamilyPanel,
+    FamilyRole,
+    PAST_FAMILY_MATRIX_SCHEMA,
+    PAST_FAMILY_MATRIX_SCHEMA_VERSION,
+    PastFamilyMatrix,
+    PastFamilySpec,
+    default_past_family_specs,
+)
 from .runtime import MemoryBackendRegistry, MemoryRuntime
 from .backends import (
     HermesEpisodicBackend,
@@ -312,6 +322,14 @@ __all__ = [
     "MethodLifecycleDescriptor",
     "classify_event_ownership",
     "surface_for_policy_layer",
+    "EXPECTED_PAST_FAMILY_IDS",
+    "FamilyPanel",
+    "FamilyRole",
+    "PAST_FAMILY_MATRIX_SCHEMA",
+    "PAST_FAMILY_MATRIX_SCHEMA_VERSION",
+    "PastFamilyMatrix",
+    "PastFamilySpec",
+    "default_past_family_specs",
     "MemoryRuntime",
     "HermesEpisodicBackend",
     "HermesProceduralBackend",
