@@ -12,6 +12,7 @@ from rsimem.adapter_contracts import (
     BenchmarkSplit,
     BenchmarkTaskRequest,
     CanonicalHostEvent,
+    DeterministicMemoryMethodAdapter,
     FeedbackCondition,
     FeedbackView,
     FinalEvaluationRecord,
@@ -215,3 +216,56 @@ def test_method_protocol_can_be_satisfied_without_benchmark_or_host_types() -> N
 
     assert isinstance(FakeMethod(), MemoryMethodAdapter)
     assert FakeMethod().snapshot_state().state_schema == "state.v1"
+
+
+def test_deterministic_method_adapter_is_kind_scoped_and_revision_safe() -> None:
+    method = DeterministicMemoryMethodAdapter(MethodCapabilities(
+        method_id="method.semantic.fixture.v1",
+        primary_kind=MemoryKind.SEMANTIC,
+        secondary_kind=None,
+        transform=None,
+        owned_surfaces=(MemoryLifecycleSurface.CONSTRUCTION,),
+        required_feedback=(FeedbackCondition.F2,),
+        required_host_capabilities=(),
+        state_schema="method.state.fixture.v1",
+        lineage_schema="method.lineage.fixture.v1",
+        online_update=True,
+        validation=True,
+        rollback=True,
+    ))
+    run = MethodRunIdentity("run.fixture.v1", "session.fixture.v1", "task.fixture.v1", "revision.initial")
+    assert method.prepare_run(run).status is AdapterStatus.SUPPORTED
+    assert method.start_episode(run).status is AdapterStatus.SUPPORTED
+    event = CanonicalHostEvent(
+        event_id="host-event.semantic.v1",
+        session_id=run.session_id,
+        task_id=run.task_id,
+        kind=HostEventKind.MEMORY_RETRIEVAL,
+        revision="revision.initial",
+        memory_kind=MemoryKind.SEMANTIC,
+    )
+    assert method.observe_event(event).status is AdapterStatus.SUPPORTED
+    assert method.observe_event(event).reason_code == "duplicate_event"
+    episodic = CanonicalHostEvent(
+        event_id="host-event.episodic.v1",
+        session_id=run.session_id,
+        task_id=run.task_id,
+        kind=HostEventKind.MEMORY_RETRIEVAL,
+        revision="revision.initial",
+        memory_kind=MemoryKind.EPISODIC,
+    )
+    assert method.observe_event(episodic).reason_code == "kind_mismatch"
+
+    f1 = FeedbackView(FeedbackCondition.F1, "2026-09-02T00:00:00Z", {"terminal_outcome": "completed"})
+    rejected, update = method.propose_update(f1)
+    assert rejected.status is AdapterStatus.REJECTED
+    assert update is None
+    f2 = FeedbackView(FeedbackCondition.F2, "2026-09-02T00:00:00Z", {"terminal_outcome": "completed", "trajectory": {"digest": _sha({"t": 1})}})
+    accepted, update = method.propose_update(f2)
+    assert accepted.status is AdapterStatus.ACCEPTED
+    assert update is not None
+    assert method.validate_update(update).status is AdapterStatus.ACCEPTED
+    assert method.activate_update(update).status is AdapterStatus.ACCEPTED
+    assert method.activate_update(update).reason_code == "duplicate_activation"
+    assert method.validate_update(update).status is AdapterStatus.STALE
+    assert method.rollback_update(update).status is AdapterStatus.ACCEPTED
