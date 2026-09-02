@@ -80,6 +80,9 @@ Current capability matrix:
 | Six-layer policy feasibility | deterministic/shadow complete | replayable action variation and mechanism explanations |
 | Real provider process-signal census | complete for SM02/SM05 train attempt | both fresh batches completed; `STOP_NO_SIGNAL` |
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
+| Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
+| Stage 2 adapter boundaries and bridge split | pending | requires Benchmark/Host/Method/Feedback contracts |
+| Stage 3 SM/EP/PC sensitivity matrix | pending | requires Stage 2 adapter harness |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
@@ -104,9 +107,10 @@ partial batch is retained for infrastructure diagnosis and excluded from the
 process-signal census.  No N+1 candidate, held-out validation, or adaptive
 effect batch is authorized.
 
-Current implementation priority remains closing Stage 0D with a clean-tree
-acceptance after the recorded removals, then freezing the Stage 1 taxonomy and
-protocol.  The finite
+Current implementation priority is now Stage 2 adapter-boundary work.  Stage
+1 taxonomy, lifecycle surfaces, 26-family applicability matrix, comparison
+conditions, split contract, and raw-only metric protocol are frozen in
+[`research_protocol_v1.json`](research_protocol_v1.json).  The finite
 SM02/SM05 family attempt is closed as `STOP_NO_SIGNAL`; any future family must
 be separately pre-registered with a deployment-visible opportunity schema
 before another provider batch is authorized.

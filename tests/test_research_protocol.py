@@ -9,6 +9,7 @@ from rsimem.memory.family_matrix import PastFamilyMatrix
 from rsimem.memory.taxonomy import MemoryControlKind
 from rsimem.research_protocol import (
     ComparisonLevel,
+    ExperimentSplit,
     JsonResearchProtocolStore,
     SensitivityCondition,
     default_research_protocol,

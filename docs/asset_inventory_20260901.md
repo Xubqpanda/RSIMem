@@ -49,12 +49,12 @@ after their evidence index remains reachable.
 | `src/rsimem/memory/extraction_validation_adapter.py` | GENERALIZE | Validation adapter boundary is reusable | validation tests; future BenchmarkAdapter |
 | `src/rsimem/memory/pure_extraction_optimizer.py` | GENERALIZE | Pure-process corpus materialization is reusable after renaming | pure optimizer tests; future updater view |
 | `src/rsimem/memory/pure_extraction.py` | GENERALIZE | Delayed feedback and source/future joins are framework evidence | Hermes bridge and pure extraction tests |
-| `configs/extraction_feedback_sm01.json` | DELETE | Retained temporarily as a deterministic preflight fixture; migrate to Stage 1 protocol manifest before deletion | `test_extraction_experiment_preflight.py`, `test_extraction_matched_preflight.py` |
+| `configs/extraction_feedback_sm01.json` | GENERALIZE | Deterministic preflight fixture retained while Stage 1 protocol tests migrate; not a production launcher config | `test_extraction_experiment_preflight.py`, `test_extraction_matched_preflight.py` |
 | `configs/extraction_feedback_sm02.json` | DELETE | Removed in Stage 0C; no active consumer after the finite SM02 attempt closed | historical baseline/evidence only |
 | `configs/extraction_feedback_sm05.json` | DELETE | Removed in Stage 0C; no active consumer after the finite SM05 attempt closed | historical baseline/evidence only |
-| `configs/extraction_split_plan_sm02_sm03_sm04.json` | DELETE | Retained temporarily by split-contract tests; migrate to Stage 1 protocol manifest before deletion | `test_extraction_split_plan.py` |
+| `configs/extraction_split_plan_sm02_sm03_sm04.json` | GENERALIZE | Split-contract fixture retained while Stage 1 protocol tests migrate; identity is generic despite legacy filename | `test_extraction_split_plan.py` |
 | `configs/extraction_split_plan_sm05_sm03_sm04.json` | DELETE | Removed in Stage 0C; superseded by the forthcoming Stage 1 protocol manifest and had no active consumer | historical split evidence only |
-| `configs/extraction_validation_sm03.json` | DELETE | Retained temporarily as a deterministic validation-contract fixture; migrate to Stage 1 family matrix before deletion | `test_extraction_experiment_preflight.py` |
+| `configs/extraction_validation_sm03.json` | GENERALIZE | Deterministic validation-contract fixture retained while Stage 1 family matrix tests migrate; not a production launcher config | `test_extraction_experiment_preflight.py` |
 | `scripts/run_luna_adaptive_sm01.sh` | DELETE | Stopped extraction/adaptive experiment launcher | docs and adaptive tests; no new entry point |
 | `scripts/run_luna_adaptive_validation_sm01.sh` | DELETE | Stopped extraction validation launcher | docs and adaptive tests |
 | `scripts/run_luna_extraction_feedback_sm01.sh` | DELETE | Stopped extraction process-signal launcher | historical reports only |
