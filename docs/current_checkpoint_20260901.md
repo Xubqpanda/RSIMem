@@ -7,20 +7,24 @@ Date: 2026-09-01
 The research execution plan has since been superseded by the revised
 foundation checklist, which broadens the target to semantic, episodic, and
 procedural memory and stops the extraction-only N+1 path.  Stage 0A baseline
-freezing and 0B asset classification are complete; Stage 0C cleanup is in
-progress and the new adapter contracts have not started.  The cleanup pass has
+freezing and 0B asset classification are complete; Stage 0C/0D cleanup and
+Stage 1 protocol freezing are complete.  The cleanup pass has
 removed the stopped launcher group, extraction-only proposal entry point, and
 three orphaned configs.  The second call-site audit is recorded in
 [`stage0_cleanup_audit_20260902.md`](stage0_cleanup_audit_20260902.md); three
-configs remain only as deterministic preflight fixtures pending Stage 1
-migration.  The pre-cleanup identity is recorded
+configs remain only as deterministic preflight fixtures classified
+`GENERALIZE`.  The pre-cleanup identity is recorded
 in [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json), with
 the candidate inventory in [`asset_inventory_20260901.md`](asset_inventory_20260901.md).
 Remaining cleanup deletion is held until the baseline gate and dependency
 audit pass for each candidate; completed removals are recorded in commits
 `b1c9970`, `480f77b`, `3b2cbb4`, and `e7e214e`.  Stage 1 contracts are now
 frozen in [`research_protocol_v1.json`](research_protocol_v1.json), and the
-next implementation boundary is the four-adapter Stage 2 split.
+next implementation boundary is the four-adapter Stage 2 split.  Typed
+Benchmark/Host/Method/Feedback contracts, deterministic host/method fixtures,
+the PAST public-identity adapter, and the Hermes projection-wrapper split are
+now implemented.  The remaining Stage 2 work is full runner/bridge wiring and
+golden-trace equivalence.
 
 The provider gate is healthy, and the finite Stage 2 clean-parent rerun is now
 complete. Formal proposal, held-out, activation, and matched-effect work
@@ -64,6 +68,12 @@ and control-state separation, six lifecycle surfaces with ownership gates, all
 26 PAST family roles and confounders, five sensitivity conditions, isolated
 split rules, and raw resource accounting.  The checked-in manifest is
 metadata-only and contains no API key, grader field, answer, or official score.
+
+Stage 3 now has a result-independent sensitivity harness.  It builds isolated
+semantic (7 families), episodic (3 families), and procedural (10 families)
+matrices with five conditions each and audit-only type-matched oracle digests.
+These artifacts prove contract coverage only; no real model matched run or
+sensitivity claim has been made.
 
 The completed implementation components include:
 
@@ -125,7 +135,8 @@ artifact identity (ID, schema version, and digest). New revocations must use
 
 The most recent deterministic acceptance baseline is:
 
-- RSIMem: `1090 passed` after the Stage 0C removals.
+- RSIMem: `1120 passed` after Stage 1 contracts, Stage 2 adapter contracts,
+  and Stage 3 sensitivity harness were added.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when invoked from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, `git diff --check`, and
