@@ -7,8 +7,11 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from past_bench.models.tool import ToolEndpoint, ToolSpec
 from past_bench.runner.self_evolve import (
+    HermesPersistenceBackend,
     NanobotPersistenceBackend,
     ZeroClawPersistenceBackend,
     snapshot_nanobot_artifacts,
@@ -72,6 +75,40 @@ def test_matching_task_tools_only_returns_registered_endpoints():
     endpoints = [ToolEndpoint(tool_name="b", url="http://example.test/b", method="POST")]
     matches = matching_task_tools(tools, endpoints)
     assert [(tool.name, endpoint.tool_name) for tool, endpoint in matches] == [("b", "b")]
+
+
+def test_full_oracle_home_seed_is_hermes_only_and_preserves_native_state(tmp_path: Path):
+    oracle = tmp_path / "oracle-home"
+    (oracle / "memories").mkdir(parents=True)
+    (oracle / "memories" / "MEMORY.md").write_text("oracle fact", encoding="utf-8")
+    (oracle / "skills" / "oracle-procedure").mkdir(parents=True)
+    (oracle / "skills" / "oracle-procedure" / "SKILL.md").write_text(
+        "---\nname: oracle-procedure\n---\noracle steps", encoding="utf-8"
+    )
+    (oracle / "sessions").mkdir()
+    (oracle / "sessions" / "seed.json").write_text("{}", encoding="utf-8")
+    (oracle / "state.db").write_bytes(b"sqlite-oracle")
+
+    hermes = HermesPersistenceBackend()
+    state_root, _ = hermes.family_paths(tmp_path / "variant", "family")
+    hermes.reset_state(state_root)
+    (state_root / "state.db").write_bytes(b"old-state")
+    hermes.materialize_oracle_home(state_root=state_root, oracle_home_seed_dir=oracle)
+    assert (state_root / "memories" / "MEMORY.md").read_text(encoding="utf-8") == "oracle fact"
+    assert (state_root / "skills" / "oracle-procedure" / "SKILL.md").exists()
+    assert (state_root / "sessions" / "seed.json").exists()
+    assert (state_root / "state.db").read_bytes() == b"sqlite-oracle"
+
+    with pytest.raises(ValueError, match="Hermes backend"):
+        NanobotPersistenceBackend().materialize_oracle_home(
+            state_root=tmp_path / "nanobot",
+            oracle_home_seed_dir=oracle,
+        )
+    with pytest.raises(ValueError, match="Hermes backend"):
+        ZeroClawPersistenceBackend().materialize_oracle_home(
+            state_root=tmp_path / "zeroclaw",
+            oracle_home_seed_dir=oracle,
+        )
 
 
 def test_nanobot_backend_history_and_artifact_snapshot(tmp_path: Path):
