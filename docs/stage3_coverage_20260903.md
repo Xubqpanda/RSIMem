@@ -9,17 +9,17 @@ PYTHONPATH=src .venv/bin/python -m rsimem.sensitivity_coverage \
   outputs/sensitivity --output outputs/sensitivity/stage3_coverage.json
 ```
 
-The generated coverage manifest has ID
-`sensitivity-coverage.43be847b4d5ea8bc3cfe36821cb5c9aa3c3bc5d0`.
+The generated coverage manifest is regenerated after each accepted or excluded
+attempt; its current ID is recorded in `outputs/sensitivity/stage3_coverage.json`.
 
 | Panel | Accepted pilots | Excluded attempts | Accepted families | Replicates |
 | --- | ---: | ---: | --- | --- |
-| Semantic | 6 | 1 | SM01, SM02, SM03, SM05, SM06, SM07 | 1, 2 (SM01 only) |
+| Semantic | 7 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2 (SM01 only) |
 | Episodic | 3 | 0 | EP01, EP02, EP03 | 1 |
 | Procedural | 2 | 2 | PC01, PC02 | 1 |
 
-Expected-family coverage is therefore semantic `6/7`, episodic `3/3`, and
-procedural `2/10`. The missing semantic family is `SM04_rule_migration`; the
+Expected-family coverage is therefore semantic `7/7`, episodic `3/3`, and
+procedural `2/10`. There is no missing semantic family; the
 missing procedural families are `PC01_sop_bootstrap_02..06`,
 `PC02_sop_patch_02`, `PC03_latent_rule_induction_01`, and
 `PC04_failure_to_rule_01`.
@@ -31,10 +31,12 @@ missing families in addition to incomplete replicate coverage.
 
 Every accepted pilot contains all five registered conditions with complete
 content-free audit. The excluded attempts are PC02's first attempt
-(`usage_incomplete` and retry mismatch), SM04 (`usage_incomplete` after
-provider timeouts), and PC03 (`run_not_completed`/`sequence_results_missing`).
-They remain in the manifest for provenance but are excluded from all coverage
-counts and sensitivity denominators.
+(`usage_incomplete` and retry mismatch), the earlier SM04 attempt
+(`usage_incomplete` after provider timeouts), and PC03
+(`run_not_completed`/`sequence_results_missing`). The accepted retry-4 SM04
+pilot replaces the earlier failed attempt and is included above. Excluded
+attempts remain in the manifest for provenance but are excluded from all
+coverage counts and sensitivity denominators.
 
 This is a coverage/readiness audit, not a sensitivity status. Stage 3 still
 requires clean coverage for the excluded families, predeclared replicate

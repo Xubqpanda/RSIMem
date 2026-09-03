@@ -48,8 +48,8 @@ drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
 family/task ID cannot enter the method boundary. Stage 3 has a
-result-independent oracle harness and eleven accepted first-pass real-model
-execution pilots (semantic SM01/SM02/SM03/SM05/SM06/SM07, episodic
+result-independent oracle harness and twelve accepted first-pass real-model
+execution pilots (semantic SM01/SM02/SM03/SM04/SM05/SM06/SM07, episodic
 EP01/EP02/EP03, and procedural PC01/PC02), but no replicated sensitivity
 results. Its new immutable run-manifest contract
 expands every `family x condition x replicate` into isolated state,
@@ -58,16 +58,17 @@ registered opaque method case ID. Semantic native, no-persistence, shortcut,
 and wrong-mechanism task slices are now catalog-backed executable deployments;
 shortcut and wrong-mechanism explicitly disable persistence. Seven semantic,
 three episodic, and ten procedural case-bound oracle seeds are registered and
-can be prepared as evaluation-only sequences; SM01, SM02, SM03, SM05, SM06,
-SM07, EP01, EP02, and EP03 have completed five-condition pilots.
+can be prepared as evaluation-only sequences; SM01, SM02, SM03, SM04, SM05,
+SM06, SM07, EP01, EP02, and EP03 have completed five-condition pilots.
 The full Stage 3 matrix remains fail-closed because replicated panel coverage is
 still incomplete. A manifest-bound pilot executor and content-free sensitivity audit now
 run one selected family/replicate only. The 2026-09-02 SM01 replicate-2, SM02
-replicate-1, SM03 replicate-1, SM05 replicate-1, SM06 replicate-1, SM07 replicate-1, EP01 replicate-1, EP02 replicate-1, EP03 replicate-1, and PC01 replicate-1 pilots each completed all
+replicate-1, SM03 replicate-1, SM04 replicate-1, SM05 replicate-1, SM06 replicate-1, SM07 replicate-1, EP01 replicate-1, EP02 replicate-1, EP03 replicate-1, and PC01 replicate-1 pilots each completed all
 five conditions and are recorded in
 `docs/sensitivity_sm01_pilot_20260902.md` and
 `docs/sensitivity_sm02_pilot_20260902.md`,
 `docs/sensitivity_sm03_pilot_20260902.md`,
+`docs/sensitivity_sm04_pilot_20260903.md`,
 `docs/sensitivity_sm05_pilot_20260903.md`,
 `docs/sensitivity_sm06_pilot_20260903.md`,
 `docs/sensitivity_sm07_pilot_20260903.md`,
@@ -97,8 +98,9 @@ executable; registry payloads contain no memory text. The checked-in SM01
 semantic panel's seven seeds and all three episodic seeds are manually authored
 from their public learn or update inputs. All ten procedural oracle seeds and
 all five procedural deployment conditions are registered and
-preparation-verified; PC01 and PC02 replicate-1 and all three episodic
-replicate-1 pilots have passed content-free audit, while remaining procedural
+preparation-verified; all seven semantic replicate-1, PC01 and PC02
+replicate-1, and all three episodic replicate-1 pilots have passed content-free
+audit, while remaining procedural
 and episodic replicates and families are pending. The first PC02 replicate-1 attempt is
 retained as an infrastructure audit but excluded: its `native_static` condition
 had incomplete usage and its control conditions exhausted provider retries
@@ -106,7 +108,7 @@ without usage. It is documented in
 `docs/sensitivity_pc02_attempt_20260902.md` and does not count as a pilot. The
 accepted PC02 retry-2 pilot is recorded in
 `docs/sensitivity_pc02_pilot_20260902.md`.
-The SM04 retry-3 attempt is excluded after provider connection/read timeouts
+The earlier SM04 retry-3 attempt is excluded after provider connection/read timeouts
 caused incomplete usage in `native_static` and `wrong_mechanism`; its
 diagnostic report is `docs/sensitivity_sm04_attempt_20260903.md`.
 The PC03 replicate-1 attempt was interrupted after the native-static run made
@@ -116,7 +118,7 @@ no progress for more than 20 minutes; audit reported `run_not_completed` and
 The content-free coverage aggregator now reconstructs all 14 discovered pilot
 audits: 11 accepted family-level pilots plus three excluded attempts. It also
 compares accepted families with the frozen 26-family target set: semantic
-coverage is `6/7`, episodic `3/3`, and procedural `2/10`; none of the panels is
+coverage is `7/7`, episodic `3/3`, and procedural `2/10`; none of the panels is
 ready for replicate analysis because the pre-registered three replicates are
 not yet complete. Its manifest is written
 to ignored `outputs/sensitivity/stage3_coverage.json` and summarized in
@@ -167,7 +169,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 11 accepted first-pass family pilots; SM04/PC03 attempts excluded, remaining family replicates and broader matched replicates pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 12 accepted first-pass family pilots; PC03 and earlier PC02 attempts excluded, remaining family replicates and broader matched replicates pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
