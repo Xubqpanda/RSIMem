@@ -109,6 +109,10 @@ the first attempt remains excluded from all sensitivity denominators.
 The SM04 retry-3 attempt is likewise excluded because provider connection/read
 timeouts caused incomplete usage; its diagnostic report is
 [`sensitivity_sm04_attempt_20260903.md`](sensitivity_sm04_attempt_20260903.md).
+The PC03 replicate-1 attempt is also excluded after the native-static run was
+interrupted for lack of progress; its audit reported
+`run_not_completed`/`sequence_results_missing` and is recorded in
+[`sensitivity_pc03_attempt_20260903.md`](sensitivity_pc03_attempt_20260903.md).
 The launcher can prepare a case-specific PAST sequence slice and passes only
 the opaque method case ID, alongside registered isolated state, Hermes-home,
 and trace locations. It rejects non-executable deployments before forming any

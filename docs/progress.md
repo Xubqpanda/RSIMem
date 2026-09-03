@@ -107,6 +107,10 @@ accepted PC02 retry-2 pilot is recorded in
 The SM04 retry-3 attempt is excluded after provider connection/read timeouts
 caused incomplete usage in `native_static` and `wrong_mechanism`; its
 diagnostic report is `docs/sensitivity_sm04_attempt_20260903.md`.
+The PC03 replicate-1 attempt was interrupted after the native-static run made
+no progress for more than 20 minutes; audit reported `run_not_completed` and
+`sequence_results_missing`. It is documented in
+`docs/sensitivity_pc03_attempt_20260903.md` and excluded from all counts.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
