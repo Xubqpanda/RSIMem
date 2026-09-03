@@ -114,7 +114,8 @@ interrupted for lack of progress; its audit reported
 `run_not_completed`/`sequence_results_missing` and is recorded in
 [`sensitivity_pc03_attempt_20260903.md`](sensitivity_pc03_attempt_20260903.md).
 The content-free coverage manifest reports 11 accepted family-level pilots and
-three excluded attempts; its reproducible summary is
+three excluded attempts, with expected-family coverage semantic `6/7`,
+episodic `3/3`, and procedural `2/10`; its reproducible summary is
 [`stage3_coverage_20260903.md`](stage3_coverage_20260903.md). This manifest is
 coverage/readiness evidence only and does not assign a sensitivity status.
 The launcher can prepare a case-specific PAST sequence slice and passes only

@@ -10,13 +10,19 @@ PYTHONPATH=src .venv/bin/python -m rsimem.sensitivity_coverage \
 ```
 
 The generated coverage manifest has ID
-`sensitivity-coverage.0649c77edbff9575a6e404004ef851e90cfad836`.
+`sensitivity-coverage.448a7da0178ae28faa9f4e50cf24d7e468bbc683`.
 
 | Panel | Accepted pilots | Excluded attempts | Accepted families | Replicates |
 | --- | ---: | ---: | --- | --- |
 | Semantic | 6 | 1 | SM01, SM02, SM03, SM05, SM06, SM07 | 1, 2 (SM01 only) |
 | Episodic | 3 | 0 | EP01, EP02, EP03 | 1 |
 | Procedural | 2 | 2 | PC01, PC02 | 1 |
+
+Expected-family coverage is therefore semantic `6/7`, episodic `3/3`, and
+procedural `2/10`. The missing semantic family is `SM04_rule_migration`; the
+missing procedural families are `PC01_sop_bootstrap_02..06`,
+`PC02_sop_patch_02`, `PC03_latent_rule_induction_01`, and
+`PC04_failure_to_rule_01`.
 
 Every accepted pilot contains all five registered conditions with complete
 content-free audit. The excluded attempts are PC02's first attempt

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from .sensitivity import SensitivityCondition, SensitivityPanel
+from .memory.family_matrix import FamilyRole, PastFamilyMatrix
 
 
 COVERAGE_SCHEMA = "rsimem-sensitivity-coverage-v1"
@@ -146,10 +147,16 @@ def aggregate_sensitivity_coverage(output_root: Path) -> dict[str, object]:
     for record in records:
         by_panel[str(record["panel"])].append(record)
     panels: dict[str, object] = {}
+    family_matrix = PastFamilyMatrix.create_default()
     for panel in SensitivityPanel:
         panel_records = by_panel[panel.value]
         accepted = [record for record in panel_records if record["pilot_ok"]]
         family_ids = sorted({str(record["family_id"]) for record in accepted})
+        expected_family_ids = sorted(
+            spec.family_id
+            for spec in family_matrix.families
+            if spec.panel.value == panel.value and spec.role is FamilyRole.TARGET
+        )
         condition_coverage = {
             condition.value: sum(
                 1 for record in accepted
@@ -160,10 +167,13 @@ def aggregate_sensitivity_coverage(output_root: Path) -> dict[str, object]:
         panels[panel.value] = {
             "accepted_pilot_count": len(accepted),
             "accepted_family_ids": family_ids,
+            "expected_family_ids": expected_family_ids,
+            "missing_family_ids": sorted(set(expected_family_ids) - set(family_ids)),
             "accepted_replicates": sorted({int(record["replicate"]) for record in accepted}),
             "condition_coverage": condition_coverage,
             "excluded_pilot_count": len(panel_records) - len(accepted),
             "pilot_count": len(panel_records),
+            "all_families_covered": set(expected_family_ids).issubset(family_ids),
         }
     identity = {"schema": COVERAGE_SCHEMA, "schema_version": COVERAGE_SCHEMA_VERSION, "panels": panels, "records": records}
     return {"schema": COVERAGE_SCHEMA, "schema_version": COVERAGE_SCHEMA_VERSION, "coverage_id": "sensitivity-coverage." + _digest(identity)[:40], "panels": panels, "records": records}

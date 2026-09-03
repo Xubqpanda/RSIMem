@@ -44,6 +44,8 @@ def test_coverage_aggregates_accepted_panel_and_condition_counts(tmp_path: Path)
     semantic = report["panels"]["semantic"]
     assert semantic["accepted_pilot_count"] == 1
     assert semantic["accepted_family_ids"] == ["SM01_preference_adoption"]
+    assert semantic["all_families_covered"] is False
+    assert "SM02_constraint_retention" in semantic["missing_family_ids"]
     assert semantic["condition_coverage"]["native_static"] == 1
     assert report["records"][0]["pilot_ok"] is True
 
