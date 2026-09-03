@@ -48,9 +48,10 @@ drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
 family/task ID cannot enter the method boundary. Stage 3 has a
-result-independent oracle harness and four audited real-model execution pilots
-(semantic SM01/SM02, episodic EP01, and procedural PC01), but no replicated
-sensitivity results. Its new immutable run-manifest contract
+result-independent oracle harness and twelve accepted first-pass real-model
+execution pilots (semantic SM01/SM02/SM03/SM05/SM06/SM07, episodic
+EP01/EP02/EP03, and procedural PC01/PC02), but no replicated sensitivity
+results. Its new immutable run-manifest contract
 expands every `family x condition x replicate` into isolated state,
 Hermes-home, and trace directories, and the PAST launcher accepts only the
 registered opaque method case ID. Semantic native, no-persistence, shortcut,
@@ -73,7 +74,8 @@ five conditions and are recorded in
 `docs/sensitivity_ep01_pilot_20260902.md`,
 `docs/sensitivity_ep02_pilot_20260902.md`, and
 `docs/sensitivity_ep03_pilot_20260902.md`,
-`docs/sensitivity_pc01_pilot_20260902.md`. This is execution/readiness evidence,
+`docs/sensitivity_pc01_pilot_20260902.md`, and
+`docs/sensitivity_pc02_pilot_20260902.md`. This is execution/readiness evidence,
 not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic, all three episodic, and all
@@ -131,8 +133,9 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines are:
 
-- RSIMem: `1169 passed`, including the Stage 3 isolated run-manifest,
-  opaque launcher task-ID handoff, and EP01 pilot-audit coverage.
+- RSIMem: `1169 passed` before the latest documentation-only updates,
+  including the Stage 3 isolated run-manifest and opaque launcher task-ID
+  handoff.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
@@ -155,7 +158,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for SM01/SM02/EP01/PC01; remaining provider pilots and broader matched replicates pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 12 accepted first-pass family pilots; SM04/PC03 attempts excluded, remaining family replicates and broader matched replicates pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
