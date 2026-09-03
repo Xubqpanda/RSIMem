@@ -10,7 +10,7 @@ PYTHONPATH=src .venv/bin/python -m rsimem.sensitivity_coverage \
 ```
 
 The generated coverage manifest has ID
-`sensitivity-coverage.448a7da0178ae28faa9f4e50cf24d7e468bbc683`.
+`sensitivity-coverage.43be847b4d5ea8bc3cfe36821cb5c9aa3c3bc5d0`.
 
 | Panel | Accepted pilots | Excluded attempts | Accepted families | Replicates |
 | --- | ---: | ---: | --- | --- |
@@ -23,6 +23,11 @@ procedural `2/10`. The missing semantic family is `SM04_rule_migration`; the
 missing procedural families are `PC01_sop_bootstrap_02..06`,
 `PC02_sop_patch_02`, `PC03_latent_rule_induction_01`, and
 `PC04_failure_to_rule_01`.
+
+The manifest also records readiness for replicate analysis. All three panels
+are currently `ready_for_replicate_analysis=false`: episodic covers all three
+families but has only replicate 1, while semantic and procedural still have
+missing families in addition to incomplete replicate coverage.
 
 Every accepted pilot contains all five registered conditions with complete
 content-free audit. The excluded attempts are PC02's first attempt

@@ -10,12 +10,18 @@ from rsimem.sensitivity_coverage import aggregate_sensitivity_coverage
 
 def _write_pilot(root: Path, *, pilot_id: str = "pilot.one", forbidden: bool = False, legacy_audit_name: bool = False) -> None:
     root.mkdir(parents=True)
-    (root / "sensitivity_manifest.json").write_text("{}\n", encoding="utf-8")
     conditions = [
         "no_persistence", "native_static", "type_matched_oracle",
         "shortcut_current_input", "wrong_mechanism",
     ]
     runs = [f"run.{index}" for index in range(5)]
+    (root / "sensitivity_manifest.json").write_text(json.dumps({
+        "runs": [
+            {"run_id": run, "family_id": "SM01_preference_adoption", "panel": "semantic",
+             "replicate": 1, "condition": condition}
+            for run, condition in zip(runs, conditions, strict=True)
+        ]
+    }) + "\n", encoding="utf-8")
     (root / "sensitivity_pilot_plan.json").write_text(json.dumps({
         "schema": "rsimem-sensitivity-pilot-v1", "schema_version": 1,
         "pilot_id": pilot_id, "family_id": "SM01_preference_adoption",
@@ -45,6 +51,7 @@ def test_coverage_aggregates_accepted_panel_and_condition_counts(tmp_path: Path)
     assert semantic["accepted_pilot_count"] == 1
     assert semantic["accepted_family_ids"] == ["SM01_preference_adoption"]
     assert semantic["all_families_covered"] is False
+    assert semantic["ready_for_replicate_analysis"] is False
     assert "SM02_constraint_retention" in semantic["missing_family_ids"]
     assert semantic["condition_coverage"]["native_static"] == 1
     assert report["records"][0]["pilot_ok"] is True
@@ -67,3 +74,13 @@ def test_coverage_accepts_legacy_audit_filename(tmp_path: Path) -> None:
     _write_pilot(tmp_path / "pilot", legacy_audit_name=True)
     report = aggregate_sensitivity_coverage(tmp_path)
     assert report["panels"]["semantic"]["accepted_pilot_count"] == 1
+
+
+def test_coverage_rejects_plan_manifest_identity_drift(tmp_path: Path) -> None:
+    _write_pilot(tmp_path / "pilot")
+    manifest_path = tmp_path / "pilot" / "sensitivity_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["runs"][0]["condition"] = "wrong_mechanism"
+    manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="identity mismatch"):
+        aggregate_sensitivity_coverage(tmp_path)

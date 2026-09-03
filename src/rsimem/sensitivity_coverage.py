@@ -67,8 +67,11 @@ def _load_audit(path: Path) -> dict[str, Any]:
 
 
 def _load_plan(root: Path) -> dict[str, Any]:
-    if not (root / "sensitivity_manifest.json").is_file():
+    manifest_path = root / "sensitivity_manifest.json"
+    if not manifest_path.is_file():
         raise ValueError(f"sensitivity manifest is missing: {root}")
+    manifest = _read_object(manifest_path)
+    _assert_content_free(manifest, path=str(manifest_path))
     value = _read_object(root / "sensitivity_pilot_plan.json")
     _assert_content_free(value, path=str(root / "sensitivity_pilot_plan.json"))
     required = {"pilot_id", "family_id", "panel", "replicate", "condition_order", "run_ids"}
@@ -85,6 +88,25 @@ def _load_plan(root: Path) -> dict[str, Any]:
     run_ids = value["run_ids"]
     if not isinstance(run_ids, list) or len(run_ids) != len(conditions) or not all(isinstance(item, str) for item in run_ids):
         raise ValueError(f"malformed sensitivity run IDs: {root}")
+    manifest_runs = manifest.get("runs")
+    if not isinstance(manifest_runs, list):
+        raise ValueError(f"sensitivity manifest runs are missing: {root}")
+    manifest_by_id = {
+        item.get("run_id"): item
+        for item in manifest_runs
+        if isinstance(item, Mapping) and isinstance(item.get("run_id"), str)
+    }
+    if not set(run_ids).issubset(set(manifest_by_id)):
+        raise ValueError(f"sensitivity plan/manifest run set mismatch: {root}")
+    for condition, run_id in zip(conditions, run_ids, strict=True):
+        item = manifest_by_id[run_id]
+        if (
+            item.get("family_id") != value["family_id"]
+            or item.get("panel") != panel.value
+            or item.get("replicate") != value["replicate"]
+            or item.get("condition") != condition.value
+        ):
+            raise ValueError(f"sensitivity plan/manifest identity mismatch: {root}")
     return {**value, "panel": panel.value, "condition_order": [item.value for item in conditions]}
 
 
@@ -174,7 +196,22 @@ def aggregate_sensitivity_coverage(output_root: Path) -> dict[str, object]:
             "excluded_pilot_count": len(panel_records) - len(accepted),
             "pilot_count": len(panel_records),
             "all_families_covered": set(expected_family_ids).issubset(family_ids),
+            "expected_replicates": list(range(1, family_matrix.replicate_count + 1)),
+            "replicate_coverage_complete": all(
+                set(range(1, family_matrix.replicate_count + 1)).issubset(
+                    {
+                        int(record["replicate"])
+                        for record in accepted
+                        if record["family_id"] == family_id
+                    }
+                )
+                for family_id in expected_family_ids
+            ),
         }
+        panels[panel.value]["ready_for_replicate_analysis"] = bool(
+            panels[panel.value]["all_families_covered"]
+            and panels[panel.value]["replicate_coverage_complete"]
+        )
     identity = {"schema": COVERAGE_SCHEMA, "schema_version": COVERAGE_SCHEMA_VERSION, "panels": panels, "records": records}
     return {"schema": COVERAGE_SCHEMA, "schema_version": COVERAGE_SCHEMA_VERSION, "coverage_id": "sensitivity-coverage." + _digest(identity)[:40], "panels": panels, "records": records}
 

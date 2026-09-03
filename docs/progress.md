@@ -116,7 +116,9 @@ no progress for more than 20 minutes; audit reported `run_not_completed` and
 The content-free coverage aggregator now reconstructs all 14 discovered pilot
 audits: 11 accepted family-level pilots plus three excluded attempts. It also
 compares accepted families with the frozen 26-family target set: semantic
-coverage is `6/7`, episodic `3/3`, and procedural `2/10`. Its manifest is written
+coverage is `6/7`, episodic `3/3`, and procedural `2/10`; none of the panels is
+ready for replicate analysis because the pre-registered three replicates are
+not yet complete. Its manifest is written
 to ignored `outputs/sensitivity/stage3_coverage.json` and summarized in
 `docs/stage3_coverage_20260903.md`; it rejects score/grader/answer fields and
 condition/run identity drift.
