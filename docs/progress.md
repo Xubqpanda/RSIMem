@@ -1,6 +1,6 @@
 # RSIMem Progress
 
-Last updated: 2026-09-02
+Last updated: 2026-09-03
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
@@ -30,7 +30,7 @@ migration.
 - [ ] Not completed.
 - **Current** identifies the milestone that should receive implementation effort next.
 
-## Current Checkpoint (2026-09-02)
+## Current Checkpoint (2026-09-03)
 
 This section is the authoritative summary for the current repository state.
 Later sections retain dated implementation history and may contain earlier
@@ -131,7 +131,7 @@ synthetic RSIMem exposure/use attribution.  Episodic and procedural adapter
 projections remain read-only/read-through surfaces with explicit projection
 verification; semantic writeback remains the only live policy path.
 
-The deterministic and storage-boundary test baselines are:
+The deterministic and storage-boundary test baselines (verified 2026-09-03) are:
 
 - RSIMem: `1169 passed` before the latest documentation-only updates,
   including the Stage 3 isolated run-manifest and opaque launcher task-ID
