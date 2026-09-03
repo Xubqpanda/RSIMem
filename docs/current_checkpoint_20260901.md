@@ -113,6 +113,10 @@ The PC03 replicate-1 attempt is also excluded after the native-static run was
 interrupted for lack of progress; its audit reported
 `run_not_completed`/`sequence_results_missing` and is recorded in
 [`sensitivity_pc03_attempt_20260903.md`](sensitivity_pc03_attempt_20260903.md).
+The content-free coverage manifest reports 11 accepted family-level pilots and
+three excluded attempts; its reproducible summary is
+[`stage3_coverage_20260903.md`](stage3_coverage_20260903.md). This manifest is
+coverage/readiness evidence only and does not assign a sensitivity status.
 The launcher can prepare a case-specific PAST sequence slice and passes only
 the opaque method case ID, alongside registered isolated state, Hermes-home,
 and trace locations. It rejects non-executable deployments before forming any
