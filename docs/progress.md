@@ -142,7 +142,7 @@ verification; semantic writeback remains the only live policy path.
 
 The deterministic and storage-boundary test baselines (verified 2026-09-03) are:
 
-- RSIMem: `1173 passed` (verified 2026-09-03), including the Stage 3 isolated
+- RSIMem: `1174 passed` (verified 2026-09-03), including the Stage 3 isolated
   run-manifest, opaque launcher task-ID handoff, and content-free coverage
   audit tests.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
