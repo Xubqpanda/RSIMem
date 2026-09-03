@@ -84,7 +84,7 @@ input only; its preparation path copies an evaluation-only seed home and passes
 only the opaque case ID to PAST. The semantic catalog also makes native and the
 three declared PAST control slices executable; shortcut and wrong-mechanism
 run without persistence. A manifest-bound pilot executor completed SM01
-replicate-2, SM02 replicate-1, SM03 replicate-1, SM05 replicate-1, SM06 replicate-1, SM07 replicate-1, EP01 replicate-1, EP02 replicate-1, EP03 replicate-1, PC01 replicate-1, and PC02 replicate-1 across
+replicate-2, SM02 replicate-1, SM03 replicate-1, SM04 replicate-1, SM05 replicate-1, SM06 replicate-1, SM07 replicate-1, EP01 replicate-1, EP02 replicate-1, EP03 replicate-1, PC01 replicate-1, and PC02 replicate-1 across
 all five conditions after passing provider probes; each content-free audit
 reconciled all traces and raw usage buckets. This is execution/readiness
 evidence only. The full semantic, episodic, and procedural panels now have 7,
@@ -92,7 +92,7 @@ evidence only. The full semantic, episodic, and procedural panels now have 7,
 learn/update input and verified as evaluation-only fresh-state slices. The
 source-level readiness catalog does not read task prompts, graders, or answers.
 Remaining family pilots and replicates are pending, and no panel sensitivity
-claim has been made. SM03, SM05, SM06, and SM07 are recorded with the semantic pilot
+claim has been made. SM03, SM04, SM05, SM06, and SM07 are recorded with the semantic pilot
 reports; EP01,
 EP02, and EP03 are recorded in the episodic pilot reports; PC02 retry-2 is
 recorded in the procedural pilot reports. A named PAST task
@@ -106,9 +106,11 @@ diagnostic report is retained in
 The accepted retry-2 report is
 [`sensitivity_pc02_pilot_20260902.md`](sensitivity_pc02_pilot_20260902.md);
 the first attempt remains excluded from all sensitivity denominators.
-The SM04 retry-3 attempt is likewise excluded because provider connection/read
+The earlier SM04 retry-3 attempt is likewise excluded because provider connection/read
 timeouts caused incomplete usage; its diagnostic report is
 [`sensitivity_sm04_attempt_20260903.md`](sensitivity_sm04_attempt_20260903.md).
+The accepted SM04 retry-4 report is
+[`sensitivity_sm04_pilot_20260903.md`](sensitivity_sm04_pilot_20260903.md).
 The PC03 replicate-1 attempt is also excluded after the native-static run was
 interrupted for lack of progress; its audit reported
 `run_not_completed`/`sequence_results_missing` and is recorded in
