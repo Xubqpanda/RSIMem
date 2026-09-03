@@ -183,7 +183,7 @@ artifact identity (ID, schema version, and digest). New revocations must use
 
 The most recent deterministic acceptance baseline is:
 
-- RSIMem: `1169 passed` (verified 2026-09-03); the focused launcher/catalog/registry/prepare/run
+- RSIMem: `1173 passed` (verified 2026-09-03); the focused launcher/catalog/registry/prepare/run
   regression suite passes `33` tests. Stage 1 contracts, Stage 2 adapter
   contracts, the Stage 3 sensitivity harness, and isolated run registration
   remain covered.
