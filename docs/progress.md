@@ -57,17 +57,18 @@ registered opaque method case ID. Semantic native, no-persistence, shortcut,
 and wrong-mechanism task slices are now catalog-backed executable deployments;
 shortcut and wrong-mechanism explicitly disable persistence. Seven semantic,
 three episodic, and ten procedural case-bound oracle seeds are registered and
-can be prepared as evaluation-only sequences; SM01, SM02, SM03, SM05, EP01,
-EP02, and EP03 have completed five-condition pilots.
+can be prepared as evaluation-only sequences; SM01, SM02, SM03, SM05, SM06,
+EP01, EP02, and EP03 have completed five-condition pilots.
 The full Stage 3 matrix remains fail-closed because replicated panel coverage is
 still incomplete. A manifest-bound pilot executor and content-free sensitivity audit now
 run one selected family/replicate only. The 2026-09-02 SM01 replicate-2, SM02
-replicate-1, SM03 replicate-1, SM05 replicate-1, EP01 replicate-1, EP02 replicate-1, EP03 replicate-1, and PC01 replicate-1 pilots each completed all
+replicate-1, SM03 replicate-1, SM05 replicate-1, SM06 replicate-1, EP01 replicate-1, EP02 replicate-1, EP03 replicate-1, and PC01 replicate-1 pilots each completed all
 five conditions and are recorded in
 `docs/sensitivity_sm01_pilot_20260902.md` and
 `docs/sensitivity_sm02_pilot_20260902.md`,
 `docs/sensitivity_sm03_pilot_20260902.md`,
 `docs/sensitivity_sm05_pilot_20260903.md`,
+`docs/sensitivity_sm06_pilot_20260903.md`,
 `docs/sensitivity_ep01_pilot_20260902.md`,
 `docs/sensitivity_ep02_pilot_20260902.md`, and
 `docs/sensitivity_ep03_pilot_20260902.md`,
