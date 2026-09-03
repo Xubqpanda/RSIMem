@@ -48,9 +48,9 @@ drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
 family/task ID cannot enter the method boundary. Stage 3 has a
-result-independent oracle harness and twelve accepted first-pass real-model
+result-independent oracle harness and fourteen accepted first-pass real-model
 execution pilots (semantic SM01/SM02/SM03/SM04/SM05/SM06/SM07, episodic
-EP01/EP02/EP03, and procedural PC01/PC02), but no replicated sensitivity
+EP01/EP02/EP03, and procedural PC01/PC02/PC03), but no replicated sensitivity
 results. Its new immutable run-manifest contract
 expands every `family x condition x replicate` into isolated state,
 Hermes-home, and trace directories, and the PAST launcher accepts only the
@@ -75,8 +75,9 @@ five conditions and are recorded in
 `docs/sensitivity_ep01_pilot_20260902.md`,
 `docs/sensitivity_ep02_pilot_20260902.md`, and
 `docs/sensitivity_ep03_pilot_20260902.md`,
-`docs/sensitivity_pc01_pilot_20260902.md`, and
-`docs/sensitivity_pc02_pilot_20260902.md`. This is execution/readiness evidence,
+`docs/sensitivity_pc01_pilot_20260902.md`,
+`docs/sensitivity_pc02_pilot_20260902.md`, and
+`docs/sensitivity_pc03_pilot_20260903.md`. This is execution/readiness evidence,
 not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic, all three episodic, and all
@@ -98,10 +99,10 @@ executable; registry payloads contain no memory text. The checked-in SM01
 semantic panel's seven seeds and all three episodic seeds are manually authored
 from their public learn or update inputs. All ten procedural oracle seeds and
 all five procedural deployment conditions are registered and
-preparation-verified; all seven semantic replicate-1, PC01 and both PC02
-replicate-1, and all three episodic replicate-1 pilots have passed content-free
-audit, while remaining procedural
-and episodic replicates and families are pending. The first PC02 replicate-1 attempt is
+preparation-verified; all seven semantic replicate-1, PC01, both PC02
+replicate-1, PC03 replicate-1, and all three episodic replicate-1 pilots have
+passed content-free audit, while remaining procedural and episodic replicates
+and families are pending. The first PC02 replicate-1 attempt is
 retained as an infrastructure audit but excluded: its `native_static` condition
 had incomplete usage and its control conditions exhausted provider retries
 without usage. It is documented in
@@ -112,14 +113,16 @@ accepted PC02 retry-2 pilot is recorded in
 The earlier SM04 retry-3 attempt is excluded after provider connection/read timeouts
 caused incomplete usage in `native_static` and `wrong_mechanism`; its
 diagnostic report is `docs/sensitivity_sm04_attempt_20260903.md`.
-The PC03 replicate-1 attempt was interrupted after the native-static run made
-no progress for more than 20 minutes; audit reported `run_not_completed` and
-`sequence_results_missing`. It is documented in
-`docs/sensitivity_pc03_attempt_20260903.md` and excluded from all counts.
-The content-free coverage aggregator now reconstructs all 16 discovered pilot
-audits: 13 accepted family-level pilots plus three excluded attempts. It also
-compares accepted families with the frozen 26-family target set: semantic
-coverage is `7/7`, episodic `3/3`, and procedural `3/10`; none of the panels is
+The first PC03 replicate-1 attempt was interrupted after the native-static run
+made no progress for more than 20 minutes; audit reported `run_not_completed`
+and `sequence_results_missing`. It is documented in
+`docs/sensitivity_pc03_attempt_20260903.md` and excluded. A fresh retry-2 batch
+completed all five conditions and is accepted in
+`docs/sensitivity_pc03_pilot_20260903.md`. The content-free coverage aggregator
+now reconstructs all 17 discovered pilot audits: 14 accepted family-level
+pilots plus three excluded attempts. It also compares accepted families with
+the frozen 26-family target set: semantic coverage is `7/7`, episodic `3/3`,
+and procedural `4/10`; none of the panels is
 ready for replicate analysis because the pre-registered three replicates are
 not yet complete. Its manifest is written
 to ignored `outputs/sensitivity/stage3_coverage.json` and summarized in
@@ -170,7 +173,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 13 accepted first-pass family pilots; PC03 and earlier PC02 attempts excluded, remaining family replicates and broader matched replicates pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 14 accepted first-pass family pilots; the first PC03 and PC02 attempts are excluded, remaining procedural families/replicates and broader matched replicates pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an

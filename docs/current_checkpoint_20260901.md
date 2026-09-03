@@ -84,7 +84,7 @@ input only; its preparation path copies an evaluation-only seed home and passes
 only the opaque case ID to PAST. The semantic catalog also makes native and the
 three declared PAST control slices executable; shortcut and wrong-mechanism
 run without persistence. A manifest-bound pilot executor completed SM01
-replicate-2, SM02 replicate-1, SM03 replicate-1, SM04 replicate-1, SM05 replicate-1, SM06 replicate-1, SM07 replicate-1, EP01 replicate-1, EP02 replicate-1, EP03 replicate-1, PC01 replicate-1, PC02 patch-01 replicate-1, and PC02 patch-02 replicate-1 across
+replicate-2, SM02 replicate-1, SM03 replicate-1, SM04 replicate-1, SM05 replicate-1, SM06 replicate-1, SM07 replicate-1, EP01 replicate-1, EP02 replicate-1, EP03 replicate-1, PC01 replicate-1, PC02 patch-01 replicate-1, PC02 patch-02 replicate-1, and PC03 replicate-1 across
 all five conditions after passing provider probes; each content-free audit
 reconciled all traces and raw usage buckets. This is execution/readiness
 evidence only. The full semantic, episodic, and procedural panels now have 7,
@@ -95,8 +95,8 @@ Remaining family pilots and replicates are pending, and no panel sensitivity
 claim has been made. SM03, SM04, SM05, SM06, and SM07 are recorded with the semantic pilot
 reports; EP01,
 EP02, and EP03 are recorded in the episodic pilot reports; both PC02 patch
-pilots are recorded in the procedural pilot reports; PC02 retry-2 is
-recorded in the procedural pilot reports. A named PAST task
+pilots are recorded in the procedural pilot reports; PC02 retry-2 and PC03
+retry-2 are recorded in the procedural pilot reports. A named PAST task
 control remains audit evidence, not an
 executable host deployment, until its artifact/state and launcher configuration
 are registered.
@@ -112,13 +112,15 @@ timeouts caused incomplete usage; its diagnostic report is
 [`sensitivity_sm04_attempt_20260903.md`](sensitivity_sm04_attempt_20260903.md).
 The accepted SM04 retry-4 report is
 [`sensitivity_sm04_pilot_20260903.md`](sensitivity_sm04_pilot_20260903.md).
-The PC03 replicate-1 attempt is also excluded after the native-static run was
+The first PC03 replicate-1 attempt is excluded after the native-static run was
 interrupted for lack of progress; its audit reported
 `run_not_completed`/`sequence_results_missing` and is recorded in
 [`sensitivity_pc03_attempt_20260903.md`](sensitivity_pc03_attempt_20260903.md).
-The content-free coverage manifest reports 13 accepted family-level pilots and
+The fresh retry-2 batch completed all five conditions and is accepted in
+[`sensitivity_pc03_pilot_20260903.md`](sensitivity_pc03_pilot_20260903.md).
+The content-free coverage manifest reports 14 accepted family-level pilots and
 three excluded attempts, with expected-family coverage semantic `7/7`,
-episodic `3/3`, and procedural `3/10`; no panel is ready for replicate analysis
+episodic `3/3`, and procedural `4/10`; no panel is ready for replicate analysis
 because the pre-registered three replicates are incomplete. Its reproducible summary is
 [`stage3_coverage_20260903.md`](stage3_coverage_20260903.md). This manifest is
 coverage/readiness evidence only and does not assign a sensitivity status.
