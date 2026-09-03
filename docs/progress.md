@@ -48,7 +48,7 @@ drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
 family/task ID cannot enter the method boundary. Stage 3 has a
-result-independent oracle harness and twelve accepted first-pass real-model
+result-independent oracle harness and eleven accepted first-pass real-model
 execution pilots (semantic SM01/SM02/SM03/SM05/SM06/SM07, episodic
 EP01/EP02/EP03, and procedural PC01/PC02), but no replicated sensitivity
 results. Its new immutable run-manifest contract
@@ -158,7 +158,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 12 accepted first-pass family pilots; SM04/PC03 attempts excluded, remaining family replicates and broader matched replicates pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 11 accepted first-pass family pilots; SM04/PC03 attempts excluded, remaining family replicates and broader matched replicates pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
