@@ -119,8 +119,8 @@ and `sequence_results_missing`. It is documented in
 `docs/sensitivity_pc03_attempt_20260903.md` and excluded. A fresh retry-2 batch
 completed all five conditions and is accepted in
 `docs/sensitivity_pc03_pilot_20260903.md`. The content-free coverage aggregator
-now reconstructs all 17 discovered pilot audits: 14 accepted family-level
-pilots plus three excluded attempts. It also compares accepted families with
+now reconstructs all 18 discovered pilot audits: 14 accepted family-level
+pilots plus four excluded attempts. It also compares accepted families with
 the frozen 26-family target set: semantic coverage is `7/7`, episodic `3/3`,
 and procedural `4/10`; none of the panels is
 ready for replicate analysis because the pre-registered three replicates are

@@ -16,7 +16,7 @@ attempt; its current ID is recorded in `outputs/sensitivity/stage3_coverage.json
 | --- | ---: | ---: | --- | --- |
 | Semantic | 7 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2 (SM01 only) |
 | Episodic | 3 | 0 | EP01, EP02, EP03 | 1 |
-| Procedural | 4 | 2 | PC01, PC02 patch-01, PC02 patch-02, PC03 | 1 |
+| Procedural | 4 | 3 | PC01, PC02 patch-01, PC02 patch-02, PC03 | 1 |
 
 Expected-family coverage is therefore semantic `7/7`, episodic `3/3`, and
 procedural `4/10`. There is no missing semantic family; the
@@ -31,11 +31,13 @@ missing families in addition to incomplete replicate coverage.
 Every accepted pilot contains all five registered conditions with complete
 content-free audit. The excluded attempts are PC02's first attempt
 (`usage_incomplete` and retry mismatch), the earlier SM04 attempt
-(`usage_incomplete` after provider timeouts), and the first PC03 attempt
-(`run_not_completed`/`sequence_results_missing`). The accepted retry-4 SM04
-pilot and PC03 retry-2 pilot replace their earlier failed attempts and are
-included above. Excluded attempts remain in the manifest for provenance but
-are excluded from all coverage counts and sensitivity denominators.
+(`usage_incomplete` after provider timeouts), the first PC03 attempt, and the
+PC01 bootstrap-02 attempt (`run_not_completed`/`sequence_results_missing`).
+The accepted retry-4 SM04 pilot and PC03 retry-2 pilot replace their earlier
+failed attempts and are included above. The PC01 bootstrap-02 attempt remains
+incomplete and has no accepted replacement. Excluded attempts remain in the
+manifest for provenance but are excluded from all coverage counts and
+sensitivity denominators.
 
 This is a coverage/readiness audit, not a sensitivity status. Stage 3 still
 requires clean coverage for the excluded families, predeclared replicate
