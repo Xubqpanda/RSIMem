@@ -48,7 +48,7 @@ drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
 family/task ID cannot enter the method boundary. Stage 3 has a
-result-independent oracle harness and fourteen accepted first-pass real-model
+result-independent oracle harness and fifteen accepted first-pass real-model
 execution pilots (semantic SM01/SM02/SM03/SM04/SM05/SM06/SM07, episodic
 EP01/EP02/EP03, and procedural PC01/PC02/PC03), but no replicated sensitivity
 results. Its new immutable run-manifest contract
@@ -77,7 +77,8 @@ five conditions and are recorded in
 `docs/sensitivity_ep03_pilot_20260902.md`,
 `docs/sensitivity_pc01_pilot_20260902.md`,
 `docs/sensitivity_pc02_pilot_20260902.md`, and
-`docs/sensitivity_pc03_pilot_20260903.md`. This is execution/readiness evidence,
+`docs/sensitivity_pc03_pilot_20260903.md`, and
+`docs/sensitivity_pc01_02_pilot_20260903.md`. This is execution/readiness evidence,
 not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic, all three episodic, and all
@@ -119,10 +120,10 @@ and `sequence_results_missing`. It is documented in
 `docs/sensitivity_pc03_attempt_20260903.md` and excluded. A fresh retry-2 batch
 completed all five conditions and is accepted in
 `docs/sensitivity_pc03_pilot_20260903.md`. The content-free coverage aggregator
-now reconstructs all 18 discovered pilot audits: 14 accepted family-level
+now reconstructs all 19 discovered pilot audits: 15 accepted family-level
 pilots plus four excluded attempts. It also compares accepted families with
 the frozen 26-family target set: semantic coverage is `7/7`, episodic `3/3`,
-and procedural `4/10`; none of the panels is
+and procedural `5/10`; none of the panels is
 ready for replicate analysis because the pre-registered three replicates are
 not yet complete. Its manifest is written
 to ignored `outputs/sensitivity/stage3_coverage.json` and summarized in

@@ -95,8 +95,9 @@ Remaining family pilots and replicates are pending, and no panel sensitivity
 claim has been made. SM03, SM04, SM05, SM06, and SM07 are recorded with the semantic pilot
 reports; EP01,
 EP02, and EP03 are recorded in the episodic pilot reports; both PC02 patch
-pilots are recorded in the procedural pilot reports; PC02 retry-2 and PC03
-retry-2 are recorded in the procedural pilot reports. A named PAST task
+pilots are recorded in the procedural pilot reports; PC02 retry-2, PC03
+retry-2, and the accepted PC01 bootstrap-02 retry-2 are recorded in the
+procedural pilot reports. A named PAST task
 control remains audit evidence, not an
 executable host deployment, until its artifact/state and launcher configuration
 are registered.
@@ -121,9 +122,9 @@ The fresh retry-2 batch completed all five conditions and is accepted in
 The PC01 bootstrap-02 retry is excluded after its `wrong_mechanism` control
 timed out before terminal completion; its audit and partial traces are
 recorded in [`sensitivity_pc01_02_attempt_20260903.md`](sensitivity_pc01_02_attempt_20260903.md).
-The content-free coverage manifest reports 14 accepted family-level pilots and
+The content-free coverage manifest reports 15 accepted family-level pilots and
 four excluded attempts, with expected-family coverage semantic `7/7`,
-episodic `3/3`, and procedural `4/10`; no panel is ready for replicate analysis
+episodic `3/3`, and procedural `5/10`; no panel is ready for replicate analysis
 because the pre-registered three replicates are incomplete. Its reproducible summary is
 [`stage3_coverage_20260903.md`](stage3_coverage_20260903.md). This manifest is
 coverage/readiness evidence only and does not assign a sensitivity status.
