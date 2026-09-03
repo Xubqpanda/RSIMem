@@ -115,8 +115,8 @@ The PC03 replicate-1 attempt is also excluded after the native-static run was
 interrupted for lack of progress; its audit reported
 `run_not_completed`/`sequence_results_missing` and is recorded in
 [`sensitivity_pc03_attempt_20260903.md`](sensitivity_pc03_attempt_20260903.md).
-The content-free coverage manifest reports 11 accepted family-level pilots and
-three excluded attempts, with expected-family coverage semantic `6/7`,
+The content-free coverage manifest reports 12 accepted family-level pilots and
+three excluded attempts, with expected-family coverage semantic `7/7`,
 episodic `3/3`, and procedural `2/10`; no panel is ready for replicate analysis
 because the pre-registered three replicates are incomplete. Its reproducible summary is
 [`stage3_coverage_20260903.md`](stage3_coverage_20260903.md). This manifest is
