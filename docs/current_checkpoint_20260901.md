@@ -105,6 +105,9 @@ diagnostic report is retained in
 The accepted retry-2 report is
 [`sensitivity_pc02_pilot_20260902.md`](sensitivity_pc02_pilot_20260902.md);
 the first attempt remains excluded from all sensitivity denominators.
+The SM04 retry-3 attempt is likewise excluded because provider connection/read
+timeouts caused incomplete usage; its diagnostic report is
+[`sensitivity_sm04_attempt_20260903.md`](sensitivity_sm04_attempt_20260903.md).
 The launcher can prepare a case-specific PAST sequence slice and passes only
 the opaque method case ID, alongside registered isolated state, Hermes-home,
 and trace locations. It rejects non-executable deployments before forming any

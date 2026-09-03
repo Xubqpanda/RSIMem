@@ -101,6 +101,9 @@ without usage. It is documented in
 `docs/sensitivity_pc02_attempt_20260902.md` and does not count as a pilot. The
 accepted PC02 retry-2 pilot is recorded in
 `docs/sensitivity_pc02_pilot_20260902.md`.
+The SM04 retry-3 attempt is excluded after provider connection/read timeouts
+caused incomplete usage in `native_static` and `wrong_mechanism`; its
+diagnostic report is `docs/sensitivity_sm04_attempt_20260903.md`.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
