@@ -1,4 +1,4 @@
-# Current Checkpoint: EP01 Pilot Audited
+# Current Checkpoint: Stage 3 Pilot Coverage
 
 Date: 2026-09-03
 
