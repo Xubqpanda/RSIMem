@@ -15,16 +15,16 @@ attempt; its current ID is recorded in `outputs/sensitivity/stage3_coverage.json
 | Panel | Accepted pilots | Excluded attempts | Accepted families | Replicates |
 | --- | ---: | ---: | --- | --- |
 | Semantic | 21 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2, 3 (all seven families) |
-| Episodic | 8 | 1 | EP01, EP02, EP03 | 1, 2 (EP01/EP02/EP03), 3 (EP01/EP02 only) |
+| Episodic | 9 | 1 | EP01, EP02, EP03 | 1, 2, 3 (all three families) |
 | Procedural | 10 | 4 | PC01 bootstrap-01/02/03/04/05/06, PC02 patch-01/02, PC03, PC04 | 1 |
 
 Expected-family coverage is therefore semantic `7/7`, episodic `3/3`, and
-procedural `10/10`. There is no missing semantic or procedural family.
+procedural `10/10`. There is no missing family in any panel.
 
-The manifest also records readiness for replicate analysis. Semantic now has
-`replicate_coverage_complete=true` and
-`ready_for_replicate_analysis=true`. Episodic and procedural remain false
-because their replicate coverage is incomplete.
+The manifest also records readiness for replicate analysis. Semantic and
+episodic now both have `replicate_coverage_complete=true` and
+`ready_for_replicate_analysis=true`. Procedural remains false because its
+replicate coverage is incomplete.
 
 Every accepted pilot contains all five registered conditions with complete
 content-free audit. The excluded attempts are PC02's first attempt
@@ -91,6 +91,14 @@ content-free audit and is recorded in
 The accepted EP02 replicate-3 pilot completed all five conditions with a
 content-free audit and is recorded in
 [`sensitivity_ep02_pilot_20260904_r03.md`](sensitivity_ep02_pilot_20260904_r03.md).
+
+The accepted EP03 replicate-3 pilot completed all five conditions with a
+content-free audit and is recorded in
+[`sensitivity_ep03_pilot_20260904_r03.md`](sensitivity_ep03_pilot_20260904_r03.md).
+
+All three episodic families now have complete three-replicate coverage. The
+coverage aggregator reports episodic as replicate-analysis ready; this is not
+yet a sensitivity status.
 
 The EP02 replicate-2 attempt is additionally excluded after
 `usage_incomplete` control traces; it requires a fresh retry. Excluded

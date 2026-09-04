@@ -48,7 +48,7 @@ drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
 family/task ID cannot enter the method boundary. Stage 3 has a
-result-independent oracle harness and a current coverage manifest with 35
+result-independent oracle harness and a current coverage manifest with 40
 accepted family-level pilots plus 6 excluded infrastructure attempts. Semantic
 coverage is 7/7 families, episodic coverage is 3/3, and procedural coverage is
 10/10. These are execution/readiness results only; no replicated sensitivity
@@ -62,7 +62,7 @@ three episodic, and ten procedural case-bound oracle seeds are registered and
 can be prepared as evaluation-only sequences; SM01, SM02, SM03, SM04, SM05,
 SM06, SM07, EP01, EP02, and EP03 have completed five-condition pilots.
 The full Stage 3 matrix remains fail-closed because the pre-registered three
-replicates are incomplete for every panel. A manifest-bound pilot executor and
+replicates are incomplete for the procedural panel. A manifest-bound pilot executor and
 content-free sensitivity audit run one selected family/replicate at a time.
 Each accepted pilot completes all five conditions; excluded attempts remain
 audit evidence and are omitted from coverage and sensitivity denominators.
@@ -90,12 +90,12 @@ semantic panel's seven seeds and all three episodic seeds are manually authored
 from their public learn or update inputs. All ten procedural oracle seeds and
 all five procedural deployment conditions are registered and
 preparation-verified; registry payloads contain no memory text. The
-content-free coverage aggregator reconstructs all 45 discovered pilot
-attempts: 39 accepted family-level pilots plus six excluded attempts. It
+content-free coverage aggregator reconstructs all 46 discovered pilot
+attempts: 40 accepted family-level pilots plus six excluded attempts. It
 compares accepted families with the frozen 26-family target set and rejects
-score/grader/answer fields and condition/run identity drift. All panels remain
-semantic panel now has complete three-replicate coverage and is ready for
-replicate analysis; episodic and procedural remain replicate-incomplete.
+score/grader/answer fields and condition/run identity drift. The semantic and
+episodic panels now have complete three-replicate coverage and are ready for
+replicate analysis; procedural remains replicate-incomplete.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
@@ -141,7 +141,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 39 accepted family-level pilots plus 6 excluded attempts; semantic is replicate-analysis ready, while episodic and procedural remain pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 40 accepted family-level pilots plus 6 excluded attempts; semantic and episodic are replicate-analysis ready, while procedural remains pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
