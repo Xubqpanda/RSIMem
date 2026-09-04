@@ -1,6 +1,6 @@
 # RSIMem Progress
 
-Last updated: 2026-09-03
+Last updated: 2026-09-04
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
@@ -48,7 +48,7 @@ drift before an observed terminal event reaches a method adapter.
 `PastRuntimeTerminalCoordinator` rebuilds the immutable observed host from a
 runner response, and requires an opaque `rsimem_method_task_id` so a PAST
 family/task ID cannot enter the method boundary. Stage 3 has a
-result-independent oracle harness and fifteen accepted first-pass real-model
+result-independent oracle harness and sixteen accepted first-pass real-model
 execution pilots (semantic SM01/SM02/SM03/SM04/SM05/SM06/SM07, episodic
 EP01/EP02/EP03, and procedural PC01/PC02/PC03), but no replicated sensitivity
 results. Its new immutable run-manifest contract
@@ -77,8 +77,9 @@ five conditions and are recorded in
 `docs/sensitivity_ep03_pilot_20260902.md`,
 `docs/sensitivity_pc01_pilot_20260902.md`,
 `docs/sensitivity_pc02_pilot_20260902.md`, and
-`docs/sensitivity_pc03_pilot_20260903.md`, and
-`docs/sensitivity_pc01_02_pilot_20260903.md`. This is execution/readiness evidence,
+`docs/sensitivity_pc03_pilot_20260903.md`,
+`docs/sensitivity_pc01_02_pilot_20260903.md`, and
+`docs/sensitivity_pc01_03_pilot_20260904.md`. This is execution/readiness evidence,
 not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic, all three episodic, and all
@@ -100,8 +101,9 @@ executable; registry payloads contain no memory text. The checked-in SM01
 semantic panel's seven seeds and all three episodic seeds are manually authored
 from their public learn or update inputs. All ten procedural oracle seeds and
 all five procedural deployment conditions are registered and
-preparation-verified; all seven semantic replicate-1, PC01, both PC02
-replicate-1, PC03 replicate-1, and all three episodic replicate-1 pilots have
+preparation-verified; all seven semantic replicate-1, the first three PC01
+bootstrap cases, both PC02 patches, PC03 replicate-1, and all three episodic
+replicate-1 pilots have
 passed content-free audit, while remaining procedural and episodic replicates
 and families are pending. The first PC02 replicate-1 attempt is
 retained as an infrastructure audit but excluded: its `native_static` condition
@@ -119,11 +121,14 @@ made no progress for more than 20 minutes; audit reported `run_not_completed`
 and `sequence_results_missing`. It is documented in
 `docs/sensitivity_pc03_attempt_20260903.md` and excluded. A fresh retry-2 batch
 completed all five conditions and is accepted in
-`docs/sensitivity_pc03_pilot_20260903.md`. The content-free coverage aggregator
-now reconstructs all 20 discovered pilot audits: 15 accepted family-level
+`docs/sensitivity_pc03_pilot_20260903.md`. The first PC01 bootstrap-03 attempt
+is also excluded after `wrong_mechanism` lacked terminal completion; its fresh
+retry-2 completed all five conditions and is accepted in
+`docs/sensitivity_pc01_03_pilot_20260904.md`. The content-free coverage aggregator
+now reconstructs all 21 discovered pilot audits: 16 accepted family-level
 pilots plus five excluded attempts. It also compares accepted families with
 the frozen 26-family target set: semantic coverage is `7/7`, episodic `3/3`,
-and procedural `5/10`; none of the panels is
+and procedural `6/10`; none of the panels is
 ready for replicate analysis because the pre-registered three replicates are
 not yet complete. Its manifest is written
 to ignored `outputs/sensitivity/stage3_coverage.json` and summarized in

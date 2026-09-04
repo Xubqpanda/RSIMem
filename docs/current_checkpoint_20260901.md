@@ -1,6 +1,6 @@
 # Current Checkpoint: Stage 3 Pilot Coverage
 
-Date: 2026-09-03
+Date: 2026-09-04
 
 ## Decision
 
@@ -125,9 +125,11 @@ recorded in [`sensitivity_pc01_02_attempt_20260903.md`](sensitivity_pc01_02_atte
 Its retry-2 pilot completed and is accepted. The first PC01 bootstrap-03 pilot
 is separately excluded after the same control lacked terminal completion; see
 [`sensitivity_pc01_03_attempt_20260903.md`](sensitivity_pc01_03_attempt_20260903.md).
-The content-free coverage manifest reports 15 accepted family-level pilots and
+Its fresh retry-2 completed all five conditions and is accepted in
+[`sensitivity_pc01_03_pilot_20260904.md`](sensitivity_pc01_03_pilot_20260904.md).
+The content-free coverage manifest reports 16 accepted family-level pilots and
 five excluded attempts, with expected-family coverage semantic `7/7`,
-episodic `3/3`, and procedural `5/10`; no panel is ready for replicate analysis
+episodic `3/3`, and procedural `6/10`; no panel is ready for replicate analysis
 because the pre-registered three replicates are incomplete. Its reproducible summary is
 [`stage3_coverage_20260903.md`](stage3_coverage_20260903.md). This manifest is
 coverage/readiness evidence only and does not assign a sensitivity status.
