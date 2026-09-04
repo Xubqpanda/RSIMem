@@ -83,8 +83,9 @@ five conditions and are recorded in
 `docs/sensitivity_pc01_04_pilot_20260904.md`, and
 `docs/sensitivity_pc01_05_pilot_20260904.md`, and
 `docs/sensitivity_pc01_06_pilot_20260904.md`, and
-`docs/sensitivity_pc04_pilot_20260904.md`, and
-`docs/sensitivity_ep01_pilot_20260904_r02.md`. This is execution/readiness evidence,
+`docs/sensitivity_pc04_pilot_20260904.md`,
+`docs/sensitivity_ep01_pilot_20260904_r02.md`, and
+`docs/sensitivity_ep02_pilot_20260904_r02.md`. This is execution/readiness evidence,
 not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic, all three episodic, and all
