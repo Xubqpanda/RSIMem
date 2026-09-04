@@ -122,8 +122,11 @@ The fresh retry-2 batch completed all five conditions and is accepted in
 The PC01 bootstrap-02 retry is excluded after its `wrong_mechanism` control
 timed out before terminal completion; its audit and partial traces are
 recorded in [`sensitivity_pc01_02_attempt_20260903.md`](sensitivity_pc01_02_attempt_20260903.md).
+Its retry-2 pilot completed and is accepted. The first PC01 bootstrap-03 pilot
+is separately excluded after the same control lacked terminal completion; see
+[`sensitivity_pc01_03_attempt_20260903.md`](sensitivity_pc01_03_attempt_20260903.md).
 The content-free coverage manifest reports 15 accepted family-level pilots and
-four excluded attempts, with expected-family coverage semantic `7/7`,
+five excluded attempts, with expected-family coverage semantic `7/7`,
 episodic `3/3`, and procedural `5/10`; no panel is ready for replicate analysis
 because the pre-registered three replicates are incomplete. Its reproducible summary is
 [`stage3_coverage_20260903.md`](stage3_coverage_20260903.md). This manifest is
