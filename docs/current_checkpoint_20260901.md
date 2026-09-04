@@ -151,7 +151,9 @@ The SM03 replicate-2 pilot completed all five conditions and is accepted in
 [`sensitivity_sm03_pilot_20260904_r02.md`](sensitivity_sm03_pilot_20260904_r02.md).
 The SM04 replicate-2 pilot completed all five conditions and is accepted in
 [`sensitivity_sm04_pilot_20260904_r02.md`](sensitivity_sm04_pilot_20260904_r02.md).
-The content-free coverage manifest reports 26 accepted family-level pilots and
+The SM05 replicate-2 pilot completed all five conditions and is accepted in
+[`sensitivity_sm05_pilot_20260904_r02.md`](sensitivity_sm05_pilot_20260904_r02.md).
+The content-free coverage manifest reports 28 accepted family-level pilots and
 six excluded attempts, with expected-family coverage semantic `7/7`,
 episodic `3/3`, and procedural `10/10`; no panel is ready for replicate analysis
 because the pre-registered three replicates are incomplete. Its reproducible summary is
