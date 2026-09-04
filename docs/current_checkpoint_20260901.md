@@ -143,7 +143,9 @@ Its fresh retry-2 completed all five conditions and is accepted in
 [`sensitivity_ep02_pilot_20260904_r02.md`](sensitivity_ep02_pilot_20260904_r02.md).
 The EP03 replicate-2 pilot completed all five conditions and is accepted in
 [`sensitivity_ep03_pilot_20260904_r02.md`](sensitivity_ep03_pilot_20260904_r02.md).
-The content-free coverage manifest reports 22 accepted family-level pilots and
+The SM01 replicate-3 pilot completed all five conditions and is accepted in
+[`sensitivity_sm01_pilot_20260904_r03.md`](sensitivity_sm01_pilot_20260904_r03.md).
+The content-free coverage manifest reports 23 accepted family-level pilots and
 six excluded attempts, with expected-family coverage semantic `7/7`,
 episodic `3/3`, and procedural `10/10`; no panel is ready for replicate analysis
 because the pre-registered three replicates are incomplete. Its reproducible summary is

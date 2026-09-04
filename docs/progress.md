@@ -86,7 +86,8 @@ five conditions and are recorded in
 `docs/sensitivity_pc04_pilot_20260904.md`,
 `docs/sensitivity_ep01_pilot_20260904_r02.md`, and
 `docs/sensitivity_ep02_pilot_20260904_r02.md`, and
-`docs/sensitivity_ep03_pilot_20260904_r02.md`. This is execution/readiness evidence,
+`docs/sensitivity_ep03_pilot_20260904_r02.md`, and
+`docs/sensitivity_sm01_pilot_20260904_r03.md`. This is execution/readiness evidence,
 not a sensitivity estimate or live N+1 experiment.
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic, all three episodic, and all
@@ -132,7 +133,7 @@ completed all five conditions and is accepted in
 is also excluded after `wrong_mechanism` lacked terminal completion; its fresh
 retry-2 completed all five conditions and is accepted in
 `docs/sensitivity_pc01_03_pilot_20260904.md`. The content-free coverage aggregator
-now reconstructs all 28 discovered pilot audits: 22 accepted family-level
+now reconstructs all 29 discovered pilot audits: 23 accepted family-level
 pilots plus six excluded attempts. It also compares accepted families with
 the frozen 26-family target set: semantic coverage is `7/7`, episodic `3/3`,
 and procedural `10/10`; none of the panels is
