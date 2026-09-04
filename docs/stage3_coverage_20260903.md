@@ -15,7 +15,7 @@ attempt; its current ID is recorded in `outputs/sensitivity/stage3_coverage.json
 | Panel | Accepted pilots | Excluded attempts | Accepted families | Replicates |
 | --- | ---: | ---: | --- | --- |
 | Semantic | 7 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2 (SM01 only) |
-| Episodic | 4 | 0 | EP01, EP02, EP03 | 1, 2 (EP01 only) |
+| Episodic | 4 | 1 | EP01, EP02, EP03 | 1, 2 (EP01 only) |
 | Procedural | 10 | 4 | PC01 bootstrap-01/02/03/04/05/06, PC02 patch-01/02, PC03, PC04 | 1 |
 
 Expected-family coverage is therefore semantic `7/7`, episodic `3/3`, and
@@ -39,6 +39,11 @@ bootstrap-03 attempt is likewise superseded by its accepted retry-2 pilot.
 Excluded attempts remain in the manifest for
 provenance but are excluded from all coverage counts and sensitivity
 denominators.
+
+The EP02 replicate-2 attempt is additionally excluded after
+`usage_incomplete` control traces; it requires a fresh retry. Excluded
+attempts remain in the manifest for provenance but are excluded from coverage
+counts and sensitivity denominators.
 
 This is a coverage/readiness audit, not a sensitivity status. Stage 3 still
 requires predeclared replicate coverage, family-level paired deltas, variation, oracle coverage, and explicit

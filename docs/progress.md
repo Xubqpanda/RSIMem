@@ -130,8 +130,8 @@ completed all five conditions and is accepted in
 is also excluded after `wrong_mechanism` lacked terminal completion; its fresh
 retry-2 completed all five conditions and is accepted in
 `docs/sensitivity_pc01_03_pilot_20260904.md`. The content-free coverage aggregator
-now reconstructs all 26 discovered pilot audits: 21 accepted family-level
-pilots plus five excluded attempts. It also compares accepted families with
+now reconstructs all 27 discovered pilot audits: 21 accepted family-level
+pilots plus six excluded attempts. It also compares accepted families with
 the frozen 26-family target set: semantic coverage is `7/7`, episodic `3/3`,
 and procedural `10/10`; none of the panels is
 ready for replicate analysis because the pre-registered three replicates are
