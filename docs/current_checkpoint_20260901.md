@@ -173,8 +173,10 @@ The SM01 replicate-1 pilot completed all five conditions and is accepted in
 [`sensitivity_sm01_pilot_20260904_r01.md`](sensitivity_sm01_pilot_20260904_r01.md).
 All seven semantic families now have complete three-replicate coverage. The
 coverage aggregator reports semantic as replicate-analysis ready; this is not
-yet a sensitivity status. The content-free coverage manifest reports 37
-accepted family-level pilots and
+yet a sensitivity status.
+The EP01 replicate-3 pilot completed all five conditions and is accepted in
+[`sensitivity_ep01_pilot_20260904_r03.md`](sensitivity_ep01_pilot_20260904_r03.md).
+The content-free coverage manifest reports 38 accepted family-level pilots and
 six excluded attempts, with expected-family coverage semantic `7/7`,
 episodic `3/3`, and procedural `10/10`; episodic and procedural remain
 replicate-incomplete. Its reproducible summary is

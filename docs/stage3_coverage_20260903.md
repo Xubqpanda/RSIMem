@@ -15,7 +15,7 @@ attempt; its current ID is recorded in `outputs/sensitivity/stage3_coverage.json
 | Panel | Accepted pilots | Excluded attempts | Accepted families | Replicates |
 | --- | ---: | ---: | --- | --- |
 | Semantic | 21 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2, 3 (all seven families) |
-| Episodic | 6 | 1 | EP01, EP02, EP03 | 1, 2 (EP01/EP02/EP03) |
+| Episodic | 7 | 1 | EP01, EP02, EP03 | 1, 2 (EP01/EP02/EP03), 3 (EP01 only) |
 | Procedural | 10 | 4 | PC01 bootstrap-01/02/03/04/05/06, PC02 patch-01/02, PC03, PC04 | 1 |
 
 Expected-family coverage is therefore semantic `7/7`, episodic `3/3`, and
@@ -83,6 +83,10 @@ content-free audit and is recorded in
 The accepted SM01 replicate-1 pilot completed all five conditions with a
 content-free audit and is recorded in
 [`sensitivity_sm01_pilot_20260904_r01.md`](sensitivity_sm01_pilot_20260904_r01.md).
+
+The accepted EP01 replicate-3 pilot completed all five conditions with a
+content-free audit and is recorded in
+[`sensitivity_ep01_pilot_20260904_r03.md`](sensitivity_ep01_pilot_20260904_r03.md).
 
 The EP02 replicate-2 attempt is additionally excluded after
 `usage_incomplete` control traces; it requires a fresh retry. Excluded
