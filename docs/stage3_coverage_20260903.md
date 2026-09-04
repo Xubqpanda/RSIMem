@@ -1,4 +1,4 @@
-# Stage 3 Coverage Audit - 2026-09-03
+# Stage 3 Coverage Audit - 2026-09-04
 
 This report is generated from the content-free pilot audits under
 `outputs/sensitivity`. It does not read task scores, prompts, grader fields,
@@ -14,17 +14,17 @@ attempt; its current ID is recorded in `outputs/sensitivity/stage3_coverage.json
 
 | Panel | Accepted pilots | Excluded attempts | Accepted families | Replicates |
 | --- | ---: | ---: | --- | --- |
-| Semantic | 19 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2 (SM01/SM02/SM03/SM04/SM05/SM06/SM07), 3 (SM01/SM02/SM03/SM04/SM05/SM06 only) |
+| Semantic | 20 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2, 3 (all seven families) |
 | Episodic | 6 | 1 | EP01, EP02, EP03 | 1, 2 (EP01/EP02/EP03) |
 | Procedural | 10 | 4 | PC01 bootstrap-01/02/03/04/05/06, PC02 patch-01/02, PC03, PC04 | 1 |
 
 Expected-family coverage is therefore semantic `7/7`, episodic `3/3`, and
 procedural `10/10`. There is no missing semantic or procedural family.
 
-The manifest also records readiness for replicate analysis. All three panels
-are currently `ready_for_replicate_analysis=false`: episodic covers all three
-families and all three have replicate 2, while semantic and procedural have
-incomplete replicate coverage.
+The manifest also records readiness for replicate analysis. Semantic is now
+`ready_for_replicate_analysis=true` because all seven families have three
+accepted replicates. Episodic and procedural remain false because their
+replicate coverage is incomplete.
 
 Every accepted pilot contains all five registered conditions with complete
 content-free audit. The excluded attempts are PC02's first attempt
@@ -75,6 +75,10 @@ content-free audit and is recorded in
 The accepted SM06 replicate-3 pilot completed all five conditions with a
 content-free audit and is recorded in
 [`sensitivity_sm06_pilot_20260904_r03.md`](sensitivity_sm06_pilot_20260904_r03.md).
+
+The accepted SM07 replicate-3 pilot completed all five conditions with a
+content-free audit and is recorded in
+[`sensitivity_sm07_pilot_20260904_r03.md`](sensitivity_sm07_pilot_20260904_r03.md).
 
 The EP02 replicate-2 attempt is additionally excluded after
 `usage_incomplete` control traces; it requires a fresh retry. Excluded
