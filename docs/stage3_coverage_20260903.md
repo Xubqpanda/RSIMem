@@ -14,7 +14,7 @@ attempt; its current ID is recorded in `outputs/sensitivity/stage3_coverage.json
 
 | Panel | Accepted pilots | Excluded attempts | Accepted families | Replicates |
 | --- | ---: | ---: | --- | --- |
-| Semantic | 9 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2 (SM01/SM02), 3 (SM01 only) |
+| Semantic | 10 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2 (SM01/SM02/SM03), 3 (SM01 only) |
 | Episodic | 6 | 1 | EP01, EP02, EP03 | 1, 2 (EP01/EP02/EP03) |
 | Procedural | 10 | 4 | PC01 bootstrap-01/02/03/04/05/06, PC02 patch-01/02, PC03, PC04 | 1 |
 
