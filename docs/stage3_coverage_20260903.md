@@ -15,7 +15,7 @@ attempt; its current ID is recorded in `outputs/sensitivity/stage3_coverage.json
 | Panel | Accepted pilots | Excluded attempts | Accepted families | Replicates |
 | --- | ---: | ---: | --- | --- |
 | Semantic | 7 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2 (SM01 only) |
-| Episodic | 5 | 1 | EP01, EP02, EP03 | 1, 2 (EP01/EP02) |
+| Episodic | 6 | 1 | EP01, EP02, EP03 | 1, 2 (EP01/EP02/EP03) |
 | Procedural | 10 | 4 | PC01 bootstrap-01/02/03/04/05/06, PC02 patch-01/02, PC03, PC04 | 1 |
 
 Expected-family coverage is therefore semantic `7/7`, episodic `3/3`, and
@@ -23,7 +23,7 @@ procedural `10/10`. There is no missing semantic or procedural family.
 
 The manifest also records readiness for replicate analysis. All three panels
 are currently `ready_for_replicate_analysis=false`: episodic covers all three
-families but only EP01 and EP02 have replicate 2, while semantic and procedural have
+families and all three have replicate 2, while semantic and procedural have
 incomplete replicate coverage.
 
 Every accepted pilot contains all five registered conditions with complete
