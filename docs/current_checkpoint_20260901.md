@@ -133,9 +133,11 @@ The PC01 bootstrap-05 pilot completed all five conditions and is accepted in
 [`sensitivity_pc01_05_pilot_20260904.md`](sensitivity_pc01_05_pilot_20260904.md).
 The PC01 bootstrap-06 pilot completed all five conditions and is accepted in
 [`sensitivity_pc01_06_pilot_20260904.md`](sensitivity_pc01_06_pilot_20260904.md).
-The content-free coverage manifest reports 19 accepted family-level pilots and
+The PC04 failure-to-rule pilot completed all five conditions and is accepted in
+[`sensitivity_pc04_pilot_20260904.md`](sensitivity_pc04_pilot_20260904.md).
+The content-free coverage manifest reports 20 accepted family-level pilots and
 five excluded attempts, with expected-family coverage semantic `7/7`,
-episodic `3/3`, and procedural `9/10`; no panel is ready for replicate analysis
+episodic `3/3`, and procedural `10/10`; no panel is ready for replicate analysis
 because the pre-registered three replicates are incomplete. Its reproducible summary is
 [`stage3_coverage_20260903.md`](stage3_coverage_20260903.md). This manifest is
 coverage/readiness evidence only and does not assign a sensitivity status.
