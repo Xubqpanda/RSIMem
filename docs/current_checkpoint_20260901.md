@@ -183,7 +183,10 @@ The EP03 replicate-3 pilot completed all five conditions and is accepted in
 All three episodic families now have complete three-replicate coverage. The
 coverage aggregator reports episodic as replicate-analysis ready; this is not
 yet a sensitivity status.
-The content-free coverage manifest reports 40 accepted family-level pilots and
+The PC01 bootstrap-01 replicate-2 pilot completed all five conditions and is
+accepted in
+[`sensitivity_pc01_01_pilot_20260904_r02.md`](sensitivity_pc01_01_pilot_20260904_r02.md).
+The content-free coverage manifest reports 41 accepted family-level pilots and
 six excluded attempts, with expected-family coverage semantic `7/7`,
 episodic `3/3`, and procedural `10/10`; procedural remains
 replicate-incomplete. Its reproducible summary is
