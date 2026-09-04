@@ -48,7 +48,7 @@ sensitivity estimate. It confirms only that the five SM07 scoped-rule
 migration deployment paths can be isolated, executed, and audited with the
 registered semantic oracle seed and explicit controls.
 
-All seven semantic families now have three accepted replicates. This makes the
-semantic panel replicate-analysis ready, but it does not itself establish a
-sensitivity status. Raw resources remain reporting fields and are not policy
-rewards.
+SM02 through SM07 now have three accepted replicates. SM01 still lacks its
+pre-registered replicate-1 pilot, so the semantic panel is not yet
+replicate-analysis ready. Raw resources remain reporting fields and are not
+policy rewards.

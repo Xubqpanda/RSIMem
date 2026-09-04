@@ -94,8 +94,8 @@ content-free coverage aggregator reconstructs all 42 discovered pilot
 attempts: 36 accepted family-level pilots plus six excluded attempts. It
 compares accepted families with the frozen 26-family target set and rejects
 score/grader/answer fields and condition/run identity drift. All panels remain
-semantic panel is ready for replicate analysis after all seven families
-completed three replicates; episodic and procedural remain replicate-incomplete.
+semantic panel remains replicate-incomplete because SM01 lacks replicate 1;
+episodic and procedural are also replicate-incomplete.
 The runtime
 automatically wires a completed Hermes task into the pure-process path:
 
@@ -141,7 +141,7 @@ Current capability matrix:
 | Extraction N+1, held-out validation, adaptive effect | locked | requires a valid Stage 2 signal gate |
 | Stage 1 taxonomy/surface/family/protocol contracts | complete | versioned contracts, manifest, and focused reverse tests |
 | Stage 2 adapter boundaries and bridge split | partial | typed contracts, deterministic host/method fixtures, Hermes host operations, three-memory projection split, live runner host-trace export, `PastExecutionTrace`, and launcher-facing terminal method binding; full method lifecycle/event-outcome-usage golden trace pending |
-| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 36 accepted family-level pilots plus 6 excluded attempts; semantic has complete three-replicate coverage, while episodic and procedural remain pending |
+| Stage 3 SM/EP/PC sensitivity matrix | partial | type-isolated harness, case-bound source census, verified registry (7 semantic + 3 episodic + 10 procedural oracle seeds), catalog-backed five-condition preparation, manifest-bound pilot executor, and content-free audits for 36 accepted family-level pilots plus 6 excluded attempts; semantic still lacks SM01 replicate 1, while episodic and procedural also remain pending |
 
 The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
