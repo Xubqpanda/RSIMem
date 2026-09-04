@@ -16,11 +16,11 @@ attempt; its current ID is recorded in `outputs/sensitivity/stage3_coverage.json
 | --- | ---: | ---: | --- | --- |
 | Semantic | 7 | 1 | SM01, SM02, SM03, SM04, SM05, SM06, SM07 | 1, 2 (SM01 only) |
 | Episodic | 3 | 0 | EP01, EP02, EP03 | 1 |
-| Procedural | 8 | 4 | PC01 bootstrap-01/02/03/04/05, PC02 patch-01/02, PC03 | 1 |
+| Procedural | 9 | 4 | PC01 bootstrap-01/02/03/04/05/06, PC02 patch-01/02, PC03 | 1 |
 
 Expected-family coverage is therefore semantic `7/7`, episodic `3/3`, and
-procedural `8/10`. There is no missing semantic family; the
-missing procedural families are `PC01_sop_bootstrap_06`,
+procedural `9/10`. There is no missing semantic family; the
+missing procedural family is
 `PC04_failure_to_rule_01`.
 
 The manifest also records readiness for replicate analysis. All three panels
