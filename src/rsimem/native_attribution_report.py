@@ -75,6 +75,10 @@ def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
             item.memory_kind or "none" for item in candidates
         ]),
         "family_counts": _counts([item.family_id for item in candidates]),
+        "replicate_counts": _counts([
+            str(item.replicate_id) if item.replicate_id is not None else "unknown"
+            for item in candidates
+        ]),
         "panel_counts": _counts([_panel(item.family_id) for item in candidates]),
         "family_surface_counts": {
             family: _counts([

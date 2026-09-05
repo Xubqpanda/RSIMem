@@ -271,6 +271,7 @@ class NativeEpisodeObservation:
     events: tuple[NativeSurfaceObservation, ...]
     usage_digest: str
     final_output_digest: str | None = None
+    replicate_id: int | None = None
     evidence_plane: str = "benchmark_audit"
 
     def __post_init__(self) -> None:
@@ -292,6 +293,8 @@ class NativeEpisodeObservation:
             or any(character not in "0123456789abcdef" for character in self.final_output_digest)
         ):
             raise ValueError("native observation final output digest is invalid")
+        if self.replicate_id is not None and (type(self.replicate_id) is not int or self.replicate_id < 1):
+            raise ValueError("native observation replicate ID is invalid")
         if self.observation_id != "native-observation." + _digest(self.identity_payload())[:40]:
             raise ValueError("native observation ID mismatch")
 
@@ -309,6 +312,8 @@ class NativeEpisodeObservation:
         }
         if self.final_output_digest is not None:
             values["final_output_digest"] = self.final_output_digest
+        if self.replicate_id is not None:
+            values["replicate_id"] = self.replicate_id
         return values
 
     def payload(self) -> dict[str, object]:
@@ -322,7 +327,8 @@ class NativeEpisodeObservation:
             "observation_id", "schema", "run_id", "trace_id", "task_id", "family_id",
             "memory_kind", "events", "usage_digest", "evidence_plane",
         }
-        if set(payload) not in (expected, expected | {"final_output_digest"}) or payload.get("schema") != OBSERVATION_SCHEMA:
+        allowed = (expected, expected | {"final_output_digest"}, expected | {"replicate_id"}, expected | {"final_output_digest", "replicate_id"})
+        if set(payload) not in allowed or payload.get("schema") != OBSERVATION_SCHEMA:
             raise ValueError("native observation payload fields are invalid")
         scalar_fields = (
             "observation_id", "run_id", "trace_id", "task_id", "family_id", "usage_digest",
@@ -335,6 +341,9 @@ class NativeEpisodeObservation:
             final_output_digest, str
         ):
             raise ValueError("native observation final output digest type is invalid")
+        replicate_id = payload.get("replicate_id")
+        if replicate_id is not None and type(replicate_id) is not int:
+            raise ValueError("native observation replicate ID type is invalid")
         raw_events = payload.get("events")
         if not isinstance(raw_events, list):
             raise ValueError("native observation events are malformed")
@@ -348,6 +357,7 @@ class NativeEpisodeObservation:
             events=tuple(NativeSurfaceObservation.from_payload(value) for value in raw_events),
             usage_digest=payload["usage_digest"],
             final_output_digest=final_output_digest,
+            replicate_id=replicate_id,
             evidence_plane=payload["evidence_plane"],
         )
 
@@ -405,6 +415,7 @@ def extract_native_observations(
             if isinstance(final_output, str)
             else None
         )
+        replicate_id = run.replicate
         memory_refs = tuple(
             str(value["eventId"]) for value in memory_events
             if isinstance(value.get("eventId"), str)
@@ -489,6 +500,7 @@ def extract_native_observations(
         }
         if final_output_digest is not None:
             values["final_output_digest"] = final_output_digest
+        values["replicate_id"] = replicate_id
         observations.append(NativeEpisodeObservation(
             observation_id="native-observation." + _digest(values)[:40],
             run_id=run.run_id,
@@ -499,6 +511,7 @@ def extract_native_observations(
             events=events,
             usage_digest=audit.usage_digest,
             final_output_digest=final_output_digest,
+            replicate_id=replicate_id,
         ))
     if tuple(value.task_id for value in observations) != run.native_task_ids:
         raise ValueError("native observations do not cover the registered task order")

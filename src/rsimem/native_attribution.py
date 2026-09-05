@@ -74,6 +74,7 @@ class NativeAttributionCandidate:
     is_actionable: bool
     review_status: str
     expectation_contract_id: str | None
+    replicate_id: int | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -85,6 +86,10 @@ class NativeAttributionCandidate:
             raise ValueError("deterministic attribution cannot finalize review")
         if self.is_actionable != (self.candidate_repair_axis is not None):
             raise ValueError("native attribution actionability and repair axis disagree")
+        if self.replicate_id is not None and (
+            type(self.replicate_id) is not int or self.replicate_id < 1
+        ):
+            raise ValueError("native attribution replicate ID is invalid")
         if self.primary_failure_surface is FailureSurface.UNRESOLVED and self.is_actionable:
             raise ValueError("unresolved native attribution cannot be actionable")
         if self.attribution_id != "native-attribution." + _digest(self.identity_payload())[:40]:
@@ -105,6 +110,7 @@ class NativeAttributionCandidate:
             "is_actionable": self.is_actionable,
             "review_status": self.review_status,
             "expectation_contract_id": self.expectation_contract_id,
+            **({"replicate_id": self.replicate_id} if self.replicate_id is not None else {}),
         }
 
     def payload(self) -> dict[str, object]:
@@ -120,7 +126,8 @@ class NativeAttributionCandidate:
             "confidence", "candidate_repair_axis", "is_actionable", "review_status",
             "expectation_contract_id",
         }
-        if set(payload) != expected or payload.get("schema") != ATTRIBUTION_SCHEMA:
+        allowed = (expected, expected | {"replicate_id"})
+        if set(payload) not in allowed or payload.get("schema") != ATTRIBUTION_SCHEMA:
             raise ValueError("native attribution payload fields are invalid")
         scalar_fields = (
             "attribution_id", "observation_id", "case_id", "family_id", "confidence",
@@ -131,6 +138,9 @@ class NativeAttributionCandidate:
         for field in ("memory_kind", "candidate_repair_axis", "expectation_contract_id"):
             if payload[field] is not None and not isinstance(payload[field], str):
                 raise ValueError("native attribution optional field type is invalid")
+        replicate_id = payload.get("replicate_id")
+        if replicate_id is not None and type(replicate_id) is not int:
+            raise ValueError("native attribution replicate ID type is invalid")
         for field in ("secondary_observations", "evidence_refs"):
             if not isinstance(payload[field], list) or any(
                 not isinstance(value, str) for value in payload[field]
@@ -152,6 +162,7 @@ class NativeAttributionCandidate:
             is_actionable=payload["is_actionable"],
             review_status=payload["review_status"],
             expectation_contract_id=payload["expectation_contract_id"],
+            replicate_id=replicate_id,
         )
 
 
@@ -277,6 +288,7 @@ def attribute_native_observation(
         "is_actionable": actionable,
         "review_status": "candidate_pending_review",
         "expectation_contract_id": expectation.contract_id if expectation else None,
+        "replicate_id": observation.replicate_id,
     }
     return NativeAttributionCandidate(
         attribution_id="native-attribution." + _digest(values)[:40],
@@ -292,6 +304,7 @@ def attribute_native_observation(
         is_actionable=actionable,
         review_status="candidate_pending_review",
         expectation_contract_id=expectation.contract_id if expectation else None,
+        replicate_id=observation.replicate_id,
     )
 
 
