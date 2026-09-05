@@ -10,7 +10,12 @@ import pytest
 from rsimem.native_attribution import attribute_native_observation
 from rsimem.native_attribution import _digest as attribution_digest
 from rsimem.native_attribution import NativeAttributionCandidate
-from rsimem.native_repair_selection import select_native_repair_cases, build_case_list_payload
+from rsimem.native_repair_selection import (
+    NativeRepairCaseList,
+    NativeRepairCaseListStore,
+    select_native_repair_cases,
+    build_case_list_payload,
+)
 from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
 from rsimem.native_attribution_report import (
     assess_stage2_gate,
@@ -203,6 +208,13 @@ def test_repair_case_selection_is_fail_closed_and_corpus_bound(tmp_path) -> None
     payload = build_case_list_payload(reviewed, cases)
     assert payload["corpus_id"] == reviewed.corpus_id
     assert payload["cases"][0]["repair_axis"] == "formation"
+    case_list = NativeRepairCaseList.from_payload({
+        **payload, "schema": payload["schema"],
+    })
+    store = NativeRepairCaseListStore(tmp_path / "repair-cases.json")
+    assert store.put(case_list) is True
+    assert store.put(case_list) is False
+    assert store.load().payload() == case_list.payload()
 
 
 def test_stage2_gate_positive_contract_requires_two_reviewer_case(tmp_path) -> None:

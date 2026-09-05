@@ -216,6 +216,8 @@ review_status
 它只接受 high-confidence、唯一合法 repair axis、完整 evidence 且完成双
 reviewer 覆盖的 attribution；不会读取 score 或生成 oracle 内容。当前
 `STOP_NO_ACTIONABLE_SIGNAL` corpus 因没有 eligible case，无法进入该入口。
+case list 已支持 canonical reload 和 append-once store，便于后续在 gate
+开启后冻结 `case list / repair axis / reference boundary`。
 
 - [ ] 只选择 `confidence` 足够高、evidence 完整、`is_actionable=true` 的 case。
 - [ ] 按 failure surface 和 Memory kind 分桶，避免只选择最容易的 semantic case。
