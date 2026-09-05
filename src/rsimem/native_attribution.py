@@ -122,6 +122,15 @@ class NativeAttributionCandidate:
         }
         if set(payload) != expected or payload.get("schema") != ATTRIBUTION_SCHEMA:
             raise ValueError("native attribution payload fields are invalid")
+        scalar_fields = (
+            "attribution_id", "observation_id", "case_id", "family_id", "confidence",
+            "review_status",
+        )
+        if any(not isinstance(payload[field], str) for field in scalar_fields):
+            raise ValueError("native attribution payload scalar types are invalid")
+        for field in ("memory_kind", "candidate_repair_axis", "expectation_contract_id"):
+            if payload[field] is not None and not isinstance(payload[field], str):
+                raise ValueError("native attribution optional field type is invalid")
         for field in ("secondary_observations", "evidence_refs"):
             if not isinstance(payload[field], list) or any(
                 not isinstance(value, str) for value in payload[field]
@@ -130,25 +139,19 @@ class NativeAttributionCandidate:
         if type(payload["is_actionable"]) is not bool:
             raise ValueError("native attribution actionability is invalid")
         return cls(
-            attribution_id=str(payload["attribution_id"]),
-            observation_id=str(payload["observation_id"]),
-            case_id=str(payload["case_id"]),
-            family_id=str(payload["family_id"]),
-            memory_kind=str(payload["memory_kind"]) if payload["memory_kind"] is not None else None,
-            primary_failure_surface=str(payload["primary_failure_surface"]),
+            attribution_id=payload["attribution_id"],
+            observation_id=payload["observation_id"],
+            case_id=payload["case_id"],
+            family_id=payload["family_id"],
+            memory_kind=payload["memory_kind"],
+            primary_failure_surface=payload["primary_failure_surface"],
             secondary_observations=tuple(payload["secondary_observations"]),
             evidence_refs=tuple(payload["evidence_refs"]),
-            confidence=str(payload["confidence"]),
-            candidate_repair_axis=(
-                str(payload["candidate_repair_axis"])
-                if payload["candidate_repair_axis"] is not None else None
-            ),
+            confidence=payload["confidence"],
+            candidate_repair_axis=payload["candidate_repair_axis"],
             is_actionable=payload["is_actionable"],
-            review_status=str(payload["review_status"]),
-            expectation_contract_id=(
-                str(payload["expectation_contract_id"])
-                if payload["expectation_contract_id"] is not None else None
-            ),
+            review_status=payload["review_status"],
+            expectation_contract_id=payload["expectation_contract_id"],
         )
 
 

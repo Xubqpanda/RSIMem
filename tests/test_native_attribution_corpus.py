@@ -87,3 +87,14 @@ def test_corpus_store_load_fails_closed_on_tampering(tmp_path) -> None:
     store.path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
     with pytest.raises(ValueError, match="ID mismatch|canonical"):
         store.load()
+
+
+def test_corpus_store_load_rejects_identity_type_coercion(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    store = NativeAttributionCorpusStore(tmp_path / "corpus.json")
+    store.put(corpus)
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    payload["observations"][0]["task_id"] = 42
+    store.path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="scalar types"):
+        store.load()

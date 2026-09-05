@@ -224,6 +224,12 @@ class NativeSurfaceObservation:
         }
         if set(payload) != expected:
             raise ValueError("native lifecycle event payload fields are invalid")
+        scalar_fields = (
+            "event_id", "producer", "owner", "state_before_digest", "state_after_digest",
+            "revision", "observation_cutoff", "evidence_plane", "evidence_source",
+        )
+        if any(not isinstance(payload[field], str) for field in scalar_fields):
+            raise ValueError("native lifecycle event payload scalar types are invalid")
         collections = (
             "evidence_refs", "input_artifact_ids", "output_artifact_ids", "parent_event_ids"
         )
@@ -234,23 +240,23 @@ class NativeSurfaceObservation:
         ):
             raise ValueError("native lifecycle event payload collections are invalid")
         return cls(
-            event_id=str(payload["event_id"]),
+            event_id=payload["event_id"],
             event_type=NativeLifecycleEventType(payload["event_type"]),
             surface=NativeLifecycleSurface(payload["surface"]),
             status=ObservationStatus(payload["status"]),
-            producer=str(payload["producer"]),
-            owner=str(payload["owner"]),
+            producer=payload["producer"],
+            owner=payload["owner"],
             memory_kind=MemoryKind(payload["memory_kind"]) if payload["memory_kind"] else None,
             evidence_refs=tuple(payload["evidence_refs"]),
             input_artifact_ids=tuple(payload["input_artifact_ids"]),
             output_artifact_ids=tuple(payload["output_artifact_ids"]),
-            state_before_digest=str(payload["state_before_digest"]),
-            state_after_digest=str(payload["state_after_digest"]),
-            revision=str(payload["revision"]),
+            state_before_digest=payload["state_before_digest"],
+            state_after_digest=payload["state_after_digest"],
+            revision=payload["revision"],
             parent_event_ids=tuple(payload["parent_event_ids"]),
-            observation_cutoff=str(payload["observation_cutoff"]),
-            evidence_plane=str(payload["evidence_plane"]),
-            evidence_source=str(payload["evidence_source"]),
+            observation_cutoff=payload["observation_cutoff"],
+            evidence_plane=payload["evidence_plane"],
+            evidence_source=payload["evidence_source"],
         )
 
 
@@ -316,23 +322,33 @@ class NativeEpisodeObservation:
         }
         if set(payload) != expected or payload.get("schema") != OBSERVATION_SCHEMA:
             raise ValueError("native observation payload fields are invalid")
+        scalar_fields = (
+            "observation_id", "run_id", "trace_id", "task_id", "family_id", "usage_digest",
+            "evidence_plane",
+        )
+        if any(not isinstance(payload[field], str) for field in scalar_fields):
+            raise ValueError("native observation payload scalar types are invalid")
+        if payload["final_output_digest"] is not None and not isinstance(
+            payload["final_output_digest"], str
+        ):
+            raise ValueError("native observation final output digest type is invalid")
         raw_events = payload.get("events")
         if not isinstance(raw_events, list):
             raise ValueError("native observation events are malformed")
         return cls(
-            observation_id=str(payload["observation_id"]),
-            run_id=str(payload["run_id"]),
-            trace_id=str(payload["trace_id"]),
-            task_id=str(payload["task_id"]),
-            family_id=str(payload["family_id"]),
+            observation_id=payload["observation_id"],
+            run_id=payload["run_id"],
+            trace_id=payload["trace_id"],
+            task_id=payload["task_id"],
+            family_id=payload["family_id"],
             memory_kind=MemoryKind(payload["memory_kind"]) if payload["memory_kind"] else None,
             events=tuple(NativeSurfaceObservation.from_payload(value) for value in raw_events),
-            usage_digest=str(payload["usage_digest"]),
+            usage_digest=payload["usage_digest"],
             final_output_digest=(
-                str(payload["final_output_digest"])
+                payload["final_output_digest"]
                 if payload["final_output_digest"] is not None else None
             ),
-            evidence_plane=str(payload["evidence_plane"]),
+            evidence_plane=payload["evidence_plane"],
         )
 
 

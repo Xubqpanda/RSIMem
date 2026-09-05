@@ -107,6 +107,8 @@ class NativeAttributionCorpus:
         }
         if set(payload) != expected or payload.get("schema") != CORPUS_SCHEMA:
             raise ValueError("native attribution corpus payload fields are invalid")
+        if any(not isinstance(payload[field], str) for field in ("corpus_id", "protocol_id", "schema")):
+            raise ValueError("native attribution corpus scalar types are invalid")
         accepted = payload.get("accepted_run_ids")
         observations = payload.get("observations")
         candidates = payload.get("candidates")
@@ -121,8 +123,8 @@ class NativeAttributionCorpus:
         ):
             raise ValueError("native attribution corpus payload collections are invalid")
         return cls(
-            corpus_id=str(payload["corpus_id"]),
-            protocol_id=str(payload["protocol_id"]),
+            corpus_id=payload["corpus_id"],
+            protocol_id=payload["protocol_id"],
             accepted_run_ids=tuple(accepted),
             observations=tuple(
                 NativeEpisodeObservation.from_payload(value) for value in observations
@@ -131,7 +133,7 @@ class NativeAttributionCorpus:
                 NativeAttributionCandidate.from_payload(value) for value in candidates
             ),
             excluded_runs=tuple(dict(value) for value in excluded),
-            schema=str(payload["schema"]),
+            schema=payload["schema"],
         )
 
     @property
