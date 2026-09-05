@@ -207,8 +207,11 @@ The frozen corpus can be independently reloaded and summarized with
 covered by deterministic tests.
 The manifest-bound assembler was also replayed against the frozen cross-panel
 output and reconstructed `2 accepted runs / 10 observations`, retaining 24
-non-content exclusions. This replay wrote a separate corpus and did not alter
-the frozen evidence used for the current gate.
+non-content exclusions. The replay corpus records manifest-bound
+`replicate_id=1` for all ten observations, whereas the older frozen v2 corpus
+predates that field and reports `unknown`; this is an identity/schema upgrade,
+not new evidence. The replay wrote a separate corpus and did not alter the
+frozen evidence used for the current gate.
 The current checklist audit confirms that Stage 0 isolation and the Stage 1
 candidate/evidence/content-boundary contracts are implemented. The remaining
 Stage 1 gates are deliberately empirical: two independent reviewer decisions,
