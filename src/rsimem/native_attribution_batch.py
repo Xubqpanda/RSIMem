@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -37,10 +38,20 @@ def _write_audit(path: Path, *, manifest_id: str, protocol_id: str,
     }
     payload = {"audit_id": "native-batch-audit." + _digest(identity)[:40], **identity}
     target = Path(path).expanduser().resolve()
+    serialized = _canonical(payload) + "\n"
     target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = target.with_name(f".{target.name}.tmp-{os.getpid()}")
-    temporary.write_text(_canonical(payload) + "\n", encoding="utf-8")
-    os.replace(temporary, target)
+    lock_path = target.with_name(target.name + ".lock")
+    with lock_path.open("a+", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        if target.is_symlink() or lock_path.is_symlink():
+            raise ValueError("native attribution batch audit cannot be symlinked")
+        if target.exists():
+            if target.read_text(encoding="utf-8") != serialized:
+                raise ValueError("native attribution batch audit conflicts with existing audit")
+            return
+        temporary = target.with_name(f".{target.name}.tmp-{os.getpid()}")
+        temporary.write_text(serialized, encoding="utf-8")
+        os.replace(temporary, target)
 
 
 def _read_sequence_results(*, output_root: Path, trace_directory: str) -> tuple[Mapping[str, object], ...]:
