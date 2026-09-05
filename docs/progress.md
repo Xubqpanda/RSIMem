@@ -211,6 +211,8 @@ The follow-up EP01/PG01 attempt is recorded in
 executed with `--no-judge` but was also excluded because all six tasks reported
 incomplete model usage after provider 503 retries. Neither attempt changes the
 accepted corpus.
+The operational closure and re-entry criteria are frozen in
+[`stage1_gate_closure_20260905.md`](stage1_gate_closure_20260905.md).
 
 The formal PAST-Bench adapter does not currently expose a trusted
 application-owned memory-use attribution provider.  Since `b1f9cd1`, benchmark
