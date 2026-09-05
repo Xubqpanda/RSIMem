@@ -29,10 +29,11 @@ and complete request usage. The next execution position is a bounded
 cross-panel native-static failure-attribution slice; one-axis repair remains
 closed until actionable Stage 1 cases are frozen.
 
-The primary provider remains intermittently available. A five-request probe on
-2026-09-05 produced three HTTP `200` responses with non-empty content and usage,
-and two HTTP `503` responses without usage. This is connectivity evidence only;
-it does not reopen any old experiment or justify a long benchmark run.
+The primary provider passed a five-request probe on 2026-09-05 (`5/5` HTTP
+`200`, non-empty content, and usage), but the subsequent bounded EP01 attempt
+entered repeated judge `APIConnectionError` retries before producing a complete
+sequence result. Probe success is connectivity evidence only; the EP01 attempt
+is classified as infrastructure evidence and does not reopen experiments.
 
 The latest RSIMem verification baseline is `1236 passed`; compileall, dependency
 checks, shell syntax, tracked secret scan, and diff checks also pass. The
@@ -204,6 +205,9 @@ candidate/evidence/content-boundary contracts are implemented. The remaining
 Stage 1 gates are deliberately empirical: two independent reviewer decisions,
 an accepted SM/EP/PC/PG cross-panel slice, and any actionable unique repair
 axis. None is claimed by the current `STOP_NO_ACTIONABLE_SIGNAL` corpus.
+The follow-up EP01/PG01 attempt is recorded in
+[`stage1_ep_pg_attempt_20260905.md`](stage1_ep_pg_attempt_20260905.md); PG01 was
+not started after EP01 failed closed.
 
 The formal PAST-Bench adapter does not currently expose a trusted
 application-owned memory-use attribution provider.  Since `b1f9cd1`, benchmark
