@@ -47,6 +47,13 @@ observed evidence does not uniquely distinguish a repair axis. In particular,
 no candidate is converted into formation, persistence, retrieval, or
 application failure solely from the task result.
 
+The accepted SM02 and PC01 sequence results do contain the pre-registered
+lifecycle expectation fields (`expected_persistence_signal`,
+`persistence_allowed`, and `evaluation_requires_retrieval`). Their candidates
+remain unresolved because the corresponding events were observed without a
+unique failure, or because the required parent evidence was insufficient. This
+is conservative attribution behavior, not a missing instrumentation contract.
+
 ## Boundary
 
 This report is an attribution and infrastructure report, not a quality result.
