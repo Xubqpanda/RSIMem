@@ -195,6 +195,9 @@ candidates, and zero actionable repair axes. EP01 and PG01 were excluded for
 incomplete model usage after provider failures. The current decision is
 `STOP_NO_ACTIONABLE_SIGNAL`; Analysis 1 repair and later feedback experiments
 remain closed.
+The frozen corpus can be independently reloaded and summarized with
+`rsimem-report-native-attribution`; the module and console entrypoints are
+covered by deterministic tests.
 
 The formal PAST-Bench adapter does not currently expose a trusted
 application-owned memory-use attribution provider.  Since `b1f9cd1`, benchmark
