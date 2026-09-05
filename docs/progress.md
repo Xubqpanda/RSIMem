@@ -208,7 +208,9 @@ an accepted SM/EP/PC/PG cross-panel slice, and any actionable unique repair
 axis. None is claimed by the current `STOP_NO_ACTIONABLE_SIGNAL` corpus.
 The follow-up EP01/PG01 attempt is recorded in
 [`stage1_ep_pg_attempt_20260905.md`](stage1_ep_pg_attempt_20260905.md); PG01 was
-not started after EP01 failed closed.
+executed with `--no-judge` but was also excluded because all six tasks reported
+incomplete model usage after provider 503 retries. Neither attempt changes the
+accepted corpus.
 
 The formal PAST-Bench adapter does not currently expose a trusted
 application-owned memory-use attribution provider.  Since `b1f9cd1`, benchmark

@@ -20,6 +20,12 @@ the manifest-bound audit. Both attempts are infrastructure evidence, not
 quality observations. PG01 was not started. Run-specific processes and
 services were terminated and their ports were confirmed released.
 
+The follow-up PG01 no-judge run completed its runner with six tasks, but every
+task reported `model_usage_complete=false`; provider HTTP 503 retries included
+the terminal task with zero model output. Its manifest-bound audit therefore
+rejected the run for incomplete usage. No PG01 observation was added to the
+accepted corpus.
+
 ## Decision
 
 This attempt does not change the frozen Stage 1 corpus and does not satisfy the
