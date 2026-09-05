@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import socket
+import threading
 
 import httpx
 import pytest
@@ -211,3 +212,53 @@ def test_sequential_notes_fixtures_are_isolated_and_process_is_stopped(tmp_path)
         assert not ServiceManager._port_is_occupied(port)
 
     assert identities[0] != identities[1]
+
+
+def test_concurrent_notes_fixtures_use_distinct_ports_and_identities(tmp_path):
+    fixture_data = {
+        "FIRST": tmp_path / "first.json",
+        "SECOND": tmp_path / "second.json",
+    }
+    for note_id, path in fixture_data.items():
+        path.write_text(
+            '[{"note_id":"' + note_id + '","title":"fixture","created_at":'
+            '"2026-01-01T00:00:00Z","participants":[],"duration_minutes":1,'
+            '"status":"active","tags":[]}]',
+            encoding="utf-8",
+        )
+    ports = (_free_port(), _free_port())
+    while ports[0] == ports[1]:
+        ports = (ports[0], _free_port())
+    barrier = threading.Barrier(2)
+    observations: dict[str, tuple[str, str]] = {}
+
+    def worker(note_id: str, fixture, port: int) -> None:
+        svc = ServiceDef(
+            name="notes", command="python mock_services/notes/server.py", port=port,
+            health_check=f"http://localhost:{port}/notes/list",
+            health_check_method="POST", reset_endpoint=f"http://localhost:{port}/notes/reset",
+            env={"NOTES_FIXTURES": str(fixture), "PORT": str(port)},
+        )
+        with ServiceManager([svc]) as manager:
+            barrier.wait(timeout=5)
+            visible = httpx.post(svc.health_check, json={}, timeout=3.0).json()["notes"]
+            identity = httpx.get(
+                f"http://localhost:{port}/_past_bench/identity", timeout=3.0
+            ).json()
+            assert identity == manager._expected_identity(svc)
+            observations[note_id] = (visible[0]["note_id"], identity["fixture_digest"])
+
+    threads = [
+        threading.Thread(target=worker, args=(note_id, fixture_data[note_id], port))
+        for note_id, port in zip(("FIRST", "SECOND"), ports, strict=True)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=15)
+        assert not thread.is_alive()
+
+    assert observations["FIRST"][0] == "FIRST"
+    assert observations["SECOND"][0] == "SECOND"
+    assert observations["FIRST"][1] != observations["SECOND"][1]
+    assert all(not ServiceManager._port_is_occupied(port) for port in ports)
