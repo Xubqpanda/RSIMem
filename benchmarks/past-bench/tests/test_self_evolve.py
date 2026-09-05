@@ -31,7 +31,11 @@ from past_bench.runner.self_evolve import (
     summarize_sequence,
     summarize_single_task_sequence,
 )
-from past_bench.cli import _apply_rsimem_execution_overrides, _save_episode_history_anchor
+from past_bench.cli import (
+    _apply_rsimem_execution_overrides,
+    _content_free_artifact_identity,
+    _save_episode_history_anchor,
+)
 from past_bench.runtime.adapters.hermes import (
     HermesAdapter,
     _RecordedHermesCompletionClient,
@@ -41,6 +45,23 @@ from past_bench.runtime.protocol import RuntimeConfigPayload, RuntimeModelConfig
 from past_bench.runtime.registry import AgentSpec
 
 _MISSING_TOOL = object()
+
+
+def test_content_free_artifact_identity_uses_digests_not_content() -> None:
+    marker = "private-memory-marker"
+    value = _content_free_artifact_identity({
+        "memory_entries": [marker],
+        "user_entries": ["private-profile-marker"],
+        "skill_docs": {"skill-a": "private-skill-marker"},
+    })
+    serialized = json.dumps(value)
+    assert value["memory_entry_count"] == 1
+    assert value["user_entry_count"] == 1
+    assert value["skill_count"] == 1
+    assert len(value["artifact_ids"]) == 3
+    assert marker not in serialized
+    assert "private-profile-marker" not in serialized
+    assert "private-skill-marker" not in serialized
 
 
 def _adaptive_config() -> dict:

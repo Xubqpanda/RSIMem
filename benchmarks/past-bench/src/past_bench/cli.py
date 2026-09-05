@@ -1839,6 +1839,38 @@ def _runtime_tree_digest(root: Path) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def _content_free_artifact_identity(snapshot: dict) -> dict[str, object]:
+    """Project a Hermes snapshot without retaining memory or skill content."""
+
+    def artifact_id(kind: str, value: object) -> str:
+        canonical = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+        return f"hermes-{kind}:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:24]
+
+    memory_entries = snapshot.get("memory_entries") or []
+    user_entries = snapshot.get("user_entries") or []
+    skill_docs = snapshot.get("skill_docs") or {}
+    if not isinstance(memory_entries, list) or not isinstance(user_entries, list):
+        raise ValueError("Hermes artifact snapshot entries are malformed")
+    if not isinstance(skill_docs, dict):
+        raise ValueError("Hermes skill snapshot is malformed")
+    ids = [artifact_id("semantic", value) for value in memory_entries]
+    ids.extend(artifact_id("profile", value) for value in user_entries)
+    ids.extend(
+        artifact_id("procedural", {"name": name, "document": skill_docs[name]})
+        for name in sorted(skill_docs)
+    )
+    identity = {
+        "artifact_ids": sorted(ids),
+        "memory_entry_count": len(memory_entries),
+        "user_entry_count": len(user_entries),
+        "skill_count": len(skill_docs),
+    }
+    identity["digest"] = hashlib.sha256(
+        json.dumps(identity, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return identity
+
+
 def _family_runtime_root(variant_dir: Path, family_id: str) -> Path:
     return variant_dir / "family_homes" / family_id
 
@@ -3119,6 +3151,8 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 if persistence_backend is not None
                 else _empty_artifact_summary(state_root)
             )
+            state_before_digest = _runtime_tree_digest(state_root)
+            artifact_before_identity = _content_free_artifact_identity(artifact_before)
 
             model_extra_body_override = None
             if persistence_backend is not None:
@@ -3229,6 +3263,17 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     task_score=episode_result["task_score"],
                     passed=episode_result["passed"],
                 )
+                write_json(episode_dir / "native_episode_identity.json", {
+                    "schema": "past-bench-native-episode-identity-v1",
+                    "task_id": task.task_id,
+                    "family_id": episode.family_id,
+                    "stage": episode.stage,
+                    "trace_id": episode_result["trace_id"],
+                    "state_before_digest": state_before_digest,
+                    "state_after_digest": _runtime_tree_digest(state_root),
+                    "artifact_before": artifact_before_identity,
+                    "artifact_after": _content_free_artifact_identity(artifact_summary),
+                })
             except RuntimeError as exc:
                 # Per-episode fault tolerance: don't abort the whole sequence
                 # because one episode timed out / crashed. Mark the episode as
@@ -3316,6 +3361,10 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 reflection_dir.mkdir(parents=True, exist_ok=True)
                 reflection_artifacts_dir = reflection_dir / "artifacts"
                 reflection_before = persistence_backend.snapshot_before(state_root, include_contents=True)
+                reflection_state_before_digest = _runtime_tree_digest(state_root)
+                reflection_artifact_before_identity = _content_free_artifact_identity(
+                    reflection_before
+                )
                 reflection_review_wait_s = (
                     args.background_review_wait_s
                     if args.background_review_wait_s is not None
@@ -3401,6 +3450,17 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     task_id=reflection_task.task_id,
                     label=f"{episode.label or task.task_name} Reflection",
                 )
+                write_json(reflection_dir / "native_episode_identity.json", {
+                    "schema": "past-bench-native-episode-identity-v1",
+                    "task_id": reflection_task.task_id,
+                    "family_id": episode.family_id,
+                    "stage": "reflection",
+                    "trace_id": reflection_result["trace_id"],
+                    "state_before_digest": reflection_state_before_digest,
+                    "state_after_digest": _runtime_tree_digest(state_root),
+                    "artifact_before": reflection_artifact_before_identity,
+                    "artifact_after": _content_free_artifact_identity(reflection_artifacts),
+                })
                 reflection_result.update({
                     "index": f"{index}r",
                     "label": f"{episode.label or task.task_name} Reflection",
