@@ -26,7 +26,8 @@ class PreparedNativeAttributionLaunch:
             raise ValueError("prepared native sequence identity is invalid")
         required = {
             "--rsimem-method-task-id", "--rsimem-state-dir",
-            "--rsimem-hermes-home-dir", "--port-offset",
+            "--rsimem-hermes-home-dir", "--rsimem-artifact-dir",
+            "--port-offset", "--model", "--base-url",
         }
         if not required.issubset(self.command):
             raise ValueError("prepared native command lacks isolation arguments")
@@ -46,15 +47,22 @@ def prepare_native_attribution_launch(
         raise ValueError("native attribution launcher only accepts native_static")
     root = Path(past_bench_root).expanduser().resolve()
     spec = PastFamilyMatrix.create_default().spec_for(run.family_id)
-    family_digest, fixture_digest, base_ports, episodes = _family_runtime_identity(
+    family_digest, fixture_digest, base_ports, episodes, task_ids, base_services = _family_runtime_identity(
         family_id=run.family_id, task_root=spec.task_root, past_bench_root=root
     )
     if family_digest != run.family_source_digest or fixture_digest != run.fixture_digest:
         raise ValueError("native attribution family or fixture identity drift")
     if episodes != run.native_episode_ids:
         raise ValueError("native attribution episode identity drift")
+    if task_ids != run.native_task_ids:
+        raise ValueError("native attribution task identity drift")
     if tuple(port + run.port_offset for port in base_ports) != run.service_ports:
         raise ValueError("native attribution service port identity drift")
+    expected_services = tuple({
+        **value.payload(), "port": value.port + run.port_offset,
+    } for value in base_services)
+    if expected_services != tuple(value.payload() for value in run.service_identities):
+        raise ValueError("native attribution service fixture identity drift")
 
     from past_bench.self_evolve_v2 import generate_manifest
 
@@ -99,11 +107,13 @@ def prepare_native_attribution_launch(
     ).hexdigest()
     command = (
         past_bench_binary, "evolve", "--sequence", str(target), "--agent", agent,
+        "--model", run.model_id, "--base-url", f"https://{run.provider_id}",
         "--persistence-variant", "with_persistence", "--rsimem-mode", "native+ledger",
         "--rsimem-method-task-id", run.method_case_id, "--port-offset", str(run.port_offset),
         "--trace-dir", str(output / run.trace_directory),
         "--rsimem-state-dir", str(output / run.state_directory),
         "--rsimem-hermes-home-dir", str(output / run.hermes_home_directory),
+        "--rsimem-artifact-dir", str(output / run.artifact_directory),
     )
     return PreparedNativeAttributionLaunch(run.run_id, target, sequence_digest, command)
 

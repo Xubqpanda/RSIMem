@@ -48,6 +48,7 @@ def test_manifest_freezes_all_26_families_with_isolated_runtime_identity() -> No
     ]
     assert len(directories) == len(set(directories))
     assert all(run.fixture_digest and run.family_source_digest for run in manifest.runs)
+    assert all(len(run.native_task_ids) == len(run.native_episode_ids) for run in manifest.runs)
     assert all(not any("control" in episode.lower() for episode in run.native_episode_ids) for run in manifest.runs)
 
 
@@ -79,11 +80,20 @@ def test_manifest_rejects_port_and_directory_collisions() -> None:
         ).hexdigest()[:40]
         return NativeAttributionRunSpec(run_id=run_id, **values)
 
+    colliding_ports = [first.service_ports[0], *second.service_ports[1:]]
+    colliding_services = second.identity_payload()["service_identities"]
+    old_port = second.service_ports[0]
+    for value in colliding_services:
+        if value["port"] == old_port:
+            value["port"] = first.service_ports[0]
     with pytest.raises(ValueError, match="ports collide"):
         NativeAttributionRunManifest(
             manifest_id=manifest.manifest_id,
             batch_id=manifest.batch_id,
-            runs=(first, changed_run(service_ports=list(first.service_ports)), *rest),
+            runs=(first, changed_run(
+                service_ports=colliding_ports,
+                service_identities=colliding_services,
+            ), *rest),
             protocol_id=manifest.protocol_id,
             protocol_digest=manifest.protocol_digest,
         )

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import inspect
 import json
 import os
@@ -1825,6 +1826,19 @@ def _clone_runtime_dir(src: Path, dst: Path) -> None:
         dst.mkdir(parents=True, exist_ok=True)
 
 
+def _runtime_tree_digest(root: Path) -> str:
+    entries = []
+    for path in sorted(root.rglob("*")):
+        if path.is_file():
+            entries.append({
+                "path": path.relative_to(root).as_posix(),
+                "digest": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "size": path.stat().st_size,
+            })
+    canonical = json.dumps(entries, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def _family_runtime_root(variant_dir: Path, family_id: str) -> Path:
     return variant_dir / "family_homes" / family_id
 
@@ -2331,6 +2345,16 @@ def cmd_evolve(args: argparse.Namespace) -> None:
         variants[0][0] if len(variants) == 1 else "with_persistence"
     )
     sensitivity_paths = _resolve_rsimem_sensitivity_paths(args, persistence_backend)
+    artifact_capture_value = vars(args).get("rsimem_artifact_dir")
+    artifact_capture_root = (
+        Path(artifact_capture_value).expanduser().resolve()
+        if artifact_capture_value
+        else None
+    )
+    if artifact_capture_root is not None and sensitivity_paths is None:
+        raise SystemExit("RSIMem artifact capture requires isolated state/home paths")
+    if vars(args).get("rsimem_state_dir") and artifact_capture_root is None:
+        raise SystemExit("manifest-bound RSIMem execution requires an artifact directory")
     if sensitivity_paths is not None and len(variants) != 1:
         raise SystemExit("RSIMem sensitivity state isolation requires one persistence variant")
     if sensitivity_paths is not None and any(ep.shared_cold_run for ep in sequence.episodes):
@@ -2997,6 +3021,24 @@ def cmd_evolve(args: argparse.Namespace) -> None:
             _reset_runtime_dir(hermes_home_dir)
             state_dir.mkdir(parents=True, exist_ok=True)
             hermes_home_dir.mkdir(parents=True, exist_ok=True)
+            if artifact_capture_root is not None:
+                _reset_runtime_dir(artifact_capture_root)
+            if vars(args).get("rsimem_state_dir"):
+                write_json(trace_root / "native_runtime_identity.json", {
+                    "schema": "past-bench-native-runtime-identity-v1",
+                    "sequence": sequence.name,
+                    "method_task_id": method_task_id,
+                    "agent": args.agent,
+                    "model_id": args.model,
+                    "base_url": args.base_url,
+                    "port_offset": port_offset,
+                    "state_directory": str(state_dir),
+                    "hermes_home_directory": str(hermes_home_dir),
+                    "session_directory": str(hermes_home_dir / "sessions"),
+                    "artifact_directory": str(artifact_capture_root),
+                    "trace_directory": str(trace_root.resolve()),
+                    "initial_home_digest": _runtime_tree_digest(hermes_home_dir),
+                })
         elif persistence_backend is not None:
             _reset_runtime_dir(family_homes_root)
         episode_results: list[dict] = []
@@ -3239,6 +3281,11 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 "runtime_family_home": str(state_root) if persistence_backend is not None else "",
                 "runtime_history_root": str(anchors_dir) if persistence_backend is not None else "",
             })
+            if artifact_capture_root is not None:
+                _clone_runtime_dir(
+                    artifacts_dir,
+                    artifact_capture_root / f"{index:02d}_{episode_result['trace_id']}",
+                )
             episode_results.append(episode_result)
 
             if persistence_backend is not None and not episode_result.get("infra_blocked", False):
@@ -3739,6 +3786,11 @@ def main(argv: list[str] | None = None) -> None:
         "--rsimem-hermes-home-dir",
         default=None,
         help="Registered Hermes HOME for one isolated RSIMem run",
+    )
+    p_evolve.add_argument(
+        "--rsimem-artifact-dir",
+        default=None,
+        help="Registered artifact capture root for one isolated RSIMem run",
     )
     p_evolve.add_argument(
         "--rsimem-sensitivity-state-dir",

@@ -26,6 +26,40 @@ _PORT_STRIDE = 257
 _MAX_SERVICE_PORT = 32767
 
 
+@dataclass(frozen=True, slots=True)
+class NativeServiceIdentitySpec:
+    episode_id: str
+    task_id: str
+    service: str
+    port: int
+    fixture_digest: str
+
+    def __post_init__(self) -> None:
+        _identifier(self.episode_id, "service episode ID")
+        _identifier(self.task_id, "service task ID")
+        _identifier(self.service, "service name")
+        if type(self.port) is not int or self.port < 1024 or self.port > _MAX_SERVICE_PORT:
+            raise ValueError("service identity port is invalid")
+        _sha(self.fixture_digest, "service fixture digest")
+
+    def payload(self) -> dict[str, object]:
+        return {
+            "episode_id": self.episode_id,
+            "task_id": self.task_id,
+            "service": self.service,
+            "port": self.port,
+            "fixture_digest": self.fixture_digest,
+        }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "NativeServiceIdentitySpec":
+        if not isinstance(value, Mapping) or set(value) != {
+            "episode_id", "task_id", "service", "port", "fixture_digest",
+        }:
+            raise ValueError("malformed native service identity")
+        return cls(**value)
+
+
 def _canonical(value: object) -> str:
     return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
 
@@ -77,7 +111,10 @@ def _tree_digest(root: Path) -> str:
 
 def _family_runtime_identity(
     *, family_id: str, task_root: str, past_bench_root: Path
-) -> tuple[str, str, tuple[int, ...], tuple[str, ...]]:
+) -> tuple[
+    str, str, tuple[int, ...], tuple[str, ...], tuple[str, ...],
+    tuple[NativeServiceIdentitySpec, ...]
+]:
     family_root = (past_bench_root / task_root).resolve()
     family_file = family_root / "family.yaml"
     try:
@@ -93,6 +130,8 @@ def _family_runtime_identity(
     fixture_entries: list[dict[str, object]] = []
     ports: set[int] = set()
     native_episodes: list[str] = []
+    native_tasks: list[str] = []
+    service_identities: list[NativeServiceIdentitySpec] = []
     for episode_name in order:
         if "control" in episode_name.lower():
             continue
@@ -103,7 +142,11 @@ def _family_runtime_identity(
             raise ValueError("family task source is unreadable") from exc
         if not isinstance(task, Mapping):
             raise ValueError("family task source is malformed")
+        task_id = task.get("task_id")
+        if not isinstance(task_id, str):
+            raise ValueError("family task ID is malformed")
         native_episodes.append(episode_name)
+        native_tasks.append(task_id)
         services = task.get("services") or []
         if not isinstance(services, list):
             raise ValueError("family task services are malformed")
@@ -114,6 +157,7 @@ def _family_runtime_identity(
             env = service.get("env") or {}
             if not isinstance(env, Mapping):
                 raise ValueError("family task service environment is malformed")
+            service_fixtures: dict[str, dict[str, object]] = {}
             for key, raw in sorted(env.items()):
                 if not isinstance(key, str) or not key.endswith("_FIXTURES"):
                     continue
@@ -132,6 +176,20 @@ def _family_runtime_identity(
                     "digest": _file_digest(fixture_path),
                     "size": fixture_path.stat().st_size,
                 })
+                service_fixtures[key] = {
+                    "digest": _file_digest(fixture_path),
+                    "size": fixture_path.stat().st_size,
+                }
+            service_name = service.get("name")
+            if not isinstance(service_name, str):
+                raise ValueError("family service name is malformed")
+            service_identities.append(NativeServiceIdentitySpec(
+                episode_id=episode_name,
+                task_id=task_id,
+                service=service_name,
+                port=service["port"],
+                fixture_digest=_digest(service_fixtures),
+            ))
     if not native_episodes or not ports:
         raise ValueError("native family must declare episodes and service ports")
     return (
@@ -139,6 +197,8 @@ def _family_runtime_identity(
         _digest(fixture_entries),
         tuple(sorted(ports)),
         tuple(native_episodes),
+        tuple(native_tasks),
+        tuple(service_identities),
     )
 
 
@@ -157,6 +217,8 @@ class NativeAttributionRunSpec:
     family_source_digest: str
     fixture_digest: str
     native_episode_ids: tuple[str, ...]
+    native_task_ids: tuple[str, ...]
+    service_identities: tuple[NativeServiceIdentitySpec, ...]
     state_directory: str
     hermes_home_directory: str
     session_directory: str
@@ -204,6 +266,31 @@ class NativeAttributionRunSpec:
             if "control" in value.lower():
                 raise ValueError("control episode cannot enter a native attribution run")
         object.__setattr__(self, "native_episode_ids", episodes)
+        tasks = tuple(self.native_task_ids)
+        if len(tasks) != len(episodes) or len(set(tasks)) != len(tasks):
+            raise ValueError("native task IDs must align with episodes and be unique")
+        for value in tasks:
+            _identifier(value, "native task ID")
+        object.__setattr__(self, "native_task_ids", tasks)
+        try:
+            identities = tuple(
+                value
+                if isinstance(value, NativeServiceIdentitySpec)
+                else NativeServiceIdentitySpec.from_payload(value)
+                for value in self.service_identities
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("native service identities are malformed") from exc
+        if not identities or len({
+            (value.episode_id, value.task_id, value.service, value.port)
+            for value in identities
+        }) != len(identities):
+            raise ValueError("native service identities must be nonempty and unique")
+        if {value.port for value in identities} != set(ports):
+            raise ValueError("native service identities do not cover run ports")
+        if not {value.episode_id for value in identities}.issubset(set(episodes)):
+            raise ValueError("native service identity references an unknown episode")
+        object.__setattr__(self, "service_identities", identities)
         for value, name in (
             (self.family_source_digest, "family source digest"),
             (self.fixture_digest, "fixture digest"),
@@ -232,6 +319,8 @@ class NativeAttributionRunSpec:
             "family_source_digest": self.family_source_digest,
             "fixture_digest": self.fixture_digest,
             "native_episode_ids": list(self.native_episode_ids),
+            "native_task_ids": list(self.native_task_ids),
+            "service_identities": [value.payload() for value in self.service_identities],
             "state_directory": self.state_directory,
             "hermes_home_directory": self.hermes_home_directory,
             "session_directory": self.session_directory,
@@ -254,6 +343,7 @@ class NativeAttributionRunSpec:
             "run_id", "method_case_id", "family_id", "panel", "memory_kind",
             "replicate", "condition", "seed", "port_offset", "service_ports",
             "family_source_digest", "fixture_digest", "native_episode_ids",
+            "native_task_ids", "service_identities",
             "state_directory", "hermes_home_directory", "session_directory",
             "artifact_directory", "trace_directory", "initial_home_digest",
             "protocol_id", "protocol_digest", "provider_id", "model_id",
@@ -271,6 +361,11 @@ class NativeAttributionRunSpec:
                 family_source_digest=value["family_source_digest"],
                 fixture_digest=value["fixture_digest"],
                 native_episode_ids=tuple(value["native_episode_ids"]),
+                native_task_ids=tuple(value["native_task_ids"]),
+                service_identities=tuple(
+                    NativeServiceIdentitySpec.from_payload(item)
+                    for item in value["service_identities"]
+                ),
                 state_directory=value["state_directory"],
                 hermes_home_directory=value["hermes_home_directory"],
                 session_directory=value["session_directory"],
@@ -382,9 +477,9 @@ def build_native_attribution_manifest(
     matrix = PastFamilyMatrix.create_default(replicate_count=replicate_count)
     runs: list[NativeAttributionRunSpec] = []
     slot = 0
-    empty_home_digest = _digest({"entries": []})
+    empty_home_digest = _digest([])
     for spec in matrix.families:
-        family_digest, fixture_digest, base_ports, episodes = _family_runtime_identity(
+        family_digest, fixture_digest, base_ports, episodes, task_ids, base_services = _family_runtime_identity(
             family_id=spec.family_id, task_root=spec.task_root, past_bench_root=root
         )
         method_case_id = "native-case." + _digest({
@@ -409,9 +504,17 @@ def build_native_attribution_manifest(
                 "family_source_digest": family_digest,
                 "fixture_digest": fixture_digest,
                 "native_episode_ids": episodes,
+                "native_task_ids": task_ids,
+                "service_identities": tuple(NativeServiceIdentitySpec(
+                    episode_id=value.episode_id,
+                    task_id=value.task_id,
+                    service=value.service,
+                    port=value.port + offset,
+                    fixture_digest=value.fixture_digest,
+                ) for value in base_services),
                 "state_directory": directory_root + "/state",
                 "hermes_home_directory": directory_root + "/hermes-home",
-                "session_directory": directory_root + "/sessions",
+                "session_directory": directory_root + "/hermes-home/sessions",
                 "artifact_directory": directory_root + "/artifacts",
                 "trace_directory": directory_root + "/trace",
                 "initial_home_digest": empty_home_digest,
@@ -422,8 +525,14 @@ def build_native_attribution_manifest(
                 "rsimem_commit": rsimem_commit,
                 "past_bench_commit": past_bench_commit,
             }
+            run_identity = {
+                **values,
+                "service_identities": [
+                    value.payload() for value in values["service_identities"]
+                ],
+            }
             runs.append(NativeAttributionRunSpec(
-                run_id="native-run." + _digest(values)[:40], **values
+                run_id="native-run." + _digest(run_identity)[:40], **values
             ))
             slot += 1
     identity = {
@@ -476,3 +585,10 @@ class NativeAttributionRunManifestStore:
             return NativeAttributionRunManifest.from_payload(value)
         except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
             raise ValueError("malformed native attribution run manifest") from exc
+
+
+__all__ = [
+    "NativeAttributionRunManifest", "NativeAttributionRunManifestStore",
+    "NativeAttributionRunSpec", "NativeServiceIdentitySpec",
+    "build_native_attribution_manifest",
+]
