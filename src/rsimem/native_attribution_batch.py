@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Mapping
 
@@ -11,6 +13,34 @@ from .native_attribution import attribute_native_observation, expectation_from_b
 from .native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
 from .native_attribution_run import NativeAttributionRunManifestStore
 from .native_observation import extract_native_observations
+
+
+AUDIT_SCHEMA = "rsimem-native-attribution-batch-audit-v1"
+
+
+def _canonical(value: object) -> str:
+    return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+
+
+def _digest(value: object) -> str:
+    return hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def _write_audit(path: Path, *, manifest_id: str, protocol_id: str,
+                 accepted_ids: list[str], excluded: list[dict[str, object]]) -> None:
+    identity = {
+        "schema": AUDIT_SCHEMA,
+        "manifest_id": manifest_id,
+        "protocol_id": protocol_id,
+        "accepted_run_ids": sorted(accepted_ids),
+        "excluded_runs": excluded,
+    }
+    payload = {"audit_id": "native-batch-audit." + _digest(identity)[:40], **identity}
+    target = Path(path).expanduser().resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f".{target.name}.tmp-{os.getpid()}")
+    temporary.write_text(_canonical(payload) + "\n", encoding="utf-8")
+    os.replace(temporary, target)
 
 
 def _read_sequence_results(*, output_root: Path, trace_directory: str) -> tuple[Mapping[str, object], ...]:
@@ -28,7 +58,8 @@ def _read_sequence_results(*, output_root: Path, trace_directory: str) -> tuple[
 
 
 def assemble_native_attribution_corpus(
-    *, manifest_path: Path, output_root: Path, corpus_path: Path | None = None
+    *, manifest_path: Path, output_root: Path, corpus_path: Path | None = None,
+    audit_path: Path | None = None,
 ) -> NativeAttributionCorpus:
     """Audit every manifest run and build a deterministic attribution corpus.
 
@@ -65,6 +96,10 @@ def assemble_native_attribution_corpus(
             attribute_native_observation(value, expectations.get(value.task_id))
             for value in extracted
         )
+    if audit_path is not None:
+        _write_audit(audit_path, manifest_id=manifest.manifest_id,
+                     protocol_id=manifest.protocol_id, accepted_ids=accepted_ids,
+                     excluded=excluded)
     if not accepted_ids:
         # A corpus without an accepted observation cannot satisfy the frozen
         # corpus contract. Keep this fail-closed instead of emitting a fake
@@ -98,9 +133,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("manifest", type=Path)
     parser.add_argument("output_root", type=Path)
     parser.add_argument("corpus", type=Path)
+    parser.add_argument("--audit", type=Path, default=None)
     args = parser.parse_args(argv)
     corpus = assemble_native_attribution_corpus(
-        manifest_path=args.manifest, output_root=args.output_root, corpus_path=args.corpus
+        manifest_path=args.manifest, output_root=args.output_root, corpus_path=args.corpus,
+        audit_path=args.audit,
     )
     print(json.dumps({
         "corpus_id": corpus.corpus_id,

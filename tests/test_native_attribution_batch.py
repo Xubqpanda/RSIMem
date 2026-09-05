@@ -48,5 +48,12 @@ def test_assembler_records_incomplete_run_without_crashing(tmp_path) -> None:
     ))
     (tmp_path / run.trace_directory / "sequence_results.json").unlink()
     import pytest
+    audit_path = tmp_path / "batch-audit.json"
     with pytest.raises(ValueError, match="no accepted native runs"):
-        assemble_native_attribution_corpus(manifest_path=manifest_path, output_root=tmp_path)
+        assemble_native_attribution_corpus(
+            manifest_path=manifest_path, output_root=tmp_path, audit_path=audit_path
+        )
+    payload = __import__("json").loads(audit_path.read_text())
+    assert payload["schema"] == "rsimem-native-attribution-batch-audit-v1"
+    assert payload["accepted_run_ids"] == []
+    assert payload["excluded_runs"][0]["run_id"] == run.run_id
