@@ -47,13 +47,13 @@ launcher must not be used for new runs.
 
 ## Stage 0D Gate
 
-Service fixture isolation has passed sequential and concurrent contract tests.
-The remaining acceptance item is an execution receipt that reconstructs and
-verifies, from one frozen run manifest, the actual trace identity, state/home
-paths and digests, service fixture identity and ports, provider/model identity,
-and complete request usage. Formal Analysis 2 remains closed until that audit
-fails closed under identity drift and passes the full serial verification
-suite.
+Service fixture isolation passed sequential and concurrent contract tests. The
+real manifest-bound SM01 smoke then reconstructed and verified trace identity,
+state/home/session/artifact paths and digests, service fixture identity and
+ports, provider/model identity, and complete request usage. The full serial
+verification suite also passed. Details are in
+[`stage0d_native_smoke_20260905.md`](stage0d_native_smoke_20260905.md); Stage 0D
+is complete.
 
 ## Provider Status
 

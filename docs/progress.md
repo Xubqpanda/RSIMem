@@ -19,16 +19,23 @@ N+1 line. Those implementations, reports, and outputs are retained only for
 historical replay and infrastructure evidence. They are not current experiment
 entrypoints and must not contribute quality observations to the new corpus.
 
-Stage 0A and 0B are complete. Stage 0C asset classification is recorded in
+Stage 0A, 0B, 0C, and 0D are complete. Stage 0C asset classification is recorded in
 [`stage0_native_attribution_cleanup_audit_20260905.md`](stage0_native_attribution_cleanup_audit_20260905.md).
-Sequential and concurrent service isolation tests pass. Stage 0D remains open
-only for the manifest-to-actual-execution receipt that binds trace, state/home,
-fixture/ports, provider/model, and complete usage. Formal Analysis 2 remains
-closed until that acceptance and the full serial verification suite pass.
+Sequential and concurrent service isolation tests pass. The real Stage 0D
+SM01 smoke and its manifest-to-actual-execution receipt are recorded in
+[`stage0d_native_smoke_20260905.md`](stage0d_native_smoke_20260905.md). The
+receipt binds trace, state/home/session/artifact, fixture/ports, provider/model,
+and complete request usage. The next execution position is a bounded
+cross-panel native-static failure-attribution slice; one-axis repair remains
+closed until actionable Stage 1 cases are frozen.
 
 The primary provider probe passed on 2026-09-05 with HTTP `200`, expected
 content, finish reason `stop`, and a usage object for `gpt-5.6-luna`. This is
 connectivity evidence only; it does not reopen any old experiment.
+
+The post-smoke verification baseline is RSIMem `1210 passed` and vendored
+PAST-Bench `401 passed, 2 skipped`; compileall, dependency checks, shell syntax,
+tracked secret scan, and diff checks also pass.
 
 The authoritative protocol and execution order are in
 [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).

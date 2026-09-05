@@ -104,7 +104,7 @@ trigger/source
 
 - [x] 审计 extraction-only launcher、proposal CLI、旧 prompt optimizer、旧 shortcut/wrong-mechanism fixture 和重复 report。
 - [x] 通用 lifecycle、provenance、revision、idempotency、rollback、evidence-plane 和 usage accounting 必须保留。
-- [ ] 旧 extraction API 若仍被通用代码依赖，改成 method/surface-neutral interface；不能直接删除调用者。
+- [x] 旧 extraction API 若仍被通用代码依赖，改成 method/surface-neutral interface；不能直接删除调用者。（当前 native 主线无该依赖；旧 API 仅保留为 legacy method fixture。）
 - [x] dataset、grader、原始 fixture 和历史 negative evidence 不做格式重写。
 - [x] 生成物、缓存和 provider secrets 不进入 tracked source。
 - [x] 更新 `progress.md`，把旧阶段标记为 superseded，把新三阶段主线写清楚。
@@ -113,8 +113,8 @@ trigger/source
 
 - [x] 连续启动两个使用不同 notes fixture 的 task，第二个 task 不能读到第一个 task 的 note。
 - [x] 并发启动多个同类 task，所有 audit 中的 service fixture digest 与 manifest 一致。
-- [ ] 任意 run 可以从 manifest 重建 trace、state、fixture 和 provider usage。
-- [ ] clean baseline、隔离 contract tests 和完整 smoke 通过后，才允许正式运行 Analysis 2。
+- [x] 任意 run 可以从 manifest 重建 trace、state、fixture 和 provider usage。
+- [x] clean baseline、隔离 contract tests 和完整 smoke 通过后，才允许正式运行 Analysis 2。
 
 ## 3. 阶段 1：Analysis 2，Native Failure Attribution
 
