@@ -95,6 +95,8 @@ class NativeRunAttempt:
     return_code: int
     usage_complete: bool
     identity_verified: bool
+    provider_status: int | None = None
+    error_code: str | None = None
 
     @classmethod
     def create(
@@ -109,6 +111,8 @@ class NativeRunAttempt:
             "return_code": observation.return_code,
             "usage_complete": observation.usage_complete,
             "identity_verified": observation.identity_verified,
+            "provider_status": observation.provider_status,
+            "error_code": observation.error_code,
         }
         return cls(
             attempt_id="native-attempt." + _digest(identity)[:40],
@@ -120,6 +124,8 @@ class NativeRunAttempt:
             return_code=observation.return_code,
             usage_complete=observation.usage_complete,
             identity_verified=observation.identity_verified,
+            provider_status=observation.provider_status,
+            error_code=observation.error_code,
         )
 
     def payload(self) -> dict[str, object]:
@@ -131,7 +137,30 @@ class NativeRunAttempt:
             "return_code": self.return_code,
             "usage_complete": self.usage_complete,
             "identity_verified": self.identity_verified,
+            "provider_status": self.provider_status,
+            "error_code": self.error_code,
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "NativeRunAttempt":
+        if not isinstance(value, dict) or set(value) != {
+            "attempt_id", "run_id", "attempt", "failure", "retryable", "accepted",
+            "return_code", "usage_complete", "identity_verified", "provider_status", "error_code",
+        }:
+            raise ValueError("malformed native run attempt")
+        failure = value["failure"]
+        if failure is not None:
+            failure = InfrastructureFailure(failure)
+        attempt = cls(
+            attempt_id=value["attempt_id"], run_id=value["run_id"], attempt=value["attempt"],
+            failure=failure, retryable=value["retryable"], accepted=value["accepted"],
+            return_code=value["return_code"], usage_complete=value["usage_complete"],
+            identity_verified=value["identity_verified"], provider_status=value["provider_status"],
+            error_code=value["error_code"],
+        )
+        if attempt.payload() != value:
+            raise ValueError("non-canonical native run attempt")
+        return attempt
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +189,20 @@ class NativeRunOutcome:
             "enters_quality_denominator": self.enters_quality_denominator,
             "attempts": [attempt.payload() for attempt in self.attempts],
         }
+
+    @classmethod
+    def from_payload(cls, value: object) -> "NativeRunOutcome":
+        if not isinstance(value, dict) or set(value) != {
+            "run_id", "status", "enters_quality_denominator", "attempts",
+        } or not isinstance(value.get("attempts"), list):
+            raise ValueError("malformed native run outcome")
+        outcome = cls(
+            run_id=value["run_id"], status=value["status"],
+            attempts=tuple(NativeRunAttempt.from_payload(item) for item in value["attempts"]),
+        )
+        if outcome.payload() != value:
+            raise ValueError("non-canonical native run outcome")
+        return outcome
 
 
 class NativeRunOutcomeStore:
@@ -195,12 +238,14 @@ class NativeRunOutcomeStore:
                 value = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
                 raise ValueError("native run outcome is unreadable") from exc
-            if not isinstance(value, dict) or value.get("run_id") != path.stem:
+            try:
+                outcome = NativeRunOutcome.from_payload(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("native run outcome is malformed") from exc
+            if outcome.run_id != path.stem:
                 raise ValueError("native run outcome identity mismatch")
-            if value.get("status") == "accepted" and value.get("enters_quality_denominator") is True:
+            if outcome.status == "accepted" and outcome.enters_quality_denominator:
                 values.append(value)
-            elif value.get("status") not in {"accepted", "infrastructure_attempt"}:
-                raise ValueError("native run outcome status is malformed")
         return tuple(values)
 
 

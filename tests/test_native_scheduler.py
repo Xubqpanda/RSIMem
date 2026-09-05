@@ -58,6 +58,8 @@ def test_scheduler_retries_only_provider_failures_and_accepts_complete_retry() -
     assert outcome.enters_quality_denominator
     assert len(outcome.attempts) == 2
     assert outcome.attempts[0].retryable
+    assert outcome.attempts[0].provider_status == 503
+    assert outcome.attempts[0].error_code is None
 
 
 def test_usage_failure_is_retained_and_excluded_without_retry() -> None:
@@ -72,6 +74,7 @@ def test_usage_failure_is_retained_and_excluded_without_retry() -> None:
     assert outcome.status == "infrastructure_attempt"
     assert not outcome.enters_quality_denominator
     assert outcome.attempts[-1].failure is InfrastructureFailure.USAGE_INCOMPLETE
+    assert outcome.attempts[-1].provider_status is None
     assert calls == 1
 
 
@@ -121,6 +124,7 @@ def test_outcome_store_is_idempotent_and_filters_infrastructure(tmp_path) -> Non
     assert store.put(accepted) is False
     assert store.put(excluded) is True
     assert [value["run_id"] for value in store.accepted()] == [first.run_id]
+    assert NativeRunOutcomeStore(tmp_path / "outcomes").accepted()[0]["attempts"][0]["provider_status"] is None
 
 
 def test_outcome_store_rejects_conflicting_receipt(tmp_path) -> None:
