@@ -33,3 +33,7 @@ SM/EP/PC/PG cross-panel gate. It is excluded from the quality denominator under
 provider/runner infrastructure failure. No repair case or Stage 2 transition is
 authorized. The `--no-judge` launcher change is covered by deterministic tests,
 but it does not make an incomplete provider run acceptable.
+
+Native run attempt receipts now retain content-free `provider_status` and
+`error_code` fields and support canonical reload, so these exclusions can be
+reconstructed as provider/server, usage, service, or runner failures.
