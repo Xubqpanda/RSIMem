@@ -54,6 +54,40 @@ def _write_audit(path: Path, *, manifest_id: str, protocol_id: str,
         os.replace(temporary, target)
 
 
+def load_native_attribution_batch_audit(path: Path) -> dict[str, object]:
+    """Reload and verify a content-free batch audit sidecar."""
+
+    target = Path(path).expanduser().resolve()
+    if target.is_symlink() or not target.is_file():
+        raise ValueError("native attribution batch audit is missing or symlinked")
+    try:
+        payload = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError("native attribution batch audit is unreadable") from exc
+    expected = {"audit_id", "schema", "manifest_id", "protocol_id", "accepted_run_ids", "excluded_runs"}
+    if not isinstance(payload, Mapping) or set(payload) != expected:
+        raise ValueError("native attribution batch audit fields are invalid")
+    if payload["schema"] != AUDIT_SCHEMA:
+        raise ValueError("native attribution batch audit schema is invalid")
+    if any(not isinstance(payload[field], str) or not payload[field]
+           for field in ("audit_id", "manifest_id", "protocol_id")):
+        raise ValueError("native attribution batch audit identity is invalid")
+    accepted = payload["accepted_run_ids"]
+    excluded = payload["excluded_runs"]
+    if (not isinstance(accepted, list) or any(not isinstance(item, str) for item in accepted)
+            or accepted != sorted(set(accepted)) or not isinstance(excluded, list)):
+        raise ValueError("native attribution batch audit collections are invalid")
+    for item in excluded:
+        if not isinstance(item, Mapping) or set(item) != {"run_id", "reason"}:
+            raise ValueError("native attribution batch audit exclusion is invalid")
+    identity = {key: payload[key] for key in expected if key != "audit_id"}
+    if payload["audit_id"] != "native-batch-audit." + _digest(identity)[:40]:
+        raise ValueError("native attribution batch audit ID mismatch")
+    if target.read_text(encoding="utf-8") != _canonical(dict(payload)) + "\n":
+        raise ValueError("native attribution batch audit is not canonical")
+    return dict(payload)
+
+
 def _read_sequence_results(*, output_root: Path, trace_directory: str) -> tuple[Mapping[str, object], ...]:
     path = output_root / trace_directory / "sequence_results.json"
     try:
@@ -161,3 +195,6 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+__all__ = ["AUDIT_SCHEMA", "assemble_native_attribution_corpus", "load_native_attribution_batch_audit", "main"]

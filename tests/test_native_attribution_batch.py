@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from rsimem.native_attribution_batch import assemble_native_attribution_corpus
+from rsimem.native_attribution_batch import (
+    assemble_native_attribution_corpus,
+    load_native_attribution_batch_audit,
+)
 from rsimem.native_attribution_run import (
     NativeAttributionRunManifest,
     NativeAttributionRunManifestStore,
@@ -87,3 +90,7 @@ def test_assembler_records_incomplete_run_without_crashing(tmp_path) -> None:
     assert payload["schema"] == "rsimem-native-attribution-batch-audit-v1"
     assert payload["accepted_run_ids"] == []
     assert payload["excluded_runs"][0]["run_id"] == run.run_id
+    assert load_native_attribution_batch_audit(audit_path) == payload
+    audit_path.write_text(audit_path.read_text().replace('"reason":"trace_invalid"', '"reason":"tampered"'))
+    with pytest.raises(ValueError, match="ID mismatch"):
+        load_native_attribution_batch_audit(audit_path)
