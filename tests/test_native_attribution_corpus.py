@@ -9,6 +9,12 @@ import pytest
 from rsimem.native_attribution import attribute_native_observation
 from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
 from rsimem.native_attribution_report import build_attribution_report, main as report_main
+from rsimem.native_attribution_review import (
+    NativeAttributionReviewRecord,
+    NativeAttributionReviewStore,
+    ReviewDecision,
+    build_review_packet,
+)
 from rsimem.native_observation import extract_native_observations
 from test_native_execution_audit import _fixture
 
@@ -105,6 +111,42 @@ def test_attribution_report_module_entrypoint(tmp_path) -> None:
         text=True,
     )
     assert json.loads(result.stdout)["corpus_id"] == corpus.corpus_id
+
+
+def test_review_packet_is_content_free_and_review_store_is_append_once(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    packet = build_review_packet(corpus)
+    assert len(packet) == len(corpus.candidates)
+    assert all("final_response_text" not in json.dumps(item) for item in packet)
+    candidate = corpus.candidates[0]
+    record = NativeAttributionReviewRecord.create(
+        corpus_id=corpus.corpus_id,
+        candidate_id=candidate.attribution_id,
+        reviewer_id="reviewer-a",
+        decision=ReviewDecision.ESCALATE,
+        reviewed_evidence_refs=candidate.evidence_refs or ("no_evidence",),
+        rationale_codes=("insufficient_process_evidence",),
+    )
+    store = NativeAttributionReviewStore(tmp_path / "reviews.jsonl")
+    assert store.append(record) is True
+    assert store.append(record) is False
+    assert NativeAttributionReviewRecord.from_payload(record.payload()) == record
+
+
+def test_review_record_rejects_tampered_id(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    candidate = corpus.candidates[0]
+    record = NativeAttributionReviewRecord.create(
+        corpus_id=corpus.corpus_id,
+        candidate_id=candidate.attribution_id,
+        reviewer_id="reviewer-a",
+        decision=ReviewDecision.CONFIRM,
+        reviewed_evidence_refs=("ref",),
+        rationale_codes=("evidence_complete",),
+    )
+    payload = dict(record.payload(), decision="reject")
+    with pytest.raises(ValueError, match="ID mismatch"):
+        NativeAttributionReviewRecord.from_payload(payload)
 
 
 def test_corpus_store_load_fails_closed_on_tampering(tmp_path) -> None:
