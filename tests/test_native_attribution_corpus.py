@@ -8,7 +8,11 @@ import pytest
 
 from rsimem.native_attribution import attribute_native_observation
 from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
-from rsimem.native_attribution_report import build_attribution_report, main as report_main
+from rsimem.native_attribution_report import (
+    assess_stage2_gate,
+    build_attribution_report,
+    main as report_main,
+)
 from rsimem.native_attribution_review import (
     NativeAttributionReviewRecord,
     NativeAttributionReviewStore,
@@ -98,6 +102,10 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert report["excluded_reasons"] == {"usage_incomplete": 1}
     assert "final_response_text" not in json.dumps(report)
     assert report["report_id"].startswith("native-attribution-report.")
+    gate = assess_stage2_gate(corpus)
+    assert gate["decision"] == "STOP_NO_ACTIONABLE_SIGNAL"
+    assert "unresolved_only" in gate["reasons"]
+    assert "no_two_reviewer_case" in gate["reasons"]
 
 
 def test_attribution_report_cli_reads_frozen_corpus(tmp_path, capsys) -> None:

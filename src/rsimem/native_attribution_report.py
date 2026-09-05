@@ -115,6 +115,33 @@ def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
     return values
 
 
+def assess_stage2_gate(
+    corpus: NativeAttributionCorpus,
+    *,
+    reviewer_two_reviewer_count: int = 0,
+) -> dict[str, object]:
+    """Return a conservative, deterministic decision for opening repairs."""
+
+    reasons: list[str] = []
+    if not corpus.observations:
+        reasons.append("no_observations")
+    if corpus.unresolved_count == len(corpus.candidates):
+        reasons.append("unresolved_only")
+    if corpus.actionable_count == 0:
+        reasons.append("no_actionable_candidate")
+    if reviewer_two_reviewer_count <= 0:
+        reasons.append("no_two_reviewer_case")
+    decision = "OPEN_STAGE2" if not reasons else "STOP_NO_ACTIONABLE_SIGNAL"
+    return {
+        "schema": "rsimem-stage2-gate-v1",
+        "corpus_id": corpus.corpus_id,
+        "decision": decision,
+        "reasons": reasons,
+        "actionable_count": corpus.actionable_count,
+        "two_reviewer_candidate_count": reviewer_two_reviewer_count,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("corpus", help="path to a frozen native attribution corpus")
@@ -124,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-__all__ = ["REPORT_SCHEMA", "build_attribution_report", "main"]
+__all__ = ["REPORT_SCHEMA", "build_attribution_report", "assess_stage2_gate", "main"]
 
 
 if __name__ == "__main__":

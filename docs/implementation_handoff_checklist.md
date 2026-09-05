@@ -196,6 +196,7 @@ review_status
 - [ ] 报告成功 case、明确 Memory failure、non-memory failure 和 unresolved case 的实例。
 - [ ] 至少完成一个跨 SM/EP/PC/PG 的 audit slice，再决定是否扩大到全量。（当前 SM02/PC01 已完成；EP01/PG01 因 usage-incomplete 排除，不能宣称跨四 panel。）
 - [x] Analysis 2 的输出冻结成版本化 attribution corpus，作为 Analysis 1 的唯一输入；当前 slice 为 `10 observations / 10 unresolved / 0 actionable`，因此触发 `STOP_NO_ACTIONABLE_SIGNAL`，不进入 repair。
+- [x] Stage 1 -> Stage 2 gate 已确定性实现：必须同时具备 actionable candidate、双 reviewer case 和非 unresolved-only corpus；当前 gate 返回 `STOP_NO_ACTIONABLE_SIGNAL`。
 
 ## 4. 阶段 2：Analysis 1，Native Improvement Headroom
 
