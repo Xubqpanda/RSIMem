@@ -100,11 +100,19 @@ class NativeSurfaceObservation:
     event_type: NativeLifecycleEventType
     surface: NativeLifecycleSurface
     status: ObservationStatus
+    producer: str
+    owner: str
+    memory_kind: MemoryKind | None
     evidence_refs: tuple[str, ...]
     input_artifact_ids: tuple[str, ...]
     output_artifact_ids: tuple[str, ...]
     state_before_digest: str
     state_after_digest: str
+    revision: str
+    parent_event_ids: tuple[str, ...]
+    observation_cutoff: str
+    evidence_plane: str = "benchmark_audit"
+    evidence_source: str = "runtime_observation"
 
     @classmethod
     def create(
@@ -113,37 +121,63 @@ class NativeSurfaceObservation:
         event_type: NativeLifecycleEventType,
         surface: NativeLifecycleSurface,
         status: ObservationStatus,
+        producer: str,
+        owner: str,
+        memory_kind: MemoryKind | None,
         evidence_refs: tuple[str, ...],
         input_artifact_ids: tuple[str, ...],
         output_artifact_ids: tuple[str, ...],
         state_before_digest: str,
         state_after_digest: str,
+        revision: str,
+        parent_event_ids: tuple[str, ...],
+        observation_cutoff: str,
     ) -> "NativeSurfaceObservation":
         values = {
             "event_type": NativeLifecycleEventType(event_type).value,
             "surface": NativeLifecycleSurface(surface).value,
             "status": ObservationStatus(status).value,
+            "producer": producer,
+            "owner": owner,
+            "memory_kind": MemoryKind(memory_kind).value if memory_kind else None,
             "evidence_refs": sorted(set(evidence_refs)),
             "input_artifact_ids": sorted(set(input_artifact_ids)),
             "output_artifact_ids": sorted(set(output_artifact_ids)),
             "state_before_digest": state_before_digest,
             "state_after_digest": state_after_digest,
+            "revision": revision,
+            "parent_event_ids": list(parent_event_ids),
+            "observation_cutoff": observation_cutoff,
+            "evidence_plane": "benchmark_audit",
+            "evidence_source": "runtime_observation",
         }
         return cls(
             event_id="native-lifecycle-event." + _digest(values)[:40],
             event_type=NativeLifecycleEventType(event_type),
             surface=NativeLifecycleSurface(surface),
             status=ObservationStatus(status),
+            producer=producer,
+            owner=owner,
+            memory_kind=MemoryKind(memory_kind) if memory_kind else None,
             evidence_refs=tuple(values["evidence_refs"]),
             input_artifact_ids=tuple(values["input_artifact_ids"]),
             output_artifact_ids=tuple(values["output_artifact_ids"]),
             state_before_digest=state_before_digest,
             state_after_digest=state_after_digest,
+            revision=revision,
+            parent_event_ids=tuple(parent_event_ids),
+            observation_cutoff=observation_cutoff,
         )
 
     def __post_init__(self) -> None:
         if self.surface is not _EVENT_SURFACE[self.event_type]:
             raise ValueError("native lifecycle event type and surface do not match")
+        if not self.producer or not self.owner or not self.observation_cutoff:
+            raise ValueError("native lifecycle provenance is incomplete")
+        if self.memory_kind is not None:
+            object.__setattr__(self, "memory_kind", MemoryKind(self.memory_kind))
+        if self.evidence_plane != "benchmark_audit" or self.evidence_source != "runtime_observation":
+            raise ValueError("native lifecycle evidence boundary is invalid")
         for value in (self.state_before_digest, self.state_after_digest):
             if not isinstance(value, str) or len(value) != 64:
                 raise ValueError("native lifecycle state digest is invalid")
@@ -160,11 +194,19 @@ class NativeSurfaceObservation:
             "event_type": self.event_type.value,
             "surface": self.surface.value,
             "status": self.status.value,
+            "producer": self.producer,
+            "owner": self.owner,
+            "memory_kind": self.memory_kind.value if self.memory_kind else None,
             "evidence_refs": list(self.evidence_refs),
             "input_artifact_ids": list(self.input_artifact_ids),
             "output_artifact_ids": list(self.output_artifact_ids),
             "state_before_digest": self.state_before_digest,
             "state_after_digest": self.state_after_digest,
+            "revision": self.revision,
+            "parent_event_ids": list(self.parent_event_ids),
+            "observation_cutoff": self.observation_cutoff,
+            "evidence_plane": self.evidence_plane,
+            "evidence_source": self.evidence_source,
         }
 
     def payload(self) -> dict[str, object]:
@@ -310,16 +352,26 @@ def extract_native_observations(
             NativeLifecycleEventType.TOOL: process_refs if process_kinds.intersection({"tool_call", "tool_result"}) else (),
             NativeLifecycleEventType.OUTCOME: process_refs if "task_outcome" in process_kinds else (trace_id,),
         }
-        events = tuple(NativeSurfaceObservation.create(
-            event_type=event_type,
-            surface=_EVENT_SURFACE[event_type],
-            status=(ObservationStatus.OBSERVED if refs_by_type[event_type] else ObservationStatus.NOT_OBSERVED),
-            evidence_refs=tuple(refs_by_type[event_type]),
-            input_artifact_ids=before_ids,
-            output_artifact_ids=after_ids,
-            state_before_digest=state_before,
-            state_after_digest=state_after,
-        ) for event_type in NativeLifecycleEventType)
+        events_list: list[NativeSurfaceObservation] = []
+        for event_type in NativeLifecycleEventType:
+            event = NativeSurfaceObservation.create(
+                event_type=event_type,
+                surface=_EVENT_SURFACE[event_type],
+                status=(ObservationStatus.OBSERVED if refs_by_type[event_type] else ObservationStatus.NOT_OBSERVED),
+                producer="hermes-past-runtime",
+                owner="hermes-native",
+                memory_kind=MemoryKind(run.memory_kind) if run.memory_kind else None,
+                evidence_refs=tuple(refs_by_type[event_type]),
+                input_artifact_ids=before_ids,
+                output_artifact_ids=after_ids,
+                state_before_digest=state_before,
+                state_after_digest=state_after,
+                revision=state_after,
+                parent_event_ids=(events_list[-1].event_id,) if events_list else (),
+                observation_cutoff=trace_id,
+            )
+            events_list.append(event)
+        events = tuple(events_list)
         values = {
             "schema": OBSERVATION_SCHEMA,
             "run_id": run.run_id,

@@ -28,6 +28,13 @@ def test_native_observation_covers_all_events_without_evaluation_content(tmp_pat
         assert status[NativeLifecycleEventType.RETRIEVAL] is ObservationStatus.OBSERVED
         assert status[NativeLifecycleEventType.TOOL] is ObservationStatus.OBSERVED
         assert status[NativeLifecycleEventType.OUTCOME] is ObservationStatus.OBSERVED
+        assert all(value.owner == "hermes-native" for value in observation.events)
+        assert observation.events[0].parent_event_ids == ()
+        assert all(
+            value.parent_event_ids == (observation.events[index - 1].event_id,)
+            for index, value in enumerate(observation.events[1:], start=1)
+        )
+        assert all(value.observation_cutoff == observation.trace_id for value in observation.events)
     serialized = json.dumps([value.payload() for value in values])
     for forbidden in ("task_score", "official_score", "grader", "answer", "final_response_text"):
         assert forbidden not in serialized
