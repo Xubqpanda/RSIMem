@@ -6,7 +6,7 @@ import pytest
 
 from rsimem.native_attribution import attribute_native_observation
 from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
-from rsimem.native_attribution_report import build_attribution_report
+from rsimem.native_attribution_report import build_attribution_report, main as report_main
 from rsimem.native_observation import extract_native_observations
 from test_native_execution_audit import _fixture
 
@@ -71,11 +71,22 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert report["actionable_count"] == 0
     assert report["unresolved_rate"] == 1.0
     assert report["actionability_rate"] == 0.0
+    assert report["attribution_coverage"] == 1.0
     assert report["surface_counts"] == {"unresolved": 5}
     assert report["memory_kind_counts"] == {"semantic": 5}
     assert report["excluded_reasons"] == {"usage_incomplete": 1}
     assert "final_response_text" not in json.dumps(report)
     assert report["report_id"].startswith("native-attribution-report.")
+
+
+def test_attribution_report_cli_reads_frozen_corpus(tmp_path, capsys) -> None:
+    corpus = _corpus(tmp_path)
+    store = NativeAttributionCorpusStore(tmp_path / "corpus.json")
+    store.put(corpus)
+    assert report_main([str(store.path)]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["corpus_id"] == corpus.corpus_id
+    assert output["actionable_count"] == 0
 
 
 def test_corpus_store_load_fails_closed_on_tampering(tmp_path) -> None:

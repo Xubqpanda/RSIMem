@@ -185,10 +185,10 @@ review_status
 
 ### 1E. Analysis 2 指标和验收
 
-- [ ] `attribution_coverage`、`unresolved_rate`、`evidence_completeness`。
+- [x] `attribution_coverage`、`unresolved_rate`、`evidence_completeness`；由 `rsimem-report-native-attribution` 从冻结 corpus 重建。
 - [ ] 各 surface 的 case 数、比例、panel 分布和 family 分布。
 - [ ] `cross_family_consistency` 和 `non_memory_exclusion_rate`。
-- [ ] `actionability_rate`：能否映射到唯一 repair axis。
+- [x] `actionability_rate`：能否映射到唯一 repair axis；当前 slice 为 `0.0`，因此不开放 repair。
 - [ ] 报告成功 case、明确 Memory failure、non-memory failure 和 unresolved case 的实例。
 - [ ] 至少完成一个跨 SM/EP/PC/PG 的 audit slice，再决定是否扩大到全量。（当前 SM02/PC01 已完成；EP01/PG01 因 usage-incomplete 排除，不能宣称跨四 panel。）
 - [x] Analysis 2 的输出冻结成版本化 attribution corpus，作为 Analysis 1 的唯一输入；当前 slice 为 `10 observations / 10 unresolved / 0 actionable`，因此触发 `STOP_NO_ACTIONABLE_SIGNAL`，不进入 repair。

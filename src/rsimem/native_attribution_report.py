@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import argparse
 from collections import Counter
+from pathlib import Path
 from typing import Any
 
-from .native_attribution_corpus import NativeAttributionCorpus
+from .native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
 
 
 REPORT_SCHEMA = "rsimem-native-attribution-report-v1"
@@ -45,6 +47,7 @@ def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
         "excluded_run_count": len(corpus.excluded_runs),
         "observation_count": len(observations),
         "candidate_count": candidate_count,
+        "attribution_coverage": candidate_count / len(observations) if observations else 0.0,
         "unresolved_count": unresolved,
         "actionable_count": actionable,
         "unresolved_rate": unresolved / candidate_count if candidate_count else 0.0,
@@ -65,4 +68,13 @@ def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
     return values
 
 
-__all__ = ["REPORT_SCHEMA", "build_attribution_report"]
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("corpus", help="path to a frozen native attribution corpus")
+    args = parser.parse_args(argv)
+    corpus = NativeAttributionCorpusStore(Path(args.corpus)).load()
+    print(json.dumps(build_attribution_report(corpus), ensure_ascii=True, sort_keys=True))
+    return 0
+
+
+__all__ = ["REPORT_SCHEMA", "build_attribution_report", "main"]
