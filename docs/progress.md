@@ -1,6 +1,39 @@
 # RSIMem Progress
 
-Last updated: 2026-09-04
+Last updated: 2026-09-05
+
+## Authoritative Current Status
+
+The active research line is now `native-attribution-repair-v1`:
+
+```text
+native_static execution
+    -> lifecycle failure attribution
+    -> one-axis oracle repair
+    -> paired headroom
+    -> feedback-granularity validation
+```
+
+This supersedes the five-condition sensitivity matrix and the extraction-first
+N+1 line. Those implementations, reports, and outputs are retained only for
+historical replay and infrastructure evidence. They are not current experiment
+entrypoints and must not contribute quality observations to the new corpus.
+
+Stage 0A and 0B are complete. Stage 0C asset classification is recorded in
+[`stage0_native_attribution_cleanup_audit_20260905.md`](stage0_native_attribution_cleanup_audit_20260905.md).
+Sequential and concurrent service isolation tests pass. Stage 0D remains open
+only for the manifest-to-actual-execution receipt that binds trace, state/home,
+fixture/ports, provider/model, and complete usage. Formal Analysis 2 remains
+closed until that acceptance and the full serial verification suite pass.
+
+The primary provider probe passed on 2026-09-05 with HTTP `200`, expected
+content, finish reason `stop`, and a usage object for `gpt-5.6-luna`. This is
+connectivity evidence only; it does not reopen any old experiment.
+
+The authoritative protocol and execution order are in
+[`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
+Sections below are retained as dated implementation history and may describe
+superseded milestones.
 
 This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 

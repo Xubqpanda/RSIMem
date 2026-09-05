@@ -1,6 +1,14 @@
-# Current Checkpoint: Stage 3 Pilot Coverage
+# Historical Checkpoint: Stage 3 Pilot Coverage
 
 Date: 2026-09-04
+
+> Superseded on 2026-09-05. The current protocol is
+> [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md),
+> with Stage 0C classification in
+> [`stage0_native_attribution_cleanup_audit_20260905.md`](stage0_native_attribution_cleanup_audit_20260905.md).
+> The five-condition matrix and extraction-first path below are historical
+> evidence only. New execution is gated on Stage 0D and uses isolated
+> `native_static` attribution runs.
 
 ## Decision
 

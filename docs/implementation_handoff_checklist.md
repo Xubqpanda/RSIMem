@@ -82,37 +82,37 @@ trigger/source
 
 ### 0A. 串行冻结 clean baseline
 
-- [ ] 记录 RSIMem commit、Python/依赖、Hermes commit、PAST identity、provider 配置 schema 和当前 CLI。
-- [ ] 运行现有测试、compileall、pip check、secret scan、shell syntax 和 `git diff --check`。
-- [ ] 生成新的 `baseline_manifest`，固定 source digest、test result、fixture digest 和 runner version。
-- [ ] 记录当前五条件 pilot 为 `historical_exploratory_only`，不再作为新协议的质量数据。
-- [ ] 写入新的 protocol ID，例如 `native-attribution-repair-v1`。
+- [x] 记录 RSIMem commit、Python/依赖、Hermes commit、PAST identity、provider 配置 schema 和当前 CLI。
+- [x] 运行现有测试、compileall、pip check、secret scan、shell syntax 和 `git diff --check`。
+- [x] 生成新的 `baseline_manifest`，固定 source digest、test result、fixture digest 和 runner version。
+- [x] 记录当前五条件 pilot 为 `historical_exploratory_only`，不再作为新协议的质量数据。
+- [x] 写入新的 protocol ID，例如 `native-attribution-repair-v1`。
 
 ### 0B. 并行修复运行隔离
 
 以下任务可并行开发，但必须共享同一份 contract test：
 
-- [ ] Service isolation：每个 task/run 使用独立 port 或独立 service process；健康检查必须校验 fixture identity/digest，不能只校验 HTTP 200。
-- [ ] Service lifecycle：task 结束时停止本 run 创建的 service；外部已有进程若 fixture 不匹配必须拒绝复用。
-- [ ] State isolation：每个 `family x replicate x condition` 使用独立 Hermes HOME、state、session、artifact 和 trace 目录。
-- [ ] Anchor isolation：所有 repair 从同一个 immutable native post-learn anchor 派生，repair 之间互不写回。
-- [ ] Provider scheduling：支持 bounded concurrency、重试上限、429/5xx 分类和按 run 的 usage 完整性检查。
-- [ ] Manifest：记录 run、task、family、replicate、port、fixture digest、home digest、model、provider、seed 和 protocol ID。
-- [ ] Failure handling：provider/service/usage 失败标记为 infrastructure attempt，不进入 task quality denominator。
+- [x] Service isolation：每个 task/run 使用独立 port 或独立 service process；健康检查必须校验 fixture identity/digest，不能只校验 HTTP 200。
+- [x] Service lifecycle：task 结束时停止本 run 创建的 service；外部已有进程若 fixture 不匹配必须拒绝复用。
+- [x] State isolation：每个 `family x replicate x condition` 使用独立 Hermes HOME、state、session、artifact 和 trace 目录。
+- [x] Anchor isolation：所有 repair 从同一个 immutable native post-learn anchor 派生，repair 之间互不写回。
+- [x] Provider scheduling：支持 bounded concurrency、重试上限、429/5xx 分类和按 run 的 usage 完整性检查。
+- [x] Manifest：记录 run、task、family、replicate、port、fixture digest、home digest、model、provider、seed 和 protocol ID。
+- [x] Failure handling：provider/service/usage 失败标记为 infrastructure attempt，不进入 task quality denominator。
 
 ### 0C. 并行清理和迁移
 
-- [ ] 审计 extraction-only launcher、proposal CLI、旧 prompt optimizer、旧 shortcut/wrong-mechanism fixture 和重复 report。
-- [ ] 通用 lifecycle、provenance、revision、idempotency、rollback、evidence-plane 和 usage accounting 必须保留。
+- [x] 审计 extraction-only launcher、proposal CLI、旧 prompt optimizer、旧 shortcut/wrong-mechanism fixture 和重复 report。
+- [x] 通用 lifecycle、provenance、revision、idempotency、rollback、evidence-plane 和 usage accounting 必须保留。
 - [ ] 旧 extraction API 若仍被通用代码依赖，改成 method/surface-neutral interface；不能直接删除调用者。
-- [ ] dataset、grader、原始 fixture 和历史 negative evidence 不做格式重写。
-- [ ] 生成物、缓存和 provider secrets 不进入 tracked source。
-- [ ] 更新 `progress.md`，把旧阶段标记为 superseded，把新三阶段主线写清楚。
+- [x] dataset、grader、原始 fixture 和历史 negative evidence 不做格式重写。
+- [x] 生成物、缓存和 provider secrets 不进入 tracked source。
+- [x] 更新 `progress.md`，把旧阶段标记为 superseded，把新三阶段主线写清楚。
 
 ### 0D. 阶段 0 验收
 
-- [ ] 连续启动两个使用不同 notes fixture 的 task，第二个 task 不能读到第一个 task 的 note。
-- [ ] 并发启动多个同类 task，所有 audit 中的 service fixture digest 与 manifest 一致。
+- [x] 连续启动两个使用不同 notes fixture 的 task，第二个 task 不能读到第一个 task 的 note。
+- [x] 并发启动多个同类 task，所有 audit 中的 service fixture digest 与 manifest 一致。
 - [ ] 任意 run 可以从 manifest 重建 trace、state、fixture 和 provider usage。
 - [ ] clean baseline、隔离 contract tests 和完整 smoke 通过后，才允许正式运行 Analysis 2。
 
