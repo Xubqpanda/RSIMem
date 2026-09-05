@@ -20,6 +20,7 @@ model request had incomplete usage after provider HTTP 503 responses.
 | Attribution candidates | 10 |
 | Unresolved candidates | 10 |
 | Actionable candidates | 0 |
+| Evidence completeness | 0.5091 |
 | Repair cases authorized | 0 |
 
 Decision: `STOP_NO_ACTIONABLE_SIGNAL`.
@@ -28,6 +29,8 @@ The deterministic summary is produced by
 `rsimem.native_attribution_report.build_attribution_report()`. Its report ID is
 derived from the frozen corpus identity and its fields are limited to counts,
 ratios, lifecycle labels, memory kinds, families, and exclusion reasons.
+The frozen corpus reload and report reconstruction were verified directly from
+disk; report ID: `native-attribution-report.849141cb52594f52f952d18cf292b03626773ebb`.
 
 The deterministic contracts, event identity, state digests, retrieval metadata,
 tool closure references, and content-free corpus are valid for this slice. The
