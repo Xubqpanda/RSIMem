@@ -1,491 +1,361 @@
-# RSIMem PAST-Bench Foundation Checklist
+# RSIMem PAST-Bench Research Checklist
 
-最后更新：2026-09-02
+最后更新：2026-09-05
 
-## 0. 文档定位
+## 0. 研究目标和执行原则
 
-本文是 RSIMem 当前唯一的实现与验收主清单。旧版 checklist 研究的是“能否根据 deployment-visible process evidence 自动修改 semantic extraction prompt”，但 SM02/SM05 的真实 clean-parent 实验均得到 `STOP_NO_SIGNAL`。这说明 extraction-only 设定过度依赖细粒度 attribution，也无法覆盖 semantic、episodic、procedural 三类 memory 的不同更新机制。因此，旧版尚未完成的真实 N+1 prompt、held-out prompt validation 和 matched prompt effect 不再继续执行。
+RSIMem 当前不是先设计一个更强的 extraction prompt，而是分析 Memory 如何实现可靠的 recursive self-improvement。核心问题是：
 
-RSIMem 当前研究问题是：
+> 在 Memory 自进化过程中，什么类型、什么粒度的反馈，足以把真实执行中的失败归因连接到可验证的 Memory 改进方向？
 
-> 在 Memory 自进化过程中，什么类型、什么粒度的反馈，足以驱动 semantic、episodic 和 procedural memory 产生可靠、可归因且能够泛化的自我改进？
-
-当前只执行四个串行阶段：
-
-0. **仓库清理与基线冻结。** 删除 extraction-only 主线遗留的冗余代码、配置、脚本、测试和重复文档，同时保护通用 runtime、lifecycle、evidence 和历史否定结果。
-1. **研究协议冻结。** 固化三类 memory、六个 lifecycle control surfaces、PAST family 映射、对照组、指标、数据边界和允许声明的 claim。
-2. **通用实验架构。** 建立 `BenchmarkAdapter`、`HostAdapter`、`MemoryMethodAdapter` 和 `FeedbackCondition` 四个独立边界，并拆分现有 Hermes/PAST 单体接线。
-3. **PAST memory sensitivity。** 在接入 AdaMem、MemQ 和 Recuris 前，证明 PAST 的 SM、EP、PC families 分别对对应 memory 类型有真实且机制一致的敏感性。
-
-阶段 4 至阶段 7 不属于当前执行范围。阶段 3 完成后，才决定是否接入三种方法、运行 feedback sufficiency、构造 `w/ RSIMem` 和增加外部 benchmark。
-
-状态约定：
-
-- `√`：已有实现与可审计证据，可作为稳定依赖。
-- `□`：尚未完成，是当前执行项。
-- `部分完成`：已有可复用实现，但未满足新的跨类型口径。
-- `停止`：旧方向不再继续，不得按原计划恢复。
-- `延后`：是否执行取决于阶段 3 的结果。
-
-## 1. 冻结边界
-
-### 1.1 当前实验范围
-
-- Benchmark 固定为 vendored PAST-Bench。
-- Host 固定为 Hermes。
-- 同一比较块内固定基础模型、provider、sampling、任务预算、工具预算和 retry policy。
-- 研究对象是 external persistent memory，不在线更新执行 Agent 的基础模型参数。
-- Semantic、episodic 和 procedural 是同级 memory 类型；working context、feedback 和 policy metadata 不是第四类 memory。
-- Cost、token、latency、storage 和 API call 只用于报告，不进入当前 updater 学习信号。
-- PAST grader、hidden expectation、答案和 official score 只允许进入 final evaluation plane。
-
-### 1.2 三类 Memory 的操作性定义
-
-分类依据持久化 memory unit 的内容，不依据论文名称、更新算法或下游用途。
-
-| 类型 | 持久化内容 | 必须保留的身份 | 典型用途 |
-| --- | --- | --- | --- |
-| Semantic | 去情境化的事实、偏好、规则和约束 | subject、scope、validity、source provenance | 回答事实、遵守偏好和约束 |
-| Episodic | 发生在具体任务、时间或环境中的经历 | episode、context、outcome、provenance | 回忆相似案例和迁移经历 |
-| Procedural | 可复用 SOP、skill、方法和动作模式 | applicability、steps、version、validation | 执行任务、恢复失败和调用技能 |
-
-混合系统必须声明 `primary_kind` 和 transform。例如 RGMem 可以声明为 `episodic -> semantic consolidation`，但未隔离 L1 profile 时不能报告为纯 semantic 方法。
-
-### 1.3 后续首选方法
-
-阶段 0 至阶段 3 不实现真实方法，但预先冻结首选方法，避免看完 sensitivity 结果后任意换方法。
-
-| 类型 | 方法 | 固定论文身份 | 归类 |
-| --- | --- | --- | --- |
-| Semantic | AdaMem | arXiv `2606.21144` | semantic write-policy adaptation |
-| Episodic | MemQ | arXiv `2605.08374` | episodic credit assignment |
-| Procedural | Recuris | arXiv `2608.24876` | procedural skill/harness evolution |
-
-不得将 arXiv `2606.05684` 的另一篇 AdaMEM 与 `2606.21144` 混用。SelfMem、SAGE、RGMem、UMEM、RoMeRL 和 GSEM 只保留为 secondary candidates。
-
-### 1.4 六个 Lifecycle Control Surfaces
-
-旧六层 policy 不再被视为六个必须联合优化的模块，而被保留为统一诊断坐标：
-
-| Surface | 核心问题 | Semantic | Episodic | Procedural |
-| --- | --- | --- | --- | --- |
-| Trigger | 何时产生 candidate | 何时检查新事实 | 何时关闭 episode | 何时触发 skill distillation |
-| Source Selection | 使用哪些证据 | 用户消息和 tool result | 轨迹、状态和 outcome | 成功、失败和恢复步骤 |
-| Construction | 构造成什么 | 事实、偏好和规则 | 带 provenance 的 episode | SOP、skill 和适用条件 |
-| Admission/Maintenance | 如何接受和维护 | ADD/UPDATE/MERGE/NOOP | 去重、保留和 credit | 新建、修补、替换和失效 |
-| Commit/Versioning | 何时持久化生效 | revision、scope、rollback | episode commit 和 lineage | skill version 和 activation |
-| Retrieval/Exposure | 何时提供给 Agent | 检索并注入事实 | 召回相似 episode | 选择、调用或注入 skill |
-
-这些 surface 用于记录方法修改了什么、失败发生在哪里、反馈能否归因到目标 surface。当前不要求每个方法修改全部 surface，也不声明“六层都能自优化”。
-
-### 1.5 三个证据平面
-
-1. **Pure Process Plane** 只包含部署自然可见的上下文、memory lifecycle、retrieval、exposure、tool call/result、状态变化和用户反馈。
-2. **Benchmark Audit Plane** 可以使用预注册 family contract 检查实现与机制，但 label 必须标记为 `benchmark_audit_only`。
-3. **Final Evaluation Plane** 只在实验冻结并运行完成后读取 official score，不得回写 updater 或下一轮 proposal。
-
-Evidence 必须带 plane、source identity、observation cutoff 和 provenance。归因不确定时保持 `unresolved`、`unknown` 或 `censored`，不得用 benchmark 先验补标签。
-
-## 2. 可复用资产与停止项
-
-### 2.1 保留的通用资产
-
-- √ PAST-Bench vendoring、安装、preflight、runner、grader isolation 和 usage accounting。
-- √ Hermes session、native semantic/episodic/procedural storage-boundary fixtures 和工具调用基础。
-- √ `ContextSnapshot`、source projection、tool closure、revision、provenance 和 idempotency。
-- √ Transaction validation、CAS、receipt、restart recovery 和 rollback。
-- √ Operation graph、process corpus、logical case、artifact set 和 crash-safe store。
-- √ Pure process、benchmark audit、final evaluation 三平面类型与拒绝边界。
-- √ Opportunity、retrieval、exposure、tool closure 和 observable outcome 基础事件。
-- √ Revocation、schema version、stale artifact fail-closed 和 secret scan。
-- √ `unresolved`、`censored`、`not_exposed`、`injected_not_used`、`retrieval_miss`、`unknown_usage`。
-- √ SM02/SM05 clean-parent 的 `STOP_NO_SIGNAL` 结果和 case audit。
-
-### 2.2 泛化后复用
-
-- `extraction-owned diagnosis` 改为 `method-owned/surface-owned diagnosis`。
-- `extraction prompt artifact` 改为 versioned `MethodStateArtifact` 或 `MemoryPolicyArtifact`。
-- `N+1 prompt` 改为方法 state、memory bank 或 policy state 的 `N+1` revision。
-- `extraction behavior variation` 改为目标 memory surface 的 state/action variation。
-- Mem0-flat path 只作为 semantic fixture，不再作为框架默认方法。
-- 旧六层 deterministic/shadow fixture 只保留 contract 和 intervention 思想。
-
-### 2.3 明确停止
-
-- 停止：使用现有 SM02/SM05 corpus 生成 extraction prompt N+1。
-- 停止：旧 checklist 的 extraction-only held-out、activation 和 matched effect。
-- 停止：继续追加 SM family，直到偶然找到 extraction-owned signal。
-- 停止：把 deterministic action variation 当作真实 policy improvement。
-- 停止：把 lifecycle cost units 当作 optimizer reward。
-
-## 3. 阶段 0：仓库清理与基线冻结
-
-阶段 0 不改变研究行为，而是把 extraction-only 原型清理为承载三类 memory 实验的最小可信基线。
-
-### 0A：冻结清理前基线
-
-- √ 记录 Git commit、Python、依赖锁状态、Hermes commit 和 PAST vendored identity，见 [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json)。仓库当前没有 lock file，manifest 固定记录 pip-freeze digest。
-- √ 在 clean tree 运行 RSIMem 全量测试、PAST 测试、compileall、dependency、shell syntax、secret scan 和 diff check。
-- √ 生成 baseline manifest，记录 test count、skips、关键 fixture identity 和验收命令。
-- √ 记录公共 CLI、Python imports、config entry points 和 artifact schemas。
-- √ 记录 `hermes_past_bridge.py` 的职责和调用图，建立阶段 2 拆分基线。
-
-反向验收：
-
-- √ 无 clean baseline manifest 时禁止删除；manifest 的 `deletionAuthorized` 当前为 `false`。
-- √ 工作树、依赖或 PAST identity 不一致时 preflight 失败；`python -m rsimem.baseline` 校验 manifest、clean tree、commit drift、pip-freeze、requirements、Python/package/import origin 和 vendored tree digest，缺失或漂移均 fail closed。
-- √ 不得通过修改 baseline 数字掩盖测试失败；manifest 保存原始命令结果和固定 source commit。
-
-### 0B：资产分类
-
-√ 每个候选文件已标记为 `KEEP`、`GENERALIZE`、`DELETE` 或 `EVIDENCE_KEEP`，理由和已知依赖者见 [`asset_inventory_20260901.md`](asset_inventory_20260901.md)。该表只完成初始分类，不授权删除。
-
-优先审计：
-
-- `src/rsimem/extraction_*`、`adaptive_*`、`matched_analysis.py` 及对应测试。
-- `src/rsimem/memory/extraction_*`、`adaptive_*`、`pure_extraction*`、旧 prompt optimizer 和 activation。
-- `configs/extraction_feedback_*`、`extraction_split_plan_*`、`extraction_validation_*`。
-- `scripts/run_luna_adaptive_*`、`run_luna_extraction_*`、旧 SM01/static/matched launchers。
-- `docs/extraction_*`、`phase*`、`matched_*`、`static_*` 和 provider attempt 流水账。
-- 只服务于已撤销 candidate、旧 corpus 或停止 N+1 的 fixtures。
-
-强制保留：
-
-- Generic contracts、artifact identity、revocation、evidence plane、lifecycle event 和 rollback。
-- `current_checkpoint_20260901.md`、`case_analysis.md` 和解释 `STOP_NO_SIGNAL` 所需 evidence index。
-- Raw outputs 的 append-only identity；可以移出默认路径，但不得篡改或用新 schema 重写。
-- PAST task data、grader 和原始 benchmark 文档。
-
-反向验收：
-
-- √ 不能仅凭文件名含 `extraction` 就删除，通用 contract 必须先迁移调用者。
-- √ 不能删除 revocation entry 后让旧 candidate 重新可加载。
-- √ 不能删除解释旧判断和 `STOP_NO_SIGNAL` 的唯一 evidence。
-- √ Dataset、grader、task prompt 和原始 fixture 不参与格式清理。
-
-### 0C：删除与收敛
-
-- √ 已对候选 `DELETE` 文件运行 import/call-site、CLI、shell、test、docs 和 packaging 审计；活动测试 fixture 已改列为 `GENERALIZE`。
-- √ 删除停止的 N+1 launcher、无调用 wrapper、重复 config 和仅服务撤销 artifact 的代码（提交 `b1c9970`、`480f77b`、`3b2cbb4`）。
-- √ 删除 dead tests，但保留保护 generic contract 的反向测试。
-- 延后：历史流水账作为已发生实验的 evidence keep，不在本阶段批量删除；当前状态由本 checklist 和 `progress.md` 汇总。
-- √ 生成物和缓存保持 untracked；baseline/preflight 只接受受控 source、manifest 和 evidence identity。
-- √ 已移除 `rsimem-propose-extraction` export；新增 `rsimem-freeze-research-protocol` 作为 Stage 1 manifest 入口。
-
-### 0D：清理后验收
-
-- √ Generic runtime、Hermes/PAST fixtures、lifecycle replay、revocation、restart 和 rollback 已在全量 RSIMem/PAST tests 中回归验证。
-- √ Tracked imports、可用 CLI、配置引用与 packaging 入口已由 baseline preflight 和全量测试覆盖。
-- √ 已审计删除入口的残留引用；已删除 launcher/proposal/config 不再是可调用路径。
-- √ Generic corpus 和 `STOP_NO_SIGNAL` evidence 仍可读；停止的 proposal CLI 已移除，不会静默恢复旧协议。
-- √ 已记录 launcher、proposal、dead test 和 orphaned config 的删除提交；Stage 0 后续回归基线为 RSIMem `1133 passed`、PAST-Bench `401 passed, 2 skipped`。
-- √ 清理提交均通过对应测试，cleanup manifest 在 `07695ef` 上完成 12 项 clean-tree preflight。
-
-## 4. 阶段 1：研究协议冻结
-
-阶段 1 先明确“测什么、怎么分、结果能说明什么”，避免看到结果后修改分类和指标。
-
-### 1A：Memory Taxonomy Contract
-
-- √ 实现版本化 `MemoryKind` 和 `MemoryUnitDescriptor`，见 `memory/taxonomy.py`。
-- √ Descriptor 包含 kind、content schema、scope、source provenance、temporal identity、applicability、version 和 owner method。
-- √ 支持 `primary_kind + secondary_kind/transform`，主表实验可按单一 target kind 冻结。
-- √ Feedback、Q-value、quality、policy state 与 memory content 由 `MemoryControlDescriptor` 分离建模。
-- √ taxonomy 反向测试覆盖事实、episode、SOP、混合 descriptor 和非法字段。
-
-### 1B：Lifecycle Surface Contract
-
-- √ 实现版本化六类 `MemoryLifecycleSurface` 和 content-free `LifecycleEvent`。
-- √ Event 声明 producer、owner、memory kind、surface、input/output IDs、revision、cutoff 和 plane/source。
-- √ `MethodLifecycleDescriptor` 声明读取、修改和仅观察哪些 surface。
-- √ foreign owner、unowned surface 和 kind mismatch 都 fail closed，不给 updater credit。
-- √ 旧 extraction operation 只映射为 Construction，不伪造其他 surface。
-
-### 1C：PAST Family Applicability Matrix
-
-PAST 当前 26 个 family 预注册如下：
-
-| Target | Families | 数量 | 用途 |
-| --- | --- | --- | --- |
-| Semantic | `SM01` preference、`SM02` constraint、`SM03` correction、`SM04` migration、`SM05` weak trigger、`SM06` exception pollution、`SM07` scoped migration | 7 | semantic sensitivity |
-| Episodic | `EP01` prior-case、`EP02` exception-list、`EP03` recall-then-modify | 3 | episodic sensitivity |
-| Procedural | `PC01_sop_bootstrap_01..06`、`PC02_sop_patch_01..02`、`PC03_latent_rule_induction_01`、`PC04_failure_to_rule_01` | 10 | procedural sensitivity |
-| Auxiliary | `PG01..PG06` proactive information gathering | 6 | process-feedback 辅助分析 |
-
-- √ `memory/family_matrix.py` 冻结 26 个 family 的 task sequence、stages、metric、memory opportunity、target kind、confounders 和 role reason。
-- √ Family ID 只用于 audit、split 和报告；`method_visible_payload()` 不包含 family/root/role identity。
-- √ Inclusion/role 在运行前由 matrix digest 冻结，不能根据分数改变。
-- √ SM、EP、PC 分 panel 报告，不直接平均异构原始分数。
-
-### 1D：比较层级与隔离
+当前实验必须围绕 native static 的真实缺陷展开，而不是通过删除组件观察分数下降。执行逻辑固定为：
 
 ```text
-Level 0: Vanilla Hermes / no cross-task persistence
-Level 1: Hermes native static memory
-Sensitivity: type-matched oracle, shortcut/current-input, wrong-mechanism
-Level 2: Existing method                 [阶段 4，延后]
-Level 3: Existing method w/ RSIMem       [阶段 6，延后]
+native static execution
+    -> lifecycle evidence
+    -> failure attribution
+    -> one-axis repair
+    -> same downstream task
+    -> paired headroom
+    -> feedback-to-update experiment
 ```
 
-- √ 每次只允许一个 target kind 改变，其他两类冻结；protocol 支持按 target kind 派生 panel manifest。
-- √ 每个 condition 声明独立 state directory，禁止跨 condition 污染。
-- √ Learn/validation/final 由 `ExperimentSplit` 按 family/template group 隔离。
-- √ protocol 固定 model、provider、wrapper、tool budget、turns、sampling 和 retry。
-- √ oracle 只用于 sensitivity 上界，condition 标记 `oracle_only` 且不进入 updater corpus。
+本 checklist 是新的主执行协议，旧版本中的五条件 sensitivity、shortcut 和 wrong-mechanism 不再是当前主线。旧结果只作为历史 pilot 保留，不得继续据此写出 Memory 表示或 prompt 注入的因果结论。
 
-### 1E：指标与解释规则
+执行原则：
 
-Primary：PAST official metric 和 paired delta，按三类 panel 报告。
+- 先修复状态隔离和 evidence 完整性，再跑正式结果。
+- 能并行的 family、replicate、trace audit 和 case review 尽早并行。
+- 共享资源必须隔离：每个 run 使用独立 port、HOME、state directory、trace directory 和 service fixture。
+- 不允许多个实验复用一个已启动但 fixture 不明的 mock service。
+- 所有实验先生成 immutable manifest，再启动 provider batch。
+- 正式质量统计排除 provider、服务和 usage infrastructure failure，但保留 attempt audit。
+- 不以最终分数单独决定 Memory failure；`non_memory_failure` 和 `unresolved` 是合法结果。
 
-Mechanism：formation/retention coverage、retrieval、exposure、attributable use、unknown use、correct/harmful update、abstention、negative transfer 和 surface failure distribution。
+## 1. 固定研究边界
 
-- √ protocol 冻结 practical improvement threshold、replicates 和 paired statistical procedure。
-- √ metric contract 明确总分变化不能单独证明目标 surface 改进。
-- √ protocol 要求先验证 oracle、activation 和 exposure，禁止由无提升直接判方法失败。
-- √ metric contract 将 unknown usage 单独列为 mechanism field，不并入 useful/harmful。
-- √ raw resource vector 只记录 input/output/cache/reasoning/latency/storage/API/retry，不作为 learning reward。
+### 1.1 当前范围
 
-### 1F：阶段 1 完成条件
+- Benchmark：vendored PAST-Bench。
+- Host：Hermes。
+- Memory：Semantic、Episodic、Procedural 三类同级对象；feedback、policy 和 context 不是第四类 Memory。
+- 基线：Hermes `native_static`，另保留 `no_persistence` 作为背景下界。
+- 基础模型参数冻结；当前研究更新外部 Memory、Memory policy 或 self-improvement state。
+- 当前论文先使用 Hermes 一个 host；其他 host 属于后续泛化实验。
+- cost、token、latency、storage 和 API call 只做报告字段，不能作为当前 Memory updater 的 reward。
 
-- √ Taxonomy、surface、family matrix、comparison、split 和指标已版本化冻结。
-- √ 三类 fixture 和混合系统反向 fixture 通过 focused contract tests。
-- √ 26 个 family 均有 target/auxiliary/excluded role contract 和理由字段；当前 matrix 的 PG families 为 auxiliary，未预注册 excluded family。
-- √ 首个 protocol manifest 已生成 digest（`docs/research_protocol_v1.json`），后续修改创建新 protocol ID。
-- 部分完成：实验仓库文档已与新 protocol 对齐；论文草稿尚待最终设计稳定后同步，不在 provider 实验前修改历史论述。
-
-## 5. 阶段 2：通用实验架构
-
-阶段 2 让 benchmark、host、method 和 feedback 独立替换。真实 AdaMem、MemQ、Recuris 在阶段 4 接入；本阶段使用 deterministic fake adapters。
-
-### 2A：BenchmarkAdapter
-
-职责：枚举 case/split、重置和推进环境、提供 public capability schema、在 final plane 评分、生成 audit-only annotation。
-
-- √ 定义 host-neutral request/response/event contract，不引用 Hermes 类，见 `adapter_contracts.py`。
-- 部分完成：`PastBenchAdapter` 已封装 PAST task layout、split/family identity、公开 digest 和 content-free `PastExecutionTrace`；`PastRuntimeTerminalCoordinator` 可从 runner response 重放 immutable terminal host 并通过 `AdapterHarness.bind_runtime_terminal()` 交给任意 method adapter。正式 launcher 尚未编排完整 method lifecycle。
-- √ 区分 public task state、audit-only contract 和 final-only score；final score 只能由显式 final-plane callback 提供。
-- □ 保持 raw prompt、grader 和 reference 不变。
-- □ Hidden answer、grader field 或 family-derived key 进入 Host/method 时 fail closed。
-- □ Adapter 前后环境 transition 和 official score 等价（需 Stage 2 bridge/golden trace）。
-
-### 2B：HostAdapter
-
-职责：Hermes session、模型、工具、native memory、context、usage、restart 和 state isolation。
-
-- √ 定义 `HostCapabilities`，声明 memory surface、tool closure、usage、restart 和 snapshot；提供 deterministic host fixture。
-- √ `HermesHostAdapter.attach()` 已接管 semantic/episodic/procedural projection attachment；adapter call、projection verification、query observation 和 native-search ledger 操作位于 `HermesHostOperations`。
-- √ BenchmarkAdapter contract 不读取 Hermes state，MemoryMethodAdapter contract 不调用 PAST grader。
-- 部分完成：native bypass、method-managed 和 no-persistence identity 已有 bridge/runtime 语义；native+ledger 与 native+adapter+ledger 的 persisted-session fixture 已验证 variant-neutral host projection digest，完整 event/outcome/usage golden trace 仍待完成。
-- √ deterministic host fixture 对重复/跨 session event 和 restart drift fail closed；真实 tool closure 已经由 host-owned `skills_list`/`skill_view` wrapper 接线。
-
-### 2C：MemoryMethodAdapter
-
-统一接口：
+### 1.2 Lifecycle vocabulary
 
 ```text
-describe_capabilities
-prepare_run
-start_episode
-observe_event
-finalize_episode
-snapshot_state
-propose_update
-validate_update
-activate_update
-rollback_update
+trigger/source
+    -> formation
+    -> persistence
+    -> maintenance
+    -> retrieval
+    -> exposure/application
+    -> downstream action/outcome
 ```
 
-- √ `MethodCapabilities` 声明 primary/secondary kind、owned surfaces、required feedback、Host capabilities、state schema、lineage、online update、validation 和 rollback。
-- √ Method state 与 memory content 分离；`MethodStateSnapshot` 只保存 digest。
-- √ `MethodUpdate` 声明 target surface、affected artifacts、base revision、cutoff 和 expected behavior change。
-- √ Unsupported capability 明确返回 unsupported，不静默改算法。
-- √ deterministic semantic fake method 不得修改 episodic/procedural state。
-- √ Method contract 不读取 final score、hidden expectation 或 cutoff 后 evidence。
-- √ Stale revision、duplicate activation 和 invalid rollback fail closed。
-
-### 2D：FeedbackCondition
-
-| ID | Condition | Updater 可见信息 |
-| --- | --- | --- |
-| F0 | Frozen | 无反馈 |
-| F1 | Terminal outcome | 部署可见 success/failure/outcome |
-| F2 | Unstructured trajectory | F1 加完整可见轨迹 |
-| F3 | Structured lifecycle | F2 加 canonical memory events |
-| F4 | Artifact-grounded | F3 加 exact provenance/use/outcome joins |
-| F5 | Counterfactual | F4 加预注册 replay/intervention |
-
-- √ 每个 condition 通过 `FeedbackView` allowlist 构造 updater view。
-- √ 低 condition 不能经 nested metadata、raw payload、pointer、answer 或 grader 读取高 condition。
-- √ Feedback view 记录 condition、schema、cutoff、plane 和 digest。
-- 部分完成：F5 contract 限定为 replay/intervention 字段；实际 train/development runner 绑定待 Stage 3。
-
-### 2E：Canonical Evidence 与 Ownership
-
-- 部分完成：既有 process/lifecycle ledgers 覆盖 candidate、constructed memory、admission、commit、retrieval、exposure、use、tool、outcome、proposal 和 activation；新 `LifecycleEvent` 提供统一 surface identity。
-- 部分完成：新 event contract 包含 kind/surface/owner/revision/parents/cutoff/plane；run/session/task join 仍由 framework core 接入。
-- □ Exposure、behavioral consistency 和 attributable use 严格区分。
-- □ Native/其他 method 可以阻止 false attribution，但不能替目标 method 获得 credit。
-- □ Semantic set、episode provenance 和 skill invocation 复用统一 parent/child contract。
-
-### 2F：拆分 Hermes-PAST 单体
-
-当前 `src/rsimem/hermes_past_bridge.py` 仍约 3306 行，同时承担 benchmark、Hermes、memory、evidence、feedback 和 report 职责。`hermes_host_adapter.py` 已拥有 semantic/episodic/procedural projection 及 host operations；bridge 对这四类 operation 保留兼容薄代理。
-
-- 部分完成：PAST task/family public identity 已迁入 `PastBenchAdapter`，grader 仍留在 final evaluation plane。
-- √ semantic/episodic/procedural projection wrappers 已迁入 `hermes_host_adapter.py` 并由 real Hermes integration tests 验证；adapter failure、native bypass 与 projection mismatch 保持 fail-closed/显式记录语义。
-- □ Canonical event、corpus 和 attribution join 留在 framework core。
-- □ Mem0/extraction path 迁入 semantic fixture/backend。
-- □ 旧入口提供兼容层或明确迁移错误，不静默运行旧协议。
-- 部分完成：真实 Hermes runner 已向 `StepResponse` 导出 content-free canonical host event IDs、per-run state digest 和 variant-neutral host projection digest；persisted-session fixture 验证 native+ledger/native+adapter+ledger projection 一致。完整 events/outcome/usage golden trace 仍待完成。
-
-### 2G：阶段 2 完成条件
-
-- √ 四个边界有 typed contract、capability descriptor 和反向测试；Benchmark/Host/Method/Feedback contract 已落地。
-- √ deterministic fake semantic/episodic/procedural methods 可在同一 host-neutral harness 独立运行；真实 PAST/Hermes harness 待接线。
-- √ F0-F5 有字段 allowlist 和 contamination tests。
-- □ Grader 无法经 Host、method、metadata 或 pointer 泄漏。
-- 部分完成：Hermes-PAST bridge 已抽出 host projections 和 host operations；真实 PAST runner 已自动产生并导出 canonical host trace，`PastExecutionTrace` 可比较终态/usage/process/host digest，`PastRuntimeTerminalCoordinator` 对 case/run/event/revision/state 做 fail-closed terminal binding。formal run 必须通过 `rsimem_method_task_id` 传入 opaque case ID，禁止 PAST task/family ID 进入 method。正式 launcher 的完整 method lifecycle 和跨 condition event/outcome/usage golden trace equivalence 仍未完成。
-- √ Restart、revision、idempotency、rollback、secret scan 和 telemetry 的现有 contract/fixture 验收通过；真实 runner 的端到端 restart/golden trace 仍属于上一项。
-- □ 本阶段不要求真实三种方法，不用 fake method 分数声明效果。
-
-## 6. 阶段 3：PAST Memory Sensitivity
-
-阶段 3 回答 PAST 的 SM、EP、PC 是否能稳定区分“没有该类 memory”和“拥有正确该类 memory”。只有通过该 gate，后续方法无提升才可解释。
-
-### 3A：Family Eligibility
-
-- 部分完成：26 个 family 的 sequence/stage/target/opportunity 已冻结；真实 Hermes runner 已导出 canonical host trace，但 formal on-disk learn -> persistence -> future -> evaluation eligibility 仍待 sensitivity launcher 接入。
-- □ Future input 完整重述目标 memory 时标记 `current_input_confounded`。
-- □ Target memory 必须存在可干预的结果路径，不能只影响无关格式。
-- √ Control contract 隔离 persistence、shortcut 和 wrong mechanism。
-- √ Split contract 禁止答案/值跨 split，并禁止 family ID 进入 method view；surface token audit 待真实 run。
-- √ Exclusion/auxiliary role 在 matrix 结果前冻结并记录理由。
-
-### 3B：五个 Sensitivity Conditions
-
-| Condition | 目的 |
+| Surface | 需要回答的问题 |
 | --- | --- |
-| `no_persistence` | 无跨任务 memory 下界 |
-| `native_static` | Hermes 原生静态 memory |
-| `type_matched_oracle` | 正确目标类型 memory 的可达上界 |
-| `shortcut/current_input` | 检查是否绕过 persistence |
-| `wrong_mechanism` | 检查是否只是额外文本带来提升 |
+| `trigger/source` | 当前交互或历史证据是否提供了形成 Memory 的机会 |
+| `formation` | 是否形成了正确、完整、范围合适的 Memory candidate |
+| `persistence` | candidate 是否成功提交，并在后续 session 可见 |
+| `maintenance` | 是否正确处理更新、冲突、过期、撤销和污染 |
+| `retrieval` | 是否在需要时检索，并选中正确 Memory |
+| `exposure/application` | 正确 Memory 是否进入模型可用上下文并影响行为 |
+| `downstream` | 工具、模型推理或任务执行是否仍然失败 |
 
-Oracle 要求：
+这些 surface 是统一诊断坐标，不要求每一种 Memory 或方法都优化全部 surface。
 
-- √ `SensitivityMatrix.create_for_panel()` 在 run 前生成并冻结 `oracle_only` audit artifacts。
-- √ Oracle 只含目标机制最小 field IDs/digest，不含标准答案、grader 指令和输出模板。
-- √ Semantic oracle 是 fact/scope/validity；episodic oracle 保留 episode/context/outcome/provenance；procedural oracle 是 applicability/steps/version/validation。
-- √ Oracle artifact plane 是 `benchmark_audit`，不进入 pure corpus、method updater、retrieval learning 或 proposal。
+### 1.3 Evidence planes
 
-### 3C：Matched Execution
+- `pure_process`：部署时自然可见的 context、Memory event、retrieval、injection、tool call/result、用户反馈和状态变化。
+- `benchmark_audit`：离线使用预注册 task contract、grader 和 reference 检查结果，仅用于审计。
+- `final_evaluation`：实验结束后读取 official score 和 hidden evaluation。
 
-- 部分完成：protocol/condition contract 固定 task/seed/model/provider/budget/tool/retry 字段；真实 runner host trace 已接线，正式 matched launcher 与 provider execution 尚待实现。
-- √ 每个 condition contract 要求独立 state identity；残留检查待真实 runner。
-- √ Replicates、failure exclusion 和 incomplete usage 规则由 protocol/raw audit boundary 预先冻结。
-- 部分完成：canonical host event/state identity 已由真实 runner 输出，现有 lifecycle/process ledger 可记录 retrieval/exposure/tool/outcome；跨 condition 的完整 trace 汇总仍待 matched launcher。
-- □ Provider/infrastructure failure 不进入质量 denominator，但保留 attempts audit。
-- □ 平衡或随机化执行顺序，避免 condition 与时间/provider drift 固定相关。
+`benchmark_audit` 和 `final_evaluation` 的字段不得进入 Agent、Memory updater 或 policy optimizer。所有 evidence 带有 `plane`、`source`、`cutoff`、`revision` 和 digest。
 
-### 3D：Type-Isolated Panels
+## 2. 阶段 0：重置协议、修复隔离和清理旧主线
 
-Semantic：分 preference、constraint、correction、migration、pollution；验证 scope/validity/correction；固定 episodic 和 procedural。
+阶段 0 是所有后续实验的前置条件。该阶段可以将审计任务并行，但协议变更和正式 batch 必须串行冻结。
 
-Episodic：分 prior-case、exception-list、recall-then-modify；验证 context/outcome/provenance；固定 semantic 和 procedural。
+### 0A. 串行冻结 clean baseline
 
-Procedural：分 SOP bootstrap、patch、latent rule、failure-to-rule；验证 skill selection/invocation；固定 semantic 和 episodic。
+- [ ] 记录 RSIMem commit、Python/依赖、Hermes commit、PAST identity、provider 配置 schema 和当前 CLI。
+- [ ] 运行现有测试、compileall、pip check、secret scan、shell syntax 和 `git diff --check`。
+- [ ] 生成新的 `baseline_manifest`，固定 source digest、test result、fixture digest 和 runner version。
+- [ ] 记录当前五条件 pilot 为 `historical_exploratory_only`，不再作为新协议的质量数据。
+- [ ] 写入新的 protocol ID，例如 `native-attribution-repair-v1`。
 
-- 部分完成：matrix 已按 semantic 7、episodic 3、procedural 10 个 target families 隔离，并冻结 panel target kind；official metric/paired delta 等报告待真实 run。
-- √ 不把三个 panel 的异构 raw metric 直接平均。
+### 0B. 并行修复运行隔离
 
-### 3E：Sensitivity Gate
+以下任务可并行开发，但必须共享同一份 contract test：
 
-每个类型独立给出：
+- [ ] Service isolation：每个 task/run 使用独立 port 或独立 service process；健康检查必须校验 fixture identity/digest，不能只校验 HTTP 200。
+- [ ] Service lifecycle：task 结束时停止本 run 创建的 service；外部已有进程若 fixture 不匹配必须拒绝复用。
+- [ ] State isolation：每个 `family x replicate x condition` 使用独立 Hermes HOME、state、session、artifact 和 trace 目录。
+- [ ] Anchor isolation：所有 repair 从同一个 immutable native post-learn anchor 派生，repair 之间互不写回。
+- [ ] Provider scheduling：支持 bounded concurrency、重试上限、429/5xx 分类和按 run 的 usage 完整性检查。
+- [ ] Manifest：记录 run、task、family、replicate、port、fixture digest、home digest、model、provider、seed 和 protocol ID。
+- [ ] Failure handling：provider/service/usage 失败标记为 infrastructure attempt，不进入 task quality denominator。
 
-- `SENSITIVE`：oracle 相对 no-persistence 达到预注册 practical improvement，replicate 一致，shortcut/wrong-mechanism 不能解释主要提升。
-- `PARTIALLY_SENSITIVE`：只有部分预注册 families 通过，后续只在通过 family 上运行方法。
-- `INSENSITIVE`：oracle 无稳定改善，不能用该 panel 否定 memory method。
-- `INVALID`：环境、泄漏、adapter 或 control 失败，修复后重新预注册。
+### 0C. 并行清理和迁移
 
-- □ 报告 family-level paired delta、replicate variation 和 oracle coverage。
-- □ 区分 dataset insensitivity、memory 未形成、未检索、未曝光和 Agent non-use。
-- □ 报告 shortcut/wrong-mechanism，排除额外 token 解释。
-- □ `INSENSITIVE` 作为合法负结果保留，不降低 gate 制造 sensitivity。
+- [ ] 审计 extraction-only launcher、proposal CLI、旧 prompt optimizer、旧 shortcut/wrong-mechanism fixture 和重复 report。
+- [ ] 通用 lifecycle、provenance、revision、idempotency、rollback、evidence-plane 和 usage accounting 必须保留。
+- [ ] 旧 extraction API 若仍被通用代码依赖，改成 method/surface-neutral interface；不能直接删除调用者。
+- [ ] dataset、grader、原始 fixture 和历史 negative evidence 不做格式重写。
+- [ ] 生成物、缓存和 provider secrets 不进入 tracked source。
+- [ ] 更新 `progress.md`，把旧阶段标记为 superseded，把新三阶段主线写清楚。
 
-### 3F：阶段 3 决策出口
+### 0D. 阶段 0 验收
 
-- 三类通过：阶段 4 接入 AdaMem、MemQ、Recuris，运行 type-matched diagonal experiments。
-- 部分通过：PAST 继续作为共同主数据集，主 claim 限于通过类型；未通过类型寻找外部 benchmark。
-- 仅 procedural 通过：PAST 作为 procedural 主数据集，semantic/episodic 使用专用 benchmark。
-- 全部未通过：停止方法接入，检查 Hermes adapter、oracle 和 PAST suitability。
+- [ ] 连续启动两个使用不同 notes fixture 的 task，第二个 task 不能读到第一个 task 的 note。
+- [ ] 并发启动多个同类 task，所有 audit 中的 service fixture digest 与 manifest 一致。
+- [ ] 任意 run 可以从 manifest 重建 trace、state、fixture 和 provider usage。
+- [ ] clean baseline、隔离 contract tests 和完整 smoke 通过后，才允许正式运行 Analysis 2。
 
-### 3G：阶段 3 完成条件
+## 3. 阶段 1：Analysis 2，Native Failure Attribution
 
-- □ 26 个 family 的 eligibility 和 inclusion 在结果前冻结。
-- □ 三个 panel 完成五个 conditions 或有预注册不可运行理由。
-- □ 每个 panel 有明确 sensitivity 状态。
-- □ Oracle 与 method-visible evidence 隔离，final score 未进入 updater。
-- □ Manifest、trace、state、attempt audit 和 report 可重建全部结论。
-- □ 根据结果另写阶段 4 至阶段 7 checklist，不在本文提前标记后续完成。
+这里虽然在论文中称为 Analysis 2，但工程上先执行。目标是分析 native static 的自然失败，而不是人为删除组件。
 
-## 7. 阶段 4 至阶段 7 的暂定方向
+### 1A. 统一 observation contract
 
-以下只记录方向，不是当前执行任务：
+- [ ] 为每个 native episode 记录 lifecycle event：source、candidate、formation、admission、commit、maintenance、retrieval、exposure、application、tool 和 outcome。
+- [ ] 每条 Memory event 带 `event_id`、`owner`、`memory_kind`、`surface`、`input_ids`、`output_ids`、`revision`、`parents`、`cutoff`、`plane` 和 digest。
+- [ ] 记录 Memory state before/after 的 digest、entry identity、scope、validity、provenance、revision 和 commit status。
+- [ ] 记录 retrieval query、candidate IDs、selected ID、injection status、injection position 和 application surface。
+- [ ] 记录 tool calls/results、service audit、最终输出和 task component score；score 只进入离线 audit。
+- [ ] 缺失的事件标记为 `not_observed`，不能默认为“没有发生”。
 
-- 延后阶段 4：忠实接入 AdaMem、MemQ、Recuris，先做 native fidelity smoke，再做 PAST 对角实验。
-- 延后阶段 5：同一方法内控制 F0-F5，研究 feedback-sufficiency frontier。
-- 延后阶段 6：构造 `Original Method + RSIMem Feedback Adapter + Validation Gate`，运行 equal-compute、oracle 和 held-out controls。
-- 延后阶段 7：根据结果选择外部 benchmark，完成跨 benchmark 验证和论文报告。
+### 1B. 并行 trace extraction
 
-阶段 3 前不实现方法专属 adapter、不承诺 SOTA、不选择 external benchmark，也不把旧 extraction N+1 当作 `w/ RSIMem`。
+按 panel 并行处理，每个 worker 只读 immutable trace：
 
-## 8. 当前状态
+- [ ] Semantic：SM01-SM07，重点检查事实、偏好、约束、迁移、过期和 scope。
+- [ ] Episodic：EP01-EP03，重点检查事件、上下文、outcome、provenance 和 prior-case recall。
+- [ ] Procedural：PC families，重点检查 SOP/skill formation、version、activation 和 invocation。
+- [ ] PG：PG01-PG06 作为 retrieval-centric 辅助 family，重点检查何时意识到需要历史并主动检索。
+- [ ] 每个 panel 至少并行抽取多个 replicate 和成功/失败样本，避免先做完一个 family 才开始下一个。
 
-截至 2026-09-02：
+### 1C. Failure taxonomy
 
-- √ PAST/Hermes runtime、usage、generic memory contracts、lifecycle、provenance、安全和 rollback 可复用。
-- √ Pure process、benchmark audit 和 final evaluation 已隔离。
-- √ SM02/SM05 clean-parent 已完成，均为 `STOP_NO_SIGNAL`。
-- √ Extraction-only 主线在研究决策上停止，不再生成 N+1。
-- √ 三类 storage-boundary、六 surfaces、taxonomy/ownership contract 和 result-independent sensitivity fixture 已验收。
-- 部分完成：PAST/Hermes 可运行；host projections/operations 已从 bridge 拆出，真实 runner 自动输出 canonical host trace，terminal event 可经 `AdapterHarness` 绑定 method adapter；正式 launcher 尚未编排完整 method flow，bridge 仍承担 lifecycle/evidence/report 编排。
-- √ 阶段 0A baseline 冻结和 0B 逐文件资产分类已完成；`baseline_preflight`
-  可在 cleanup 前 fail closed。
-- √ 阶段 0C 已删除无活动依赖的旧 launcher、proposal 入口、dead tests 和三个 orphaned config；仍在使用的 extraction-named configs 已明确为 generalized deterministic fixtures。
-- √ 阶段 1 已冻结 taxonomy、surface、26-family matrix 与 protocol manifest。
-- 部分完成：阶段 2 的四类 adapter contracts、deterministic harness、Hermes host boundary 与三类 projection 已完成；真实 runner 的 host trace 和 terminal method binding 已接线，正式 full-lifecycle method flow/golden trace 尚待实现。
-- 部分完成：阶段 3 已完成 SM/EP/PC result-independent five-condition oracle harness、case-bound source readiness census、verified oracle-seed registry，以及将每个 `family x condition x replicate` 展开为独立 state/Hermes-home/trace 的 immutable run manifest。registry 要求 case/panel/kind、family source digest、完整 trusted-home tree digest 和严格 memory layout；只有 registry 验证通过才会把 deployment 标为 executable，且不保存 memory text。PAST catalog 已使 semantic 7 个、episodic 3 个和 procedural 10 个 family 的 native、no-persistence、shortcut 与 wrong-mechanism slice 可执行；shortcut/wrong-mechanism 固定使用无持久化 variant。三类 panel 的 oracle seed 均只从公开 learn/update input 人工编写、case-bound 注册，并已通过 evaluation-only fresh-state slice preparation；procedural 10 个 family 的五条件 deployment 已全部 preparation-verified。15 个 family 的 replicate-1 五 condition pilot 已通过 content-free audit：semantic SM01/SM02/SM03/SM04/SM05/SM06/SM07、episodic EP01/EP02/EP03、procedural PC01/PC01 bootstrap-02/PC02/PC03。SM04 earlier provider-failed attempt、PC03 first interrupted attempt、PC01 bootstrap-02 first timeout、PC01 bootstrap-03 first timeout 和 PC02 首次失败 attempt 单独保留并排除；content-free coverage aggregator 已能从 20 个 audit manifest 重建 accepted/excluded coverage；正式矩阵 replicates 与任何 panel sensitivity 结论仍未完成。
-- 注：当前 accepted family 数为 15（semantic 7、episodic 3、procedural 5）；PC01 bootstrap 03--06、PC04 failure-to-rule 仍缺少有效 pilot。PC01 bootstrap-02 retry-2 与 PC03 retry-2 已纳入 accepted coverage，早期失败 attempt 仅作 excluded evidence。
-- □ AdaMem、MemQ、Recuris 未接入；这是阶段 4，不是当前缺陷。
+每个 case 只有一个 primary failure surface，可有多个 secondary observation：
 
-## 9. 标准验收命令
+| Label | 判定规则 |
+| --- | --- |
+| `formation_missing` | 应形成 candidate，但没有 candidate |
+| `formation_incorrect` | candidate 存在，但内容、scope、provenance 或 procedure 不正确 |
+| `persistence_failed` | candidate 正确，但未提交、版本不一致或后续不可见 |
+| `maintenance_stale` | 旧、过期或撤销内容仍被视为有效 |
+| `maintenance_conflict` | 冲突 entry 共存且没有正确消解 |
+| `maintenance_pollution` | 一次性、无关或错误内容被持久化 |
+| `retrieval_missed` | 正确 Memory 存在，但没有触发、召回或注入 |
+| `retrieval_wrong` | 检索发生，但选中错误、过期或无关 Memory |
+| `application_ignored` | 正确 Memory 已暴露，但没有影响后续行为 |
+| `non_memory_failure` | 主要问题来自工具、服务、任务理解或通用推理 |
+| `unresolved` | 现有 process evidence 不足以唯一归因 |
 
-RSIMem 根目录：
+判定顺序为：formation -> persistence/maintenance -> retrieval -> application -> non-memory。不能仅凭低分给 Memory 归因。
 
-```bash
-PYTHONPATH=src .venv/bin/python -m rsimem.baseline --manifest docs/baseline_manifest_20260901.json --repo-root .
-.venv/bin/python -m pytest -q tests
-.venv/bin/python -m compileall -q src tests
-.venv/bin/python -m pip check
-.venv/bin/python -m rsimem.secret_scan
-git diff --check
-bash -n scripts/*.sh
+### 1D. 并行 case review
+
+- [ ] 自动规则先生成候选 attribution，不直接生成最终标签。
+- [ ] 至少两名 reviewer 独立检查代表性 case；分歧 case 进入 adjudication。
+- [ ] 每个标签引用 event ID、artifact digest、revision、tool index 或 snapshot digest。
+- [ ] 每个 case 生成 `candidate_repair_axis`，若不能唯一映射则标记 `is_actionable=false`。
+- [ ] hidden answer、future-test answer、grader instruction 和 official score 不得出现在 updater view。
+
+输出 schema：
+
+```text
+case_id
+family_id
+replicate_id
+memory_kind
+primary_failure_surface
+secondary_observations
+evidence_refs
+confidence
+candidate_repair_axis
+is_actionable
+review_status
 ```
 
-Vendored PAST-Bench：
+### 1E. Analysis 2 指标和验收
 
-```bash
-../../.venv/bin/pytest -q
+- [ ] `attribution_coverage`、`unresolved_rate`、`evidence_completeness`。
+- [ ] 各 surface 的 case 数、比例、panel 分布和 family 分布。
+- [ ] `cross_family_consistency` 和 `non_memory_exclusion_rate`。
+- [ ] `actionability_rate`：能否映射到唯一 repair axis。
+- [ ] 报告成功 case、明确 Memory failure、non-memory failure 和 unresolved case 的实例。
+- [ ] 至少完成一个跨 SM/EP/PC/PG 的 audit slice，再决定是否扩大到全量。
+- [ ] Analysis 2 的输出冻结成版本化 attribution corpus，作为 Analysis 1 的唯一输入。
+
+## 4. 阶段 2：Analysis 1，Native Improvement Headroom
+
+本阶段验证 Analysis 2 找到的 failure 是否确实对应 native static 的可优化空间。它不做删除式 ablation，而做同一任务上的局部反事实 repair。
+
+### 2A. 串行选择 repair cases
+
+- [ ] 只选择 `confidence` 足够高、evidence 完整、`is_actionable=true` 的 case。
+- [ ] 按 failure surface 和 Memory kind 分桶，避免只选择最容易的 semantic case。
+- [ ] 预先冻结 case list、repair axis、reference source、allowed changes 和 expected behavior。
+- [ ] unresolved 和 non-memory case 保留为 negative control，但不强行做 Memory repair。
+
+### 2B. 并行实现局部 oracle repair
+
+每个 repair 从相同 native anchor 派生，不能改变其他 lifecycle surface：
+
+| Repair | 只允许改变 | 适用问题 |
+| --- | --- | --- |
+| `oracle_formation` | candidate 内容、完整性、scope 或 provenance | 漏写、错写、错误抽取 |
+| `oracle_persistence` | commit、revision、跨 session 可见性 | 正确 candidate 未持久化 |
+| `oracle_maintenance` | stale、冲突、污染和错误覆盖状态 | 保存后状态错误 |
+| `oracle_retrieval` | trigger、query、ranking、target selection 或 retrieval timing | 未召回或召回错误 |
+| `oracle_application` | 正确 entry 的 exposure/application surface | 已召回但 Agent 未使用 |
+
+每个 repair 必须声明：
+
+- `base_native_state_digest`；
+- `repair_axis`；
+- `repair_payload_digest`；
+- changed artifact IDs；
+- explicitly unchanged artifact IDs；
+- expected behavior change；
+- rollback path。
+
+### 2C. 并行运行 matched validation
+
+- [ ] `native_static` 和每个 oracle repair 使用完全相同的 evaluation task、fixture、工具、模型、预算、grader 和 seed。
+- [ ] 每个 `case x repair x replicate` 使用独立 service process、port、HOME 和 trace directory。
+- [ ] repair 不得读取 evaluation answer、hidden grader 或正式 task score。
+- [ ] 先运行 bounded smoke，再并行运行各 repair bucket 的正式 replicate。
+- [ ] condition 顺序随机化或平衡化，避免 provider drift 与某个 repair 固定相关。
+- [ ] infrastructure failure 单独重试；质量分母只包含 accepted runs。
+
+### 2D. Headroom 指标
+
+核心是同一 native case 的 paired improvement：
+
+```text
+formation_headroom   = score(oracle_formation)   - score(native_static)
+persistence_headroom = score(oracle_persistence) - score(native_static)
+maintenance_headroom = score(oracle_maintenance) - score(native_static)
+retrieval_headroom   = score(oracle_retrieval)   - score(native_static)
+application_headroom = score(oracle_application) - score(native_static)
 ```
 
-每阶段还要求 clean tree、isolated temporary HOME、restart fixture、tracked-secret scan、schema/revision/revocation/state isolation 验收。正式 provider batch 前运行 bounded completion probe，但 probe 不进入质量统计。不要从 RSIMem 根目录直接运行 `pytest benchmarks/past-bench`，避免错误解析 Hermes-plus 顶层 `agent` package。
+同时报告：
 
-## 10. 总体验收原则
+- task score 和 completion/robustness/safety 等 component delta；
+- case-level repair success rate；
+- content coverage、stale/conflict contamination、target retrieval hit、wrong hit；
+- exposure/application use rate；
+- regression、side effect 和 non-memory residual failure。
 
-1. **先证明 benchmark 需要 memory，再评价 method。** Oracle 不工作时，方法无提升不能解释为方法失败。
-2. **先证明更新发生并被使用，再解释分数。** Task delta 不能单独证明目标 surface 改进。
-3. **分类依据 memory content。** 混合系统必须声明 primary target 和 transform。
-4. **六个 surfaces 用于诊断，不要求联合优化。** 方法只对拥有的 surface 负责。
-5. **负结果合法。** `STOP_NO_SIGNAL`、`INSENSITIVE`、`unresolved` 和 abstention 不得被改写为正标签。
-6. **Benchmark knowledge 与 method feedback 隔离。** Family ID、grader、答案、oracle 和 official score 不进入 updater。
-7. **后续由前三阶段决定。** 阶段 3 完成前不提前实现或宣称阶段 4 至阶段 7。
+只有当某个 repair 在对应 attribution bucket 上稳定提升，才认定该 surface 是 native static 的可优化维度。oracle 无提升同样是结果：说明 attribution 不完整、该 surface 不是主要瓶颈，或失败不属于 Memory policy。
+
+### 2E. Reference state 边界
+
+- [ ] formation/maintenance reference 只来自公开 learn/update input、公开 task contract 和预注册 schema。
+- [ ] 不使用 evaluation answer、hidden expectation、future-test content 或 official score 编写 reference。
+- [ ] reference 保存结构化 keys、scope、validity、provenance、retrieval target 和 allowed changes，不只保存无身份文本。
+- [ ] oracle artifact 只进入 benchmark audit plane，不进入 pure process corpus 或 updater。
+
+### 2F. Analysis 1 验收
+
+- [ ] 每个 repair case 能追溯到 Analysis 2 的 attribution record。
+- [ ] 每个 repair 只有一个 declared changed axis。
+- [ ] native 与 repair 的 downstream task 完全 matched。
+- [ ] 报告 paired delta、case distribution、replicate variation 和 regression。
+- [ ] 生成 native improvement map：surface、failure count、headroom、confidence、适用 Memory kind。
+- [ ] 只将 evidence-supported 且 repair 有真实提升的 surface 交给下一阶段。
+
+## 5. 阶段 3：Feedback-to-Repair Sufficiency
+
+前三阶段中的“阶段 3”是方法验证阶段，只有 Analysis 2/1 完成后才开始。目标是验证不同粒度的部署可见反馈，能否自动完成“归因 -> 修复目标”的连接。
+
+### 3A. 并行构造反馈条件
+
+所有条件使用相同 native cases、同一个 meta-agent、相同 update budget 和 validation gate：
+
+| Condition | Meta-Agent 可见内容 |
+| --- | --- |
+| `F0_terminal` | 终态成功/失败和部署可见 outcome |
+| `F1_trajectory` | F0 加完整可见对话和 tool trace |
+| `F2_lifecycle` | F1 加 canonical lifecycle events |
+| `F3_artifact_grounded` | F2 加 Memory artifact、revision、provenance 和 use join |
+| `F4_counterfactual` | F3 加预注册 replay/intervention observation |
+
+F4 是诊断上界，不代表真实部署反馈。每种 feedback view 使用 field allowlist、cutoff、plane 和 digest，做 contamination test。
+
+### 3B. 并行运行 proposal
+
+- [ ] 每个 feedback condition 在独立 state 上生成 candidate update。
+- [ ] candidate update 必须声明 target surface、affected artifacts、base revision、expected behavior 和 rollback。
+- [ ] updater 不得直接读取 final score、hidden label 或 future-test result。
+- [ ] 同一 native case 的不同 feedback condition 不能共享已激活的 update。
+- [ ] update proposal、validation 和 activation 分离记录，防止“生成即成功”。
+
+### 3C. 指标和验收
+
+- [ ] actionable diagnosis rate；
+- [ ] surface attribution accuracy/consistency；
+- [ ] candidate acceptance rate；
+- [ ] 真实 `N+1` task gain 和 held-out gain；
+- [ ] regression、harmful update、rollback 和 abstention rate；
+- [ ] unresolved/censored rate；
+- [ ] meta-agent input tokens、调用次数和 latency 作为报告字段。
+
+若结构化 process evidence 相比 terminal-only feedback 能稳定生成正确 repair，并在真实 `N+1` 上提升，才说明 feedback 粒度能够连接错误归因和优化方向。
+
+## 6. 并行执行矩阵
+
+### 可以并行的工作
+
+- service/state isolation、manifest、trace schema、fixture audit、usage audit；
+- SM、EP、PC、PG 四个 panel 的 native trace extraction；
+- 不同 family 和 replicate 的 case review；
+- 已冻结 attribution 后，不同 repair axis 的 oracle implementation；
+- F0-F4 feedback view 的 schema 和 contamination tests；
+- report aggregation、paired statistics 和 case visualization。
+
+### 必须串行的工作
+
+- clean baseline -> isolation fix -> formal run；
+- protocol freeze -> native execution -> attribution corpus freeze；
+- attribution corpus freeze -> repair case selection；
+- native anchor freeze -> repair materialization；
+- repair result -> feedback sufficiency；
+- feedback sufficiency -> multi-round RSI。
+
+### 并行资源规则
+
+- 每个 worker 通过 run manifest 分配唯一 port range。
+- 每个 worker 拥有独立 `HOME`、Hermes state、service fixture、trace 和 artifact root。
+- provider 并发由全局 semaphore 控制，默认从低并发开始，根据 429/503 和 usage completeness 调整。
+- 任一 worker 发现 fixture digest、state digest 或 revision 不匹配，立即 fail closed，不继续计入结果。
+- 汇总脚本只读取 accepted immutable manifests，不扫描目录猜测结果。
+
+## 7. 后续阶段，不在当前 checklist 提前实现
+
+前三阶段通过后再决定：
+
+- 接入 Hermes native 之外的 Memory method adapter；
+- 在 semantic、episodic、procedural 上运行 method-specific self-improvement；
+- 运行多轮 `M0 -> M1 -> M2` 的 recursive improvement；
+- 跨 benchmark 或跨 host 泛化；
+- feedback compression 和 Meta-Agent cost study。
+
+当前不承诺每个 Memory kind 都有提升，不承诺所有六个 surface 都可优化，也不把一次 oracle repair 结果称为完整 RSI。
+
+## 8. 总体验收出口
+
+- [ ] 阶段 0：环境、fixture、state、usage 和 manifest 隔离可信。
+- [ ] 阶段 1 / Analysis 2：native failure 有 evidence-backed attribution，无法归因的 case 被保留为 unresolved。
+- [ ] 阶段 2 / Analysis 1：局部 repair 能测量 native static 各 surface 的真实 headroom。
+- [ ] 阶段 3：不同粒度 feedback 能否把 attribution 映射为可执行 repair 得到实证结论。
+- [ ] 所有结论可由 immutable manifest、trace、state digest、audit 和 report 重建。
+- [ ] 任何 negative result、abstention、unresolved 和 infrastructure failure 都单独报告，不被改写为 positive evidence。
