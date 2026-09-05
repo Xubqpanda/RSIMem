@@ -212,6 +212,9 @@ non-content exclusions. The replay corpus records manifest-bound
 predates that field and reports `unknown`; this is an identity/schema upgrade,
 not new evidence. The replay wrote a separate corpus and did not alter the
 frozen evidence used for the current gate.
+An ID-only review packet was generated from that replay corpus for the ten
+candidate cases; no reviewer decision was fabricated, so the two-reviewer gate
+remains closed.
 The current checklist audit confirms that Stage 0 isolation and the Stage 1
 candidate/evidence/content-boundary contracts are implemented. The remaining
 Stage 1 gates are deliberately empirical: two independent reviewer decisions,
