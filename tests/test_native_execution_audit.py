@@ -75,9 +75,46 @@ def _fixture(tmp_path: Path, family_id: str | None = None):
             "task_id": task_id,
             "services": services,
         }), encoding="utf-8")
+        artifact_dir = episode_dir / "artifacts"
+        artifact_dir.mkdir()
+        memory_events = [
+            {"eventId": f"memory-query-{index}", "kind": "query"},
+            {"eventId": f"memory-retrieved-{index}", "kind": "retrieved"},
+        ]
+        (artifact_dir / "rsimem_memory_events.jsonl").write_text(
+            "\n".join(json.dumps(item) for item in memory_events) + "\n",
+            encoding="utf-8",
+        )
+        process_events = [
+            {"event_id": f"tool-call-{index}", "kind": "tool_call"},
+            {"event_id": f"tool-result-{index}", "kind": "tool_result"},
+            {"event_id": f"outcome-{index}", "kind": "task_outcome"},
+        ]
+        (artifact_dir / "pure_process_event_archive.jsonl").write_text(
+            "\n".join(json.dumps(item) for item in process_events) + "\n",
+            encoding="utf-8",
+        )
+        empty_artifacts = {
+            "artifact_ids": [], "memory_entry_count": 0,
+            "user_entry_count": 0, "skill_count": 0, "digest": "1" * 64,
+        }
+        (episode_dir / "native_episode_identity.json").write_text(json.dumps({
+            "schema": "past-bench-native-episode-identity-v1",
+            "task_id": task_id,
+            "family_id": run.family_id,
+            "stage": "fixture",
+            "trace_id": trace_id,
+            "state_before_digest": "2" * 64,
+            "state_after_digest": "3" * 64,
+            "artifact_before": empty_artifacts,
+            "artifact_after": empty_artifacts,
+        }), encoding="utf-8")
         result_episodes.append({
             "trace_id": trace_id,
+            "task_id": task_id,
+            "family_id": run.family_id,
             "trace": str(trace_path),
+            "internal_tools": {},
             "token_usage": {
                 "input_tokens": 10, "output_tokens": 2,
                 "cache_read_tokens": 1, "cache_write_tokens": 0,
