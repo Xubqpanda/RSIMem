@@ -37,7 +37,7 @@ audit. Probe success is connectivity evidence only; the EP01/PG01 attempts
 remain classified as infrastructure evidence and do not reopen experiments.
 No new benchmark batch was authorized after the latest probe.
 
-The latest RSIMem verification baseline is `1236 passed`; compileall, dependency
+The latest RSIMem verification baseline is `1244 passed`; compileall, dependency
 checks, shell syntax, tracked secret scan, and diff checks also pass. The
 vendored PAST-Bench baseline is `403 passed, 2 skipped` when
 run from its own directory with the repository `.venv` and `PYTHONPATH=RSIMem/src`.
@@ -162,7 +162,7 @@ verification; semantic writeback remains the only live policy path.
 The deterministic and storage-boundary test baselines (latest verification
 2026-09-05) are:
 
-- RSIMem: `1236 passed`, including the native attribution corpus reload,
+- RSIMem: `1244 passed`, including the native attribution corpus reload,
   report CLI, reviewer provenance, and replicate identity tests.
 - Vendored PAST-Bench: `403 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
