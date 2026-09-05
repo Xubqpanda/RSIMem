@@ -69,6 +69,7 @@ def test_multiple_missing_axes_are_not_forced_to_one_primary(tmp_path) -> None:
 def test_benchmark_expectation_uses_only_registered_lifecycle_fields() -> None:
     episode = {
         "task_id": "task-a", "family_id": "family-a", "bucket": "evaluation",
+        "stage": "eval_near",
         "expected_persistence_signal": "memory", "persistence_allowed": True,
         "evaluation_requires_retrieval": True,
         "task_score": 0.0, "grader": {"answer": "must-not-enter"},
@@ -81,3 +82,11 @@ def test_benchmark_expectation_uses_only_registered_lifecycle_fields() -> None:
     assert first is not None
     assert first.source == "benchmark_contract"
     assert first.required_events == (NativeLifecycleEventType.RETRIEVAL,)
+
+
+def test_update_or_stabilize_does_not_imply_mutation() -> None:
+    assert expectation_from_benchmark_contract({
+        "task_id": "task-a", "family_id": "family-a", "bucket": "learn",
+        "stage": "update", "expected_persistence_signal": "skill",
+        "persistence_allowed": True, "evaluation_requires_retrieval": False,
+    }) is None

@@ -132,9 +132,10 @@ def expectation_from_benchmark_contract(
     if not isinstance(task_id, str) or not isinstance(family_id, str):
         raise ValueError("benchmark attribution contract identity is incomplete")
     required: list[NativeLifecycleEventType] = []
-    if episode.get("persistence_allowed") is True and episode.get("bucket") in {
-        "learn", "reflection",
-    }:
+    if (
+        episode.get("persistence_allowed") is True
+        and episode.get("stage") in {"learn", "learn_a", "learn_b"}
+    ):
         signal = episode.get("expected_persistence_signal")
         if signal in {"memory", "session", "skill"}:
             required.extend((
@@ -149,6 +150,7 @@ def expectation_from_benchmark_contract(
         "task_id": task_id,
         "family_id": family_id,
         "bucket": episode.get("bucket"),
+        "stage": episode.get("stage"),
         "expected_persistence_signal": episode.get("expected_persistence_signal"),
         "persistence_allowed": episode.get("persistence_allowed"),
         "evaluation_requires_retrieval": episode.get("evaluation_requires_retrieval"),
