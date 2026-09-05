@@ -35,6 +35,7 @@ def test_launcher_prepares_native_episodes_and_isolation_arguments(tmp_path) -> 
     assert run.family_id not in prepared.command[prepared.command.index("--rsimem-method-task-id") + 1]
     assert prepared.command[prepared.command.index("--port-offset") + 1] == str(run.port_offset)
     assert prepared.command[prepared.command.index("--model") + 1] == run.model_id
+    assert prepared.command[prepared.command.index("--runtime") + 1] == "local"
     assert prepared.command[prepared.command.index("--base-url") + 1] == f"https://{run.provider_id}"
     assert prepared.command[prepared.command.index("--rsimem-artifact-dir") + 1] == str(
         (tmp_path / run.artifact_directory).resolve()

@@ -107,7 +107,7 @@ def prepare_native_attribution_launch(
     ).hexdigest()
     command = (
         past_bench_binary, "evolve", "--sequence", str(target), "--agent", agent,
-        "--model", run.model_id, "--base-url", f"https://{run.provider_id}",
+        "--runtime", "local", "--model", run.model_id, "--base-url", f"https://{run.provider_id}",
         "--persistence-variant", "with_persistence", "--rsimem-mode", "native+ledger",
         "--rsimem-method-task-id", run.method_case_id, "--port-offset", str(run.port_offset),
         "--trace-dir", str(output / run.trace_directory),
