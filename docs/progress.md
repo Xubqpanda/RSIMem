@@ -36,9 +36,8 @@ it does not reopen any old experiment or justify a long benchmark run.
 
 The latest RSIMem verification baseline is `1236 passed`; compileall, dependency
 checks, shell syntax, tracked secret scan, and diff checks also pass. The
-vendored PAST-Bench historical baseline remains `401 passed, 2 skipped` when
-run from its own directory; a current full collection is environment-sensitive
-because the optional `firecrawl` package is absent.
+vendored PAST-Bench baseline is `403 passed, 2 skipped` when
+run from its own directory with the repository `.venv` and `PYTHONPATH=RSIMem/src`.
 
 The authoritative protocol and execution order are in
 [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
@@ -162,7 +161,7 @@ The deterministic and storage-boundary test baselines (latest verification
 
 - RSIMem: `1236 passed`, including the native attribution corpus reload,
   report CLI, reviewer provenance, and replicate identity tests.
-- Vendored PAST-Bench: `401 passed, 2 skipped` when run from
+- Vendored PAST-Bench: `403 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
   passed.
