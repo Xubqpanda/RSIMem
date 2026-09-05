@@ -30,7 +30,7 @@ The deterministic summary is produced by
 derived from the frozen corpus identity and its fields are limited to counts,
 ratios, lifecycle labels, memory kinds, families, and exclusion reasons.
 The frozen corpus reload and report reconstruction were verified directly from
-disk; report ID: `native-attribution-report.6700c8dfd4226bf7628f5adc774d107cc8f9d6c2`.
+disk; report ID: `native-attribution-report.45a6610a37cfef1573e58c61522919f5075dbca6`.
 The report also exposes a content-free case index and evidence-reference map
 for all ten unresolved candidates, so reviewer work can be performed against
 stable IDs without copying task text.

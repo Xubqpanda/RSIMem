@@ -12,6 +12,14 @@ from typing import Any
 from .native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
 
 
+_FAILURE_SURFACES = (
+    "formation_missing", "formation_incorrect", "persistence_failed",
+    "maintenance_stale", "maintenance_conflict", "maintenance_pollution",
+    "retrieval_missed", "retrieval_wrong", "application_ignored",
+    "non_memory_failure", "unresolved",
+)
+
+
 REPORT_SCHEMA = "rsimem-native-attribution-report-v1"
 
 
@@ -75,7 +83,10 @@ def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
             if candidate_count else 0.0
         ),
         "evidence_completeness": observed_events / total_events if total_events else 0.0,
-        "surface_counts": _counts([item.primary_failure_surface.value for item in candidates]),
+        "surface_counts": {
+            surface: sum(item.primary_failure_surface.value == surface for item in candidates)
+            for surface in _FAILURE_SURFACES
+        },
         "memory_kind_counts": _counts([
             item.memory_kind or "none" for item in candidates
         ]),
@@ -99,7 +110,7 @@ def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
                 for item in candidates
                 if item.primary_failure_surface.value == surface
             )
-            for surface in sorted({item.primary_failure_surface.value for item in candidates})
+            for surface in _FAILURE_SURFACES
         },
         "evidence_refs_by_case": {
             _case_key(item): list(item.evidence_refs)

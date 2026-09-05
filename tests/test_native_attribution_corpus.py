@@ -89,10 +89,13 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert report["actionability_rate"] == 0.0
     assert report["non_memory_exclusion_rate"] == 0.0
     assert report["attribution_coverage"] == 1.0
-    assert report["surface_counts"] == {"unresolved": 5}
+    assert report["surface_counts"]["unresolved"] == 5
+    assert report["surface_counts"]["formation_missing"] == 0
+    assert report["surface_counts"]["non_memory_failure"] == 0
     assert report["memory_kind_counts"] == {"semantic": 5}
     assert report["panel_counts"] == {"semantic": 5}
     assert len(report["case_ids_by_surface"]["unresolved"]) == 5
+    assert report["case_ids_by_surface"]["formation_missing"] == []
     assert all(
         isinstance(case_id, str) and case_id
         for case_id in report["case_ids_by_surface"]["unresolved"]

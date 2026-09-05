@@ -193,7 +193,7 @@ review_status
 - [x] 各 surface 的 case 数、比例、panel 分布和 family 分布；由 frozen-corpus report 重建。
 - [x] `cross_family_consistency` 和 `non_memory_exclusion_rate` 已可计算；前者是描述性分组指标，不替代 reviewer/adjudication 的归因准确率。
 - [x] `actionability_rate`：能否映射到唯一 repair axis；当前 slice 为 `0.0`，因此不开放 repair。
-- [ ] 报告成功 case、明确 Memory failure、non-memory failure 和 unresolved case 的实例。
+- [x] 报告成功 case、明确 Memory failure、non-memory failure 和 unresolved case 的实例；完整 failure taxonomy 对未出现类别显式报告为零。
 - [ ] 至少完成一个跨 SM/EP/PC/PG 的 audit slice，再决定是否扩大到全量。（当前 SM02/PC01 已完成；EP01/PG01 因 usage-incomplete 排除，不能宣称跨四 panel。）
 - [x] Analysis 2 的输出冻结成版本化 attribution corpus，作为 Analysis 1 的唯一输入；当前 slice 为 `10 observations / 10 unresolved / 0 actionable`，因此触发 `STOP_NO_ACTIONABLE_SIGNAL`，不进入 repair。
 - [x] Stage 1 -> Stage 2 gate 已确定性实现：必须同时具备 high-confidence actionable candidate、合法 repair axis、双 reviewer case、通过 event/evidence contract 校验和非 unresolved-only corpus；`not_observed` 是合法自然执行状态，不被误判为证据缺失。
