@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import socket
+
+import httpx
+import pytest
+
+from mock_services._base import fixture_identity
 from past_bench.models.task import ServiceDef
-from past_bench.runner.services import ServiceManager
+from past_bench.runner.services import ServiceIdentityError, ServiceManager
 
 
 class _FakeResponse:
@@ -16,7 +22,7 @@ class _FakeResponse:
 
 
 class _FakeClient:
-    def __init__(self, response: _FakeResponse):
+    def __init__(self, response: _FakeResponse | dict[str, _FakeResponse]):
         self._response = response
 
     def __enter__(self):
@@ -25,11 +31,16 @@ class _FakeClient:
     def __exit__(self, exc_type, exc, tb):
         return False
 
-    def get(self, *_args, **_kwargs):
+    def _resolve(self, url):
+        if isinstance(self._response, dict):
+            return self._response[url]
         return self._response
 
-    def post(self, *_args, **_kwargs):
-        return self._response
+    def get(self, url, **_kwargs):
+        return self._resolve(url)
+
+    def post(self, url, **_kwargs):
+        return self._resolve(url)
 
 
 def _config_service() -> ServiceDef:
@@ -80,7 +91,7 @@ def test_service_health_check_accepts_fastapi_validation_error(monkeypatch):
     assert manager._is_healthy(svc) is True
 
 
-def test_service_manager_spawns_when_port_is_occupied_by_wrong_service(monkeypatch):
+def test_service_manager_rejects_port_occupied_by_wrong_service(monkeypatch):
     svc = _config_service()
     manager = ServiceManager([svc])
     fake_response = _FakeResponse(
@@ -89,11 +100,114 @@ def test_service_manager_spawns_when_port_is_occupied_by_wrong_service(monkeypat
     )
     monkeypatch.setattr("httpx.Client", lambda **_kwargs: _FakeClient(fake_response))
 
+    monkeypatch.setattr(manager, "_identity_status", lambda _service: "mismatch")
+    with pytest.raises(ServiceIdentityError, match="different fixture identity"):
+        manager.__enter__()
+
+
+def test_fixture_identity_changes_with_fixture_content(tmp_path):
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    first.write_text('[{"note_id":"one"}]', encoding="utf-8")
+    second.write_text('[{"note_id":"two"}]', encoding="utf-8")
+    one = fixture_identity(
+        service_name="notes",
+        environment={"NOTES_FIXTURES": str(first)},
+    )
+    two = fixture_identity(
+        service_name="notes",
+        environment={"NOTES_FIXTURES": str(second)},
+    )
+    assert one["schema"] == "past-bench-service-identity-v1"
+    assert one["service"] == "notes"
+    assert one["fixture_digest"] != two["fixture_digest"]
+
+
+def test_manager_identity_matches_exact_fixture(tmp_path, monkeypatch):
+    fixture = tmp_path / "notes.json"
+    fixture.write_text('[{"note_id":"one"}]', encoding="utf-8")
+    svc = ServiceDef(
+        name="notes",
+        command="python mock_services/notes/server.py",
+        port=9105,
+        health_check="http://localhost:9105/notes/list",
+        env={"NOTES_FIXTURES": str(fixture)},
+    )
+    manager = ServiceManager([svc])
+    expected = manager._expected_identity(svc)
+    response = _FakeResponse(200, expected)
+    monkeypatch.setattr("httpx.Client", lambda **_kwargs: _FakeClient(response))
+    assert manager._identity_status(svc) == "match"
+
+    fixture.write_text('[{"note_id":"changed"}]', encoding="utf-8")
+    assert manager._identity_status(svc) == "mismatch"
+
+
+def test_manager_starts_only_when_port_is_unreachable(monkeypatch):
+    svc = _config_service()
+    manager = ServiceManager([svc])
+    monkeypatch.setattr(manager, "_identity_status", lambda _service: "unreachable")
+    monkeypatch.setattr(manager, "_port_is_occupied", lambda _port: False)
     spawned: list[str] = []
     monkeypatch.setattr(manager, "_spawn", lambda service: spawned.append(service.name))
-
+    monkeypatch.setattr(manager, "reset_all", lambda: None)
     manager.__enter__()
     try:
         assert spawned == ["config"]
     finally:
         manager.__exit__(None, None, None)
+
+
+def test_reset_failure_is_fatal(monkeypatch):
+    svc = _config_service()
+    manager = ServiceManager([svc])
+    monkeypatch.setattr(
+        "httpx.Client",
+        lambda **_kwargs: _FakeClient(_FakeResponse(500, {"error": "reset failed"})),
+    )
+    with pytest.raises(ServiceIdentityError, match="reset returned HTTP 500"):
+        manager.reset_all()
+
+
+def _free_port() -> int:
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        return listener.getsockname()[1]
+
+
+def test_sequential_notes_fixtures_are_isolated_and_process_is_stopped(tmp_path):
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    first.write_text(
+        '[{"note_id":"FIRST","title":"one","created_at":"2026-01-01T00:00:00Z",'
+        '"participants":[],"duration_minutes":1,"status":"active","tags":[]}]',
+        encoding="utf-8",
+    )
+    second.write_text(
+        '[{"note_id":"SECOND","title":"two","created_at":"2026-01-01T00:00:00Z",'
+        '"participants":[],"duration_minutes":1,"status":"active","tags":[]}]',
+        encoding="utf-8",
+    )
+    port = _free_port()
+
+    def service(fixture):
+        return ServiceDef(
+            name="notes",
+            command="python mock_services/notes/server.py",
+            port=port,
+            health_check=f"http://localhost:{port}/notes/list",
+            health_check_method="POST",
+            reset_endpoint=f"http://localhost:{port}/notes/reset",
+            env={"NOTES_FIXTURES": str(fixture), "PORT": str(port)},
+        )
+
+    identities = []
+    for fixture, expected in ((first, "FIRST"), (second, "SECOND")):
+        svc = service(fixture)
+        with ServiceManager([svc]) as manager:
+            identities.append(manager._expected_identity(svc)["fixture_digest"])
+            response = httpx.post(svc.health_check, json={}, timeout=3.0)
+            assert [item["note_id"] for item in response.json()["notes"]] == [expected]
+        assert not ServiceManager._port_is_occupied(port)
+
+    assert identities[0] != identities[1]

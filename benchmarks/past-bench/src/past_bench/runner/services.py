@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import os
 import shlex
+import hashlib
+import json
+import socket
 import subprocess
 import sys
 import time
@@ -19,6 +22,10 @@ if TYPE_CHECKING:
 
 class ServiceStartError(RuntimeError):
     """Raised when a service fails to become ready within its timeout."""
+
+
+class ServiceIdentityError(ServiceStartError):
+    """Raised when an occupied service port has an unexpected fixture identity."""
 
 
 class ServiceManager:
@@ -43,9 +50,15 @@ class ServiceManager:
     def __enter__(self) -> ServiceManager:
         try:
             for svc in self._services:
-                if self._is_healthy(svc):
+                identity = self._identity_status(svc)
+                if identity == "match" and self._is_healthy(svc):
                     print(f"  service '{svc.name}' already running on port {svc.port}")
                     continue
+                if identity != "unreachable" or self._port_is_occupied(svc.port):
+                    raise ServiceIdentityError(
+                        f"Service '{svc.name}' port {svc.port} is occupied by an "
+                        "unmanaged service or a different fixture identity"
+                    )
                 self._spawn(svc)
         except Exception:
             # _spawn failed mid-way — kill already-spawned services to avoid port leaks
@@ -76,13 +89,70 @@ class ServiceManager:
         for svc in self._services:
             if svc.reset_endpoint:
                 try:
-                    httpx.post(svc.reset_endpoint, timeout=5.0)
+                    with httpx.Client(trust_env=False, timeout=5.0) as client:
+                        response = client.post(svc.reset_endpoint)
                 except Exception as exc:
-                    print(f"  [WARN] reset failed for service '{svc.name}': {exc}")
+                    raise ServiceIdentityError(
+                        f"Service '{svc.name}' reset failed"
+                    ) from exc
+                if response.status_code < 200 or response.status_code >= 300:
+                    raise ServiceIdentityError(
+                        f"Service '{svc.name}' reset returned HTTP {response.status_code}"
+                    )
+                if self._identity_status(svc) != "match":
+                    raise ServiceIdentityError(
+                        f"Service '{svc.name}' fixture identity changed during reset"
+                    )
 
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _port_is_occupied(port: int) -> bool:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                return True
+        except OSError:
+            return False
+
+    def _expected_identity(self, svc: ServiceDef) -> dict[str, str]:
+        fixtures: dict[str, dict[str, object]] = {}
+        for key in sorted(name for name in (svc.env or {}) if name.endswith("_FIXTURES")):
+            raw_path = svc.env[key]
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = self._cwd / path
+            if path.is_symlink() or not path.is_file():
+                file_digest = "missing"
+                size = -1
+            else:
+                data = path.read_bytes()
+                file_digest = hashlib.sha256(data).hexdigest()
+                size = len(data)
+            fixtures[key] = {"digest": file_digest, "size": size}
+        canonical = json.dumps(fixtures, sort_keys=True, separators=(",", ":"))
+        return {
+            "schema": "past-bench-service-identity-v1",
+            "service": svc.name,
+            "fixture_digest": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+        }
+
+    def _identity_status(self, svc: ServiceDef) -> str:
+        parsed = urlparse(svc.health_check)
+        identity_url = f"{parsed.scheme}://{parsed.netloc}/_past_bench/identity"
+        try:
+            with httpx.Client(trust_env=False, timeout=2.0) as client:
+                response = client.get(identity_url, headers={"X-Health-Check": "1"})
+        except Exception:
+            return "unreachable"
+        if response.status_code != 200:
+            return "mismatch"
+        try:
+            payload = response.json()
+        except ValueError:
+            return "mismatch"
+        return "match" if payload == self._expected_identity(svc) else "mismatch"
 
     def _is_healthy(self, svc: ServiceDef) -> bool:
         """Return True if the service responds to its health-check probe."""
@@ -150,7 +220,13 @@ class ServiceManager:
             "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
         ):
             base_env.pop(proxy_key, None)
-        env = {**base_env, **(svc.env or {})}
+        for fixture_key in tuple(key for key in base_env if key.endswith("_FIXTURES")):
+            base_env.pop(fixture_key, None)
+        env = {
+            **base_env,
+            **(svc.env or {}),
+            "PAST_BENCH_SERVICE_NAME": svc.name,
+        }
         proc = subprocess.Popen(
             cmd,
             cwd=self._cwd,
@@ -165,7 +241,7 @@ class ServiceManager:
                 raise ServiceStartError(
                     f"Service '{svc.name}' exited immediately (rc={proc.returncode}): {stderr[:500]}"
                 )
-            if self._is_healthy(svc):
+            if self._identity_status(svc) == "match" and self._is_healthy(svc):
                 self._spawned.append((svc, proc))
                 print(f"  service '{svc.name}' started on port {svc.port}")
                 return

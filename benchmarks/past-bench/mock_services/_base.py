@@ -20,6 +20,9 @@ from __future__ import annotations
 import os
 import random
 import time
+import hashlib
+import json
+from pathlib import Path
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -30,6 +33,39 @@ _EXEMPT_SUFFIXES = ("/audit", "/reset", "/health", "/docs", "/openapi.json")
 
 # Env-controlled error rate; default 25%
 _ERROR_RATE = float(os.environ.get("ERROR_RATE", "0"))
+_IDENTITY_SCHEMA = "past-bench-service-identity-v1"
+
+
+def fixture_identity(
+    *,
+    service_name: str,
+    environment: dict[str, str] | os._Environ[str] | None = None,
+    cwd: Path | None = None,
+) -> dict[str, str]:
+    """Return a content-only identity for the fixture files visible to a service."""
+
+    values = environment if environment is not None else os.environ
+    root = (cwd or Path.cwd()).resolve()
+    fixtures: dict[str, dict[str, object]] = {}
+    for key in sorted(name for name in values if name.endswith("_FIXTURES")):
+        raw_path = values[key]
+        path = Path(raw_path)
+        if not path.is_absolute():
+            path = root / path
+        if path.is_symlink() or not path.is_file():
+            file_digest = "missing"
+            size = -1
+        else:
+            data = path.read_bytes()
+            file_digest = hashlib.sha256(data).hexdigest()
+            size = len(data)
+        fixtures[key] = {"digest": file_digest, "size": size}
+    canonical = json.dumps(fixtures, sort_keys=True, separators=(",", ":"))
+    return {
+        "schema": _IDENTITY_SCHEMA,
+        "service": service_name,
+        "fixture_digest": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+    }
 
 
 def _should_inject() -> bool:
@@ -93,3 +129,9 @@ class ErrorInjectionMiddleware(BaseHTTPMiddleware):
 def add_error_injection(app):
     """Add error injection middleware to a FastAPI app."""
     app.add_middleware(ErrorInjectionMiddleware)
+
+    @app.get("/_past_bench/identity", include_in_schema=False)
+    def service_identity() -> dict[str, str]:
+        return fixture_identity(
+            service_name=os.environ.get("PAST_BENCH_SERVICE_NAME", "unmanaged"),
+        )
