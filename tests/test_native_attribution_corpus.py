@@ -9,6 +9,7 @@ import pytest
 
 from rsimem.native_attribution import attribute_native_observation
 from rsimem.native_attribution import _digest as attribution_digest
+from rsimem.native_attribution import NativeAttributionCandidate
 from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
 from rsimem.native_attribution_report import (
     assess_stage2_gate,
@@ -139,6 +140,40 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert gate["invalid_repair_axis_count"] == 0
     assert "incomplete_evidence" not in gate["reasons"]
     assert gate["evidence_contract_valid"] is True
+
+
+def test_stage2_gate_requires_two_reviewer_coverage_for_all_actionable_cases(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    def make_actionable(base, surface, axis):
+        values = {**base.identity_payload(), "primary_failure_surface": surface,
+                  "candidate_repair_axis": axis, "is_actionable": True,
+                  "confidence": "high"}
+        return NativeAttributionCandidate(
+            attribution_id="native-attribution." + attribution_digest(values)[:40],
+            observation_id=base.observation_id, case_id=base.case_id,
+            family_id=base.family_id, memory_kind=base.memory_kind,
+            primary_failure_surface=surface, secondary_observations=base.secondary_observations,
+            evidence_refs=base.evidence_refs, confidence="high",
+            candidate_repair_axis=axis, is_actionable=True,
+            review_status=base.review_status, expectation_contract_id=base.expectation_contract_id,
+            replicate_id=base.replicate_id,
+        )
+    actionable = make_actionable(corpus.candidates[0], "formation_missing", "formation")
+    second = make_actionable(corpus.candidates[1], "retrieval_missed", "retrieval")
+    mixed = NativeAttributionCorpus.create(
+        protocol_id=corpus.protocol_id,
+        accepted_run_ids=corpus.accepted_run_ids,
+        observations=corpus.observations,
+        candidates=(actionable, second, *corpus.candidates[2:]),
+        excluded_runs=corpus.excluded_runs,
+    )
+    gate = assess_stage2_gate(mixed, reviewer_two_reviewer_count=0)
+    assert gate["decision"] == "STOP_NO_ACTIONABLE_SIGNAL"
+    gate = assess_stage2_gate(mixed, reviewer_two_reviewer_count=1)
+    assert gate["decision"] == "STOP_NO_ACTIONABLE_SIGNAL"
+    assert "insufficient_two_reviewer_coverage" in gate["reasons"]
+    gate = assess_stage2_gate(mixed, reviewer_two_reviewer_count=2)
+    assert gate["decision"] == "OPEN_STAGE2"
 
 
 def test_stage2_gate_positive_contract_requires_two_reviewer_case(tmp_path) -> None:

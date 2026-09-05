@@ -162,6 +162,8 @@ def assess_stage2_gate(
         reasons.append("invalid_repair_axis")
     if reviewer_two_reviewer_count <= 0:
         reasons.append("no_two_reviewer_case")
+    elif reviewer_two_reviewer_count < len(high_confidence_actionable):
+        reasons.append("insufficient_two_reviewer_coverage")
     decision = "OPEN_STAGE2" if not reasons else "STOP_NO_ACTIONABLE_SIGNAL"
     return {
         "schema": "rsimem-stage2-gate-v1",
