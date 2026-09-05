@@ -152,6 +152,7 @@ def test_manager_starts_only_when_port_is_unreachable(monkeypatch):
     spawned: list[str] = []
     monkeypatch.setattr(manager, "_spawn", lambda service: spawned.append(service.name))
     monkeypatch.setattr(manager, "reset_all", lambda: None)
+    monkeypatch.setattr(manager, "capture_identities", lambda: ())
     manager.__enter__()
     try:
         assert spawned == ["config"]
@@ -168,6 +169,21 @@ def test_reset_failure_is_fatal(monkeypatch):
     )
     with pytest.raises(ServiceIdentityError, match="reset returned HTTP 500"):
         manager.reset_all()
+
+
+def test_enter_rejects_identity_drift_after_reset(monkeypatch):
+    svc = _config_service()
+    manager = ServiceManager([svc])
+    monkeypatch.setattr(manager, "_identity_status", lambda _service: "match")
+    monkeypatch.setattr(manager, "_is_healthy", lambda _service: True)
+    monkeypatch.setattr(manager, "reset_all", lambda: None)
+    monkeypatch.setattr(manager, "_identity_payload", lambda _service: {
+        "schema": "past-bench-service-identity-v1",
+        "service": "config",
+        "fixture_digest": "0" * 64,
+    })
+    with pytest.raises(ServiceIdentityError, match="unavailable or changed"):
+        manager.__enter__()
 
 
 def _free_port() -> int:
@@ -207,6 +223,12 @@ def test_sequential_notes_fixtures_are_isolated_and_process_is_stopped(tmp_path)
         svc = service(fixture)
         with ServiceManager([svc]) as manager:
             identities.append(manager._expected_identity(svc)["fixture_digest"])
+            assert manager.verified_identities == ({
+                "schema": "past-bench-verified-service-identity-v1",
+                "service": "notes",
+                "port": port,
+                "fixture_digest": identities[-1],
+            },)
             response = httpx.post(svc.health_check, json={}, timeout=3.0)
             assert [item["note_id"] for item in response.json()["notes"]] == [expected]
         assert not ServiceManager._port_is_occupied(port)

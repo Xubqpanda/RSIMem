@@ -2493,7 +2493,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 if task.task_file
                 else sequence.manifest_path.parent
             )
-            with ServiceManager(task.services, cwd=_svc_cwd):
+            with ServiceManager(task.services, cwd=_svc_cwd) as service_manager:
+                write_json(episode_dir / "service_identity.json", {
+                    "schema": "past-bench-episode-service-identity-v1",
+                    "task_id": task.task_id,
+                    "services": list(getattr(service_manager, "verified_identities", ())),
+                })
                 trace_path, env_snapshot = _execute_trial(
                     task=task,
                     cfg=cfg,
@@ -2887,7 +2892,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 f"task={_sc_task.task_id}"
             )
 
-            with ServiceManager(_sc_task.services, cwd=_sc_tasks_dir.parent):
+            with ServiceManager(_sc_task.services, cwd=_sc_tasks_dir.parent) as service_manager:
+                write_json(_sc_episode_dir / "service_identity.json", {
+                    "schema": "past-bench-episode-service-identity-v1",
+                    "task_id": _sc_task.task_id,
+                    "services": list(getattr(service_manager, "verified_identities", ())),
+                })
                 _sc_trace_path, _sc_env_snapshot = _execute_trial(
                     task=_sc_task,
                     cfg=cfg,
@@ -3112,7 +3122,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
             )
 
             try:
-                with ServiceManager(task.services, cwd=tasks_dir.parent):
+                with ServiceManager(task.services, cwd=tasks_dir.parent) as service_manager:
+                    write_json(episode_dir / "service_identity.json", {
+                        "schema": "past-bench-episode-service-identity-v1",
+                        "task_id": task.task_id,
+                        "services": list(getattr(service_manager, "verified_identities", ())),
+                    })
                     trace_path, env_snapshot = _execute_trial(
                         task=task,
                         cfg=cfg,

@@ -42,6 +42,7 @@ class ServiceManager:
         self._cwd = cwd or Path.cwd()
         # Only processes we spawned ourselves — external ones are left alone.
         self._spawned: list[tuple[ServiceDef, subprocess.Popen]] = []  # type: ignore[type-arg]
+        self._verified_identities: tuple[dict[str, object], ...] = ()
 
     # ------------------------------------------------------------------
     # Context manager
@@ -67,6 +68,7 @@ class ServiceManager:
         # Reset on entry so a new invocation doesn't inherit audit/state from a
         # prior process holding the same port.
         self.reset_all()
+        self._verified_identities = self.capture_identities()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:  # noqa: ANN001
@@ -104,6 +106,30 @@ class ServiceManager:
                         f"Service '{svc.name}' fixture identity changed during reset"
                     )
 
+    @property
+    def verified_identities(self) -> tuple[dict[str, object], ...]:
+        """Return identities observed after the most recent successful reset."""
+
+        return tuple(dict(value) for value in self._verified_identities)
+
+    def capture_identities(self) -> tuple[dict[str, object], ...]:
+        """Read and verify identity evidence from every live service."""
+
+        values: list[dict[str, object]] = []
+        for svc in self._services:
+            payload = self._identity_payload(svc)
+            if payload != self._expected_identity(svc):
+                raise ServiceIdentityError(
+                    f"Service '{svc.name}' fixture identity is unavailable or changed"
+                )
+            values.append({
+                "schema": "past-bench-verified-service-identity-v1",
+                "service": svc.name,
+                "port": svc.port,
+                "fixture_digest": payload["fixture_digest"],
+            })
+        return tuple(values)
+
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
@@ -138,20 +164,26 @@ class ServiceManager:
             "fixture_digest": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
         }
 
-    def _identity_status(self, svc: ServiceDef) -> str:
+    def _identity_payload(self, svc: ServiceDef) -> dict[str, object] | None:
         parsed = urlparse(svc.health_check)
         identity_url = f"{parsed.scheme}://{parsed.netloc}/_past_bench/identity"
         try:
             with httpx.Client(trust_env=False, timeout=2.0) as client:
                 response = client.get(identity_url, headers={"X-Health-Check": "1"})
         except Exception:
-            return "unreachable"
+            return None
         if response.status_code != 200:
-            return "mismatch"
+            return None
         try:
             payload = response.json()
         except ValueError:
-            return "mismatch"
+            return None
+        return payload if isinstance(payload, dict) else None
+
+    def _identity_status(self, svc: ServiceDef) -> str:
+        payload = self._identity_payload(svc)
+        if payload is None:
+            return "unreachable" if not self._port_is_occupied(svc.port) else "mismatch"
         return "match" if payload == self._expected_identity(svc) else "mismatch"
 
     def _is_healthy(self, svc: ServiceDef) -> bool:
