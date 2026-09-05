@@ -212,6 +212,47 @@ class NativeSurfaceObservation:
     def payload(self) -> dict[str, object]:
         return {"event_id": self.event_id, **self.identity_payload()}
 
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, object]) -> "NativeSurfaceObservation":
+        if not isinstance(payload, Mapping):
+            raise ValueError("native lifecycle event payload is malformed")
+        expected = {
+            "event_id", "event_type", "surface", "status", "producer", "owner",
+            "memory_kind", "evidence_refs", "input_artifact_ids", "output_artifact_ids",
+            "state_before_digest", "state_after_digest", "revision", "parent_event_ids",
+            "observation_cutoff", "evidence_plane", "evidence_source",
+        }
+        if set(payload) != expected:
+            raise ValueError("native lifecycle event payload fields are invalid")
+        collections = (
+            "evidence_refs", "input_artifact_ids", "output_artifact_ids", "parent_event_ids"
+        )
+        if any(
+            not isinstance(payload[field], list)
+            or any(not isinstance(value, str) for value in payload[field])
+            for field in collections
+        ):
+            raise ValueError("native lifecycle event payload collections are invalid")
+        return cls(
+            event_id=str(payload["event_id"]),
+            event_type=NativeLifecycleEventType(payload["event_type"]),
+            surface=NativeLifecycleSurface(payload["surface"]),
+            status=ObservationStatus(payload["status"]),
+            producer=str(payload["producer"]),
+            owner=str(payload["owner"]),
+            memory_kind=MemoryKind(payload["memory_kind"]) if payload["memory_kind"] else None,
+            evidence_refs=tuple(payload["evidence_refs"]),
+            input_artifact_ids=tuple(payload["input_artifact_ids"]),
+            output_artifact_ids=tuple(payload["output_artifact_ids"]),
+            state_before_digest=str(payload["state_before_digest"]),
+            state_after_digest=str(payload["state_after_digest"]),
+            revision=str(payload["revision"]),
+            parent_event_ids=tuple(payload["parent_event_ids"]),
+            observation_cutoff=str(payload["observation_cutoff"]),
+            evidence_plane=str(payload["evidence_plane"]),
+            evidence_source=str(payload["evidence_source"]),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class NativeEpisodeObservation:
@@ -264,6 +305,35 @@ class NativeEpisodeObservation:
 
     def payload(self) -> dict[str, object]:
         return {"observation_id": self.observation_id, **self.identity_payload()}
+
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, object]) -> "NativeEpisodeObservation":
+        if not isinstance(payload, Mapping):
+            raise ValueError("native observation payload is malformed")
+        expected = {
+            "observation_id", "schema", "run_id", "trace_id", "task_id", "family_id",
+            "memory_kind", "events", "usage_digest", "final_output_digest", "evidence_plane",
+        }
+        if set(payload) != expected or payload.get("schema") != OBSERVATION_SCHEMA:
+            raise ValueError("native observation payload fields are invalid")
+        raw_events = payload.get("events")
+        if not isinstance(raw_events, list):
+            raise ValueError("native observation events are malformed")
+        return cls(
+            observation_id=str(payload["observation_id"]),
+            run_id=str(payload["run_id"]),
+            trace_id=str(payload["trace_id"]),
+            task_id=str(payload["task_id"]),
+            family_id=str(payload["family_id"]),
+            memory_kind=MemoryKind(payload["memory_kind"]) if payload["memory_kind"] else None,
+            events=tuple(NativeSurfaceObservation.from_payload(value) for value in raw_events),
+            usage_digest=str(payload["usage_digest"]),
+            final_output_digest=(
+                str(payload["final_output_digest"])
+                if payload["final_output_digest"] is not None else None
+            ),
+            evidence_plane=str(payload["evidence_plane"]),
+        )
 
 
 def extract_native_observations(

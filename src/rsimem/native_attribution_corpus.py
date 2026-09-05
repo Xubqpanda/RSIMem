@@ -97,6 +97,43 @@ class NativeAttributionCorpus:
     def payload(self) -> dict[str, object]:
         return {"corpus_id": self.corpus_id, **self.identity_payload()}
 
+    @classmethod
+    def from_payload(cls, payload: Mapping[str, object]) -> "NativeAttributionCorpus":
+        if not isinstance(payload, Mapping):
+            raise ValueError("native attribution corpus payload is malformed")
+        expected = {
+            "corpus_id", "schema", "protocol_id", "accepted_run_ids", "observations",
+            "candidates", "excluded_runs",
+        }
+        if set(payload) != expected or payload.get("schema") != CORPUS_SCHEMA:
+            raise ValueError("native attribution corpus payload fields are invalid")
+        accepted = payload.get("accepted_run_ids")
+        observations = payload.get("observations")
+        candidates = payload.get("candidates")
+        excluded = payload.get("excluded_runs")
+        if (
+            not isinstance(accepted, list)
+            or any(not isinstance(value, str) for value in accepted)
+            or not isinstance(observations, list)
+            or not isinstance(candidates, list)
+            or not isinstance(excluded, list)
+            or any(not isinstance(value, Mapping) for value in excluded)
+        ):
+            raise ValueError("native attribution corpus payload collections are invalid")
+        return cls(
+            corpus_id=str(payload["corpus_id"]),
+            protocol_id=str(payload["protocol_id"]),
+            accepted_run_ids=tuple(accepted),
+            observations=tuple(
+                NativeEpisodeObservation.from_payload(value) for value in observations
+            ),
+            candidates=tuple(
+                NativeAttributionCandidate.from_payload(value) for value in candidates
+            ),
+            excluded_runs=tuple(dict(value) for value in excluded),
+            schema=str(payload["schema"]),
+        )
+
     @property
     def actionable_count(self) -> int:
         return sum(value.is_actionable for value in self.candidates)
@@ -155,6 +192,18 @@ class NativeAttributionCorpusStore:
             temporary.write_text(serialized, encoding="utf-8")
             temporary.replace(self.path)
             return True
+
+    def load(self) -> NativeAttributionCorpus:
+        if not self.path.is_file() or self.path.is_symlink():
+            raise ValueError("native attribution corpus store is missing or symlinked")
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("native attribution corpus store is unreadable") from exc
+        corpus = NativeAttributionCorpus.from_payload(payload)
+        if self.path.read_text(encoding="utf-8") != _canonical(corpus.payload()) + "\n":
+            raise ValueError("native attribution corpus store is not canonical")
+        return corpus
 
 
 __all__ = [

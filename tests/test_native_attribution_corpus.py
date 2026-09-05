@@ -33,6 +33,8 @@ def test_corpus_is_deterministic_content_free_and_append_once(tmp_path) -> None:
     store = NativeAttributionCorpusStore(tmp_path / "corpus.json")
     assert store.put(corpus) is True
     assert store.put(corpus) is False
+    loaded = store.load()
+    assert loaded.payload() == corpus.payload()
 
 
 def test_corpus_rejects_forbidden_evaluation_fields(tmp_path) -> None:
@@ -74,3 +76,14 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert report["excluded_reasons"] == {"usage_incomplete": 1}
     assert "final_response_text" not in json.dumps(report)
     assert report["report_id"].startswith("native-attribution-report.")
+
+
+def test_corpus_store_load_fails_closed_on_tampering(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    store = NativeAttributionCorpusStore(tmp_path / "corpus.json")
+    store.put(corpus)
+    payload = json.loads(store.path.read_text(encoding="utf-8"))
+    payload["candidates"][0]["confidence"] = "high"
+    store.path.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="ID mismatch|canonical"):
+        store.load()
