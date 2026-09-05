@@ -202,3 +202,11 @@ def test_native_execution_audit_store_is_append_once(tmp_path: Path) -> None:
     changed = replace(audit, state_digest="f" * 64)
     with pytest.raises(ValueError, match="different execution audit"):
         store.put(changed)
+
+
+def test_native_execution_audit_requires_episode_state_identity(tmp_path: Path) -> None:
+    run = _fixture(tmp_path)
+    sidecar = next((tmp_path / run.trace_directory).glob("**/native_episode_identity.json"))
+    sidecar.unlink()
+    with pytest.raises(ValueError, match="native_episode_identity.json"):
+        audit_native_execution(run=run, output_root=tmp_path)

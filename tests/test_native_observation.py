@@ -47,5 +47,5 @@ def test_native_observation_rejects_sidecar_trace_drift(tmp_path: Path) -> None:
     value = json.loads(sidecar.read_text())
     value["trace_id"] = "different-trace"
     sidecar.write_text(json.dumps(value))
-    with pytest.raises(ValueError, match="sidecar identity mismatch"):
+    with pytest.raises(ValueError, match="episode state identity is malformed"):
         extract_native_observations(run=run, output_root=tmp_path)

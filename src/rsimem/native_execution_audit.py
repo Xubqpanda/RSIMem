@@ -62,6 +62,7 @@ class NativeExecutionAudit:
     hermes_home_digest: str
     artifact_digest: str
     service_identity_digest: str
+    episode_identity_digest: str
     provider_id: str
     model_id: str
     usage_complete: bool
@@ -84,6 +85,7 @@ class NativeExecutionAudit:
             (self.hermes_home_digest, "Hermes home digest"),
             (self.artifact_digest, "artifact digest"),
             (self.service_identity_digest, "service identity digest"),
+            (self.episode_identity_digest, "episode identity digest"),
             (self.usage_digest, "usage digest"),
         ):
             if not isinstance(value, str) or len(value) != 64:
@@ -115,6 +117,7 @@ class NativeExecutionAudit:
             "hermes_home_digest": self.hermes_home_digest,
             "artifact_digest": self.artifact_digest,
             "service_identity_digest": self.service_identity_digest,
+            "episode_identity_digest": self.episode_identity_digest,
             "provider_id": self.provider_id,
             "model_id": self.model_id,
             "usage_complete": self.usage_complete,
@@ -221,6 +224,7 @@ def audit_native_execution(
         "retry_count": 0,
     }
     service_evidence: list[object] = []
+    episode_identities: list[object] = []
     episode_dirs: set[Path] = set()
     observed_task_ids: list[str] = []
     for episode in episodes:
@@ -254,6 +258,32 @@ def audit_native_execution(
             raise ValueError("native trace model does not match manifest")
         if ends[0].get("model_usage_complete") is not True:
             raise ValueError("native trace usage is incomplete")
+        episode_identity = _read_json(trace_path.parent / "native_episode_identity.json")
+        if (
+            not isinstance(episode_identity, Mapping)
+            or episode_identity.get("schema") != "past-bench-native-episode-identity-v1"
+            or episode_identity.get("trace_id") != trace_id
+            or episode_identity.get("task_id") != starts[0].get("task_id")
+            or episode_identity.get("family_id") != run.family_id
+        ):
+            raise ValueError("native episode state identity is malformed")
+        for field in ("state_before_digest", "state_after_digest"):
+            value = episode_identity.get(field)
+            if not isinstance(value, str) or len(value) != 64:
+                raise ValueError("native episode state digest is malformed")
+        for field in ("artifact_before", "artifact_after"):
+            value = episode_identity.get(field)
+            if not isinstance(value, Mapping) or set(value) != {
+                "artifact_ids", "memory_entry_count", "user_entry_count",
+                "skill_count", "digest",
+            }:
+                raise ValueError("native episode artifact identity is malformed")
+            if not isinstance(value.get("artifact_ids"), list):
+                raise ValueError("native episode artifact IDs are malformed")
+            digest = value.get("digest")
+            if not isinstance(digest, str) or len(digest) != 64:
+                raise ValueError("native episode artifact digest is malformed")
+        episode_identities.append(episode_identity)
         calls = [event for event in events if event.get("type") == "model_call_usage"]
         if not calls:
             raise ValueError("native trace has no model request usage")
@@ -337,6 +367,7 @@ def audit_native_execution(
         hermes_home_digest=_tree_digest(home),
         artifact_digest=_tree_digest(artifacts),
         service_identity_digest=_digest(service_evidence),
+        episode_identity_digest=_digest(episode_identities),
         provider_id=run.provider_id,
         model_id=run.model_id,
         usage_complete=True,
