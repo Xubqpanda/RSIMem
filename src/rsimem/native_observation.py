@@ -223,6 +223,7 @@ class NativeEpisodeObservation:
     memory_kind: MemoryKind | None
     events: tuple[NativeSurfaceObservation, ...]
     usage_digest: str
+    final_output_digest: str | None = None
     evidence_plane: str = "benchmark_audit"
 
     def __post_init__(self) -> None:
@@ -232,8 +233,18 @@ class NativeEpisodeObservation:
             raise ValueError("native attribution observations are audit-only")
         if self.memory_kind is not None:
             object.__setattr__(self, "memory_kind", MemoryKind(self.memory_kind))
-        if not isinstance(self.usage_digest, str) or len(self.usage_digest) != 64:
+        if (
+            not isinstance(self.usage_digest, str)
+            or len(self.usage_digest) != 64
+            or any(character not in "0123456789abcdef" for character in self.usage_digest)
+        ):
             raise ValueError("native observation usage digest is invalid")
+        if self.final_output_digest is not None and (
+            not isinstance(self.final_output_digest, str)
+            or len(self.final_output_digest) != 64
+            or any(character not in "0123456789abcdef" for character in self.final_output_digest)
+        ):
+            raise ValueError("native observation final output digest is invalid")
         if self.observation_id != "native-observation." + _digest(self.identity_payload())[:40]:
             raise ValueError("native observation ID mismatch")
 
@@ -247,6 +258,7 @@ class NativeEpisodeObservation:
             "memory_kind": self.memory_kind.value if self.memory_kind else None,
             "events": [value.payload() for value in self.events],
             "usage_digest": self.usage_digest,
+            "final_output_digest": self.final_output_digest,
             "evidence_plane": self.evidence_plane,
         }
 
@@ -301,6 +313,12 @@ def extract_native_observations(
         artifacts_dir = trace_path.parent / "artifacts"
         memory_events = _read_jsonl(artifacts_dir / "rsimem_memory_events.jsonl")
         process_events = _read_jsonl(artifacts_dir / "pure_process_event_archive.jsonl")
+        final_output = episode.get("final_response_text")
+        final_output_digest = (
+            hashlib.sha256(final_output.encode("utf-8")).hexdigest()
+            if isinstance(final_output, str)
+            else None
+        )
         memory_refs = tuple(
             str(value["eventId"]) for value in memory_events
             if isinstance(value.get("eventId"), str)
@@ -381,6 +399,7 @@ def extract_native_observations(
             "memory_kind": run.memory_kind,
             "events": [value.payload() for value in events],
             "usage_digest": audit.usage_digest,
+            "final_output_digest": final_output_digest,
             "evidence_plane": "benchmark_audit",
         }
         observations.append(NativeEpisodeObservation(
@@ -392,6 +411,7 @@ def extract_native_observations(
             memory_kind=MemoryKind(run.memory_kind) if run.memory_kind else None,
             events=events,
             usage_digest=audit.usage_digest,
+            final_output_digest=final_output_digest,
         ))
     if tuple(value.task_id for value in observations) != run.native_task_ids:
         raise ValueError("native observations do not cover the registered task order")

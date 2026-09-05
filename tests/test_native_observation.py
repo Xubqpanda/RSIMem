@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
 
 import pytest
@@ -46,6 +47,21 @@ def test_native_observation_requires_episode_state_identity(tmp_path: Path) -> N
     sidecar.unlink()
     with pytest.raises(ValueError, match="native_episode_identity.json"):
         extract_native_observations(run=run, output_root=tmp_path)
+
+
+def test_native_observation_projects_only_final_output_digest(tmp_path: Path) -> None:
+    run = _fixture(tmp_path)
+    result_path = tmp_path / run.trace_directory / "sequence_results.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    result["episodes"][0]["final_response_text"] = "private final response"
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+
+    observation = extract_native_observations(run=run, output_root=tmp_path)[0]
+    assert observation.final_output_digest == hashlib.sha256(
+        b"private final response"
+    ).hexdigest()
+    serialized = json.dumps(observation.payload())
+    assert "private final response" not in serialized
 
 
 def test_native_observation_rejects_sidecar_trace_drift(tmp_path: Path) -> None:
