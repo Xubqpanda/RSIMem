@@ -134,6 +134,40 @@ class NativeExecutionAudit:
             "trace_ids": list(self.trace_ids),
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "NativeExecutionAudit":
+        expected = {
+            "schema", "run_id", "trace_digest", "state_digest", "hermes_home_digest",
+            "artifact_digest", "service_identity_digest", "episode_identity_digest",
+            "provider_id", "model_id", "usage_complete", "usage", "usage_digest", "trace_ids",
+        }
+        if not isinstance(value, Mapping) or set(value) != expected:
+            raise ValueError("malformed native execution audit")
+        if value.get("schema") != AUDIT_SCHEMA or not isinstance(value.get("usage"), Mapping):
+            raise ValueError("native execution audit schema is invalid")
+        usage = value["usage"]
+        usage_fields = {
+            "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens",
+            "reasoning_tokens", "request_count", "retry_count",
+        }
+        if set(usage) != usage_fields or not isinstance(value.get("trace_ids"), list):
+            raise ValueError("native execution audit usage fields are invalid")
+        audit = cls(
+            run_id=value["run_id"], trace_digest=value["trace_digest"],
+            state_digest=value["state_digest"], hermes_home_digest=value["hermes_home_digest"],
+            artifact_digest=value["artifact_digest"], service_identity_digest=value["service_identity_digest"],
+            episode_identity_digest=value["episode_identity_digest"], provider_id=value["provider_id"],
+            model_id=value["model_id"], usage_complete=value["usage_complete"],
+            input_tokens=usage["input_tokens"], output_tokens=usage["output_tokens"],
+            cache_read_tokens=usage["cache_read_tokens"], cache_write_tokens=usage["cache_write_tokens"],
+            reasoning_tokens=usage["reasoning_tokens"], request_count=usage["request_count"],
+            retry_count=usage["retry_count"], usage_digest=value["usage_digest"],
+            trace_ids=tuple(value["trace_ids"]),
+        )
+        if audit.payload() != dict(value):
+            raise ValueError("non-canonical native execution audit")
+        return audit
+
 
 class NativeExecutionAuditStore:
     """Append-once content-free audit receipts keyed by logical run ID."""
@@ -158,6 +192,23 @@ class NativeExecutionAuditStore:
             temporary.write_text(serialized, encoding="utf-8")
             temporary.replace(path)
             return True
+
+    def get(self, run_id: str) -> NativeExecutionAudit:
+        if not isinstance(run_id, str) or not run_id:
+            raise ValueError("native execution audit run ID is required")
+        path = self.root / f"{run_id}.json"
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("native execution audit is missing or symlinked")
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+            audit = NativeExecutionAudit.from_payload(value)
+        except (OSError, json.JSONDecodeError, TypeError, ValueError) as exc:
+            raise ValueError("malformed native execution audit") from exc
+        if audit.run_id != run_id:
+            raise ValueError("native execution audit run ID mismatch")
+        if path.read_text(encoding="utf-8") != _canonical(audit.payload()) + "\n":
+            raise ValueError("native execution audit is not canonical")
+        return audit
 
 
 def audit_native_execution(

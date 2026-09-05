@@ -202,9 +202,22 @@ def test_native_execution_audit_store_is_append_once(tmp_path: Path) -> None:
     store = NativeExecutionAuditStore(tmp_path / "receipts")
     assert store.put(audit) is True
     assert store.put(audit) is False
+    assert store.get(run.run_id) == audit
     changed = replace(audit, state_digest="f" * 64)
     with pytest.raises(ValueError, match="different execution audit"):
         store.put(changed)
+
+
+def test_native_execution_audit_store_rejects_tampered_receipt(tmp_path: Path) -> None:
+    run = _fixture(tmp_path)
+    audit = audit_native_execution(run=run, output_root=tmp_path)
+    store = NativeExecutionAuditStore(tmp_path / "receipts")
+    store.put(audit)
+    payload = json.loads((tmp_path / "receipts" / f"{run.run_id}.json").read_text())
+    payload["usage"]["request_count"] += 1
+    (tmp_path / "receipts" / f"{run.run_id}.json").write_text(json.dumps(payload) + "\n")
+    with pytest.raises(ValueError, match="audit"):
+        store.get(run.run_id)
 
 
 def test_native_execution_audit_requires_episode_state_identity(tmp_path: Path) -> None:
