@@ -145,9 +145,24 @@ def assess_stage2_gate(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("corpus", help="path to a frozen native attribution corpus")
+    parser.add_argument("--review-store", help="optional canonical reviewer JSONL store")
     args = parser.parse_args(argv)
     corpus = NativeAttributionCorpusStore(Path(args.corpus)).load()
-    print(json.dumps(build_attribution_report(corpus), ensure_ascii=True, sort_keys=True))
+    report = build_attribution_report(corpus)
+    reviewer_two_reviewer_count = 0
+    if args.review_store:
+        from .native_attribution_review import (
+            NativeAttributionReviewStore,
+            build_review_summary,
+        )
+        store = NativeAttributionReviewStore(Path(args.review_store))
+        summary = build_review_summary(corpus, store.load_all(corpus=corpus))
+        report["review_summary"] = summary
+        reviewer_two_reviewer_count = int(summary["two_reviewer_candidate_count"])
+    report["stage2_gate"] = assess_stage2_gate(
+        corpus, reviewer_two_reviewer_count=reviewer_two_reviewer_count
+    )
+    print(json.dumps(report, ensure_ascii=True, sort_keys=True))
     return 0
 
 

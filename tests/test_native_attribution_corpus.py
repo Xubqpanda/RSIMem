@@ -116,6 +116,7 @@ def test_attribution_report_cli_reads_frozen_corpus(tmp_path, capsys) -> None:
     output = json.loads(capsys.readouterr().out)
     assert output["corpus_id"] == corpus.corpus_id
     assert output["actionable_count"] == 0
+    assert output["stage2_gate"]["decision"] == "STOP_NO_ACTIONABLE_SIGNAL"
 
 
 def test_attribution_report_module_entrypoint(tmp_path) -> None:
@@ -129,6 +130,28 @@ def test_attribution_report_module_entrypoint(tmp_path) -> None:
         text=True,
     )
     assert json.loads(result.stdout)["corpus_id"] == corpus.corpus_id
+
+
+def test_attribution_report_cli_binds_review_store_to_gate(tmp_path, capsys) -> None:
+    corpus = _corpus(tmp_path)
+    corpus_store = NativeAttributionCorpusStore(tmp_path / "corpus.json")
+    corpus_store.put(corpus)
+    candidate = corpus.candidates[0]
+    record = NativeAttributionReviewRecord.create(
+        corpus_id=corpus.corpus_id,
+        candidate_id=candidate.attribution_id,
+        reviewer_id="reviewer-a",
+        decision=ReviewDecision.ESCALATE,
+        reviewed_evidence_refs=candidate.evidence_refs or ("no_evidence",),
+        rationale_codes=("insufficient_process_evidence",),
+    )
+    review_store = NativeAttributionReviewStore(tmp_path / "reviews.jsonl", corpus=corpus)
+    review_store.append(record)
+    assert report_main([str(corpus_store.path), "--review-store", str(review_store.path)]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["review_summary"]["reviewer_count"] == 1
+    assert output["stage2_gate"]["decision"] == "STOP_NO_ACTIONABLE_SIGNAL"
+    assert "no_two_reviewer_case" in output["stage2_gate"]["reasons"]
 
 
 def test_review_packet_is_content_free_and_review_store_is_append_once(tmp_path) -> None:
