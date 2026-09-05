@@ -31,9 +31,10 @@ closed until actionable Stage 1 cases are frozen.
 
 The primary provider passed a five-request probe on 2026-09-05 (`5/5` HTTP
 `200`, non-empty content, and usage), but the subsequent bounded EP01 attempt
-entered repeated judge `APIConnectionError` retries before producing a complete
-sequence result. Probe success is connectivity evidence only; the EP01 attempt
-is classified as infrastructure evidence and does not reopen experiments.
+encountered repeated provider HTTP `503` responses in its final task and failed
+the complete-usage audit. Probe success is connectivity evidence only; the EP01
+attempt is classified as infrastructure evidence and does not reopen
+experiments.
 
 The latest RSIMem verification baseline is `1236 passed`; compileall, dependency
 checks, shell syntax, tracked secret scan, and diff checks also pass. The
