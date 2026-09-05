@@ -37,6 +37,11 @@ def _panel(family_id: str) -> str:
     return "unknown"
 
 
+def _case_key(candidate: object) -> str:
+    replicate = getattr(candidate, "replicate_id", None)
+    return f"{candidate.case_id}@replicate-{replicate if replicate is not None else 'unknown'}"
+
+
 def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
     """Summarize attribution coverage without inspecting evaluation content."""
 
@@ -90,14 +95,14 @@ def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
         },
         "case_ids_by_surface": {
             surface: sorted(
-                item.case_id
+                _case_key(item)
                 for item in candidates
                 if item.primary_failure_surface.value == surface
             )
             for surface in sorted({item.primary_failure_surface.value for item in candidates})
         },
         "evidence_refs_by_case": {
-            item.case_id: list(item.evidence_refs)
+            _case_key(item): list(item.evidence_refs)
             for item in sorted(candidates, key=lambda value: value.case_id)
         },
         "excluded_reasons": _counts([

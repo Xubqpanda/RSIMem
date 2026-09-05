@@ -98,7 +98,8 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
         for case_id in report["case_ids_by_surface"]["unresolved"]
     )
     assert set(report["evidence_refs_by_case"]) == {
-        candidate.case_id for candidate in corpus.candidates
+        f"{candidate.case_id}@replicate-{candidate.replicate_id if candidate.replicate_id is not None else 'unknown'}"
+        for candidate in corpus.candidates
     }
     assert report["cross_family_consistency"] is True
     assert report["excluded_reasons"] == {"usage_incomplete": 1}
