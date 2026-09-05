@@ -108,6 +108,7 @@ def prepare_native_attribution_launch(
     command = (
         past_bench_binary, "evolve", "--sequence", str(target), "--agent", agent,
         "--runtime", "local", "--model", run.model_id, "--base-url", f"https://{run.provider_id}",
+        "--no-judge",
         "--persistence-variant", "with_persistence", "--rsimem-mode", "native+ledger",
         "--rsimem-method-task-id", run.method_case_id, "--port-offset", str(run.port_offset),
         "--trace-dir", str(output / run.trace_directory),
