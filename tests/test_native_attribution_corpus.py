@@ -10,6 +10,7 @@ import pytest
 from rsimem.native_attribution import attribute_native_observation
 from rsimem.native_attribution import _digest as attribution_digest
 from rsimem.native_attribution import NativeAttributionCandidate
+from rsimem.native_repair_selection import select_native_repair_cases, build_case_list_payload
 from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
 from rsimem.native_attribution_report import (
     assess_stage2_gate,
@@ -174,6 +175,34 @@ def test_stage2_gate_requires_two_reviewer_coverage_for_all_actionable_cases(tmp
     assert "insufficient_two_reviewer_coverage" in gate["reasons"]
     gate = assess_stage2_gate(mixed, reviewer_two_reviewer_count=2)
     assert gate["decision"] == "OPEN_STAGE2"
+
+
+def test_repair_case_selection_is_fail_closed_and_corpus_bound(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    with pytest.raises(ValueError, match="no eligible"):
+        select_native_repair_cases(corpus, two_reviewer_candidate_ids=())
+    base = corpus.candidates[0]
+    values = {**base.identity_payload(), "primary_failure_surface": "formation_missing",
+              "candidate_repair_axis": "formation", "is_actionable": True, "confidence": "high",
+              "evidence_refs": ["event.fixture"]}
+    candidate = NativeAttributionCandidate(
+        attribution_id="native-attribution." + attribution_digest(values)[:40],
+        observation_id=base.observation_id, case_id=base.case_id, family_id=base.family_id,
+        memory_kind=base.memory_kind, primary_failure_surface="formation_missing",
+        secondary_observations=base.secondary_observations, evidence_refs=("event.fixture",),
+        confidence="high", candidate_repair_axis="formation", is_actionable=True,
+        review_status=base.review_status, expectation_contract_id=base.expectation_contract_id,
+        replicate_id=base.replicate_id,
+    )
+    reviewed = NativeAttributionCorpus.create(
+        protocol_id=corpus.protocol_id, accepted_run_ids=corpus.accepted_run_ids,
+        observations=corpus.observations, candidates=(candidate, *corpus.candidates[1:]),
+        excluded_runs=corpus.excluded_runs,
+    )
+    cases = select_native_repair_cases(reviewed, two_reviewer_candidate_ids=(candidate.attribution_id,))
+    payload = build_case_list_payload(reviewed, cases)
+    assert payload["corpus_id"] == reviewed.corpus_id
+    assert payload["cases"][0]["repair_axis"] == "formation"
 
 
 def test_stage2_gate_positive_contract_requires_two_reviewer_case(tmp_path) -> None:
