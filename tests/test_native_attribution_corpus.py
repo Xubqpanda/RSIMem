@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 
 import pytest
 
@@ -87,6 +89,19 @@ def test_attribution_report_cli_reads_frozen_corpus(tmp_path, capsys) -> None:
     output = json.loads(capsys.readouterr().out)
     assert output["corpus_id"] == corpus.corpus_id
     assert output["actionable_count"] == 0
+
+
+def test_attribution_report_module_entrypoint(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    store = NativeAttributionCorpusStore(tmp_path / "corpus.json")
+    store.put(corpus)
+    result = subprocess.run(
+        [sys.executable, "-m", "rsimem.native_attribution_report", str(store.path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert json.loads(result.stdout)["corpus_id"] == corpus.corpus_id
 
 
 def test_corpus_store_load_fails_closed_on_tampering(tmp_path) -> None:

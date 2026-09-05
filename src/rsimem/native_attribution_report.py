@@ -78,3 +78,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 __all__ = ["REPORT_SCHEMA", "build_attribution_report", "main"]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
