@@ -48,5 +48,5 @@ def test_assembler_records_incomplete_run_without_crashing(tmp_path) -> None:
     ))
     (tmp_path / run.trace_directory / "sequence_results.json").unlink()
     import pytest
-    with pytest.raises(ValueError, match="corpus identity is incomplete"):
+    with pytest.raises(ValueError, match="no accepted native runs"):
         assemble_native_attribution_corpus(manifest_path=manifest_path, output_root=tmp_path)

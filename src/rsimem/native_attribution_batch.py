@@ -65,6 +65,11 @@ def assemble_native_attribution_corpus(
             attribute_native_observation(value, expectations.get(value.task_id))
             for value in extracted
         )
+    if not accepted_ids:
+        # A corpus without an accepted observation cannot satisfy the frozen
+        # corpus contract. Keep this fail-closed instead of emitting a fake
+        # empty corpus that could be mistaken for evidence.
+        raise ValueError("no accepted native runs; no attribution corpus written")
     corpus = NativeAttributionCorpus.create(
         protocol_id=manifest.protocol_id,
         accepted_run_ids=accepted_ids,
@@ -108,4 +113,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
