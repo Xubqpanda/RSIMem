@@ -1913,26 +1913,32 @@ def _resolve_episode_oracle_home_seed_dir(sequence, episode) -> Path | None:
 
 
 def _resolve_rsimem_sensitivity_paths(args, persistence_backend) -> tuple[Path, Path] | None:
-    """Return registered state/home paths for one isolated sensitivity run."""
+    """Return registered state/home paths for one isolated RSIMem run."""
     # Tests and programmatic callers commonly supply a partial Namespace. Do
     # not treat dynamically supplied attributes as an opt-in launcher flag.
     argument_values = vars(args)
-    state_value = argument_values.get("rsimem_sensitivity_state_dir")
-    home_value = argument_values.get("rsimem_sensitivity_hermes_home_dir")
+    legacy_state = argument_values.get("rsimem_sensitivity_state_dir")
+    legacy_home = argument_values.get("rsimem_sensitivity_hermes_home_dir")
+    state_value = argument_values.get("rsimem_state_dir") or legacy_state
+    home_value = argument_values.get("rsimem_hermes_home_dir") or legacy_home
+    if legacy_state and state_value != legacy_state:
+        raise SystemExit("RSIMem state directory aliases conflict")
+    if legacy_home and home_value != legacy_home:
+        raise SystemExit("RSIMem Hermes-home directory aliases conflict")
     if state_value is None and home_value is None:
         return None
     if not state_value or not home_value:
         raise SystemExit(
-            "RSIMem sensitivity execution requires both state and Hermes-home directories"
+            "RSIMem isolated execution requires both state and Hermes-home directories"
         )
     if persistence_backend is None:
-        raise SystemExit("RSIMem sensitivity state isolation requires a persistence backend")
+        raise SystemExit("RSIMem state isolation requires a persistence backend")
     if persistence_backend.__class__.__name__ != "HermesPersistenceBackend":
-        raise SystemExit("RSIMem sensitivity state isolation requires the Hermes backend")
+        raise SystemExit("RSIMem state isolation requires the Hermes backend")
     state_path = Path(state_value).expanduser().resolve()
     home_path = Path(home_value).expanduser().resolve()
     if state_path == home_path:
-        raise SystemExit("RSIMem sensitivity state and Hermes-home directories must differ")
+        raise SystemExit("RSIMem state and Hermes-home directories must differ")
     return state_path, home_path
 
 
@@ -3708,6 +3714,16 @@ def main(argv: list[str] | None = None) -> None:
             "Opaque RSIMem method task ID. Sensitivity launchers set this to "
             "their registered case ID; it must not be a PAST family/task ID."
         ),
+    )
+    p_evolve.add_argument(
+        "--rsimem-state-dir",
+        default=None,
+        help="Registered state root for one isolated RSIMem run",
+    )
+    p_evolve.add_argument(
+        "--rsimem-hermes-home-dir",
+        default=None,
+        help="Registered Hermes HOME for one isolated RSIMem run",
     )
     p_evolve.add_argument(
         "--rsimem-sensitivity-state-dir",

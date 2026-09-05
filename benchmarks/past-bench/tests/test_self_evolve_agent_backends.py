@@ -138,6 +138,27 @@ def test_sensitivity_paths_require_explicit_distinct_hermes_directories(tmp_path
     )
     assert paths == ((tmp_path / "state").resolve(), (tmp_path / "home").resolve())
 
+    neutral = _resolve_rsimem_sensitivity_paths(
+        argparse.Namespace(
+            rsimem_state_dir=str(tmp_path / "neutral-state"),
+            rsimem_hermes_home_dir=str(tmp_path / "neutral-home"),
+        ),
+        backend,
+    )
+    assert neutral == (
+        (tmp_path / "neutral-state").resolve(),
+        (tmp_path / "neutral-home").resolve(),
+    )
+    with pytest.raises(SystemExit, match="aliases conflict"):
+        _resolve_rsimem_sensitivity_paths(
+            argparse.Namespace(
+                rsimem_state_dir=str(tmp_path / "new"),
+                rsimem_sensitivity_state_dir=str(tmp_path / "old"),
+                rsimem_hermes_home_dir=str(tmp_path / "home"),
+            ),
+            backend,
+        )
+
 
 def test_nanobot_backend_history_and_artifact_snapshot(tmp_path: Path):
     backend = NanobotPersistenceBackend()
