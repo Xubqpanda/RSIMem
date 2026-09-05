@@ -205,6 +205,10 @@ remain closed.
 The frozen corpus can be independently reloaded and summarized with
 `rsimem-report-native-attribution`; the module and console entrypoints are
 covered by deterministic tests.
+The manifest-bound assembler was also replayed against the frozen cross-panel
+output and reconstructed `2 accepted runs / 10 observations`, retaining 24
+non-content exclusions. This replay wrote a separate corpus and did not alter
+the frozen evidence used for the current gate.
 The current checklist audit confirms that Stage 0 isolation and the Stage 1
 candidate/evidence/content-boundary contracts are implemented. The remaining
 Stage 1 gates are deliberately empirical: two independent reviewer decisions,
