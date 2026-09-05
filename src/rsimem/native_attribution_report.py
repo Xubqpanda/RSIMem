@@ -123,12 +123,25 @@ def assess_stage2_gate(
     """Return a conservative, deterministic decision for opening repairs."""
 
     reasons: list[str] = []
+    allowed_axes = {"formation", "persistence", "maintenance", "retrieval", "application"}
+    high_confidence_actionable = tuple(
+        item for item in corpus.candidates
+        if item.is_actionable and item.confidence == "high"
+    )
+    invalid_axes = tuple(
+        item for item in corpus.candidates
+        if item.is_actionable and item.candidate_repair_axis not in allowed_axes
+    )
     if not corpus.observations:
         reasons.append("no_observations")
     if corpus.unresolved_count == len(corpus.candidates):
         reasons.append("unresolved_only")
     if corpus.actionable_count == 0:
         reasons.append("no_actionable_candidate")
+    if not high_confidence_actionable:
+        reasons.append("no_high_confidence_actionable_candidate")
+    if invalid_axes:
+        reasons.append("invalid_repair_axis")
     if reviewer_two_reviewer_count <= 0:
         reasons.append("no_two_reviewer_case")
     decision = "OPEN_STAGE2" if not reasons else "STOP_NO_ACTIONABLE_SIGNAL"
@@ -138,6 +151,8 @@ def assess_stage2_gate(
         "decision": decision,
         "reasons": reasons,
         "actionable_count": corpus.actionable_count,
+        "high_confidence_actionable_count": len(high_confidence_actionable),
+        "invalid_repair_axis_count": len(invalid_axes),
         "two_reviewer_candidate_count": reviewer_two_reviewer_count,
         "evidence_contract_valid": True,
     }

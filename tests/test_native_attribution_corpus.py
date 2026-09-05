@@ -106,6 +106,8 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert gate["decision"] == "STOP_NO_ACTIONABLE_SIGNAL"
     assert "unresolved_only" in gate["reasons"]
     assert "no_two_reviewer_case" in gate["reasons"]
+    assert "no_high_confidence_actionable_candidate" in gate["reasons"]
+    assert gate["invalid_repair_axis_count"] == 0
     assert "incomplete_evidence" not in gate["reasons"]
     assert gate["evidence_contract_valid"] is True
 
