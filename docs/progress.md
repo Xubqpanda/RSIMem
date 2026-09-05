@@ -34,9 +34,11 @@ The primary provider remains intermittently available. A five-request probe on
 and two HTTP `503` responses without usage. This is connectivity evidence only;
 it does not reopen any old experiment or justify a long benchmark run.
 
-The post-smoke verification baseline is RSIMem `1210 passed` and vendored
-PAST-Bench `401 passed, 2 skipped`; compileall, dependency checks, shell syntax,
-tracked secret scan, and diff checks also pass.
+The latest RSIMem verification baseline is `1236 passed`; compileall, dependency
+checks, shell syntax, tracked secret scan, and diff checks also pass. The
+vendored PAST-Bench historical baseline remains `401 passed, 2 skipped` when
+run from its own directory; a current full collection is environment-sensitive
+because the optional `firecrawl` package is absent.
 
 The authoritative protocol and execution order are in
 [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
@@ -155,11 +157,11 @@ synthetic RSIMem exposure/use attribution.  Episodic and procedural adapter
 projections remain read-only/read-through surfaces with explicit projection
 verification; semantic writeback remains the only live policy path.
 
-The deterministic and storage-boundary test baselines (verified 2026-09-03) are:
+The deterministic and storage-boundary test baselines (latest verification
+2026-09-05) are:
 
-- RSIMem: `1174 passed` (verified 2026-09-03), including the Stage 3 isolated
-  run-manifest, opaque launcher task-ID handoff, and content-free coverage
-  audit tests.
+- RSIMem: `1236 passed`, including the native attribution corpus reload,
+  report CLI, reviewer provenance, and replicate identity tests.
 - Vendored PAST-Bench: `401 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
 - `compileall`, `pip check`, `bash -n scripts/*.sh`, and `git diff --check`:
