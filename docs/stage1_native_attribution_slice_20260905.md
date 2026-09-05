@@ -30,13 +30,16 @@ The deterministic summary is produced by
 derived from the frozen corpus identity and its fields are limited to counts,
 ratios, lifecycle labels, memory kinds, families, and exclusion reasons.
 The frozen corpus reload and report reconstruction were verified directly from
-disk; report ID: `native-attribution-report.849141cb52594f52f952d18cf292b03626773ebb`.
+disk; report ID: `native-attribution-report.6700c8dfd4226bf7628f5adc774d107cc8f9d6c2`.
 The report also exposes a content-free case index and evidence-reference map
 for all ten unresolved candidates, so reviewer work can be performed against
 stable IDs without copying task text.
 When reviewer records exist, pass `--review-store` to the report CLI; the
 result includes review coverage and the bound Stage 2 gate. The current slice
 has no reviewer records and therefore remains closed.
+The current gate result is `STOP_NO_ACTIONABLE_SIGNAL` with reasons
+`unresolved_only`, `no_actionable_candidate`,
+`no_high_confidence_actionable_candidate`, and `no_two_reviewer_case`.
 
 The deterministic contracts, event identity, state digests, retrieval metadata,
 tool closure references, and content-free corpus are valid for this slice. The
