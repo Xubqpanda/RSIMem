@@ -6,6 +6,7 @@ import pytest
 
 from rsimem.native_attribution import attribute_native_observation
 from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
+from rsimem.native_attribution_report import build_attribution_report
 from rsimem.native_observation import extract_native_observations
 from test_native_execution_audit import _fixture
 
@@ -57,3 +58,19 @@ def test_corpus_rejects_observation_candidate_mismatch(tmp_path) -> None:
             candidates=corpus.candidates[:-1],
             excluded_runs=corpus.excluded_runs,
         )
+
+
+def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    report = build_attribution_report(corpus)
+    assert report["observation_count"] == 5
+    assert report["candidate_count"] == 5
+    assert report["unresolved_count"] == 5
+    assert report["actionable_count"] == 0
+    assert report["unresolved_rate"] == 1.0
+    assert report["actionability_rate"] == 0.0
+    assert report["surface_counts"] == {"unresolved": 5}
+    assert report["memory_kind_counts"] == {"semantic": 5}
+    assert report["excluded_reasons"] == {"usage_incomplete": 1}
+    assert "final_response_text" not in json.dumps(report)
+    assert report["report_id"].startswith("native-attribution-report.")
