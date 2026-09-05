@@ -159,13 +159,37 @@ def build_review_packet(corpus: NativeAttributionCorpus) -> tuple[dict[str, obje
     } for candidate in corpus.candidates)
 
 
+def validate_review_record(
+    record: NativeAttributionReviewRecord,
+    corpus: NativeAttributionCorpus,
+) -> None:
+    """Bind a reviewer record to an existing frozen candidate."""
+
+    if record.corpus_id != corpus.corpus_id:
+        raise ValueError("native attribution review corpus mismatch")
+    candidate = next(
+        (item for item in corpus.candidates if item.attribution_id == record.candidate_id),
+        None,
+    )
+    if candidate is None:
+        raise ValueError("native attribution review candidate is not in corpus")
+    allowed = set(candidate.evidence_refs)
+    if not allowed:
+        allowed.add("no_evidence")
+    if not set(record.reviewed_evidence_refs).issubset(allowed):
+        raise ValueError("native attribution review cites unknown evidence")
+
+
 class NativeAttributionReviewStore:
     """Append-once JSONL store for independent reviewer records."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, *, corpus: NativeAttributionCorpus | None = None) -> None:
         self.path = Path(path).expanduser().resolve()
+        self.corpus = corpus
 
     def append(self, record: NativeAttributionReviewRecord) -> bool:
+        if self.corpus is not None:
+            validate_review_record(record, self.corpus)
         line = _canonical(record.payload()) + "\n"
         self.path.parent.mkdir(parents=True, exist_ok=True)
         lock_path = self.path.with_name(self.path.name + ".lock")
@@ -187,5 +211,5 @@ class NativeAttributionReviewStore:
 
 __all__ = [
     "REVIEW_SCHEMA", "ReviewDecision", "NativeAttributionReviewRecord",
-    "NativeAttributionReviewStore", "build_review_packet",
+    "NativeAttributionReviewStore", "build_review_packet", "validate_review_record",
 ]

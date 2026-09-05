@@ -14,6 +14,7 @@ from rsimem.native_attribution_review import (
     NativeAttributionReviewStore,
     ReviewDecision,
     build_review_packet,
+    validate_review_record,
 )
 from rsimem.native_observation import extract_native_observations
 from test_native_execution_audit import _fixture
@@ -127,10 +128,37 @@ def test_review_packet_is_content_free_and_review_store_is_append_once(tmp_path)
         reviewed_evidence_refs=candidate.evidence_refs or ("no_evidence",),
         rationale_codes=("insufficient_process_evidence",),
     )
-    store = NativeAttributionReviewStore(tmp_path / "reviews.jsonl")
+    store = NativeAttributionReviewStore(tmp_path / "reviews.jsonl", corpus=corpus)
     assert store.append(record) is True
     assert store.append(record) is False
     assert NativeAttributionReviewRecord.from_payload(record.payload()) == record
+    validate_review_record(record, corpus)
+
+    with pytest.raises(ValueError, match="unknown evidence"):
+        validate_review_record(
+            NativeAttributionReviewRecord.create(
+                corpus_id=corpus.corpus_id,
+                candidate_id=candidate.attribution_id,
+                reviewer_id="reviewer-b",
+                decision=ReviewDecision.ESCALATE,
+                reviewed_evidence_refs=("made-up-ref",),
+                rationale_codes=("insufficient_process_evidence",),
+            ),
+            corpus,
+        )
+
+    with pytest.raises(ValueError, match="not in corpus"):
+        validate_review_record(
+            NativeAttributionReviewRecord.create(
+                corpus_id=corpus.corpus_id,
+                candidate_id="native-attribution.missing",
+                reviewer_id="reviewer-b",
+                decision=ReviewDecision.ESCALATE,
+                reviewed_evidence_refs=("no_evidence",),
+                rationale_codes=("missing_candidate",),
+            ),
+            corpus,
+        )
 
 
 def test_review_record_rejects_tampered_id(tmp_path) -> None:
