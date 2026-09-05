@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+from dataclasses import replace
 
 import pytest
 
 from rsimem.native_attribution import attribute_native_observation
+from rsimem.native_attribution import _digest as attribution_digest
 from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
 from rsimem.native_attribution_report import (
     assess_stage2_gate,
@@ -110,6 +112,39 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert gate["invalid_repair_axis_count"] == 0
     assert "incomplete_evidence" not in gate["reasons"]
     assert gate["evidence_contract_valid"] is True
+
+
+def test_stage2_gate_positive_contract_requires_two_reviewer_case(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    original = corpus.candidates[0]
+    values = dict(original.identity_payload())
+    values.update(
+        primary_failure_surface="formation_missing",
+        confidence="high",
+        candidate_repair_axis="formation",
+        is_actionable=True,
+        evidence_refs=["native-lifecycle-event.fixture"],
+    )
+    actionable = replace(
+        original,
+        attribution_id="native-attribution." + attribution_digest(values)[:40],
+        primary_failure_surface="formation_missing",
+        confidence="high",
+        candidate_repair_axis="formation",
+        is_actionable=True,
+        evidence_refs=("native-lifecycle-event.fixture",),
+    )
+    candidates = (actionable, *corpus.candidates[1:])
+    positive = NativeAttributionCorpus.create(
+        protocol_id=corpus.protocol_id,
+        accepted_run_ids=corpus.accepted_run_ids,
+        observations=corpus.observations,
+        candidates=candidates,
+        excluded_runs=(),
+    )
+    gate = assess_stage2_gate(positive, reviewer_two_reviewer_count=1)
+    assert gate["decision"] == "OPEN_STAGE2"
+    assert gate["high_confidence_actionable_count"] == 1
 
 
 def test_attribution_report_cli_reads_frozen_corpus(tmp_path, capsys) -> None:
