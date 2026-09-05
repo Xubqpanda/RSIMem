@@ -35,6 +35,17 @@ class NativeRepairCase:
     repair_axis: str
     evidence_refs: tuple[str, ...]
 
+    def __post_init__(self) -> None:
+        if self.repair_axis not in _AXES:
+            raise ValueError("native repair case axis is invalid")
+        for value in (self.case_id, self.attribution_id, self.corpus_id, self.family_id):
+            if not isinstance(value, str) or not value:
+                raise ValueError("native repair case identity is invalid")
+        if self.memory_kind is not None and not isinstance(self.memory_kind, str):
+            raise ValueError("native repair case memory kind is invalid")
+        if not self.evidence_refs or any(not isinstance(item, str) or not item for item in self.evidence_refs):
+            raise ValueError("native repair case evidence is invalid")
+
     def identity_payload(self) -> dict[str, object]:
         return {
             "case_id": self.case_id, "attribution_id": self.attribution_id,
@@ -75,6 +86,23 @@ class NativeRepairCaseList:
     corpus_id: str
     cases: tuple[NativeRepairCase, ...]
     schema: str = SCHEMA
+
+    def __post_init__(self) -> None:
+        if self.schema != SCHEMA or not self.case_list_id or not self.corpus_id:
+            raise ValueError("native repair case list identity is invalid")
+        if not self.cases:
+            raise ValueError("native repair case list is empty")
+        if any(case.corpus_id != self.corpus_id for case in self.cases):
+            raise ValueError("native repair case list corpus mismatch")
+        ids = [case.attribution_id for case in self.cases]
+        if len(ids) != len(set(ids)):
+            raise ValueError("native repair case list contains duplicate candidates")
+        expected = "native-repair-cases." + _digest({
+            "schema": self.schema, "corpus_id": self.corpus_id,
+            "cases": [case.payload() for case in self.cases],
+        })[:40]
+        if self.case_list_id != expected:
+            raise ValueError("native repair case list ID mismatch")
 
     def payload(self) -> dict[str, object]:
         identity = {"schema": self.schema, "corpus_id": self.corpus_id,

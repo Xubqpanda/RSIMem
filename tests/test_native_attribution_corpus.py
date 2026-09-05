@@ -215,6 +215,10 @@ def test_repair_case_selection_is_fail_closed_and_corpus_bound(tmp_path) -> None
     assert store.put(case_list) is True
     assert store.put(case_list) is False
     assert store.load().payload() == case_list.payload()
+    malformed = dict(case_list.payload())
+    malformed["cases"] = [dict(malformed["cases"][0]), dict(malformed["cases"][0])]
+    with pytest.raises(ValueError, match="duplicate"):
+        NativeRepairCaseList.from_payload(malformed)
 
 
 def test_stage2_gate_positive_contract_requires_two_reviewer_case(tmp_path) -> None:
