@@ -36,6 +36,9 @@ provider HTTP `503` responses in its final task and failed the complete-usage
 audit. Probe success is connectivity evidence only; the EP01/PG01 attempts
 remain classified as infrastructure evidence and do not reopen experiments.
 No new benchmark batch was authorized after the latest probe.
+The documented backup endpoint was also probed on 2026-09-05; it timed out
+after 30 seconds with no HTTP status, content, or usage. This is recorded as a
+provider diagnostic only and does not create an accepted native run.
 
 The latest RSIMem verification baseline is `1244 passed`; compileall, dependency
 checks, shell syntax, tracked secret scan, and diff checks also pass. The
