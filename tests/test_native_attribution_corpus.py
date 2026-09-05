@@ -78,6 +78,29 @@ def test_corpus_rejects_observation_candidate_mismatch(tmp_path) -> None:
         )
 
 
+def test_corpus_rejects_malformed_or_duplicate_exclusions(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    with pytest.raises(ValueError, match="exclusion fields"):
+        NativeAttributionCorpus.create(
+            protocol_id=corpus.protocol_id,
+            accepted_run_ids=corpus.accepted_run_ids,
+            observations=corpus.observations,
+            candidates=corpus.candidates,
+            excluded_runs=({"run_id": "native-run.bad", "reason": "x", "extra": "y"},),
+        )
+    with pytest.raises(ValueError, match="exclusion identity"):
+        NativeAttributionCorpus.create(
+            protocol_id=corpus.protocol_id,
+            accepted_run_ids=corpus.accepted_run_ids,
+            observations=corpus.observations,
+            candidates=corpus.candidates,
+            excluded_runs=(
+                {"run_id": "native-run.bad", "reason": "x"},
+                {"run_id": "native-run.bad", "reason": "y"},
+            ),
+        )
+
+
 def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> None:
     corpus = _corpus(tmp_path)
     report = build_attribution_report(corpus)

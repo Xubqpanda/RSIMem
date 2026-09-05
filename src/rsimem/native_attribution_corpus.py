@@ -45,6 +45,24 @@ def _assert_content_free(value: object) -> None:
     visit(value)
 
 
+def _validate_excluded_runs(values: Sequence[Mapping[str, object]]) -> tuple[dict[str, str], ...]:
+    validated: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for value in values:
+        if set(value) != {"run_id", "reason"}:
+            raise ValueError("native attribution exclusion fields are invalid")
+        run_id, reason = value.get("run_id"), value.get("reason")
+        if (
+            not isinstance(run_id, str) or not run_id
+            or not isinstance(reason, str) or not reason
+            or run_id in seen
+        ):
+            raise ValueError("native attribution exclusion identity is invalid")
+        seen.add(run_id)
+        validated.append({"run_id": run_id, "reason": reason})
+    return tuple(validated)
+
+
 @dataclass(frozen=True, slots=True)
 class NativeAttributionCorpus:
     corpus_id: str
@@ -70,14 +88,14 @@ class NativeAttributionCorpus:
             raise ValueError("native attribution corpus observation/candidate coverage mismatch")
         if any(value.run_id not in self.accepted_run_ids for value in observations):
             raise ValueError("native attribution observation references an unaccepted run")
-        excluded = tuple(dict(value) for value in self.excluded_runs)
         _assert_content_free({
             "protocol_id": self.protocol_id,
             "accepted_run_ids": list(self.accepted_run_ids),
             "observations": [value.payload() for value in observations],
             "candidates": [value.payload() for value in candidates],
-            "excluded_runs": list(excluded),
+            "excluded_runs": [dict(value) for value in self.excluded_runs],
         })
+        excluded = _validate_excluded_runs(self.excluded_runs)
         object.__setattr__(self, "observations", observations)
         object.__setattr__(self, "candidates", candidates)
         object.__setattr__(self, "excluded_runs", excluded)
