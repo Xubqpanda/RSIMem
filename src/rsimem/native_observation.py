@@ -296,7 +296,7 @@ class NativeEpisodeObservation:
             raise ValueError("native observation ID mismatch")
 
     def identity_payload(self) -> dict[str, object]:
-        return {
+        values = {
             "schema": OBSERVATION_SCHEMA,
             "run_id": self.run_id,
             "trace_id": self.trace_id,
@@ -305,9 +305,11 @@ class NativeEpisodeObservation:
             "memory_kind": self.memory_kind.value if self.memory_kind else None,
             "events": [value.payload() for value in self.events],
             "usage_digest": self.usage_digest,
-            "final_output_digest": self.final_output_digest,
             "evidence_plane": self.evidence_plane,
         }
+        if self.final_output_digest is not None:
+            values["final_output_digest"] = self.final_output_digest
+        return values
 
     def payload(self) -> dict[str, object]:
         return {"observation_id": self.observation_id, **self.identity_payload()}
@@ -318,9 +320,9 @@ class NativeEpisodeObservation:
             raise ValueError("native observation payload is malformed")
         expected = {
             "observation_id", "schema", "run_id", "trace_id", "task_id", "family_id",
-            "memory_kind", "events", "usage_digest", "final_output_digest", "evidence_plane",
+            "memory_kind", "events", "usage_digest", "evidence_plane",
         }
-        if set(payload) != expected or payload.get("schema") != OBSERVATION_SCHEMA:
+        if set(payload) not in (expected, expected | {"final_output_digest"}) or payload.get("schema") != OBSERVATION_SCHEMA:
             raise ValueError("native observation payload fields are invalid")
         scalar_fields = (
             "observation_id", "run_id", "trace_id", "task_id", "family_id", "usage_digest",
@@ -328,8 +330,9 @@ class NativeEpisodeObservation:
         )
         if any(not isinstance(payload[field], str) for field in scalar_fields):
             raise ValueError("native observation payload scalar types are invalid")
-        if payload["final_output_digest"] is not None and not isinstance(
-            payload["final_output_digest"], str
+        final_output_digest = payload.get("final_output_digest")
+        if final_output_digest is not None and not isinstance(
+            final_output_digest, str
         ):
             raise ValueError("native observation final output digest type is invalid")
         raw_events = payload.get("events")
@@ -344,10 +347,7 @@ class NativeEpisodeObservation:
             memory_kind=MemoryKind(payload["memory_kind"]) if payload["memory_kind"] else None,
             events=tuple(NativeSurfaceObservation.from_payload(value) for value in raw_events),
             usage_digest=payload["usage_digest"],
-            final_output_digest=(
-                payload["final_output_digest"]
-                if payload["final_output_digest"] is not None else None
-            ),
+            final_output_digest=final_output_digest,
             evidence_plane=payload["evidence_plane"],
         )
 
@@ -485,9 +485,10 @@ def extract_native_observations(
             "memory_kind": run.memory_kind,
             "events": [value.payload() for value in events],
             "usage_digest": audit.usage_digest,
-            "final_output_digest": final_output_digest,
             "evidence_plane": "benchmark_audit",
         }
+        if final_output_digest is not None:
+            values["final_output_digest"] = final_output_digest
         observations.append(NativeEpisodeObservation(
             observation_id="native-observation." + _digest(values)[:40],
             run_id=run.run_id,
