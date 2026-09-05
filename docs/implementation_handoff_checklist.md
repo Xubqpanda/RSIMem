@@ -164,6 +164,7 @@ trigger/source
 - [x] 自动规则先生成候选 attribution，不直接生成最终标签。
 - [x] reviewer packet/record 独立于冻结 corpus 持久化，且只包含 ID、标签和 evidence refs；review 结果不会覆盖 deterministic candidate。
 - [x] reviewer record 在写入前绑定 frozen corpus、candidate ID 和 evidence-ref allowlist；未知 candidate/evidence 会 fail closed。
+- [x] review store 支持 canonical reload，并可统计 review coverage、reviewer 分歧和 adjudication 覆盖；未达到双 reviewer 门槛时不生成最终标签。
 - [ ] 至少两名 reviewer 独立检查代表性 case；分歧 case 进入 adjudication。
 - [ ] 每个标签引用 event ID、artifact digest、revision、tool index 或 snapshot digest。
 - [ ] 每个 case 生成 `candidate_repair_axis`，若不能唯一映射则标记 `is_actionable=false`。
