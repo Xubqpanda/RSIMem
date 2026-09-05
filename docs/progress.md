@@ -40,7 +40,7 @@ The documented backup endpoint was also probed on 2026-09-05; it timed out
 after 30 seconds with no HTTP status, content, or usage. This is recorded as a
 provider diagnostic only and does not create an accepted native run.
 
-The latest RSIMem verification baseline is `1248 passed`; compileall, dependency
+The latest RSIMem verification baseline is `1250 passed`; compileall, dependency
 checks, shell syntax, tracked secret scan, and diff checks also pass. The
 vendored PAST-Bench baseline is `403 passed, 2 skipped` when
 run from its own directory with the repository `.venv` and `PYTHONPATH=RSIMem/src`.
@@ -165,7 +165,7 @@ verification; semantic writeback remains the only live policy path.
 The deterministic and storage-boundary test baselines (latest verification
 2026-09-05) are:
 
-- RSIMem: `1248 passed`, including the native attribution corpus reload,
+- RSIMem: `1250 passed`, including the native attribution corpus reload,
   report CLI, reviewer provenance, and replicate identity tests.
 - Vendored PAST-Bench: `403 passed, 2 skipped` when run from
   `benchmarks/past-bench`.
