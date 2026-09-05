@@ -96,10 +96,13 @@ def _fixture(tmp_path: Path, family_id: str | None = None):
         )
         empty_artifacts = {
             "artifact_ids": [], "memory_entry_count": 0,
-            "user_entry_count": 0, "skill_count": 0, "digest": "1" * 64,
+            "user_entry_count": 0, "skill_count": 0, "episodic_entry_count": 0,
         }
+        empty_artifacts["digest"] = __import__("hashlib").sha256(
+            json.dumps(empty_artifacts, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
         (episode_dir / "native_episode_identity.json").write_text(json.dumps({
-            "schema": "past-bench-native-episode-identity-v1",
+            "schema": "past-bench-native-episode-identity-v2",
             "task_id": task_id,
             "family_id": run.family_id,
             "stage": "fixture",

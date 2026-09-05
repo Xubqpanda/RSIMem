@@ -233,12 +233,25 @@ def extract_native_observations(
         sidecar = _read_json(trace_path.parent / "native_episode_identity.json")
         if sidecar.get("trace_id") != trace_id or sidecar.get("task_id") != task_id:
             raise ValueError("native episode sidecar identity mismatch")
+        if (
+            run.memory_kind == "episodic"
+            and sidecar.get("schema") != "past-bench-native-episode-identity-v2"
+        ):
+            raise ValueError("episodic native observation requires v2 session identity")
         before = sidecar.get("artifact_before")
         after = sidecar.get("artifact_after")
         if not isinstance(before, Mapping) or not isinstance(after, Mapping):
             raise ValueError("native artifact identity is malformed")
-        before_ids = tuple(before.get("artifact_ids") or ())
-        after_ids = tuple(after.get("artifact_ids") or ())
+        before_ids_all = tuple(before.get("artifact_ids") or ())
+        after_ids_all = tuple(after.get("artifact_ids") or ())
+        prefixes = {
+            "semantic": ("hermes-semantic:", "hermes-profile:"),
+            "episodic": ("hermes-episodic:",),
+            "procedural": ("hermes-procedural:",),
+            None: ("hermes-",),
+        }[run.memory_kind]
+        before_ids = tuple(value for value in before_ids_all if value.startswith(prefixes))
+        after_ids = tuple(value for value in after_ids_all if value.startswith(prefixes))
         state_before = sidecar.get("state_before_digest")
         state_after = sidecar.get("state_after_digest")
         if not isinstance(state_before, str) or not isinstance(state_after, str):

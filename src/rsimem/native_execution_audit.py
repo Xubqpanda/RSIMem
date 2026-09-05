@@ -261,7 +261,10 @@ def audit_native_execution(
         episode_identity = _read_json(trace_path.parent / "native_episode_identity.json")
         if (
             not isinstance(episode_identity, Mapping)
-            or episode_identity.get("schema") != "past-bench-native-episode-identity-v1"
+            or episode_identity.get("schema") not in {
+                "past-bench-native-episode-identity-v1",
+                "past-bench-native-episode-identity-v2",
+            }
             or episode_identity.get("trace_id") != trace_id
             or episode_identity.get("task_id") != starts[0].get("task_id")
             or episode_identity.get("family_id") != run.family_id
@@ -273,16 +276,22 @@ def audit_native_execution(
                 raise ValueError("native episode state digest is malformed")
         for field in ("artifact_before", "artifact_after"):
             value = episode_identity.get(field)
-            if not isinstance(value, Mapping) or set(value) != {
+            expected_fields = {
                 "artifact_ids", "memory_entry_count", "user_entry_count",
                 "skill_count", "digest",
-            }:
+            }
+            if episode_identity.get("schema") == "past-bench-native-episode-identity-v2":
+                expected_fields.add("episodic_entry_count")
+            if not isinstance(value, Mapping) or set(value) != expected_fields:
                 raise ValueError("native episode artifact identity is malformed")
             if not isinstance(value.get("artifact_ids"), list):
                 raise ValueError("native episode artifact IDs are malformed")
             digest = value.get("digest")
             if not isinstance(digest, str) or len(digest) != 64:
                 raise ValueError("native episode artifact digest is malformed")
+            identity = {key: item for key, item in value.items() if key != "digest"}
+            if digest != _digest(identity):
+                raise ValueError("native episode artifact digest does not match identity")
         episode_identities.append(episode_identity)
         calls = [event for event in events if event.get("type") == "model_call_usage"]
         if not calls:

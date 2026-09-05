@@ -52,16 +52,35 @@ def test_content_free_artifact_identity_uses_digests_not_content() -> None:
     value = _content_free_artifact_identity({
         "memory_entries": [marker],
         "user_entries": ["private-profile-marker"],
-        "skill_docs": {"skill-a": "private-skill-marker"},
+        "skill_docs": {"skill-a": {
+            "path": "/private/machine/path/SKILL.md",
+            "sha1": "a" * 40,
+            "content": "private-skill-marker",
+        }},
     })
     serialized = json.dumps(value)
     assert value["memory_entry_count"] == 1
     assert value["user_entry_count"] == 1
     assert value["skill_count"] == 1
+    assert value["episodic_entry_count"] == 0
     assert len(value["artifact_ids"]) == 3
     assert marker not in serialized
     assert "private-profile-marker" not in serialized
     assert "private-skill-marker" not in serialized
+
+
+def test_content_free_artifact_identity_tracks_sessions_without_content(tmp_path: Path) -> None:
+    sessions = tmp_path / "sessions"
+    sessions.mkdir()
+    marker = "private-session-marker"
+    (sessions / "session_one.json").write_text(marker, encoding="utf-8")
+    value = _content_free_artifact_identity(
+        {"memory_entries": [], "user_entries": [], "skill_docs": {}},
+        state_root=tmp_path,
+    )
+    assert value["episodic_entry_count"] == 1
+    assert value["artifact_ids"][0].startswith("hermes-episodic:")
+    assert marker not in json.dumps(value)
 
 
 def _adaptive_config() -> dict:
