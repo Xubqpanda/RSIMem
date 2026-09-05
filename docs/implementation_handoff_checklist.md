@@ -133,6 +133,11 @@ trigger/source
 
 按 panel 并行处理，每个 worker 只读 immutable trace：
 
+仓库现在提供 `rsimem-assemble-native-attribution`，按 immutable manifest
+逐 run 执行 native audit，并将失败 run 只记录为 content-free exclusion；它
+不会把 provider failure、grader 或最终输出复制进 attribution corpus。该入口
+完成了 trace-to-corpus 的确定性接线，但不替代下面要求的真实 accepted runs。
+
 - [ ] Semantic：SM01-SM07，重点检查事实、偏好、约束、迁移、过期和 scope。
 - [ ] Episodic：EP01-EP03，重点检查事件、上下文、outcome、provenance 和 prior-case recall。
 - [ ] Procedural：PC families，重点检查 SOP/skill formation、version、activation 和 invocation。
