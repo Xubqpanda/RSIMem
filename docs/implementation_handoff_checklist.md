@@ -167,9 +167,9 @@ trigger/source
 - [x] review store 支持 canonical reload，并可统计 review coverage、reviewer 分歧和 adjudication 覆盖；未达到双 reviewer 门槛时不生成最终标签。
 - [x] candidate/observation 绑定 manifest 的 `replicate_id`；历史 corpus 缺失该字段时显式报告为 `unknown`，不从 case ID 猜测。
 - [ ] 至少两名 reviewer 独立检查代表性 case；分歧 case 进入 adjudication。
-- [ ] 每个标签引用 event ID、artifact digest、revision、tool index 或 snapshot digest。
-- [ ] 每个 case 生成 `candidate_repair_axis`，若不能唯一映射则标记 `is_actionable=false`。
-- [ ] hidden answer、future-test answer、grader instruction 和 official score 不得出现在 updater view。
+- [x] 每个标签引用 event ID、artifact digest、revision、tool index 或 snapshot digest；无法形成稳定引用的 case 保留为 unresolved。
+- [x] 每个 case 生成 `candidate_repair_axis`，若不能唯一映射则标记 `is_actionable=false`。
+- [x] hidden answer、future-test answer、grader instruction 和 official score 不得出现在 updater view；content-free corpus/review packet 有对应污染测试。
 
 输出 schema：
 
@@ -357,7 +357,7 @@ F4 是诊断上界，不代表真实部署反馈。每种 feedback view 使用 f
 
 ## 8. 总体验收出口
 
-- [ ] 阶段 0：环境、fixture、state、usage 和 manifest 隔离可信。
+- [x] 阶段 0：环境、fixture、state、usage 和 manifest 隔离可信。
 - [ ] 阶段 1 / Analysis 2：native failure 有 evidence-backed attribution，无法归因的 case 被保留为 unresolved。
 - [ ] 阶段 2 / Analysis 1：局部 repair 能测量 native static 各 surface 的真实 headroom。
 - [ ] 阶段 3：不同粒度 feedback 能否把 attribution 映射为可执行 repair 得到实证结论。

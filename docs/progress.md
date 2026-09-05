@@ -198,6 +198,11 @@ remain closed.
 The frozen corpus can be independently reloaded and summarized with
 `rsimem-report-native-attribution`; the module and console entrypoints are
 covered by deterministic tests.
+The current checklist audit confirms that Stage 0 isolation and the Stage 1
+candidate/evidence/content-boundary contracts are implemented. The remaining
+Stage 1 gates are deliberately empirical: two independent reviewer decisions,
+an accepted SM/EP/PC/PG cross-panel slice, and any actionable unique repair
+axis. None is claimed by the current `STOP_NO_ACTIONABLE_SIGNAL` corpus.
 
 The formal PAST-Bench adapter does not currently expose a trusted
 application-owned memory-use attribution provider.  Since `b1f9cd1`, benchmark
