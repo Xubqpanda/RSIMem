@@ -135,8 +135,10 @@ trigger/source
 
 仓库现在提供 `rsimem-assemble-native-attribution`，按 immutable manifest
 逐 run 执行 native audit，并将失败 run 只记录为 content-free exclusion；它
-不会把 provider failure、grader 或最终输出复制进 attribution corpus。该入口
-完成了 trace-to-corpus 的确定性接线，但不替代下面要求的真实 accepted runs。
+不会把 provider failure、grader 或最终输出复制进 attribution corpus。可选的
+`--audit PATH` 会单独持久化所有 accepted/excluded run identity，即使整批没有
+accepted run 也不会丢失 infrastructure attempt。该入口完成了
+trace-to-corpus 的确定性接线，但不替代下面要求的真实 accepted runs。
 
 - [ ] Semantic：SM01-SM07，重点检查事实、偏好、约束、迁移、过期和 scope。
 - [ ] Episodic：EP01-EP03，重点检查事件、上下文、outcome、provenance 和 prior-case recall。
