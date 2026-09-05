@@ -57,7 +57,8 @@ is complete.
 
 ## Provider Status
 
-A bounded connectivity probe on 2026-09-05 returned HTTP 200 from the primary
-OpenAI-compatible endpoint with model `gpt-5.6-luna`, the expected response,
-and a usage object. This is connectivity evidence only and does not enter a
-benchmark denominator or reopen a superseded experiment.
+A bounded connectivity probe on 2026-09-05 was intermittent: three of five
+requests returned HTTP 200 from the primary OpenAI-compatible endpoint with
+model `gpt-5.6-luna`, expected content, and usage; two returned HTTP 503 without
+usage. This is connectivity evidence only and does not enter a benchmark
+denominator or reopen a superseded experiment.

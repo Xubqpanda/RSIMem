@@ -29,9 +29,10 @@ and complete request usage. The next execution position is a bounded
 cross-panel native-static failure-attribution slice; one-axis repair remains
 closed until actionable Stage 1 cases are frozen.
 
-The primary provider probe passed on 2026-09-05 with HTTP `200`, expected
-content, finish reason `stop`, and a usage object for `gpt-5.6-luna`. This is
-connectivity evidence only; it does not reopen any old experiment.
+The primary provider remains intermittently available. A five-request probe on
+2026-09-05 produced three HTTP `200` responses with non-empty content and usage,
+and two HTTP `503` responses without usage. This is connectivity evidence only;
+it does not reopen any old experiment or justify a long benchmark run.
 
 The post-smoke verification baseline is RSIMem `1210 passed` and vendored
 PAST-Bench `401 passed, 2 skipped`; compileall, dependency checks, shell syntax,
@@ -187,16 +188,24 @@ The completed rows establish implementation capacity and deterministic
 observability.  They do not establish matched real-model equivalence, an
 extraction-owned optimization signal, or a quality improvement.
 
+The first bounded Stage 1 native-attribution slice is recorded in
+[`stage1_native_attribution_slice_20260905.md`](stage1_native_attribution_slice_20260905.md).
+SM02 and PC01 yielded two accepted runs, ten observations, ten unresolved
+candidates, and zero actionable repair axes. EP01 and PG01 were excluded for
+incomplete model usage after provider failures. The current decision is
+`STOP_NO_ACTIONABLE_SIGNAL`; Analysis 1 repair and later feedback experiments
+remain closed.
+
 The formal PAST-Bench adapter does not currently expose a trusted
 application-owned memory-use attribution provider.  Since `b1f9cd1`, benchmark
 resolver classifications stay in the audit plane and cannot mark pure
 `USE` operations; retrieval/exposure without explicit attribution remains
 unresolved by design.
 
-The latest bounded probe against the configured primary endpoint returned HTTP
-`200` with non-empty content and a usage object.  Five consecutive follow-up
-probes on the same endpoint/model also passed.  These are provider diagnostics,
-not benchmark evidence.  The fresh SM02 and SM05
+The latest five-request probe against the configured primary endpoint returned
+three HTTP `200` responses with non-empty content and usage, and two HTTP `503`
+responses without usage. These are provider diagnostics, not benchmark
+evidence. The fresh SM02 and SM05
 clean-parent v1 batches completed with audit-clean manifests and no
 extraction-owned process signal.  A later SM02 v2 retry was registered after
 the boundary-scoped join fix (`a89f7d7`), but only one replicate was clean; the

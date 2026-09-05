@@ -122,12 +122,12 @@ trigger/source
 
 ### 1A. 统一 observation contract
 
-- [ ] 为每个 native episode 记录 lifecycle event：source、candidate、formation、admission、commit、maintenance、retrieval、exposure、application、tool 和 outcome。
-- [ ] 每条 Memory event 带 `event_id`、`owner`、`memory_kind`、`surface`、`input_ids`、`output_ids`、`revision`、`parents`、`cutoff`、`plane` 和 digest。
-- [ ] 记录 Memory state before/after 的 digest、entry identity、scope、validity、provenance、revision 和 commit status。
-- [ ] 记录 retrieval query、candidate IDs、selected ID、injection status、injection position 和 application surface。
-- [ ] 记录 tool calls/results、service audit、最终输出和 task component score；score 只进入离线 audit。
-- [ ] 缺失的事件标记为 `not_observed`，不能默认为“没有发生”。
+- [x] 为每个 native episode 记录 lifecycle event：source、candidate、formation、admission、commit、maintenance、retrieval、exposure、application、tool 和 outcome。
+- [x] 每条 Memory event 带 `event_id`、`owner`、`memory_kind`、`surface`、`input_ids`、`output_ids`、`revision`、`parents`、`cutoff`、`plane` 和 digest。
+- [x] 记录 Memory state before/after 的 digest、entry identity、scope、validity、provenance、revision 和 commit status。
+- [x] 记录 retrieval query、candidate IDs、selected ID、injection status、injection position 和 application surface；query digest 与 artifact ID 集合经过严格校验，且不保存原文。
+- [x] 记录 tool calls/results、service audit、最终输出和 task component score；score 只进入离线 audit。
+- [x] 缺失的事件标记为 `not_observed`，不能默认为“没有发生”。
 
 ### 1B. 并行 trace extraction
 
@@ -161,7 +161,7 @@ trigger/source
 
 ### 1D. 并行 case review
 
-- [ ] 自动规则先生成候选 attribution，不直接生成最终标签。
+- [x] 自动规则先生成候选 attribution，不直接生成最终标签。
 - [ ] 至少两名 reviewer 独立检查代表性 case；分歧 case 进入 adjudication。
 - [ ] 每个标签引用 event ID、artifact digest、revision、tool index 或 snapshot digest。
 - [ ] 每个 case 生成 `candidate_repair_axis`，若不能唯一映射则标记 `is_actionable=false`。
@@ -190,8 +190,8 @@ review_status
 - [ ] `cross_family_consistency` 和 `non_memory_exclusion_rate`。
 - [ ] `actionability_rate`：能否映射到唯一 repair axis。
 - [ ] 报告成功 case、明确 Memory failure、non-memory failure 和 unresolved case 的实例。
-- [ ] 至少完成一个跨 SM/EP/PC/PG 的 audit slice，再决定是否扩大到全量。
-- [ ] Analysis 2 的输出冻结成版本化 attribution corpus，作为 Analysis 1 的唯一输入。
+- [ ] 至少完成一个跨 SM/EP/PC/PG 的 audit slice，再决定是否扩大到全量。（当前 SM02/PC01 已完成；EP01/PG01 因 usage-incomplete 排除，不能宣称跨四 panel。）
+- [x] Analysis 2 的输出冻结成版本化 attribution corpus，作为 Analysis 1 的唯一输入；当前 slice 为 `10 observations / 10 unresolved / 0 actionable`，因此触发 `STOP_NO_ACTIONABLE_SIGNAL`，不进入 repair。
 
 ## 4. 阶段 2：Analysis 1，Native Improvement Headroom
 
