@@ -6,6 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Mapping
 
 from .native_observation import (
     NativeEpisodeObservation,
@@ -46,8 +47,8 @@ class NativeAttributionExpectation:
     source: str = "application_contract"
 
     def __post_init__(self) -> None:
-        if self.source != "application_contract":
-            raise ValueError("native attribution expectation must be application-owned")
+        if self.source not in {"application_contract", "benchmark_contract"}:
+            raise ValueError("native attribution expectation source is invalid")
         if not self.contract_id or not self.task_id:
             raise ValueError("native attribution expectation identity is incomplete")
         if len(self.contract_digest) != 64:
@@ -115,6 +116,52 @@ _FAILURE_FOR_EVENT = {
     NativeLifecycleEventType.COMMIT: (FailureSurface.PERSISTENCE_FAILED, "persistence"),
     NativeLifecycleEventType.RETRIEVAL: (FailureSurface.RETRIEVAL_MISSED, "retrieval"),
 }
+
+
+def expectation_from_benchmark_contract(
+    episode: Mapping[str, object],
+) -> NativeAttributionExpectation | None:
+    """Project only pre-registered lifecycle requirements from a PAST result.
+
+    Scores, grader output, final text, and task outcome are deliberately not
+    inspected. This object remains in the offline benchmark-audit plane.
+    """
+
+    task_id = episode.get("task_id")
+    family_id = episode.get("family_id")
+    if not isinstance(task_id, str) or not isinstance(family_id, str):
+        raise ValueError("benchmark attribution contract identity is incomplete")
+    required: list[NativeLifecycleEventType] = []
+    if episode.get("persistence_allowed") is True and episode.get("bucket") in {
+        "learn", "reflection",
+    }:
+        signal = episode.get("expected_persistence_signal")
+        if signal in {"memory", "session", "skill"}:
+            required.extend((
+                NativeLifecycleEventType.FORMATION,
+                NativeLifecycleEventType.COMMIT,
+            ))
+    if episode.get("evaluation_requires_retrieval") is True:
+        required.append(NativeLifecycleEventType.RETRIEVAL)
+    if not required:
+        return None
+    projection = {
+        "task_id": task_id,
+        "family_id": family_id,
+        "bucket": episode.get("bucket"),
+        "expected_persistence_signal": episode.get("expected_persistence_signal"),
+        "persistence_allowed": episode.get("persistence_allowed"),
+        "evaluation_requires_retrieval": episode.get("evaluation_requires_retrieval"),
+        "required_events": [value.value for value in required],
+    }
+    digest = _digest(projection)
+    return NativeAttributionExpectation(
+        contract_id="benchmark-expectation." + digest[:40],
+        contract_digest=digest,
+        task_id=task_id,
+        required_events=tuple(required),
+        source="benchmark_contract",
+    )
 
 
 def attribute_native_observation(
@@ -205,4 +252,5 @@ def attribute_native_observation(
 __all__ = [
     "ATTRIBUTION_SCHEMA", "FailureSurface", "NativeAttributionCandidate",
     "NativeAttributionExpectation", "attribute_native_observation",
+    "expectation_from_benchmark_contract",
 ]

@@ -2,6 +2,7 @@ from rsimem.native_attribution import (
     FailureSurface,
     NativeAttributionExpectation,
     attribute_native_observation,
+    expectation_from_benchmark_contract,
 )
 from rsimem.native_observation import NativeLifecycleEventType, ObservationStatus
 from test_native_execution_audit import _fixture
@@ -63,3 +64,20 @@ def test_multiple_missing_axes_are_not_forced_to_one_primary(tmp_path) -> None:
     )
     assert value.primary_failure_surface is FailureSurface.UNRESOLVED
     assert not value.is_actionable
+
+
+def test_benchmark_expectation_uses_only_registered_lifecycle_fields() -> None:
+    episode = {
+        "task_id": "task-a", "family_id": "family-a", "bucket": "evaluation",
+        "expected_persistence_signal": "memory", "persistence_allowed": True,
+        "evaluation_requires_retrieval": True,
+        "task_score": 0.0, "grader": {"answer": "must-not-enter"},
+        "final_response_text": "must-not-enter",
+    }
+    first = expectation_from_benchmark_contract(episode)
+    episode.update(task_score=1.0, grader={"answer": "changed"}, final_response_text="changed")
+    second = expectation_from_benchmark_contract(episode)
+    assert first == second
+    assert first is not None
+    assert first.source == "benchmark_contract"
+    assert first.required_events == (NativeLifecycleEventType.RETRIEVAL,)
