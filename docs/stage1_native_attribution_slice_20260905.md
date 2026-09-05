@@ -34,6 +34,9 @@ disk; report ID: `native-attribution-report.849141cb52594f52f952d18cf292b0362677
 The report also exposes a content-free case index and evidence-reference map
 for all ten unresolved candidates, so reviewer work can be performed against
 stable IDs without copying task text.
+When reviewer records exist, pass `--review-store` to the report CLI; the
+result includes review coverage and the bound Stage 2 gate. The current slice
+has no reviewer records and therefore remains closed.
 
 The deterministic contracts, event identity, state digests, retrieval metadata,
 tool closure references, and content-free corpus are valid for this slice. The
