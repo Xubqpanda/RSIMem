@@ -106,6 +106,8 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert gate["decision"] == "STOP_NO_ACTIONABLE_SIGNAL"
     assert "unresolved_only" in gate["reasons"]
     assert "no_two_reviewer_case" in gate["reasons"]
+    assert "incomplete_evidence" in gate["reasons"]
+    assert gate["evidence_completeness"] < 1.0
 
 
 def test_attribution_report_cli_reads_frozen_corpus(tmp_path, capsys) -> None:

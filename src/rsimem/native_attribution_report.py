@@ -123,12 +123,21 @@ def assess_stage2_gate(
     """Return a conservative, deterministic decision for opening repairs."""
 
     reasons: list[str] = []
+    total_events = sum(len(observation.events) for observation in corpus.observations)
+    observed_events = sum(
+        event.status.value == "observed"
+        for observation in corpus.observations
+        for event in observation.events
+    )
+    evidence_completeness = observed_events / total_events if total_events else 0.0
     if not corpus.observations:
         reasons.append("no_observations")
     if corpus.unresolved_count == len(corpus.candidates):
         reasons.append("unresolved_only")
     if corpus.actionable_count == 0:
         reasons.append("no_actionable_candidate")
+    if evidence_completeness < 1.0:
+        reasons.append("incomplete_evidence")
     if reviewer_two_reviewer_count <= 0:
         reasons.append("no_two_reviewer_case")
     decision = "OPEN_STAGE2" if not reasons else "STOP_NO_ACTIONABLE_SIGNAL"
@@ -139,6 +148,7 @@ def assess_stage2_gate(
         "reasons": reasons,
         "actionable_count": corpus.actionable_count,
         "two_reviewer_candidate_count": reviewer_two_reviewer_count,
+        "evidence_completeness": evidence_completeness,
     }
 
 
