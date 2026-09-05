@@ -86,6 +86,14 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert report["surface_counts"] == {"unresolved": 5}
     assert report["memory_kind_counts"] == {"semantic": 5}
     assert report["panel_counts"] == {"semantic": 5}
+    assert len(report["case_ids_by_surface"]["unresolved"]) == 5
+    assert all(
+        isinstance(case_id, str) and case_id
+        for case_id in report["case_ids_by_surface"]["unresolved"]
+    )
+    assert set(report["evidence_refs_by_case"]) == {
+        candidate.case_id for candidate in corpus.candidates
+    }
     assert report["cross_family_consistency"] is True
     assert report["excluded_reasons"] == {"usage_incomplete": 1}
     assert "final_response_text" not in json.dumps(report)

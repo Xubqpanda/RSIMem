@@ -88,6 +88,18 @@ def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
             ])
             for family in sorted({item.family_id for item in candidates})
         },
+        "case_ids_by_surface": {
+            surface: sorted(
+                item.case_id
+                for item in candidates
+                if item.primary_failure_surface.value == surface
+            )
+            for surface in sorted({item.primary_failure_surface.value for item in candidates})
+        },
+        "evidence_refs_by_case": {
+            item.case_id: list(item.evidence_refs)
+            for item in sorted(candidates, key=lambda value: value.case_id)
+        },
         "excluded_reasons": _counts([
             str(item.get("reason"))
             for item in corpus.excluded_runs
