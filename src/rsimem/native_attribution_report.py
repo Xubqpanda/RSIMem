@@ -25,6 +25,18 @@ def _counts(values: list[str]) -> dict[str, int]:
     return dict(sorted(Counter(values).items()))
 
 
+def _panel(family_id: str) -> str:
+    if family_id.startswith("SM"):
+        return "semantic"
+    if family_id.startswith("EP"):
+        return "episodic"
+    if family_id.startswith("PC"):
+        return "procedural"
+    if family_id.startswith("PG"):
+        return "auxiliary"
+    return "unknown"
+
+
 def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
     """Summarize attribution coverage without inspecting evaluation content."""
 
@@ -52,18 +64,37 @@ def build_attribution_report(corpus: NativeAttributionCorpus) -> dict[str, Any]:
         "actionable_count": actionable,
         "unresolved_rate": unresolved / candidate_count if candidate_count else 0.0,
         "actionability_rate": actionable / candidate_count if candidate_count else 0.0,
+        "non_memory_exclusion_rate": (
+            sum(item.primary_failure_surface.value == "non_memory_failure" for item in candidates)
+            / candidate_count
+            if candidate_count else 0.0
+        ),
         "evidence_completeness": observed_events / total_events if total_events else 0.0,
         "surface_counts": _counts([item.primary_failure_surface.value for item in candidates]),
         "memory_kind_counts": _counts([
             item.memory_kind or "none" for item in candidates
         ]),
         "family_counts": _counts([item.family_id for item in candidates]),
+        "panel_counts": _counts([_panel(item.family_id) for item in candidates]),
+        "family_surface_counts": {
+            family: _counts([
+                item.primary_failure_surface.value
+                for item in candidates
+                if item.family_id == family
+            ])
+            for family in sorted({item.family_id for item in candidates})
+        },
         "excluded_reasons": _counts([
             str(item.get("reason"))
             for item in corpus.excluded_runs
             if item.get("reason") is not None
         ]),
     }
+    grouped_surfaces = {
+        tuple(sorted(report.values()))
+        for report in values["family_surface_counts"].values()
+    }
+    values["cross_family_consistency"] = len(grouped_surfaces) <= 1
     values["report_id"] = "native-attribution-report." + _digest(values)[:40]
     return values
 

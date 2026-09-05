@@ -73,9 +73,12 @@ def test_attribution_report_is_content_free_and_reconstructible(tmp_path) -> Non
     assert report["actionable_count"] == 0
     assert report["unresolved_rate"] == 1.0
     assert report["actionability_rate"] == 0.0
+    assert report["non_memory_exclusion_rate"] == 0.0
     assert report["attribution_coverage"] == 1.0
     assert report["surface_counts"] == {"unresolved": 5}
     assert report["memory_kind_counts"] == {"semantic": 5}
+    assert report["panel_counts"] == {"semantic": 5}
+    assert report["cross_family_consistency"] is True
     assert report["excluded_reasons"] == {"usage_incomplete": 1}
     assert "final_response_text" not in json.dumps(report)
     assert report["report_id"].startswith("native-attribution-report.")
