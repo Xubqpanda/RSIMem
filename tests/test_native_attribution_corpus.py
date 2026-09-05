@@ -173,6 +173,21 @@ def test_review_packet_is_content_free_and_review_store_is_append_once(tmp_path)
         )
 
 
+def test_review_packet_module_entrypoint(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    store = NativeAttributionCorpusStore(tmp_path / "corpus.json")
+    store.put(corpus)
+    result = subprocess.run(
+        [sys.executable, "-m", "rsimem.native_attribution_review", str(store.path)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    payload = json.loads(result.stdout)
+    assert payload["corpus_id"] == corpus.corpus_id
+    assert len(payload["candidates"]) == len(corpus.candidates)
+    assert "final_response_text" not in result.stdout
+
 def test_review_record_rejects_tampered_id(tmp_path) -> None:
     corpus = _corpus(tmp_path)
     candidate = corpus.candidates[0]

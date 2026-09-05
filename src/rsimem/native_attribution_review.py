@@ -6,6 +6,7 @@ import fcntl
 import hashlib
 import json
 import os
+import argparse
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -159,6 +160,22 @@ def build_review_packet(corpus: NativeAttributionCorpus) -> tuple[dict[str, obje
     } for candidate in corpus.candidates)
 
 
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("corpus", help="path to a frozen native attribution corpus")
+    args = parser.parse_args(argv)
+    from .native_attribution_corpus import NativeAttributionCorpusStore
+
+    corpus = NativeAttributionCorpusStore(Path(args.corpus)).load()
+    payload = {
+        "schema": "rsimem-native-attribution-review-packet-v1",
+        "corpus_id": corpus.corpus_id,
+        "candidates": list(build_review_packet(corpus)),
+    }
+    print(json.dumps(payload, ensure_ascii=True, sort_keys=True))
+    return 0
+
+
 def validate_review_record(
     record: NativeAttributionReviewRecord,
     corpus: NativeAttributionCorpus,
@@ -275,4 +292,9 @@ __all__ = [
     "REVIEW_SCHEMA", "ReviewDecision", "NativeAttributionReviewRecord",
     "NativeAttributionReviewStore", "build_review_packet", "validate_review_record",
     "build_review_summary",
+    "main",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
