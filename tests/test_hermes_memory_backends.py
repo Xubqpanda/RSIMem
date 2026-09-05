@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from pathlib import Path
@@ -330,6 +331,17 @@ def test_registry_runtime_routes_all_kinds_without_content_in_events(tmp_path: P
         MemoryEventKind.MUTATION_REQUESTED,
         MemoryEventKind.MUTATION_REJECTED,
     ]
+    query_event, retrieved_event, injected_event = observer.events[:3]
+    assert query_event.attributes["query_digest"] == hashlib.sha256(
+        b"PRIVATE_MEMORY"
+    ).hexdigest()
+    assert retrieved_event.attributes["candidate_artifact_ids"] == list(
+        retrieved_event.artifact_ids
+    )
+    assert retrieved_event.attributes["selected_artifact_ids"] == list(
+        retrieved_event.artifact_ids
+    )
+    assert injected_event.attributes["injection_position"] == "system_prompt"
     serialized = json.dumps([{
         "kind": event.kind,
         "memory_kind": event.memory_kind,

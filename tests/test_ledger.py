@@ -716,6 +716,49 @@ def test_auto_loaded_runtime_evidence_rejects_content_fields(tmp_path: Path) -> 
         build_events(comparison)
 
 
+def test_retrieval_metadata_is_content_free_and_replayable(tmp_path: Path) -> None:
+    comparison = _fixture(tmp_path)
+    event = _write_runtime_evidence(comparison)
+    event["data"]["attributes"] = {
+        "limit": 5,
+        "namespace": "default",
+        "query_digest": hashlib.sha256(b"chat-send").hexdigest(),
+        "candidate_artifact_ids": ["native-episodic:message:1"],
+        "selected_artifact_ids": ["native-episodic:message:1"],
+        "injection_position": "session_search",
+    }
+    _runtime_evidence_path(comparison).write_text(
+        json.dumps(event) + "\n", encoding="utf-8"
+    )
+    loaded = load_episode_lifecycle_events(comparison)
+    assert loaded[0]["data"]["attributes"]["query_digest"] == hashlib.sha256(
+        b"chat-send"
+    ).hexdigest()
+    assert "chat-send" not in json.dumps(loaded)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("query_digest", "not-a-digest"),
+        ("candidate_artifact_ids", ["artifact", "artifact"]),
+        ("selected_artifact_ids", ["raw content"]),
+        ("injection_position", "bad position"),
+    ),
+)
+def test_retrieval_metadata_rejects_malformed_values(
+    tmp_path: Path, field: str, value: object
+) -> None:
+    comparison = _fixture(tmp_path)
+    event = _write_runtime_evidence(comparison)
+    event["data"]["attributes"][field] = value
+    _runtime_evidence_path(comparison).write_text(
+        json.dumps(event) + "\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="retrieval|injection"):
+        build_events(comparison)
+
+
 def test_infra_blocked_episode_with_empty_trace_keeps_unknown_usage(
     tmp_path: Path,
 ) -> None:

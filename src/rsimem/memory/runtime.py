@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterable, Sequence
 
 from .contracts import (
@@ -86,7 +87,11 @@ class MemoryRuntime:
             memory_kind=query.kind,
             backend=backend.descriptor.name,
             query_chars=len(query.text),
-            attributes={"limit": query.limit, "namespace": query.namespace},
+            attributes={
+                "limit": query.limit,
+                "namespace": query.namespace,
+                "query_digest": hashlib.sha256(query.text.encode("utf-8")).hexdigest(),
+            },
         ))
         hits = tuple(backend.query(query))[:query.limit]
         for hit in hits:
@@ -105,7 +110,11 @@ class MemoryRuntime:
             backend=backend.descriptor.name,
             artifact_ids=tuple(hit.artifact.artifact_id for hit in hits),
             content_chars=sum(len(hit.artifact.content) for hit in hits),
-            attributes={"count": len(hits)},
+            attributes={
+                "count": len(hits),
+                "candidate_artifact_ids": [hit.artifact.artifact_id for hit in hits],
+                "selected_artifact_ids": [hit.artifact.artifact_id for hit in hits],
+            },
         ))
         return hits
 
@@ -179,7 +188,11 @@ class MemoryRuntime:
                 backend=backend,
                 artifact_ids=tuple(hit.artifact.artifact_id for hit in group),
                 content_chars=sum(len(hit.artifact.content) for hit in group),
-                attributes={"count": len(group), "surface": surface},
+                attributes={
+                    "count": len(group),
+                    "surface": surface,
+                    "injection_position": "system_prompt",
+                },
             ))
 
     def close(self) -> None:

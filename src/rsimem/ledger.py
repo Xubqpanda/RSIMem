@@ -60,6 +60,10 @@ _MEMORY_RUNTIME_ATTRIBUTE_FIELDS = {
     "mutation_id",
     "receipt_id",
     "writer_identity",
+    "query_digest",
+    "candidate_artifact_ids",
+    "selected_artifact_ids",
+    "injection_position",
 }
 _MEMORY_RUNTIME_ID_ATTRIBUTES = {
     "execution_id",
@@ -223,6 +227,29 @@ def _validate_memory_runtime_event(value: dict[str, Any], source_path: Path) -> 
         raise ValueError(f"invalid RSIMem runtime event attributes in {source_path}")
     if "equivalent" in attributes and not isinstance(attributes["equivalent"], bool):
         raise ValueError(f"invalid RSIMem projection result in {source_path}")
+    query_digest = attributes.get("query_digest")
+    if query_digest is not None and (
+        not isinstance(query_digest, str) or _SHA256.fullmatch(query_digest) is None
+    ):
+        raise ValueError(f"invalid RSIMem retrieval query digest in {source_path}")
+    for field in ("candidate_artifact_ids", "selected_artifact_ids"):
+        artifact_ids = attributes.get(field)
+        if artifact_ids is not None and (
+            not isinstance(artifact_ids, list)
+            or any(
+                not isinstance(artifact_id, str)
+                or _IDENTIFIER.fullmatch(artifact_id) is None
+                for artifact_id in artifact_ids
+            )
+            or len(artifact_ids) != len(set(artifact_ids))
+        ):
+            raise ValueError(f"invalid RSIMEM retrieval {field} in {source_path}")
+    injection_position = attributes.get("injection_position")
+    if injection_position is not None and (
+        not isinstance(injection_position, str)
+        or _IDENTIFIER.fullmatch(injection_position) is None
+    ):
+        raise ValueError(f"invalid RSIMEM injection position in {source_path}")
     if any(
         key in attributes
         and attributes[key] is not None

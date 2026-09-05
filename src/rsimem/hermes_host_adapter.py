@@ -627,7 +627,11 @@ class HermesHostOperations:
             MemoryKind.EPISODIC,
             "hermes-native-episodic",
             query_chars=len(query),
-            attributes={"limit": limit, "namespace": "default"},
+            attributes={
+                "limit": limit,
+                "namespace": "default",
+                "query_digest": hashlib.sha256(query.encode("utf-8")).hexdigest(),
+            },
         ))
         bridge.ledger.record(MemoryEvent(
             MemoryEventKind.RETRIEVED,
@@ -637,7 +641,15 @@ class HermesHostOperations:
                 f"native-episodic:message:{item.get('id')}" for item in results
             ),
             content_chars=sum(len(str(item.get("content") or "")) for item in results),
-            attributes={"count": len(results)},
+            attributes={
+                "count": len(results),
+                "candidate_artifact_ids": [
+                    f"native-episodic:message:{item.get('id')}" for item in results
+                ],
+                "selected_artifact_ids": [
+                    f"native-episodic:message:{item.get('id')}" for item in results
+                ],
+            },
         ))
         query_digest = hashlib.sha256(query.encode("utf-8")).hexdigest()
         bridge._record_process_observation(

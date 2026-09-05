@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sqlite3
 import threading
@@ -382,7 +383,11 @@ def _record_native_surface(
             MemoryKind.SEMANTIC,
             "hermes-native-semantic",
             query_chars=0,
-            attributes={"limit": 100, "namespace": namespace},
+            attributes={
+                "limit": 100,
+                "namespace": namespace,
+                "query_digest": hashlib.sha256(b"").hexdigest(),
+            },
         ))
         observer.record(MemoryEvent(
             MemoryEventKind.RETRIEVED,
@@ -390,7 +395,11 @@ def _record_native_surface(
             "hermes-native-semantic",
             artifact_ids=artifact_ids,
             content_chars=content_chars,
-            attributes={"count": count},
+            attributes={
+                "count": count,
+                "candidate_artifact_ids": list(artifact_ids),
+                "selected_artifact_ids": list(artifact_ids),
+            },
         ))
         if artifact_ids:
             observer.record(MemoryEvent(
@@ -399,7 +408,11 @@ def _record_native_surface(
                 "hermes-native-semantic",
                 artifact_ids=artifact_ids,
                 content_chars=content_chars,
-                attributes={"count": count, "surface": "system_prompt"},
+                attributes={
+                    "count": count,
+                    "surface": "system_prompt",
+                    "injection_position": "system_prompt",
+                },
             ))
 
     episodic_ids = tuple(
@@ -411,7 +424,11 @@ def _record_native_surface(
         MemoryKind.EPISODIC,
         "hermes-native-episodic",
         query_chars=len(probe.episodic_query),
-        attributes={"limit": probe.episodic_limit, "namespace": "default"},
+        attributes={
+            "limit": probe.episodic_limit,
+            "namespace": "default",
+            "query_digest": hashlib.sha256(probe.episodic_query.encode("utf-8")).hexdigest(),
+        },
     ))
     observer.record(MemoryEvent(
         MemoryEventKind.RETRIEVED,
@@ -419,7 +436,11 @@ def _record_native_surface(
         "hermes-native-episodic",
         artifact_ids=episodic_ids,
         content_chars=episodic_chars,
-        attributes={"count": len(episodic_ids)},
+        attributes={
+            "count": len(episodic_ids),
+            "candidate_artifact_ids": list(episodic_ids),
+            "selected_artifact_ids": list(episodic_ids),
+        },
     ))
     if episodic_ids:
         observer.record(MemoryEvent(
@@ -428,7 +449,11 @@ def _record_native_surface(
             "hermes-native-episodic",
             artifact_ids=episodic_ids,
             content_chars=episodic_chars,
-            attributes={"count": len(episodic_ids), "surface": "session_search"},
+            attributes={
+                "count": len(episodic_ids),
+                "surface": "session_search",
+                "injection_position": "session_search",
+            },
         ))
 
     procedural_ids = tuple(
@@ -440,7 +465,11 @@ def _record_native_surface(
         MemoryKind.PROCEDURAL,
         "hermes-native-procedural",
         query_chars=0,
-        attributes={"limit": 100, "namespace": "default"},
+        attributes={
+            "limit": 100,
+            "namespace": "default",
+            "query_digest": hashlib.sha256(b"").hexdigest(),
+        },
     ))
     observer.record(MemoryEvent(
         MemoryEventKind.RETRIEVED,
@@ -566,7 +595,11 @@ def _record_native_prompt_memory(
             MemoryKind.SEMANTIC,
             "hermes-native-semantic",
             query_chars=0,
-            attributes={"limit": 100, "namespace": namespace},
+            attributes={
+                "limit": 100,
+                "namespace": namespace,
+                "query_digest": hashlib.sha256(b"").hexdigest(),
+            },
         ))
         observer.record(MemoryEvent(
             MemoryEventKind.RETRIEVED,
@@ -574,7 +607,11 @@ def _record_native_prompt_memory(
             "hermes-native-semantic",
             artifact_ids=artifact_ids,
             content_chars=content_chars,
-            attributes={"count": len(entries)},
+            attributes={
+                "count": len(entries),
+                "candidate_artifact_ids": list(artifact_ids),
+                "selected_artifact_ids": list(artifact_ids),
+            },
         ))
     for namespace, entries in snapshots:
         if entries:
@@ -587,7 +624,11 @@ def _record_native_prompt_memory(
                 "hermes-native-semantic",
                 artifact_ids=artifact_ids,
                 content_chars=sum(len(entry) for entry in entries),
-                attributes={"count": len(entries), "surface": "system_prompt"},
+                attributes={
+                    "count": len(entries),
+                    "surface": "system_prompt",
+                    "injection_position": "system_prompt",
+                },
             ))
 
 
@@ -707,7 +748,11 @@ class _ObservedNativeSessionDb:
             MemoryKind.EPISODIC,
             "hermes-native-episodic",
             query_chars=len(query),
-            attributes={"limit": kwargs.get("limit", 50), "namespace": "default"},
+            attributes={
+                "limit": kwargs.get("limit", 50),
+                "namespace": "default",
+                "query_digest": hashlib.sha256(query.encode("utf-8")).hexdigest(),
+            },
         ))
         results = self.db.search_messages(query=query, **kwargs)
         for result in results:
@@ -722,7 +767,11 @@ class _ObservedNativeSessionDb:
             "hermes-native-episodic",
             artifact_ids=artifact_ids,
             content_chars=sum(len(str(result.get("content") or "")) for result in results),
-            attributes={"count": len(results)},
+            attributes={
+                "count": len(results),
+                "candidate_artifact_ids": list(artifact_ids),
+                "selected_artifact_ids": list(artifact_ids),
+            },
         ))
         return results
 
@@ -743,7 +792,11 @@ class _ObservedNativeSessionDb:
                 content_chars=sum(
                     len(str(message.get("content") or "")) for message in messages
                 ),
-                attributes={"count": len(hits), "surface": "session_search"},
+                attributes={
+                    "count": len(hits),
+                    "surface": "session_search",
+                    "injection_position": "session_search",
+                },
             ))
             self._injected_sessions.add(session_id)
         return messages
@@ -944,7 +997,11 @@ def _record_native_skills(
         MemoryKind.PROCEDURAL,
         "hermes-native-procedural",
         query_chars=0,
-        attributes={"limit": 100, "namespace": "default"},
+        attributes={
+            "limit": 100,
+            "namespace": "default",
+            "query_digest": hashlib.sha256(b"").hexdigest(),
+        },
     ))
     observer.record(MemoryEvent(
         MemoryEventKind.RETRIEVED,
@@ -952,7 +1009,11 @@ def _record_native_skills(
         "hermes-native-procedural",
         artifact_ids=all_ids,
         content_chars=sum(len(skill.content) for skill in skills),
-        attributes={"count": len(skills)},
+        attributes={
+            "count": len(skills),
+            "candidate_artifact_ids": list(all_ids),
+            "selected_artifact_ids": list(all_ids),
+        },
     ))
     if skills:
         observer.record(MemoryEvent(
@@ -961,7 +1022,11 @@ def _record_native_skills(
             "hermes-native-procedural",
             artifact_ids=all_ids,
             content_chars=sum(len(skill.content) for skill in skills),
-            attributes={"count": len(skills), "surface": "skills_list"},
+            attributes={
+                "count": len(skills),
+                "surface": "skills_list",
+                "injection_position": "skills_list",
+            },
         ))
 
     selected = tuple(
@@ -974,7 +1039,11 @@ def _record_native_skills(
         MemoryKind.PROCEDURAL,
         "hermes-native-procedural",
         query_chars=len(probe.procedural_skill_name or ""),
-        attributes={"limit": 5, "namespace": "default"},
+        attributes={
+            "limit": 5,
+            "namespace": "default",
+            "query_digest": hashlib.sha256((probe.procedural_skill_name or "").encode("utf-8")).hexdigest(),
+        },
     ))
     observer.record(MemoryEvent(
         MemoryEventKind.RETRIEVED,
@@ -982,7 +1051,11 @@ def _record_native_skills(
         "hermes-native-procedural",
         artifact_ids=tuple(f"native-procedural:{index}" for index, _ in selected),
         content_chars=sum(len(skill.content) for _, skill in selected),
-        attributes={"count": len(selected)},
+        attributes={
+            "count": len(selected),
+            "candidate_artifact_ids": list(all_ids),
+            "selected_artifact_ids": [f"native-procedural:{index}" for index, _ in selected],
+        },
     ))
     if selected:
         observer.record(MemoryEvent(
@@ -993,7 +1066,11 @@ def _record_native_skills(
                 f"native-procedural:{index}" for index, _ in selected
             ),
             content_chars=sum(len(skill.content) for _, skill in selected),
-            attributes={"count": len(selected), "surface": "skill_view"},
+            attributes={
+                "count": len(selected),
+                "surface": "skill_view",
+                "injection_position": "skill_view",
+            },
         ))
 
 
