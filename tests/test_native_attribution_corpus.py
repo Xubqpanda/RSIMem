@@ -148,6 +148,12 @@ def test_stage2_gate_positive_contract_requires_two_reviewer_case(tmp_path) -> N
     assert gate["high_confidence_actionable_count"] == 1
 
 
+@pytest.mark.parametrize("count", (True, -1, 1.5, "1"))
+def test_stage2_gate_rejects_malformed_reviewer_count(tmp_path, count) -> None:
+    with pytest.raises(ValueError, match="two-reviewer candidate count"):
+        assess_stage2_gate(_corpus(tmp_path), reviewer_two_reviewer_count=count)
+
+
 def test_attribution_report_cli_reads_frozen_corpus(tmp_path, capsys) -> None:
     corpus = _corpus(tmp_path)
     store = NativeAttributionCorpusStore(tmp_path / "corpus.json")

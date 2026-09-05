@@ -127,6 +127,8 @@ def assess_stage2_gate(
 ) -> dict[str, object]:
     """Return a conservative, deterministic decision for opening repairs."""
 
+    if type(reviewer_two_reviewer_count) is not int or reviewer_two_reviewer_count < 0:
+        raise ValueError("two-reviewer candidate count must be a nonnegative integer")
     reasons: list[str] = []
     allowed_axes = {"formation", "persistence", "maintenance", "retrieval", "application"}
     high_confidence_actionable = tuple(
