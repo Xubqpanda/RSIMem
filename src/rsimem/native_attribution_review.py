@@ -180,6 +180,46 @@ def validate_review_record(
         raise ValueError("native attribution review cites unknown evidence")
 
 
+def build_review_summary(
+    corpus: NativeAttributionCorpus,
+    records: Sequence[NativeAttributionReviewRecord],
+) -> dict[str, object]:
+    """Summarize independent review coverage without changing candidates."""
+
+    bound = tuple(records)
+    for record in bound:
+        validate_review_record(record, corpus)
+    by_candidate: dict[str, list[NativeAttributionReviewRecord]] = {}
+    for record in bound:
+        by_candidate.setdefault(record.candidate_id, []).append(record)
+    decisions = {
+        decision.value: sum(item.decision is decision for item in bound)
+        for decision in ReviewDecision
+    }
+    reviewed = set(by_candidate)
+    disagreements = sum(
+        len({item.decision for item in values}) > 1
+        for values in by_candidate.values()
+    )
+    two_reviewer = sum(
+        len({item.reviewer_id for item in values}) >= 2
+        for values in by_candidate.values()
+    )
+    return {
+        "schema": "rsimem-native-attribution-review-summary-v1",
+        "corpus_id": corpus.corpus_id,
+        "candidate_count": len(corpus.candidates),
+        "review_record_count": len(bound),
+        "reviewed_candidate_count": len(reviewed),
+        "review_coverage": len(reviewed) / len(corpus.candidates) if corpus.candidates else 0.0,
+        "reviewer_count": len({item.reviewer_id for item in bound}),
+        "decision_counts": decisions,
+        "disagreement_count": disagreements,
+        "two_reviewer_candidate_count": two_reviewer,
+        "adjudicated_count": sum(item.adjudication_id is not None for item in bound),
+    }
+
+
 class NativeAttributionReviewStore:
     """Append-once JSONL store for independent reviewer records."""
 
@@ -208,8 +248,31 @@ class NativeAttributionReviewStore:
                 os.fsync(handle.fileno())
             return True
 
+    def load_all(
+        self, *, corpus: NativeAttributionCorpus | None = None
+    ) -> tuple[NativeAttributionReviewRecord, ...]:
+        if not self.path.is_file() or self.path.is_symlink():
+            return ()
+        records = []
+        seen: set[str] = set()
+        for line in self.path.read_text(encoding="utf-8").splitlines():
+            try:
+                record = NativeAttributionReviewRecord.from_payload(json.loads(line))
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise ValueError("native attribution review store is malformed") from exc
+            if record.record_id in seen:
+                raise ValueError("native attribution review store contains duplicate ID")
+            if corpus is not None:
+                validate_review_record(record, corpus)
+            if _canonical(record.payload()) != line:
+                raise ValueError("native attribution review store is not canonical")
+            seen.add(record.record_id)
+            records.append(record)
+        return tuple(records)
+
 
 __all__ = [
     "REVIEW_SCHEMA", "ReviewDecision", "NativeAttributionReviewRecord",
     "NativeAttributionReviewStore", "build_review_packet", "validate_review_record",
+    "build_review_summary",
 ]

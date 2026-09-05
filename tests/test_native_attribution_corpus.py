@@ -14,6 +14,7 @@ from rsimem.native_attribution_review import (
     NativeAttributionReviewStore,
     ReviewDecision,
     build_review_packet,
+    build_review_summary,
     validate_review_record,
 )
 from rsimem.native_observation import extract_native_observations
@@ -133,6 +134,9 @@ def test_review_packet_is_content_free_and_review_store_is_append_once(tmp_path)
     assert store.append(record) is False
     assert NativeAttributionReviewRecord.from_payload(record.payload()) == record
     validate_review_record(record, corpus)
+    assert build_review_summary(corpus, (record,))["review_coverage"] == 0.2
+    assert build_review_summary(corpus, (record,))["reviewer_count"] == 1
+    assert store.load_all(corpus=corpus) == (record,)
 
     with pytest.raises(ValueError, match="unknown evidence"):
         validate_review_record(
