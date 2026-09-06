@@ -217,6 +217,9 @@ The PC01 procedural retry on the same date encountered repeated provider
 `503` responses and failed complete-usage audit; no procedural observation was
 accepted. It is recorded as infrastructure evidence in
 [`stage1_pc01_provider_attempt_20260906.md`](stage1_pc01_provider_attempt_20260906.md).
+A second PC01 retry had the same repeated `503`/usage-incomplete outcome and was
+also excluded; see [`stage1_pc01_provider_attempt2_20260906.md`](stage1_pc01_provider_attempt2_20260906.md).
+Further PC01 retries are paused until provider capacity is demonstrably stable.
 The frozen corpus can be independently reloaded and summarized with
 `rsimem-report-native-attribution`; the module and console entrypoints are
 covered by deterministic tests.
