@@ -15,6 +15,7 @@ from rsimem.native_repair_selection import (
     NativeRepairCaseListStore,
     select_native_repair_cases,
     build_case_list_payload,
+    freeze_native_repair_case_list,
 )
 from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
 from rsimem.native_attribution_report import (
@@ -219,6 +220,16 @@ def test_repair_case_selection_is_fail_closed_and_corpus_bound(tmp_path) -> None
     malformed["cases"] = [dict(malformed["cases"][0]), dict(malformed["cases"][0])]
     with pytest.raises(ValueError, match="duplicate"):
         NativeRepairCaseList.from_payload(malformed)
+
+
+def test_freeze_native_repair_cases_requires_reviewer_store(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    with pytest.raises(ValueError, match="no eligible"):
+        freeze_native_repair_case_list(
+            corpus=corpus,
+            review_store_path=tmp_path / "missing-review.jsonl",
+            output_path=tmp_path / "cases.json",
+        )
 
 
 def test_stage2_gate_positive_contract_requires_two_reviewer_case(tmp_path) -> None:

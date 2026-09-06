@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import fcntl
+import argparse
 import json
 import os
 from dataclasses import dataclass
@@ -157,6 +158,26 @@ class NativeRepairCaseListStore:
         return result
 
 
+def freeze_native_repair_case_list(
+    *, corpus: NativeAttributionCorpus, review_store_path: Path, output_path: Path
+) -> NativeRepairCaseList:
+    from .native_attribution_review import NativeAttributionReviewStore
+
+    records = NativeAttributionReviewStore(review_store_path).load_all(corpus=corpus)
+    by_candidate: dict[str, set[str]] = {}
+    for record in records:
+        by_candidate.setdefault(record.candidate_id, set()).add(record.reviewer_id)
+    covered = tuple(
+        candidate_id for candidate_id, reviewers in by_candidate.items()
+        if len(reviewers) >= 2
+    )
+    cases = select_native_repair_cases(corpus, two_reviewer_candidate_ids=covered)
+    payload = build_case_list_payload(corpus, cases)
+    case_list = NativeRepairCaseList.from_payload(payload)
+    NativeRepairCaseListStore(output_path).put(case_list)
+    return case_list
+
+
 def select_native_repair_cases(
     corpus: NativeAttributionCorpus,
     *,
@@ -203,3 +224,25 @@ def build_case_list_payload(
 
 
 __all__ = ["NativeRepairCase", "NativeRepairCaseList", "NativeRepairCaseListStore", "SCHEMA", "build_case_list_payload", "select_native_repair_cases"]
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("corpus", type=Path)
+    parser.add_argument("review_store", type=Path)
+    parser.add_argument("output", type=Path)
+    args = parser.parse_args(argv)
+    from .native_attribution_corpus import NativeAttributionCorpusStore
+    corpus = NativeAttributionCorpusStore(args.corpus).load()
+    case_list = freeze_native_repair_case_list(
+        corpus=corpus, review_store_path=args.review_store, output_path=args.output
+    )
+    print(json.dumps({"case_list_id": case_list.case_list_id, "case_count": len(case_list.cases)}, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+
+
+__all__ += ["freeze_native_repair_case_list", "main"]
