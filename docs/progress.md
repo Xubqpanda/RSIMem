@@ -208,6 +208,11 @@ observations, all unresolved and none actionable; the dated audit is recorded
 in [`stage1_ep01_accepted_retry_20260906.md`](stage1_ep01_accepted_retry_20260906.md).
 This incremental slice does not replace the frozen cross-panel corpus and does
 not reopen Stage 2.
+On the same date, a fresh SM02 retry also passed native audit with complete
+usage, adding five semantic observations. All five remain unresolved and none
+is actionable; see [`stage1_sm02_accepted_retry_20260906.md`](stage1_sm02_accepted_retry_20260906.md).
+The runtime's Honcho initialization diagnostic is retained as runtime evidence,
+not relabeled as a Memory failure.
 The frozen corpus can be independently reloaded and summarized with
 `rsimem-report-native-attribution`; the module and console entrypoints are
 covered by deterministic tests.
