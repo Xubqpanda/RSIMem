@@ -220,6 +220,11 @@ accepted. It is recorded as infrastructure evidence in
 A second PC01 retry had the same repeated `503`/usage-incomplete outcome and was
 also excluded; see [`stage1_pc01_provider_attempt2_20260906.md`](stage1_pc01_provider_attempt2_20260906.md).
 Further PC01 retries are paused until provider capacity is demonstrably stable.
+Merging the accepted EP01 retry with the older accepted SM02/PC01 slice now
+produces a three-panel corpus (`15 observations`, all unresolved, zero
+actionable). The merged identity and mixed replicate provenance are recorded in
+[`stage1_three_panel_merged_20260906.md`](stage1_three_panel_merged_20260906.md);
+this still does not satisfy the four-panel gate or open Stage 2.
 The frozen corpus can be independently reloaded and summarized with
 `rsimem-report-native-attribution`; the module and console entrypoints are
 covered by deterministic tests.

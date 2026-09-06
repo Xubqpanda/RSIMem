@@ -17,7 +17,9 @@ from rsimem.native_repair_selection import (
     build_case_list_payload,
     freeze_native_repair_case_list,
 )
-from rsimem.native_attribution_corpus import NativeAttributionCorpus, NativeAttributionCorpusStore
+from rsimem.native_attribution_corpus import (
+    NativeAttributionCorpus, NativeAttributionCorpusStore, merge_native_attribution_corpora,
+)
 from rsimem.native_attribution_report import (
     assess_stage2_gate,
     build_attribution_report,
@@ -84,6 +86,14 @@ def test_corpus_rejects_observation_candidate_mismatch(tmp_path) -> None:
             candidates=corpus.candidates[:-1],
             excluded_runs=corpus.excluded_runs,
         )
+
+
+def test_corpus_merge_is_deterministic_and_rejects_overlap(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    merged = merge_native_attribution_corpora((corpus,))
+    assert merged.payload() == corpus.payload()
+    with pytest.raises(ValueError, match="duplicate accepted runs"):
+        merge_native_attribution_corpora((corpus, corpus))
 
 
 def test_corpus_rejects_malformed_or_duplicate_exclusions(tmp_path) -> None:

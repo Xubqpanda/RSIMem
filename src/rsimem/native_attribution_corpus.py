@@ -162,6 +162,7 @@ class NativeAttributionCorpus:
     def unresolved_count(self) -> int:
         return sum(value.primary_failure_surface.value == "unresolved" for value in self.candidates)
 
+
     @classmethod
     def create(
         cls,
@@ -188,6 +189,44 @@ class NativeAttributionCorpus:
             candidates=tuple(sorted(candidates, key=lambda item: item.attribution_id)),
             excluded_runs=tuple(values["excluded_runs"]),
         )
+
+
+def merge_native_attribution_corpora(
+    corpora: Sequence[NativeAttributionCorpus],
+) -> NativeAttributionCorpus:
+    """Merge disjoint accepted slices without weakening any contract."""
+    if not corpora:
+        raise ValueError("cannot merge an empty native attribution corpus set")
+    protocol_id = corpora[0].protocol_id
+    accepted: list[str] = []
+    observations: list[NativeEpisodeObservation] = []
+    candidates: list[NativeAttributionCandidate] = []
+    excluded: list[Mapping[str, object]] = []
+    for corpus in corpora:
+        if corpus.protocol_id != protocol_id:
+            raise ValueError("native attribution corpus protocol mismatch")
+        accepted.extend(corpus.accepted_run_ids)
+        observations.extend(corpus.observations)
+        candidates.extend(corpus.candidates)
+        excluded.extend(corpus.excluded_runs)
+    if len(accepted) != len(set(accepted)):
+        raise ValueError("native attribution corpora contain duplicate accepted runs")
+    observation_ids = [item.observation_id for item in observations]
+    if len(observation_ids) != len(set(observation_ids)):
+        raise ValueError("native attribution corpora contain duplicate observations")
+    candidate_ids = [item.attribution_id for item in candidates]
+    if len(candidate_ids) != len(set(candidate_ids)):
+        raise ValueError("native attribution corpora contain duplicate candidates")
+    excluded_ids = {str(item["run_id"]) for item in excluded}
+    if excluded_ids.intersection(accepted):
+        raise ValueError("native attribution corpus run is both accepted and excluded")
+    return NativeAttributionCorpus.create(
+        protocol_id=protocol_id,
+        accepted_run_ids=accepted,
+        observations=observations,
+        candidates=candidates,
+        excluded_runs=excluded,
+    )
 
 
 class NativeAttributionCorpusStore:
@@ -228,4 +267,5 @@ class NativeAttributionCorpusStore:
 
 __all__ = [
     "CORPUS_SCHEMA", "NativeAttributionCorpus", "NativeAttributionCorpusStore",
+    "merge_native_attribution_corpora",
 ]
