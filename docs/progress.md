@@ -213,6 +213,10 @@ usage, adding five semantic observations. All five remain unresolved and none
 is actionable; see [`stage1_sm02_accepted_retry_20260906.md`](stage1_sm02_accepted_retry_20260906.md).
 The runtime's Honcho initialization diagnostic is retained as runtime evidence,
 not relabeled as a Memory failure.
+The PC01 procedural retry on the same date encountered repeated provider
+`503` responses and failed complete-usage audit; no procedural observation was
+accepted. It is recorded as infrastructure evidence in
+[`stage1_pc01_provider_attempt_20260906.md`](stage1_pc01_provider_attempt_20260906.md).
 The frozen corpus can be independently reloaded and summarized with
 `rsimem-report-native-attribution`; the module and console entrypoints are
 covered by deterministic tests.
