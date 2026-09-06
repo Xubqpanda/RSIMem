@@ -202,6 +202,12 @@ candidates, and zero actionable repair axes. EP01 and PG01 were excluded for
 incomplete model usage after provider failures. The current decision is
 `STOP_NO_ACTIONABLE_SIGNAL`; Analysis 1 repair and later feedback experiments
 remain closed.
+On 2026-09-06, a fresh manifest-bound EP01 retry completed all five tasks with
+complete model usage and passed native audit. It produced five episodic
+observations, all unresolved and none actionable; the dated audit is recorded
+in [`stage1_ep01_accepted_retry_20260906.md`](stage1_ep01_accepted_retry_20260906.md).
+This incremental slice does not replace the frozen cross-panel corpus and does
+not reopen Stage 2.
 The frozen corpus can be independently reloaded and summarized with
 `rsimem-report-native-attribution`; the module and console entrypoints are
 covered by deterministic tests.
