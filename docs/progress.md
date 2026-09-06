@@ -220,6 +220,9 @@ accepted. It is recorded as infrastructure evidence in
 A second PC01 retry had the same repeated `503`/usage-incomplete outcome and was
 also excluded; see [`stage1_pc01_provider_attempt2_20260906.md`](stage1_pc01_provider_attempt2_20260906.md).
 Further PC01 retries are paused until provider capacity is demonstrably stable.
+The latest provider probe on 2026-09-06 returned HTTP `503` without content or
+usage, so PG01 was not started. The three-panel accepted slice remains the
+current empirical boundary; no provider probe is treated as a benchmark result.
 Merging the accepted EP01 retry with the older accepted SM02/PC01 slice now
 produces a three-panel corpus (`15 observations`, all unresolved, zero
 actionable). The merged identity and mixed replicate provenance are recorded in
