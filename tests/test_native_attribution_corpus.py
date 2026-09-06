@@ -96,6 +96,18 @@ def test_corpus_merge_is_deterministic_and_rejects_overlap(tmp_path) -> None:
         merge_native_attribution_corpora((corpus, corpus))
 
 
+def test_corpus_merge_cli_writes_canonical_output(tmp_path) -> None:
+    corpus = _corpus(tmp_path)
+    first = tmp_path / "first.json"
+    second = tmp_path / "second.json"
+    NativeAttributionCorpusStore(first).put(corpus)
+    NativeAttributionCorpusStore(second).put(corpus)
+    with pytest.raises(ValueError, match="duplicate accepted runs"):
+        __import__("rsimem.native_attribution_corpus", fromlist=["main"]).main(
+            [str(first), str(second), "--output", str(tmp_path / "merged.json")]
+        )
+
+
 def test_corpus_rejects_malformed_or_duplicate_exclusions(tmp_path) -> None:
     corpus = _corpus(tmp_path)
     with pytest.raises(ValueError, match="exclusion fields"):

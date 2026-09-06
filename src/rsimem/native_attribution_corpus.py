@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fcntl
+import argparse
 import hashlib
 import json
 import os
@@ -269,3 +270,24 @@ __all__ = [
     "CORPUS_SCHEMA", "NativeAttributionCorpus", "NativeAttributionCorpusStore",
     "merge_native_attribution_corpora",
 ]
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("corpora", nargs="+", type=Path)
+    parser.add_argument("--output", required=True, type=Path)
+    args = parser.parse_args(argv)
+    merged = merge_native_attribution_corpora(tuple(
+        NativeAttributionCorpusStore(path).load() for path in args.corpora
+    ))
+    NativeAttributionCorpusStore(args.output).put(merged)
+    print(json.dumps({
+        "corpus_id": merged.corpus_id,
+        "accepted_run_count": len(merged.accepted_run_ids),
+        "observation_count": len(merged.observations),
+    }, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
