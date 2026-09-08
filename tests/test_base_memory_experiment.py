@@ -79,3 +79,19 @@ def test_dry_run_materializes_isolated_command_receipts(tmp_path: Path) -> None:
         assert launch["dry_run"] is True
         command = launch["command"]
         assert command[command.index("--rsimem-artifact-dir") + 1].endswith(run.artifact_directory)
+
+
+def test_single_condition_execution_leaves_other_conditions_unlaunched(tmp_path: Path) -> None:
+    sequence = tmp_path / "source.yaml"
+    sequence.write_text("name: fixture\nepisodes:\n  - task: task.yaml\n", encoding="utf-8")
+    config = tmp_path / "config.yaml"; config.write_text("x: 1\n", encoding="utf-8")
+    registry = tmp_path / "registry.yaml"; registry.write_text("x: 1\n", encoding="utf-8")
+    manifest = run_comparison(
+        source_sequence=sequence, output_root=tmp_path / "out", family_id="SM01",
+        past_bin=tmp_path / "past-bench", past_root=tmp_path, config=config,
+        registry=registry, base_url="https://example.test/v1", token_budget=32,
+        condition=BaseMemoryCondition.NO_MEMORY, dry_run=True,
+    )
+    for run in manifest.runs:
+        launch = tmp_path / "out" / run.run_id / "launch.json"
+        assert launch.exists() is (run.condition is BaseMemoryCondition.NO_MEMORY)

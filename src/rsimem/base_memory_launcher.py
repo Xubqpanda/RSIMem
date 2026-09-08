@@ -128,12 +128,23 @@ def prepare_comparison(*, source_sequence: Path, output_root: Path, family_id: s
     return manifest
 
 
-def run_comparison(*, source_sequence: Path, output_root: Path, family_id: str, past_bin: Path, past_root: Path, config: Path, registry: Path, base_url: str, token_budget: int, run_prefix: str = "base-memory", dry_run: bool = False) -> BaseMemoryComparisonManifest:
+def run_comparison(
+    *, source_sequence: Path, output_root: Path, family_id: str, past_bin: Path,
+    past_root: Path, config: Path, registry: Path, base_url: str, token_budget: int,
+    run_prefix: str = "base-memory", condition: BaseMemoryCondition | None = None,
+    dry_run: bool = False,
+) -> BaseMemoryComparisonManifest:
     manifest = prepare_comparison(
         source_sequence=source_sequence, output_root=output_root, family_id=family_id,
         config=config, registry=registry, token_budget=token_budget, run_prefix=run_prefix,
     )
-    for run in manifest.runs:
+    selected_runs = tuple(
+        run for run in manifest.runs
+        if condition is None or run.condition is BaseMemoryCondition(condition)
+    )
+    if not selected_runs:
+        raise ValueError("requested base-memory condition is absent from manifest")
+    for run in selected_runs:
         root = output_root / run.run_id
         command = _past_command(
             past_bin=past_bin, sequence=root / "sequence.yaml", trace_dir=root / run.trace_directory,
@@ -158,13 +169,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--token-budget", type=int, default=4096)
     parser.add_argument("--run-prefix", default="base-memory")
+    parser.add_argument("--condition", choices=[item.value for item in BaseMemoryCondition])
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     run_comparison(
         source_sequence=args.sequence.resolve(), output_root=args.output_root.resolve(), family_id=args.family_id,
         past_bin=args.past_bin.resolve(), past_root=args.past_root.resolve(), config=args.config.resolve(),
         registry=args.registry.resolve(), base_url=args.base_url, token_budget=args.token_budget,
-        run_prefix=args.run_prefix, dry_run=args.dry_run,
+        run_prefix=args.run_prefix,
+        condition=(BaseMemoryCondition(args.condition) if args.condition else None),
+        dry_run=args.dry_run,
     )
     return 0
 
