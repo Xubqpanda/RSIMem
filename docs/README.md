@@ -9,6 +9,8 @@ Start here for current work:
 3. [AdaMem adaptation audit](adamem_adapter_audit_20260908.md): upstream
    mechanism, permitted adaptation boundary, and leakage boundary for the
    current Semantic RSI baseline.
+4. [Documentation status inventory](document_status_inventory_20260908.md):
+   current, reference, historical, and generated-evidence classification.
 
 ## Status Labels
 
