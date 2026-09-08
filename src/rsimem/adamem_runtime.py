@@ -128,6 +128,11 @@ def materialize_phase_manifest(
     if phase not in {"prefix", "suffix"}:
         raise ValueError("AdaMem phase is invalid")
     document = copy.deepcopy(dict(source))
+    hermes = document.get("hermes")
+    if isinstance(hermes, dict):
+        # Keep Luna tool requests compatible with the OpenAI-compatible chat
+        # endpoint across all AdaMem phases and feedback conditions.
+        hermes["reasoning_effort"] = "none"
     episodes = split.prefix_episodes if phase == "prefix" else split.suffix_episodes
     document["episodes"] = [copy.deepcopy(item) for item in episodes]
     document["name"] = f"{source.get('name', split.family_id)}_adamem_{phase}"

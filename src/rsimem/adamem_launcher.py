@@ -142,7 +142,7 @@ def _past_command(
     port_offset: int,
 ) -> list[str]:
     command = [
-        str(past_bin), "evolve", "--sequence", str(sequence), "--agent", "hermes-luna",
+        str(past_bin), "evolve", "--sequence", str(sequence), "--agent", "hermes",
         "--runtime", "local", "--sandbox", "--sandbox-tools", "--no-judge",
         "--persistence-variant", "with_persistence", "--config", str(config),
         "--registry", str(registry), "--trace-dir", str(trace_dir), "--model", model,
@@ -222,13 +222,16 @@ def run_trajectory(
     })
 
     if not dry_run:
+        environment = os.environ.copy()
+        if environment.get("GPT_LUNA_API_KEY") and not environment.get("ANTHROPIC_API_KEY"):
+            environment["ANTHROPIC_API_KEY"] = environment["GPT_LUNA_API_KEY"]
         subprocess.run(
             _past_command(
                 past_bin=past_bin, past_root=past_root, sequence=prefix_manifest_file,
                 trace_dir=prefix_root, config=config, registry=registry, model=base_model,
                 base_url=base_url, policy_path=None,
                 port_offset=port_offset,
-            ), cwd=past_root, check=True,
+            ), cwd=past_root, check=True, env=environment,
         )
         _require_accepted_phase(prefix_root)
 
@@ -290,6 +293,9 @@ def run_trajectory(
     suffix_manifest_file = run_root / "manifests" / "suffix.yaml"
     suffix_manifest_file.write_text(yaml.safe_dump(suffix_manifest, sort_keys=False), encoding="utf-8")
     if not dry_run:
+        environment = os.environ.copy()
+        if environment.get("GPT_LUNA_API_KEY") and not environment.get("ANTHROPIC_API_KEY"):
+            environment["ANTHROPIC_API_KEY"] = environment["GPT_LUNA_API_KEY"]
         subprocess.run(
             _past_command(
                 past_bin=past_bin, past_root=past_root, sequence=suffix_manifest_file,
@@ -297,7 +303,7 @@ def run_trajectory(
                 base_url=base_url,
                 policy_path=(policy_file if policy_updated else None),
                 port_offset=port_offset,
-            ), cwd=past_root, check=True,
+            ), cwd=past_root, check=True, env=environment,
         )
         _require_accepted_phase(suffix_root)
     return receipt

@@ -22,6 +22,7 @@ from rsimem.adamem_runtime import (
 def _source() -> dict[str, object]:
     return {
         "name": "fixture",
+        "hermes": {},
         "episodes": [
             {"label": "learn-a", "bucket": "learn", "family_id": "SM01"},
             {"label": "learn-b", "bucket": "learn", "family_id": "SM01"},
@@ -37,6 +38,7 @@ def test_split_requires_explicit_learning_cutover_and_filters_controls() -> None
     assert [item["label"] for item in split.suffix_episodes] == ["learn-b", "eval-n1"]
     suffix = materialize_phase_manifest(_source(), split=split, phase="suffix", initial_home_fixture_dir="seed")
     assert suffix["episodes"][0]["initial_home_fixture_dir"] == "seed"
+    assert suffix["hermes"]["reasoning_effort"] == "none"
     with pytest.raises(ValueError, match="cutover"):
         split_family_manifest(_source(), cutover_label="control")
 
@@ -103,6 +105,7 @@ def test_launcher_rejects_incomplete_usage_and_preserves_port_isolation(tmp_path
         registry=Path("registry"), model="model", base_url="https://example.test/v1",
         policy_path=None, port_offset=1000,
     )
+    assert command[command.index("--agent") + 1] == "hermes"
     assert command[command.index("--port-offset") + 1] == "1000"
 
 
