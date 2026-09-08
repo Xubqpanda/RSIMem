@@ -767,6 +767,10 @@ class HermesAdapter(RuntimeAdapter):
                 disabled_toolsets.append("memory")
 
         memory_cfg = hermes_cfg.get("config_overrides", {}).get("memory", {})
+        from hermes_constants import parse_reasoning_effort
+        reasoning_config = parse_reasoning_effort(
+            str(hermes_cfg.get("reasoning_effort") or "")
+        )
         memory_active = bool(memory_cfg.get("memory_enabled", True) or memory_cfg.get("user_profile_enabled", True))
         rsimem_cfg = hermes_cfg.get("rsimem") or {}
         lifecycle_cfg = rsimem_cfg.get("lifecycle") or {}
@@ -808,6 +812,7 @@ class HermesAdapter(RuntimeAdapter):
             quiet_mode=True,
             session_db=session_db,
             model_usage_callback=collected_model_calls.append,
+            reasoning_config=reasoning_config,
         )
         if rsimem_writeback_enabled:
             self._isolate_rsimem_semantic_writer(agent)

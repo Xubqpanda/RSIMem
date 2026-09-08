@@ -626,6 +626,7 @@ class HermesPersistenceConfig(BaseModel):
     memory_flush_min_turns: int = 1
     skill_creation_nudge_interval: int = 1
     background_review_wait_s: float = 1.0
+    reasoning_effort: str = ""
     preseed_artifacts_dir: str = ""
     initial_home_fixture_dir: str = ""
     rsimem_mode: Literal[

@@ -111,6 +111,7 @@ def build_hermes_extra_body(
     memory_flush_min_turns: int,
     skill_creation_nudge_interval: int,
     background_review_wait_s: float,
+    reasoning_effort: str = "",
     initial_home_fixture_dir: Path | None = None,
     preseed_artifacts_dir: Path | None = None,
     rsimem_mode: str = "native",
@@ -308,6 +309,7 @@ def build_hermes_extra_body(
             "home_dir": str(home_dir),
             "capture_artifacts_dir": str(artifacts_dir),
             "background_review_wait_s": background_review_wait_s,
+            "reasoning_effort": reasoning_effort,
             "enabled_toolsets": enabled_toolsets,
             "config_overrides": {
                 "memory": {
@@ -885,6 +887,7 @@ class HermesPersistenceBackend(PersistenceBackend):
             memory_flush_min_turns=sequence.hermes.memory_flush_min_turns,
             skill_creation_nudge_interval=sequence.hermes.skill_creation_nudge_interval,
             background_review_wait_s=review_wait_s,
+            reasoning_effort=sequence.hermes.reasoning_effort,
             rsimem_mode=sequence.hermes.rsimem_mode,
             rsimem_adapter_failure_policy=(
                 sequence.hermes.rsimem_adapter_failure_policy

@@ -87,6 +87,7 @@ def _materialize_sequence(
         hermes["user_profile_enabled"] = True
     hermes["rsimem_mode"] = descriptor["rsimem_mode"]
     hermes["rsimem_semantic_writeback_mode"] = descriptor["semantic_writeback_mode"]
+    hermes["reasoning_effort"] = "none"
     result["hermes"] = hermes
     return result
 

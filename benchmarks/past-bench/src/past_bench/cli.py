@@ -2507,6 +2507,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     memory_flush_min_turns=sequence.hermes.memory_flush_min_turns,
                     skill_creation_nudge_interval=sequence.hermes.skill_creation_nudge_interval,
                     background_review_wait_s=float(review_wait_s),
+                    reasoning_effort=sequence.hermes.reasoning_effort,
                     initial_home_fixture_dir=Path(sequence.hermes.initial_home_fixture_dir).expanduser()
                     if sequence.hermes.initial_home_fixture_dir
                     else None,
