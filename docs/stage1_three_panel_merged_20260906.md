@@ -1,5 +1,8 @@
 # Stage 1 Three-Panel Merged Slice
 
+> Status: `historical/superseded` (2026-09-08). This merged native-attribution
+> slice is retained as evidence and does not define the current experiment.
+
 Date: 2026-09-06  
 Protocol: `native-attribution-repair-v1`
 

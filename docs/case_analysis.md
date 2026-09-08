@@ -1,5 +1,8 @@
 # Process-Signal Case Analysis
 
+> Status: `historical/superseded` (2026-09-08). This analysis is retained for
+> evidence only; the active route is the AdaMem trajectory checklist.
+
 日期：2026-08-30（含 clean parent rerun 更新；2026-09-01 implementation checkpoint supersedes earlier infrastructure wording）
 
 > **Current implementation note (2026-09-01).**  The earlier statements in

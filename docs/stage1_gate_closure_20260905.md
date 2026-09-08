@@ -1,5 +1,9 @@
 # Stage 1 Gate Closure
 
+> Status: `historical/superseded` (2026-09-08). This native-attribution gate
+> is preserved as dated evidence and is not a prerequisite for the current
+> AdaMem trajectory baseline.
+
 Date: 2026-09-05  
 Protocol: `native-attribution-repair-v1`  
 Corpus: `native-corpus.3eb219b15ac433f9eb00a89896f3ebd9aa30b368`

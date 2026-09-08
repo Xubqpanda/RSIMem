@@ -1,5 +1,9 @@
 # Provider completion probe
 
+> Status: `reference/historical` (2026-09-08). This utility remains reusable,
+> but it is not an experiment entrypoint; consult the current checklist for
+> batch execution.
+
 Before starting a formal PAST-Bench batch, run the provider-only probe against
 the exact base URL and model that the manifest will use:
 

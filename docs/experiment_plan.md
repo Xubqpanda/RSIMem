@@ -1,5 +1,9 @@
 # Experiment Plan
 
+> Status: `historical/superseded` (2026-09-08). The active protocol is
+> [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md)
+> and its current evidence is summarized in [`progress.md`](progress.md).
+
 ## Research Question
 
 Can delayed deployment feedback improve a semantic memory extraction prompt
