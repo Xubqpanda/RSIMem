@@ -27,6 +27,15 @@ Mem0 backend, train/N+1 split, base model, budget, and AdaMem patch space.
 Stage -1 documentation cleanup is in progress; no AdaMem or Mem0Static
 quality result is claimed yet.
 
+The first deterministic AdaMem policy adapter is now available as
+`rsimem.adamem_adapter`. It preserves AdaMem's `general_policy` /
+`by_character` patch contract, fail-closed parse/no-op behavior, terminal versus
+full-trajectory feedback allowlists, and Mem0-flat extraction-slot binding.
+`rsimem.adamem_experiment` adds a manifest contract for isolated
+`B0_mem0_static`, `B1_mem0_adamem_terminal`, and
+`B2_mem0_adamem_full_trajectory` runs; it does not claim a live smoke or quality
+result.
+
 ## Historical Log
 
 Everything below this heading is retained for dated evidence or reusable
