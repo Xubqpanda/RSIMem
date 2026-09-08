@@ -50,7 +50,7 @@ one static Memory backend executes a train sequence
 - [x] 审计 `docs/`：逐份标记为 `current`、`historical`、`superseded`、`reference` 或 `generated evidence`。
 - [x] 保留并更新三个权威入口：本 checklist、`docs/progress.md` 的当前状态摘要、AdaMem upstream/adaptation audit；它们之间必须互相链接。
 - [x] 将旧 extraction-only、five-condition sensitivity、deterministic native-attribution 主线文档移入 `docs/archive/` 或在文件首段加醒目的 `historical/superseded` 状态；保留原文件名、日期和不可变实验结果。主线说明文档已加状态头；dated generated evidence 由 `document_status_inventory_20260908.md` 按文件族分类并保留原路径。
-- [ ] 删除真正冗余的草稿、重复的计划和无引用的临时说明；不删除 dataset/task/grader 文档、baseline manifest、accepted/excluded attempt、原始 trace 或可复现实验报告。
+- [x] 删除真正冗余的草稿、重复的计划和无引用的临时说明；不删除 dataset/task/grader 文档、baseline manifest、accepted/excluded attempt、原始 trace 或可复现实验报告。2026-09-08 redundancy audit 未发现可安全删除的文件；无引用文件均为 dated evidence，详见 `document_status_inventory_20260908.md`。
 - [x] 更新 `docs/README.md` 或新建 `docs/README.md`：列出当前入口、归档原则和历史证据位置。
 - [x] 对移动后的 Markdown 链接运行检查，避免 current docs 指向失效路径。
 

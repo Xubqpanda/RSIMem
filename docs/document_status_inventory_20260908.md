@@ -68,3 +68,12 @@ find docs -maxdepth 1 -type f -printf '%f\n' | sort | awk '
 
 The check is intentionally conservative: a new document is unclassified until
 someone explicitly assigns it a role here.
+
+## Redundancy Audit
+
+The 2026-09-08 audit checked repository references for unreferenced top-level
+documents. Unreferenced files are all dated sensitivity, extraction, native
+attribution, baseline, or smoke evidence; they are retained because they carry
+accepted/excluded attempts or reproducible historical measurements. No
+unreferenced draft was identified that could be deleted without removing
+research evidence, so this pass performs no deletion.
