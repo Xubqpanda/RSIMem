@@ -139,7 +139,8 @@ def _reflect_via_openai(
 def _past_command(
     *, past_bin: Path, past_root: Path, sequence: Path, trace_dir: Path,
     config: Path, registry: Path, model: str, base_url: str, policy_path: Path | None,
-    port_offset: int,
+    port_offset: int, state_dir: Path | None = None, hermes_home_dir: Path | None = None,
+    artifact_dir: Path | None = None,
 ) -> list[str]:
     command = [
         str(past_bin), "evolve", "--sequence", str(sequence), "--agent", "hermes",
@@ -152,6 +153,15 @@ def _past_command(
     ]
     if policy_path is not None:
         command.extend(["--rsimem-adamem-policy", str(policy_path)])
+    isolated = (state_dir, hermes_home_dir, artifact_dir)
+    if any(value is not None for value in isolated):
+        if any(value is None for value in isolated):
+            raise ValueError("AdaMem phase isolation requires state, home, and artifact paths")
+        command.extend([
+            "--rsimem-state-dir", str(state_dir),
+            "--rsimem-hermes-home-dir", str(hermes_home_dir),
+            "--rsimem-artifact-dir", str(artifact_dir),
+        ])
     return command
 
 
@@ -221,6 +231,11 @@ def run_trajectory(
         "config_digest": _file_digest(config),
         "registry_digest": _file_digest(registry),
         "port_offset": port_offset,
+        "replicate": run.replicate,
+        "state_directory": run.state_directory,
+        "trace_directory": run.trace_directory,
+        "artifact_directory": run.artifact_directory,
+        "mem0_collection": run.mem0_collection,
     })
 
     if not dry_run:
@@ -233,6 +248,9 @@ def run_trajectory(
                 trace_dir=prefix_root, config=config, registry=registry, model=base_model,
                 base_url=base_url, policy_path=None,
                 port_offset=port_offset,
+                state_dir=run_root / run.state_directory / "prefix",
+                hermes_home_dir=run_root / "hermes_home" / "prefix",
+                artifact_dir=run_root / run.artifact_directory / "prefix",
             ), cwd=past_root, check=True, env=environment,
         )
         _require_accepted_phase(prefix_root)
@@ -292,7 +310,7 @@ def run_trajectory(
         })
     _write_json(run_root / "policy_receipt.json", receipt.payload())
 
-    prefix_home = prefix_root / "family_homes" / split.family_id / "hermes_home"
+    prefix_home = run_root / "hermes_home" / "prefix"
     suffix_manifest = materialize_phase_manifest(
         source, split=split, phase="suffix", initial_home_fixture_dir=str(prefix_home),
     )
@@ -309,6 +327,9 @@ def run_trajectory(
                 base_url=base_url,
                 policy_path=(policy_file if policy_updated else None),
                 port_offset=port_offset,
+                state_dir=run_root / run.state_directory / "suffix",
+                hermes_home_dir=run_root / "hermes_home" / "suffix",
+                artifact_dir=run_root / run.artifact_directory / "suffix",
             ), cwd=past_root, check=True, env=environment,
         )
         _require_accepted_phase(suffix_root)

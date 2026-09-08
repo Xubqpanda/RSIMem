@@ -40,6 +40,7 @@ def test_split_requires_explicit_learning_cutover_and_filters_controls() -> None
     suffix = materialize_phase_manifest(_source(), split=split, phase="suffix", initial_home_fixture_dir="seed")
     assert suffix["episodes"][0]["initial_home_fixture_dir"] == "seed"
     assert suffix["hermes"]["reasoning_effort"] == "none"
+    assert all(item["shared_cold_run"] is False for item in suffix["episodes"])
     with pytest.raises(ValueError, match="cutover"):
         split_family_manifest(_source(), cutover_label="control")
 
@@ -108,6 +109,13 @@ def test_launcher_rejects_incomplete_usage_and_preserves_port_isolation(tmp_path
     )
     assert command[command.index("--agent") + 1] == "hermes"
     assert command[command.index("--port-offset") + 1] == "1000"
+    isolated = _past_command(
+        past_bin=Path("past-bench"), past_root=Path("past-root"), sequence=Path("phase.yaml"),
+        trace_dir=Path("trace"), config=Path("config"), registry=Path("registry"), model="model",
+        base_url="https://example.test/v1", policy_path=None, port_offset=1000,
+        state_dir=Path("state"), hermes_home_dir=Path("home"), artifact_dir=Path("artifacts"),
+    )
+    assert "--rsimem-state-dir" in isolated
 
 
 def test_launcher_rejects_model_drift_before_execution(tmp_path: Path) -> None:
@@ -164,6 +172,7 @@ def test_native_fidelity_uses_native_feedback_shape_and_label(tmp_path: Path) ->
     assert receipt.feedback_view.value == "native"
     manifest = __import__("json").loads((tmp_path / "native-fidelity" / "run_manifest.json").read_text())
     assert manifest["condition"] == "AdaMem-native"
+    assert manifest["state_directory"] == "state"
 
 
 def test_run_manifest_allows_only_condition_identity_differences(tmp_path: Path) -> None:

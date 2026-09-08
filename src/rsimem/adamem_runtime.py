@@ -135,6 +135,11 @@ def materialize_phase_manifest(
         hermes["reasoning_effort"] = "none"
     episodes = split.prefix_episodes if phase == "prefix" else split.suffix_episodes
     document["episodes"] = [copy.deepcopy(item) for item in episodes]
+    for episode in document["episodes"]:
+        if isinstance(episode, dict):
+            # Formal trajectories own their full state; never import a shared
+            # cold result from a different replicate/condition.
+            episode["shared_cold_run"] = False
     document["name"] = f"{source.get('name', split.family_id)}_adamem_{phase}"
     if phase == "suffix":
         if not initial_home_fixture_dir:

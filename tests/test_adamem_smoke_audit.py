@@ -16,7 +16,8 @@ def _write_run(root: Path, condition: AdaMemCondition, *, outcome: str, applied:
         "source_sequence_digest": "a" * 64, "split_id": "split", "base_model": "gpt-5.6-luna", "meta_agent_model": "gpt-5.6-luna",
         "temperature": 0.0, "update_budget": 1, "policy_update_space": "versioned_semantic_extraction_policy_only",
         "mem0_backend": "mem0-flat-hermes-v1", "past_bin_digest": "b" * 64, "config_digest": "c" * 64, "registry_digest": "d" * 64,
-        "port_offset": list(AdaMemCondition).index(condition) + 1000,
+        "port_offset": list(AdaMemCondition).index(condition) + 1000, "replicate": 1,
+        "state_directory": "state", "trace_directory": "trace", "artifact_directory": "artifacts", "mem0_collection": "collection",
     }
     (root / "run_manifest.json").write_text(json.dumps(common), encoding="utf-8")
     (root / "policy_receipt.json").write_text(json.dumps({"outcome": outcome, "feedback_view": common["feedback_view"]}), encoding="utf-8")
