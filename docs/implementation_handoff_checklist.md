@@ -163,7 +163,7 @@ policy schema
 - [x] 全局 provider-backed run 上限固定为 3，不随机器资源提高。出现 429/503、usage-incomplete 或延迟急剧上升时，停止启动新的 batch；失败 replicate 仅在该 batch 完全结束后，以新的隔离 run 串行或重新组成三-replicate batch 重试。
 - [x] 不同 replicate/condition 不共享 policy、Mem0 collection、Hermes state、service process、fixture directory、trace 或 artifact root；唯一允许共享的是只读代码、冻结任务源和只读模型配置。
 - [x] 记录每个 batch 的启动/结束时间、provider health、condition 顺序和重试原因。不同 family 的 B0/B1/B2 batch 顺序轮换，避免长期 provider drift 总是与同一 condition 相关。
-- [ ] 额外保留 `AdaMem-native` 输入条件，确认 adapter 接线没有改变 AdaMem 原始行为；它是方法 fidelity baseline，不替代 B0/B1/B2。
+- [x] 额外保留 `AdaMem-native` 输入条件，确认 adapter 接线没有改变 AdaMem 原始行为；它是方法 fidelity baseline，不替代 B0/B1/B2。
 - [x] 对每个 case 保存 `P_n`、`P_{n+1}`、是否更新、N+1 score/component delta、proposal/acceptance/rollback 与资源记录。
 - [x] 聚合时只使用 accepted matched pairs；报告全部 3 个 raw replicate、均值/标准差和 paired delta，不用 infrastructure failure 填补缺失值。若某个 condition 未达到 3 个 accepted replicate，不报告正式主结论。
 - [x] 同时报告 proposal rate、abstention rate、acceptance rate、N+1 gain、harmful update、rollback rate 和 updater input token。
