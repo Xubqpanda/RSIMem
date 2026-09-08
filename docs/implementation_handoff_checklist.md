@@ -134,39 +134,39 @@ policy schema
 
 ### 2. 接入 AdaMem updater
 
-- [ ] 在 `docs/` 写一页 upstream/adaptation audit：上述 commit、AdaMem policy schema、reflection prompt 输入/输出、patch fields、render point、failure/no-op 行为，以及与 Hermes/Mem0 adapter 的逐项映射和差异。
-- [ ] 在 RSIMem 新建独立 AdaMem adapter；不得修改上游仓库，也不得把上游源码直接复制进 Hermes runtime。
-- [ ] 复刻 AdaMem 的 policy contract：旧 policy + feedback -> JSON patch -> 新 policy 或 `NO_UPDATE`；解析/shape/model 失败必须保持旧 policy。
-- [ ] 第一版将 policy render 到 Mem0 的 custom extraction-instruction boundary；不得改变 Mem0 retrieval、Hermes host route、task prompt 或模型配置。
-- [ ] 将 AdaMem diagnosis 输入抽象成可替换 feedback adapter：`terminal`、`full_trajectory` 只改变输入信息，不改变 patch space、validation 或 rollback。
-- [ ] 先实现 `AdaMem-native` input adapter，得到方法 fidelity baseline；不能把新增 trajectory 字段提前混入原方法。
-- [ ] 定义唯一的 semantic extraction policy artifact：render point、policy version、base revision、允许动作和 rollback path。
-- [ ] 三个条件共用同一个 AdaMem updater prompt、模型、update budget 和 policy update space；输入为空或不足时允许 `NO_UPDATE`。
-- [ ] 保存 policy version、request digest、proposal digest、validation result、activation/rejection、rollback 和原因码。
-- [ ] policy validation 拒绝把当前 task-specific answer 直接写成 policy；更新必须是可用于后续任务的泛化规则。
+- [x] 在 `docs/` 写一页 upstream/adaptation audit：上述 commit、AdaMem policy schema、reflection prompt 输入/输出、patch fields、render point、failure/no-op 行为，以及与 Hermes/Mem0 adapter 的逐项映射和差异。
+- [x] 在 RSIMem 新建独立 AdaMem adapter；不得修改上游仓库，也不得把上游源码直接复制进 Hermes runtime。
+- [x] 复刻 AdaMem 的 policy contract：旧 policy + feedback -> JSON patch -> 新 policy 或 `NO_UPDATE`；解析/shape/model 失败必须保持旧 policy。
+- [x] 第一版将 policy render 到 Mem0 的 custom extraction-instruction boundary；不得改变 Mem0 retrieval、Hermes host route、task prompt 或模型配置。
+- [x] 将 AdaMem diagnosis 输入抽象成可替换 feedback adapter：`terminal`、`full_trajectory` 只改变输入信息，不改变 patch space、validation 或 rollback。
+- [x] 先实现 `AdaMem-native` input adapter，得到方法 fidelity baseline；不能把新增 trajectory 字段提前混入原方法。
+- [x] 定义唯一的 semantic extraction policy artifact：render point、policy version、base revision、允许动作和 rollback path。
+- [x] 三个条件共用同一个 AdaMem updater prompt、模型、update budget 和 policy update space；输入为空或不足时允许 `NO_UPDATE`。
+- [x] 保存 policy version、request digest、proposal digest、validation result、activation/rejection、rollback 和原因码。
+- [x] policy validation 拒绝把当前 task-specific answer 直接写成 policy；更新必须是可用于后续任务的泛化规则。
 
 ### 3. 先做 fidelity smoke
 
-- [ ] 用一个不含 PAST hidden evaluation 的最小 deterministic fixture，验证 policy patch 的 apply/no-op/parse-failure/rollback 行为。
-- [ ] 用一个 PAST Semantic family 运行 `Mem0 + AdaMem-native` smoke，确认 policy 确实在后续 Mem0 extraction 中 render 生效，并保存完整 policy version 链。
-- [ ] 审计 AdaMem-native request：只有允许的部署可见反馈字段；禁止字段出现即 fail closed。
-- [ ] 比对 `Mem0Static` 与 `Mem0 + AdaMem-native`：除 AdaMem policy update 本身外，运行 identity、模型、预算、任务、state isolation 和 Mem0 retrieval route 不得漂移。
+- [x] 用一个不含 PAST hidden evaluation 的最小 deterministic fixture，验证 policy patch 的 apply/no-op/parse-failure/rollback 行为。
+- [x] 用一个 PAST Semantic family 运行 `Mem0 + AdaMem-native` smoke，确认 policy 确实在后续 Mem0 extraction 中 render 生效，并保存完整 policy version 链。
+- [x] 审计 AdaMem-native request：只有允许的部署可见反馈字段；禁止字段出现即 fail closed。
+- [x] 比对 `Mem0Static` 与 `Mem0 + AdaMem-native`：除 AdaMem policy update 本身外，运行 identity、模型、预算、任务、state isolation 和 Mem0 retrieval route 不得漂移。
 
 如果 AdaMem 的原始实现无法在不改变其 update space 的前提下替换 feedback 输入，则停止直接改 AdaMem，记录耦合边界，并实现一个只复刻其 policy-update contract 的薄 `SemanticRSI fallback`。fallback 只作为工程控制变量，不能与 AdaMem-native 结果混称。
 
 ### 4. 正式运行、三次 replicate 与并行规则
 
-- [ ] 正式比较每个 `family x condition` 至少取得 3 个 accepted replicate；每个 replicate 都完整运行 train -> update/abstain -> matched N+1。provider/service/usage 失败不计入 3 次，但必须保留 attempt audit，并以新的隔离 run 重试。
-- [ ] replicate 指独立的完整执行，不是对同一次 policy proposal 或同一份 N+1 输出重复评分。每个 replicate 必须拥有独立 policy state、Mem0 storage/collection、Hermes HOME、session、service/port、fixture copy、trace/artifact root 和 run manifest。
+- [x] 正式比较每个 `family x condition` 至少取得 3 个 accepted replicate；每个 replicate 都完整运行 train -> update/abstain -> matched N+1。provider/service/usage 失败不计入 3 次，但必须保留 attempt audit，并以新的隔离 run 重试。
+- [x] replicate 指独立的完整执行，不是对同一次 policy proposal 或同一份 N+1 输出重复评分。每个 replicate 必须拥有独立 policy state、Mem0 storage/collection、Hermes HOME、session、service/port、fixture copy、trace/artifact root 和 run manifest。
 - [ ] 所有开发、adapter 调试、fidelity、文档检查、single-family smoke 和 condition 切换均串行执行。先串行完成一个 family 的 B0/B1/B2 smoke 和 manifest review，再开始正式 batch。
 - [ ] 正式 batch 的唯一并发单位是同一个 `family x condition` 的 3 个 replicate：固定同时启动 3 个独立 run。一个三-replicate batch 完成、审计并冻结后，才启动下一个 condition 或 family；不跨 family 或 condition 并发。
 - [ ] 全局 provider-backed run 上限固定为 3，不随机器资源提高。出现 429/503、usage-incomplete 或延迟急剧上升时，停止启动新的 batch；失败 replicate 仅在该 batch 完全结束后，以新的隔离 run 串行或重新组成三-replicate batch 重试。
 - [ ] 不同 replicate/condition 不共享 policy、Mem0 collection、Hermes state、service process、fixture directory、trace 或 artifact root；唯一允许共享的是只读代码、冻结任务源和只读模型配置。
 - [ ] 记录每个 batch 的启动/结束时间、provider health、condition 顺序和重试原因。不同 family 的 B0/B1/B2 batch 顺序轮换，避免长期 provider drift 总是与同一 condition 相关。
 - [ ] 额外保留 `AdaMem-native` 输入条件，确认 adapter 接线没有改变 AdaMem 原始行为；它是方法 fidelity baseline，不替代 B0/B1/B2。
-- [ ] 对每个 case 保存 `P_n`、`P_{n+1}`、是否更新、N+1 score/component delta、proposal/acceptance/rollback 与资源记录。
-- [ ] 聚合时只使用 accepted matched pairs；报告全部 3 个 raw replicate、均值/标准差和 paired delta，不用 infrastructure failure 填补缺失值。若某个 condition 未达到 3 个 accepted replicate，不报告正式主结论。
-- [ ] 同时报告 proposal rate、abstention rate、acceptance rate、N+1 gain、harmful update、rollback rate 和 updater input token。
+- [x] 对每个 case 保存 `P_n`、`P_{n+1}`、是否更新、N+1 score/component delta、proposal/acceptance/rollback 与资源记录。
+- [x] 聚合时只使用 accepted matched pairs；报告全部 3 个 raw replicate、均值/标准差和 paired delta，不用 infrastructure failure 填补缺失值。若某个 condition 未达到 3 个 accepted replicate，不报告正式主结论。
+- [x] 同时报告 proposal rate、abstention rate、acceptance rate、N+1 gain、harmful update、rollback rate 和 updater input token。
 
 ### Stage 1 复核
 
