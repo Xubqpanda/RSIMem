@@ -89,7 +89,7 @@ def _materialize_sequence(
 def _past_command(*, past_bin: Path, sequence: Path, trace_dir: Path, config: Path, registry: Path, run: BaseMemoryRunSpec, base_url: str) -> list[str]:
     descriptor = _backend_descriptor(run.condition)
     command = [
-        str(past_bin), "evolve", "--sequence", str(sequence), "--agent", "hermes-luna",
+        str(past_bin), "evolve", "--sequence", str(sequence), "--agent", "hermes",
         "--runtime", "local", "--sandbox", "--sandbox-tools", "--no-judge",
         "--persistence-variant", "with_persistence", "--config", str(config),
         "--registry", str(registry), "--trace-dir", str(trace_dir), "--model", FROZEN_MODEL_ID,

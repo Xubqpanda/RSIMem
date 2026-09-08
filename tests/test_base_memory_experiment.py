@@ -58,6 +58,7 @@ def test_prepare_writes_three_backend_specific_immutable_manifests(tmp_path: Pat
         rendered = (tmp_path / "out" / run.run_id / "sequence.yaml").read_text(encoding="utf-8")
         assert str((tmp_path / "task.yaml").resolve()) in rendered
         command = _past_command(past_bin=Path("past-bench"), sequence=Path("sequence.yaml"), trace_dir=Path("trace"), config=config, registry=registry, run=run, base_url="https://example.test/v1")
+        assert command[command.index("--agent") + 1] == "hermes"
         assert command[command.index("--persistence-variant") + 1] == "with_persistence"
         assert command[command.index("--rsimem-state-dir") + 1].endswith(run.state_directory)
         assert command[command.index("--rsimem-hermes-home-dir") + 1].endswith(run.hermes_home_directory)
