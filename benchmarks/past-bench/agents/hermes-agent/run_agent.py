@@ -1670,6 +1670,7 @@ class AIAgent:
                         quiet_mode=True,
                         platform=self.platform,
                         provider=self.provider,
+                        reasoning_config=self.reasoning_config,
                         model_usage_callback=self.model_usage_callback,
                         usage_component="memory_controller",
                         usage_purpose="background_review",
