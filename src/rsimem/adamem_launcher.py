@@ -214,11 +214,13 @@ def run_trajectory(
         })
     policy_file = run_root / "policies" / "policy_active.json"
     _write_json(policy_file, policy.payload())
-    if condition == AdaMemCondition.MEM0_STATIC:
+    policy_updated = receipt.outcome == "updated"
+    if not policy_updated:
         _write_json(run_root / "policy_binding.json", {
             "binding_source": "mem0-flat-root",
             "policy_version": "root-v1",
             "adamem_policy_applied": False,
+            "reason_code": receipt.reason_code,
         })
     else:
         binding = bind_to_mem0_flat(policy)
@@ -245,7 +247,7 @@ def run_trajectory(
                 past_bin=past_bin, past_root=past_root, sequence=suffix_manifest_file,
                 trace_dir=suffix_root, config=config, registry=registry, model=base_model,
                 base_url=base_url,
-                policy_path=(None if condition == AdaMemCondition.MEM0_STATIC else policy_file),
+                policy_path=(policy_file if policy_updated else None),
                 port_offset=port_offset,
             ), cwd=past_root, check=True,
         )

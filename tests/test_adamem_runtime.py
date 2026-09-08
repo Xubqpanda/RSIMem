@@ -117,3 +117,15 @@ def test_launcher_rejects_model_drift_before_execution(tmp_path: Path) -> None:
             meta_agent_model="gpt-5.4", base_url="https://example.test/v1", api_key=None,
             update_budget=1, temperature=0.0, dry_run=True,
         )
+
+
+def test_no_update_retains_mem0_root_binding(tmp_path: Path) -> None:
+    split = split_family_manifest(_source(), cutover_label="learn-a")
+    parent = AdaMemPolicy.root()
+    result = update_policy(
+        parent=parent, feedback_view=AdaMemFeedbackView.TERMINAL,
+        feedback={"outcome": "completed"}, reflect=lambda _: "{}",
+    )
+    receipt = AdaMemPolicyReceipt.from_update(split=split, result=result)
+    assert receipt.outcome == "no_update"
+    assert receipt.candidate_policy_version == receipt.parent_policy_version
