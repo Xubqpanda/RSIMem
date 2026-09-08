@@ -24,6 +24,9 @@ from .adamem_runtime import (
 )
 
 
+FROZEN_MODEL_ID = "gpt-5.6-luna"
+
+
 def _write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2) + "\n", encoding="utf-8")
@@ -137,6 +140,11 @@ def run_trajectory(
 
     if update_budget != 1:
         raise ValueError("AdaMem baseline currently permits exactly one update")
+    if base_model != FROZEN_MODEL_ID or meta_agent_model != FROZEN_MODEL_ID:
+        raise ValueError(
+            "AdaMem trajectory baseline requires the frozen base/meta model "
+            + FROZEN_MODEL_ID
+        )
     source = _read_yaml(source_sequence)
     episodes = source.get("episodes")
     if not isinstance(episodes, list):
@@ -247,8 +255,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--past-root", type=Path, required=True)
     parser.add_argument("--config", type=Path, required=True)
     parser.add_argument("--registry", type=Path, required=True)
-    parser.add_argument("--base-model", required=True)
-    parser.add_argument("--meta-agent-model", required=True)
+    parser.add_argument("--base-model", default=FROZEN_MODEL_ID)
+    parser.add_argument("--meta-agent-model", default=FROZEN_MODEL_ID)
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--api-key-env", default="GPT_LUNA_API_KEY")
     parser.add_argument("--temperature", type=float, default=0.0)

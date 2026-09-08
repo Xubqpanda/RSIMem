@@ -46,6 +46,19 @@ leaving retrieval, Hermes routing, task prompts, and model configuration
 unchanged. The policy file is parsed into `AdaMemPolicy`, converted to an
 immutable extraction artifact, and validated by `StaticSemanticWritebackRuntime`.
 
+An invalid `SM01_preference_adoption` B0 infrastructure attempt was launched
+on 2026-09-08 with a
+dedicated PAST service-port offset (`10105`) and completed its prefix/suffix
+orchestration. It is classified as an infrastructure attempt, not an accepted
+smoke: that attempt accidentally passed `gpt-5.4` instead of the frozen
+`gpt-5.6-luna` model, every provider request returned HTTP 503, and every
+episode reported incomplete model usage with zero input/output tokens. The ignored raw
+evidence is under `outputs/adamem_smoke_20260908/sm01-b0-smoke-20260908-r3/`.
+`rsimem.adamem_launcher` now fails closed on this state rather than accepting a
+zero-token PAST result. When provider inference recovers, restart from a new
+isolated B0 run, require complete usage for prefix and suffix, then proceed
+serially to B1 and B2.
+
 ## Historical Log
 
 Everything below this heading is retained for dated evidence or reusable

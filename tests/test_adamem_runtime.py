@@ -3,7 +3,8 @@ from pathlib import Path
 import pytest
 
 from rsimem.adamem_adapter import AdaMemFeedbackView, AdaMemPolicy, update_policy
-from rsimem.adamem_launcher import _past_command, _require_accepted_phase
+from rsimem.adamem_experiment import AdaMemCondition, AdaMemRunSpec
+from rsimem.adamem_launcher import FROZEN_MODEL_ID, _past_command, _require_accepted_phase, run_trajectory
 from rsimem.adamem_runtime import (
     AdaMemPolicyReceipt,
     build_pure_process_feedback,
@@ -97,3 +98,22 @@ def test_launcher_rejects_incomplete_usage_and_preserves_port_isolation(tmp_path
         policy_path=None, port_offset=1000,
     )
     assert command[command.index("--port-offset") + 1] == "1000"
+
+
+def test_launcher_rejects_model_drift_before_execution(tmp_path: Path) -> None:
+    sequence = tmp_path / "sequence.yaml"
+    sequence.write_text("name: fixture\nepisodes: []\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=FROZEN_MODEL_ID):
+        run_trajectory(
+            source_sequence=sequence,
+            run=AdaMemRunSpec(
+                run_id="run", condition=AdaMemCondition.MEM0_STATIC, replicate=1,
+                state_directory="state", trace_directory="trace", artifact_directory="artifacts",
+                mem0_collection="collection",
+            ),
+            condition=AdaMemCondition.MEM0_STATIC, cutover_label="learn", output_root=tmp_path,
+            past_bin=tmp_path / "past", past_root=tmp_path, config=tmp_path / "config",
+            registry=tmp_path / "registry", base_model="gpt-5.4",
+            meta_agent_model="gpt-5.4", base_url="https://example.test/v1", api_key=None,
+            update_budget=1, temperature=0.0, dry_run=True,
+        )
