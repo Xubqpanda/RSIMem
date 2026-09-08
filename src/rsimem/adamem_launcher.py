@@ -47,6 +47,26 @@ def _operation_paths(root: Path) -> list[Path]:
     return sorted(root.rglob("rsimem_semantic_operations.jsonl"))
 
 
+def _require_accepted_phase(root: Path) -> None:
+    results_path = root / "sequence_results.json"
+    try:
+        payload = json.loads(results_path.read_text(encoding="utf-8"))
+        episodes = payload["episodes"]
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        raise RuntimeError("AdaMem phase has no readable sequence results") from exc
+    if not isinstance(episodes, list) or not episodes:
+        raise RuntimeError("AdaMem phase has no episodes")
+    rejected = []
+    for episode in episodes:
+        usage = episode.get("token_usage") if isinstance(episode, Mapping) else None
+        if not isinstance(usage, Mapping) or usage.get("model_usage_complete") is not True:
+            rejected.append(str(episode.get("task_id", "unknown")) if isinstance(episode, Mapping) else "unknown")
+    if rejected:
+        raise RuntimeError(
+            "AdaMem infrastructure failure: incomplete model usage for " + ", ".join(rejected)
+        )
+
+
 def _reflect_via_openai(
     request: Mapping[str, object], *, api_key: str, base_url: str, model: str,
     max_tokens: int, temperature: float,
@@ -90,6 +110,7 @@ def _reflect_via_openai(
 def _past_command(
     *, past_bin: Path, past_root: Path, sequence: Path, trace_dir: Path,
     config: Path, registry: Path, model: str, base_url: str, policy_path: Path | None,
+    port_offset: int,
 ) -> list[str]:
     command = [
         str(past_bin), "evolve", "--sequence", str(sequence), "--agent", "hermes-luna",
@@ -98,6 +119,7 @@ def _past_command(
         "--registry", str(registry), "--trace-dir", str(trace_dir), "--model", model,
         "--base-url", base_url, "--rsimem-mode", "native+ledger",
         "--rsimem-semantic-writeback-mode", "static",
+        "--port-offset", str(port_offset),
     ]
     if policy_path is not None:
         command.extend(["--rsimem-adamem-policy", str(policy_path)])
@@ -109,7 +131,7 @@ def run_trajectory(
     cutover_label: str, output_root: Path, past_bin: Path, past_root: Path,
     config: Path, registry: Path, base_model: str, meta_agent_model: str,
     base_url: str, api_key: str | None, update_budget: int, temperature: float,
-    dry_run: bool = False,
+    port_offset: int = 1000, dry_run: bool = False,
 ) -> AdaMemPolicyReceipt:
     """Execute prefix/update/suffix with a policy state transition at the cutover."""
 
@@ -149,8 +171,10 @@ def run_trajectory(
                 past_bin=past_bin, past_root=past_root, sequence=prefix_manifest_file,
                 trace_dir=prefix_root, config=config, registry=registry, model=base_model,
                 base_url=base_url, policy_path=None,
+                port_offset=port_offset,
             ), cwd=past_root, check=True,
         )
+        _require_accepted_phase(prefix_root)
 
     feedback_view = feedback_view_for_condition(condition)
     policy = policy_root
@@ -205,8 +229,10 @@ def run_trajectory(
                 trace_dir=suffix_root, config=config, registry=registry, model=base_model,
                 base_url=base_url,
                 policy_path=(None if condition == AdaMemCondition.MEM0_STATIC else policy_file),
+                port_offset=port_offset,
             ), cwd=past_root, check=True,
         )
+        _require_accepted_phase(suffix_root)
     return receipt
 
 
@@ -226,6 +252,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--api-key-env", default="GPT_LUNA_API_KEY")
     parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--port-offset", type=int, default=1000)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     condition = AdaMemCondition(args.condition)
@@ -242,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         base_model=args.base_model, meta_agent_model=args.meta_agent_model,
         base_url=args.base_url, api_key=os.environ.get(args.api_key_env),
         update_budget=1, temperature=args.temperature, dry_run=args.dry_run,
+        port_offset=args.port_offset,
     )
     print(json.dumps(receipt.payload(), ensure_ascii=True, sort_keys=True))
     return 0
