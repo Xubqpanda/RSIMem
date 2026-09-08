@@ -1,23 +1,39 @@
 # RSIMem Progress
 
-Last updated: 2026-09-05
+Last updated: 2026-09-08
 
 ## Authoritative Current Status
 
-The active research line is now `native-attribution-repair-v1`:
+The active research line is now `adamem-trajectory-baseline-v1`:
 
 ```text
-native_static execution
-    -> lifecycle failure attribution
-    -> one-axis oracle repair
-    -> paired headroom
-    -> feedback-granularity validation
+Mem0Static train sequence
+    -> AdaMem policy update or abstention
+    -> matched N+1 validation
+    -> terminal versus full-trajectory comparison
 ```
 
-This supersedes the five-condition sensitivity matrix and the extraction-first
-N+1 line. Those implementations, reports, and outputs are retained only for
-historical replay and infrastructure evidence. They are not current experiment
-entrypoints and must not contribute quality observations to the new corpus.
+This supersedes the five-condition sensitivity matrix, extraction-only
+optimizer line, and native-attribution-repair line as current experiment
+entrypoints. They remain historical evidence and reusable infrastructure; they
+do not establish the current Semantic RSI comparison.
+
+The current documentation entrypoints are [README.md](README.md),
+[implementation_handoff_checklist.md](implementation_handoff_checklist.md),
+and [adamem_adapter_audit_20260908.md](adamem_adapter_audit_20260908.md).
+The active protocol fixes `B0_mem0_static`,
+`B1_mem0_adamem_terminal`, and `B2_mem0_adamem_full_trajectory` on the same
+Mem0 backend, train/N+1 split, base model, budget, and AdaMem patch space.
+Stage -1 documentation cleanup is in progress; no AdaMem or Mem0Static
+quality result is claimed yet.
+
+## Historical Log
+
+Everything below this heading is retained for dated evidence or reusable
+infrastructure context. It may describe superseded extraction-only,
+sensitivity, or native-attribution protocols and is not an active experiment
+entrypoint. Use [README.md](README.md) and the current checklist for the
+current route.
 
 Stage 0A, 0B, 0C, and 0D are complete. Stage 0C asset classification is recorded in
 [`stage0_native_attribution_cleanup_audit_20260905.md`](stage0_native_attribution_cleanup_audit_20260905.md).
