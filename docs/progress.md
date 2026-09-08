@@ -41,6 +41,19 @@ persistence-facing tool and state behavior.  Contract tests and dry-run
 command receipts pass.  No provider-backed three-backend smoke has run yet,
 so this is execution preparation rather than base-memory quality evidence.
 
+The first accepted three-backend Stage 0 smoke is now available for
+`SM01_preference_adoption`: `NoMemory`
+(`sm01-base-memory-luna56-r5-nomemory`), `HermesNative`
+(`sm01-base-memory-luna56-r6-hermesnative`), and `Mem0Static`
+(`sm01-base-memory-luna56-r5-mem0static`). Each run used the frozen
+`gpt-5.6-luna` model, its own port/state/Hermes-home/artifact root, and nine
+complete usage records. The fail-closed audit is
+`outputs/base_memory_smoke_20260908/sm01-current-trio-audit-20260908-r1.json`.
+It verified identity invariants and found 444 Mem0Static operation-evidence
+events spanning extraction, mutation, retrieval, and injection. This is one
+single-family smoke only: raw scores/tokens remain evidence, not a backend
+quality comparison, an uplift claim, or an RSI result.
+
 The first deterministic AdaMem policy adapter is now available as
 `rsimem.adamem_adapter`. It preserves AdaMem's `general_policy` /
 `by_character` patch contract, fail-closed parse/no-op behavior, terminal versus
