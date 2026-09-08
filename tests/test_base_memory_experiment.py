@@ -39,11 +39,19 @@ def test_no_memory_preserves_persistence_and_only_removes_semantic_memory() -> N
 
 
 def test_compare_rejects_model_or_fixture_drift() -> None:
-    common = {"run_id": "one", "condition": "NoMemory", "backend": {}, "port_offset": 1,
+    common = {"manifest_id": "left", "runs": [], "sequence_digest": "a", "run_id": "one", "condition": "NoMemory", "backend": {}, "port_offset": 1,
               "state_directory": "state", "trace_directory": "trace", "artifact_directory": "artifacts", "hermes_home_directory": "home", "base_model": "gpt-5.6-luna"}
     right = {**common, "run_id": "two", "condition": "Mem0Static", "base_model": "gpt-5.4"}
     with pytest.raises(ValueError, match="identity drift"):
         compare_run_manifests(common, right)
+
+
+def test_compare_accepts_fresh_assembly_and_backend_sequence_difference() -> None:
+    left = {"manifest_id": "one", "runs": ["one"], "sequence_digest": "a", "run_id": "one", "condition": "NoMemory", "backend": {"id": "none"}, "port_offset": 1,
+            "state_directory": "state-one", "trace_directory": "trace-one", "artifact_directory": "artifacts-one", "hermes_home_directory": "home-one", "base_model": "gpt-5.6-luna"}
+    right = {**left, "manifest_id": "two", "runs": ["two"], "sequence_digest": "b", "run_id": "two", "condition": "Mem0Static", "backend": {"id": "mem0"}, "port_offset": 2,
+             "state_directory": "state-two", "trace_directory": "trace-two", "artifact_directory": "artifacts-two", "hermes_home_directory": "home-two"}
+    assert set(compare_run_manifests(left, right)) == {"manifest_id", "runs", "sequence_digest", "run_id", "condition", "backend", "port_offset", "state_directory", "trace_directory", "artifact_directory", "hermes_home_directory"}
 
 
 def test_prepare_writes_three_backend_specific_immutable_manifests(tmp_path: Path) -> None:

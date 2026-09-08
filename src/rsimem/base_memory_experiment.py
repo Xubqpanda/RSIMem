@@ -171,7 +171,16 @@ def compare_run_manifests(left: dict[str, object], right: dict[str, object]) -> 
 
     if set(left) != set(right):
         raise ValueError("base-memory run manifest shape differs")
-    allowed = {"run_id", "condition", "backend", "port_offset", "state_directory", "trace_directory", "artifact_directory", "hermes_home_directory"}
+    # ``manifest_id``/``runs`` identify the complete comparison assembly and
+    # naturally differ when independently launched conditions use fresh run
+    # roots. ``sequence_digest`` differs only because the selected backend is
+    # rendered into the otherwise source-bound sequence. The source digest and
+    # all protocol/model/config identities remain mandatory equalities.
+    allowed = {
+        "manifest_id", "runs", "run_id", "condition", "backend", "sequence_digest",
+        "port_offset", "state_directory", "trace_directory", "artifact_directory",
+        "hermes_home_directory",
+    }
     differences = {key: (left[key], right[key]) for key in left if left[key] != right[key]}
     unexpected = set(differences) - allowed
     if unexpected:
