@@ -4684,6 +4684,16 @@ class AIAgent:
                         "effort": "medium"
                     }
 
+        # The Luna gateway defaults tool-bearing chat-completions requests to
+        # reasoning unless this OpenAI-compatible field is explicit.  Its
+        # /v1/chat/completions route rejects that combination, so preserving
+        # the configured no-reasoning mode requires a top-level override.
+        if (
+            self.reasoning_config == {"enabled": False}
+            and self.model.lower() == "gpt-5.6-luna"
+        ):
+            extra_body["reasoning_effort"] = "none"
+
         # Nous Portal product attribution
         if _is_nous:
             extra_body["tags"] = ["product=hermes-agent"]
