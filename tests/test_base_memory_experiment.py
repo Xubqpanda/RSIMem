@@ -96,3 +96,18 @@ def test_single_condition_execution_leaves_other_conditions_unlaunched(tmp_path:
     for run in manifest.runs:
         launch = tmp_path / "out" / run.run_id / "launch.json"
         assert launch.exists() is (run.condition is BaseMemoryCondition.NO_MEMORY)
+
+
+def test_launcher_does_not_put_api_key_in_receipts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    sequence = tmp_path / "source.yaml"
+    sequence.write_text("name: fixture\nepisodes:\n  - task: task.yaml\n", encoding="utf-8")
+    config = tmp_path / "config.yaml"; config.write_text("x: 1\n", encoding="utf-8")
+    registry = tmp_path / "registry.yaml"; registry.write_text("x: 1\n", encoding="utf-8")
+    monkeypatch.setenv("GPT_LUNA_API_KEY", "sk-secret-test")
+    run_comparison(
+        source_sequence=sequence, output_root=tmp_path / "out", family_id="SM01",
+        past_bin=tmp_path / "past-bench", past_root=tmp_path, config=config,
+        registry=registry, base_url="https://example.test/v1", token_budget=32,
+        condition=BaseMemoryCondition.NO_MEMORY, dry_run=True,
+    )
+    assert "sk-secret-test" not in (tmp_path / "out" / "base-memory-nomemory" / "launch.json").read_text()

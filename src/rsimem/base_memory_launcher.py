@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 from typing import Mapping
@@ -152,7 +153,14 @@ def run_comparison(
         )
         _write_json(root / "launch.json", {"command": command, "dry_run": dry_run})
         if not dry_run:
-            subprocess.run(command, cwd=past_root, check=True)
+            environment = os.environ.copy()
+            # The Hermes registry names its required credential
+            # ANTHROPIC_API_KEY even when the runtime is pointed at an
+            # OpenAI-compatible endpoint.  Keep the secret out of manifests
+            # and command receipts while satisfying the registry preflight.
+            if environment.get("GPT_LUNA_API_KEY") and not environment.get("ANTHROPIC_API_KEY"):
+                environment["ANTHROPIC_API_KEY"] = environment["GPT_LUNA_API_KEY"]
+            subprocess.run(command, cwd=past_root, check=True, env=environment)
             _require_accepted_phase(root / run.trace_directory)
     return manifest
 
