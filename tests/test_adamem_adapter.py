@@ -25,7 +25,7 @@ def test_patch_updates_policy_and_render_boundary() -> None:
     assert result.candidate_policy.parent_version == root.version
     rendered = render_extraction_instructions(result.candidate_policy)
     assert "Ava" in rendered
-    assert result.candidate_policy.general_policy in rendered
+    assert result.candidate_policy.general_policy not in rendered
 
 
 @pytest.mark.parametrize("raw,reason", [

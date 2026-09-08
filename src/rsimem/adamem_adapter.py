@@ -204,7 +204,6 @@ def render_extraction_instructions(policy: AdaMemPolicy) -> str:
         preferences = "(none; use the default extraction behavior for each person.)"
     return (
         "User-specific memory extraction preferences:\n"
-        f"- General policy: {policy.general_policy}\n"
         f"{preferences}\n\n"
         "Treat every rule as an additional positive priority. Preserve relevant "
         "facts outside a listed preference when they concern the user's plans, "
