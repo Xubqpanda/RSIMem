@@ -99,7 +99,7 @@ def compare_run_manifests(left_path: Path, right_path: Path) -> dict[str, tuple[
 def _reflect_via_openai(
     request: Mapping[str, object], *, api_key: str, base_url: str, model: str,
     max_tokens: int, temperature: float,
-) -> str:
+) -> tuple[str, dict[str, int | None]]:
     body = {
         "model": model,
         "temperature": temperature,
@@ -133,7 +133,30 @@ def _reflect_via_openai(
     content = message.get("content") if isinstance(message, dict) else None
     if not isinstance(content, str):
         raise ValueError("AdaMem reflection response has no text content")
-    return content
+    usage = payload.get("usage") if isinstance(payload, dict) else None
+    if not isinstance(usage, Mapping):
+        raise ValueError("AdaMem reflection response lacks usage")
+
+    def integer(*names: str, required: bool = False) -> int | None:
+        for name in names:
+            value = usage.get(name)
+            if type(value) is int and value >= 0:
+                return value
+        if required:
+            raise ValueError("AdaMem reflection usage is incomplete")
+        return None
+
+    normalized_usage = {
+        "input_tokens": integer("prompt_tokens", "input_tokens", required=True),
+        "output_tokens": integer("completion_tokens", "output_tokens", required=True),
+        "total_tokens": integer("total_tokens"),
+        "cache_read_tokens": integer("prompt_cache_hit_tokens", "cache_read_tokens"),
+        "cache_write_tokens": integer("cache_creation_input_tokens", "cache_write_tokens"),
+        "reasoning_tokens": integer("reasoning_tokens"),
+        "request_count": 1,
+        "usage_complete": True,
+    }
+    return content, normalized_usage
 
 
 def _past_command(
@@ -273,12 +296,21 @@ def run_trajectory(
             )
         if api_key is None and not dry_run:
             raise ValueError("AdaMem update requires an API key")
-        result = update_policy(
-            parent=policy_root, feedback_view=feedback_view, feedback=feedback,
-            reflect=lambda request: _reflect_via_openai(
+        updater_usage: dict[str, int | None] | None = None
+
+        def reflect(request: Mapping[str, object]) -> str:
+            nonlocal updater_usage
+            if dry_run:
+                return "{}"
+            content, updater_usage = _reflect_via_openai(
                 request, api_key=api_key, base_url=base_url, model=meta_agent_model,
                 max_tokens=1024, temperature=temperature,
-            ) if not dry_run else "{}",
+            )
+            return content
+
+        result = update_policy(
+            parent=policy_root, feedback_view=feedback_view, feedback=feedback,
+            reflect=reflect,
         )
         policy = result.candidate_policy
         receipt = AdaMemPolicyReceipt.from_update(split=split, result=result)
@@ -287,6 +319,10 @@ def run_trajectory(
             "feedback_digest": result.feedback_digest,
             "request_digest": result.request_digest,
         })
+        if not dry_run:
+            if updater_usage is None:
+                raise RuntimeError("AdaMem updater did not return complete usage")
+            _write_json(run_root / "updater_usage.json", updater_usage)
     policy_file = run_root / "policies" / "policy_active.json"
     _write_json(policy_file, policy.payload())
     policy_updated = receipt.outcome == "updated"

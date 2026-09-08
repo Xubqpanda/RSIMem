@@ -27,6 +27,11 @@ def _batch(root: Path, condition: AdaMemCondition, *, count: int = 3) -> None:
                 {"bucket": "evaluation", "task_id": "eval", "task_score": 1,
                  "token_usage": {"model_usage_complete": True, "input_tokens": 2}}
             ]}), encoding="utf-8")
+        if condition is not AdaMemCondition.MEM0_STATIC:
+            (run / "updater_usage.json").write_text(json.dumps({
+                "input_tokens": 3, "output_tokens": 1, "request_count": 1,
+                "usage_complete": True,
+            }), encoding="utf-8")
         outcomes[run_id] = {"outcome": "updated" if condition is AdaMemCondition.ADAMEM_FULL_TRAJECTORY else ("no_update" if condition is AdaMemCondition.ADAMEM_TERMINAL else "static"), "candidate_policy_version": "policy"}
     (root / "batch_result.json").write_text(json.dumps({"accepted": True, "outcomes": outcomes}), encoding="utf-8")
 
@@ -39,6 +44,7 @@ def test_aggregate_requires_all_three_conditions(tmp_path: Path) -> None:
     report = aggregate_batches(roots)
     assert report["accepted"] is True
     assert report["conditions"][AdaMemCondition.ADAMEM_FULL_TRAJECTORY.value]["update_rate"] == 1.0
+    assert report["conditions"][AdaMemCondition.ADAMEM_FULL_TRAJECTORY.value]["updater_input_tokens"]["mean"] == 3.0
 
 
 def test_aggregate_rejects_incomplete_condition(tmp_path: Path) -> None:

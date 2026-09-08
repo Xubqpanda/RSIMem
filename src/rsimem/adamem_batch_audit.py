@@ -44,6 +44,14 @@ def audit_batch(batch_root: Path) -> dict[str, object]:
             raise ValueError("AdaMem replicate number is invalid")
         _require_accepted_phase(root / "prefix")
         _require_accepted_phase(root / "suffix")
+        if condition is not AdaMemCondition.MEM0_STATIC and (root / "updater_usage.json").exists():
+            usage = _load(root / "updater_usage.json")
+            if usage.get("usage_complete") is not True:
+                raise ValueError("AdaMem updater usage is incomplete")
+            for field in ("input_tokens", "output_tokens", "request_count"):
+                value = usage.get(field)
+                if type(value) is not int or value < 0:
+                    raise ValueError("AdaMem updater usage is malformed")
         identities.append(manifest)
     for field in ("state_directory", "trace_directory", "artifact_directory", "mem0_collection"):
         values = [item.get(field) for item in identities]

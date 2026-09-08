@@ -77,13 +77,23 @@ def aggregate_batches(batch_roots: Mapping[AdaMemCondition, Path]) -> dict[str, 
             if len(complete_usage) != len(usage):
                 raise ValueError("incomplete model usage in accepted replicate")
             suffix_input_tokens = sum(int(u.get("input_tokens", 0) or 0) for u in complete_usage)
+            updater_usage = None
+            updater_usage_path = root / str(run_id) / "updater_usage.json"
+            if condition is not AdaMemCondition.MEM0_STATIC and updater_usage_path.exists():
+                updater_usage = _load(updater_usage_path)
+                if updater_usage.get("usage_complete") is not True:
+                    raise ValueError("AdaMem updater usage is incomplete")
+                for field in ("input_tokens", "output_tokens", "request_count"):
+                    value = updater_usage.get(field)
+                    if type(value) is not int or value < 0:
+                        raise ValueError("AdaMem updater usage is malformed")
             row = {"condition": condition.value, "replicate": replicate, "run_id": run_id,
                    "policy_outcome": outcome.get("outcome"), "policy_version": outcome.get("candidate_policy_version"),
                    "evaluation_scores": {task: ep.get("task_score") for task, ep in sorted(episodes.items())},
                    "suffix_input_tokens": suffix_input_tokens,
                    # Older accepted runs only persist an updater request digest;
                    # never present suffix task usage as updater usage.
-                   "updater_input_tokens": None}
+                   "updater_input_tokens": (updater_usage.get("input_tokens") if updater_usage else None)}
             condition_rows.append(row); rows.append(row)
         by_condition[condition.value] = condition_rows
     task_ids = sorted({task for row in rows for task in row["evaluation_scores"]})
@@ -94,11 +104,17 @@ def aggregate_batches(batch_roots: Mapping[AdaMemCondition, Path]) -> dict[str, 
         scores = {task: _mean_sd([float(row["evaluation_scores"][task]) for row in condition_rows]) for task in task_ids}
         outcomes = [row["policy_outcome"] for row in condition_rows]
         updater = condition is not AdaMemCondition.MEM0_STATIC
+        updater_inputs = [row["updater_input_tokens"] for row in condition_rows]
+        if updater and any(value is None for value in updater_inputs) and any(value is not None for value in updater_inputs):
+            raise ValueError("AdaMem updater usage is only partially available")
         updated = sum(value == "updated" for value in outcomes)
         no_update = sum(value == "no_update" for value in outcomes)
         summary["conditions"][condition.value] = {"replicates": 3, "evaluation_scores": scores,
             "suffix_input_tokens": _mean_sd([float(row["suffix_input_tokens"]) for row in condition_rows]),
-            "updater_input_tokens": None,
+            "updater_input_tokens": (
+                _mean_sd([float(value) for value in updater_inputs])
+                if updater and all(value is not None for value in updater_inputs) else None
+            ),
             "updater_attempted": updater, "proposal_rate": (updated + no_update) / 3 if updater else 0.0,
             "abstention_rate": no_update / 3 if updater else None, "acceptance_rate": updated / 3 if updater else None,
             "update_rate": updated / 3 if updater else 0.0, "rollback_rate": 0.0}
