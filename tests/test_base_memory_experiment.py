@@ -27,10 +27,11 @@ def test_manifest_requires_all_isolated_backends() -> None:
 
 
 def test_no_memory_preserves_persistence_and_only_removes_semantic_memory() -> None:
-    source = {"name": "fixture", "episodes": [{"task": "task.yaml"}], "hermes": {"skills_enabled": True, "session_search_enabled": True}}
+    source = {"name": "fixture", "episodes": [{"task": "task.yaml", "shared_cold_run": True}], "hermes": {"skills_enabled": True, "session_search_enabled": True}}
     no_memory = _materialize_sequence(source, BaseMemoryCondition.NO_MEMORY)
     assert no_memory["hermes"]["memory_enabled"] is False
     assert no_memory["hermes"]["skills_enabled"] is True
+    assert no_memory["episodes"][0]["shared_cold_run"] is False
     assert _backend_descriptor(BaseMemoryCondition.NO_MEMORY)["persistence_variant"] == "with_persistence"
     static = _materialize_sequence(source, BaseMemoryCondition.MEM0_STATIC)
     assert static["hermes"]["rsimem_semantic_writeback_mode"] == "static"

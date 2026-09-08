@@ -64,6 +64,10 @@ def _materialize_sequence(
         if not isinstance(episode, Mapping):
             raise ValueError("base-memory source episode must be a mapping")
         materialized = dict(episode)
+        # Explicit per-run state/home roots require ordinary execution.  The
+        # PAST shared-cold optimization is a cross-variant state reuse path and
+        # is incompatible with the Stage 0 isolation contract.
+        materialized["shared_cold_run"] = False
         task = materialized.get("task")
         if not isinstance(task, str) or not task:
             raise ValueError("base-memory source episode task is invalid")
