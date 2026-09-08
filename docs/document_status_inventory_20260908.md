@@ -11,7 +11,7 @@ not an active AdaMem experiment instruction.
 
 | Files | Status | Role |
 | --- | --- | --- |
-| `README.md`, `implementation_handoff_checklist.md`, `progress.md` | `current` | Entry, active protocol, and current execution state. |
+| `README.md`, `implementation_handoff_checklist.md`, `progress.md`, `sm01_adamem_trajectory_results_20260908.md` | `current` | Entry, active protocol, execution state, and final SM01 result. |
 | `adamem_adapter_audit_20260908.md` | `reference` | Frozen upstream/adaptation boundary for the current protocol. |
 | `document_status_inventory_20260908.md` | `current` | This classification index. |
 
@@ -55,7 +55,8 @@ above. It must produce no output when this inventory is updated:
 ```bash
 find docs/archive -maxdepth 1 -type f -printf '%f\n' | sort | awk '
   $0 == "README.md" || $0 == "implementation_handoff_checklist.md" ||
-  $0 == "progress.md" || $0 == "adamem_adapter_audit_20260908.md" ||
+  $0 == "progress.md" || $0 == "sm01_adamem_trajectory_results_20260908.md" ||
+  $0 == "adamem_adapter_audit_20260908.md" ||
   $0 == "document_status_inventory_20260908.md" { next }
   $0 ~ /^(dataset_selection|memory_adapters|usage_accounting|lifecycle_controller)\.md$/ { next }
   $0 ~ /^(experiment_plan|lifecycle_implementation_plan|current_checkpoint_20260901|case_analysis|provider_probe)\.md$/ { next }

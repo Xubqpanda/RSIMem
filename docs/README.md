@@ -9,7 +9,9 @@ Start here for current work:
 3. [AdaMem adaptation audit](adamem_adapter_audit_20260908.md): upstream
    mechanism, permitted adaptation boundary, and leakage boundary for the
    current Semantic RSI baseline.
-4. [Documentation status inventory](document_status_inventory_20260908.md):
+4. [SM01 formal results](sm01_adamem_trajectory_results_20260908.md): final
+   provenance-complete B0/B1/B2 comparison and its limits.
+5. [Documentation status inventory](document_status_inventory_20260908.md):
    current, reference, historical, and generated-evidence classification.
 
 Stage 0 base-memory preparation is implemented by
