@@ -214,14 +214,23 @@ def run_trajectory(
         })
     policy_file = run_root / "policies" / "policy_active.json"
     _write_json(policy_file, policy.payload())
-    binding = bind_to_mem0_flat(policy)
-    _write_json(run_root / "policy_binding.json", {
-        "policy_version": binding.policy_version,
-        "policy_digest": binding.policy_digest,
-        "artifact_id": binding.extraction_policy_artifact.artifact_id,
-        "artifact_digest": binding.extraction_policy_artifact.artifact_digest,
-        "binding_id": binding.binding.binding_id,
-    })
+    if condition == AdaMemCondition.MEM0_STATIC:
+        _write_json(run_root / "policy_binding.json", {
+            "binding_source": "mem0-flat-root",
+            "policy_version": "root-v1",
+            "adamem_policy_applied": False,
+        })
+    else:
+        binding = bind_to_mem0_flat(policy)
+        _write_json(run_root / "policy_binding.json", {
+            "binding_source": "adamem",
+            "policy_version": binding.policy_version,
+            "policy_digest": binding.policy_digest,
+            "artifact_id": binding.extraction_policy_artifact.artifact_id,
+            "artifact_digest": binding.extraction_policy_artifact.artifact_digest,
+            "binding_id": binding.binding.binding_id,
+            "adamem_policy_applied": True,
+        })
     _write_json(run_root / "policy_receipt.json", receipt.payload())
 
     prefix_home = prefix_root / "family_homes" / split.family_id / "hermes_home"

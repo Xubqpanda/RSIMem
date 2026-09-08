@@ -46,6 +46,15 @@ leaving retrieval, Hermes routing, task prompts, and model configuration
 unchanged. The policy file is parsed into `AdaMemPolicy`, converted to an
 immutable extraction artifact, and validated by `StaticSemanticWritebackRuntime`.
 
+The first accepted Stage 0 B0 smoke used the frozen `gpt-5.6-luna` model on
+`SM01_preference_adoption` (2026-09-08, isolated port offset `1000`). Both
+prefix and suffix had complete model usage. The semantic operation ledger
+contains automatic fact extraction, mutation, reread verification, retrieval,
+injection, and downstream-outcome events; `memory_calls=0` in the task summary
+means the agent did not explicitly call the Hermes memory tool, not that the
+Mem0Static write path was bypassed. This is an infrastructure/fidelity smoke,
+not a quality conclusion. The earlier `gpt-5.4` attempt remains excluded.
+
 An invalid `SM01_preference_adoption` B0 infrastructure attempt was launched
 on 2026-09-08 with a
 dedicated PAST service-port offset (`10105`) and completed its prefix/suffix
