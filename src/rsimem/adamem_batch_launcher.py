@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Mapping
@@ -71,6 +72,7 @@ def run_replicate_batch(
         registry=registry, replicate_count=replicate_count, temperature=temperature,
     )
     batch_root = output_root / batch_id
+    started_at = datetime.now(timezone.utc).isoformat()
     _write(batch_root / "batch_manifest.json", {
         "schema": "rsimem-adamem-replicate-batch-v1",
         "batch_id": batch_id,
@@ -79,6 +81,9 @@ def run_replicate_batch(
         "replicate_count": replicate_count,
         "max_workers": max_workers,
         "run_ids": [run.run_id for run in manifest.runs if run.condition is condition],
+        "started_at": started_at,
+        "condition_order": [condition.value],
+        "retry_reason": None,
     })
     runs = tuple(run for run in manifest.runs if run.condition is condition)
     # The manifest is written first; only these three same-condition runs may
@@ -123,6 +128,14 @@ def run_replicate_batch(
         "condition": condition.value,
         "accepted": accepted,
         "outcomes": outcomes,
+        "started_at": started_at,
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "condition_order": [condition.value],
+        "provider_health": {
+            "status": "healthy" if accepted else "degraded",
+            "evidence": "complete_run_usage" if accepted else "infrastructure_failure",
+        },
+        "retry_reason": None,
     }
     _write(batch_root / "batch_result.json", report)
     return report

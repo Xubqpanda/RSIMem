@@ -57,3 +57,8 @@ def test_batch_writes_manifest_before_replicate_execution(tmp_path: Path, monkey
     assert report["accepted"] is True
     assert (tmp_path / "out" / "batch" / "batch_manifest.json").is_file()
     assert len(seen) == 3
+    manifest = json.loads((tmp_path / "out" / "batch" / "batch_manifest.json").read_text())
+    assert manifest["condition_order"] == [AdaMemCondition.MEM0_STATIC.value]
+    assert manifest["started_at"]
+    assert report["provider_health"]["status"] == "healthy"
+    assert report["finished_at"]
