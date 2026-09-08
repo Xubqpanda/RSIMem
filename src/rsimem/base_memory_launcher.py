@@ -51,8 +51,25 @@ def _backend_descriptor(condition: BaseMemoryCondition) -> dict[str, object]:
     }
 
 
-def _materialize_sequence(source: Mapping[str, object], condition: BaseMemoryCondition) -> dict[str, object]:
+def _materialize_sequence(
+    source: Mapping[str, object], condition: BaseMemoryCondition, *, source_directory: Path | None = None,
+) -> dict[str, object]:
     result = dict(source)
+    episodes = result.get("episodes")
+    if not isinstance(episodes, list):
+        raise ValueError("base-memory source sequence must contain episodes")
+    materialized_episodes: list[dict[str, object]] = []
+    for episode in episodes:
+        if not isinstance(episode, Mapping):
+            raise ValueError("base-memory source episode must be a mapping")
+        materialized = dict(episode)
+        task = materialized.get("task")
+        if not isinstance(task, str) or not task:
+            raise ValueError("base-memory source episode task is invalid")
+        if source_directory is not None and not Path(task).is_absolute():
+            materialized["task"] = str((source_directory / task).resolve())
+        materialized_episodes.append(materialized)
+    result["episodes"] = materialized_episodes
     hermes = dict(result.get("hermes") or {})
     descriptor = _backend_descriptor(condition)
     # Preserve persistence, sessions and task protocol.  NoMemory removes only
@@ -97,7 +114,9 @@ def prepare_comparison(*, source_sequence: Path, output_root: Path, family_id: s
     _write_json(output_root / "base_memory_manifest.json", manifest.payload())
     for run in manifest.runs:
         root = output_root / run.run_id
-        sequence = _materialize_sequence(source, run.condition)
+        sequence = _materialize_sequence(
+            source, run.condition, source_directory=source_sequence.parent,
+        )
         sequence_file = root / "sequence.yaml"
         sequence_file.parent.mkdir(parents=True, exist_ok=True)
         sequence_file.write_text(yaml.safe_dump(sequence, allow_unicode=False, sort_keys=False), encoding="utf-8")
