@@ -2097,6 +2097,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         "rsimem_revocation_registry",
         None,
     )
+    adamem_policy_path = getattr(args, "rsimem_adamem_policy", None)
     revocation_registry = None
     if revocation_registry_path is not None:
         from rsimem.memory.revocation import JsonRevocationRegistry
@@ -2123,6 +2124,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         extraction_trial_path,
         extraction_offline_path,
         revocation_registry_path,
+        adamem_policy_path,
     )) and not verify_projection:
         return
     if not str(args.agent).startswith("hermes"):
@@ -2222,6 +2224,11 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
         sequence.hermes.rsimem_revocation_registry_path = str(
             revocation_registry.path
         )
+    if adamem_policy_path is not None:
+        path = Path(adamem_policy_path).expanduser().resolve()
+        if not path.is_file() or path.is_symlink():
+            raise SystemExit("invalid AdaMem policy: expected an existing regular file")
+        sequence.hermes.rsimem_adamem_policy_source_path = str(path)
     adaptive_selected = (
         sequence.hermes.rsimem_semantic_writeback_mode == "adaptive_utility"
     )
@@ -3942,6 +3949,14 @@ def main(argv: list[str] | None = None) -> None:
         ],
         default=None,
         help="Pre-registered deployment signal contract for semantic feedback",
+    )
+    p_evolve.add_argument(
+        "--rsimem-adamem-policy",
+        default=None,
+        help=(
+            "Path to an immutable AdaMem policy JSON file. It is copied into "
+            "each isolated Hermes artifact directory and requires static semantic writeback."
+        ),
     )
     p_evolve.add_argument(
         "--rsimem-adaptive-config",
