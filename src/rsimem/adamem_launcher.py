@@ -116,6 +116,17 @@ def run_trajectory(
     if update_budget != 1:
         raise ValueError("AdaMem baseline currently permits exactly one update")
     source = _read_yaml(source_sequence)
+    episodes = source.get("episodes")
+    if not isinstance(episodes, list):
+        raise ValueError("AdaMem source sequence requires episodes")
+    # Temporary phase manifests live under the run artifact root, so retain
+    # the original sequence directory as the authority for relative task refs.
+    for episode in episodes:
+        if not isinstance(episode, dict) or not isinstance(episode.get("task"), str):
+            raise ValueError("AdaMem source episode task is invalid")
+        task = Path(episode["task"])
+        if not task.is_absolute():
+            episode["task"] = str((source_sequence.parent / task).resolve())
     split = split_family_manifest(source, cutover_label=cutover_label)
     if split.family_id not in source_sequence.name:
         # The source filename is audit metadata, never a replacement for YAML identity.
