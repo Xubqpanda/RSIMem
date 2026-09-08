@@ -27,8 +27,26 @@ Mem0 backend, train/N+1 split, base model, budget, and AdaMem patch space.
 Stage -1 documentation cleanup is complete. The Mem0Static runtime now
 accepts an isolated, validated AdaMem extraction policy artifact through the
 PAST/Hermes launch boundary. B0, B1, and B2 each have a single accepted
-orchestration smoke, but not a single frozen-revision matched trio; no quality
-result is claimed yet.
+orchestration smoke and the first frozen-revision SM01 formal batch trio. No
+general quality result is claimed yet.
+
+The first formal `SM01_preference_adoption` comparison is frozen under
+`outputs/adamem_formal_20260908/`: B0
+(`sm01-b0-formal-20260908-r1`), B1
+(`sm01-b1-formal-20260908-r1`), and B2
+(`sm01-b2-formal-20260908-r1`). Each condition has three accepted isolated
+replicates, with complete prefix/suffix usage and a fail-closed batch audit.
+The comparison aggregate is
+`outputs/adamem_formal_20260908/sm01-comparison-aggregate.json`. B1 abstained
+in all three updates (`no_update` / `empty_patch`); B2 produced and activated a
+distinct policy in all three. Both held-out N+1 evaluation tasks scored `1.0`
+for every replicate and every condition, so every paired B2-B0 and B2-B1 delta
+is `0.0`. This establishes an auditable information-dependent policy-update
+signal, not an uplift claim. The accepted historical receipts lack provider
+token usage for the meta-agent update call; the aggregate reports suffix task
+usage separately and leaves `updater_input_tokens` null rather than conflating
+the two. Future formal batches must persist updater usage before a raw-resource
+comparison is reported.
 
 The Stage 0 base-memory comparison now has a separate
 `base-memory-comparison-v1` contract and launcher.  It materializes isolated
