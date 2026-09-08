@@ -64,6 +64,14 @@ prompt-binding provenance, rather than relying only on the policy-binding
 receipt. This remains a single orchestration/fidelity smoke, not a replicated
 matched quality result.
 
+The current revision also has a separate `AdaMem-native` fidelity smoke for
+SM01 (`sm01-adamem-native-luna56-current-20260908-r1`). It uses the same
+policy patch/apply/render boundary but the native-style feedback adapter, whose
+audited request contains only `messages`; its reconstructed request digest
+matches the stored receipt. The native run activated
+`adamem-policy.86f65dd2022c7edffc549e1f`. This is a fidelity observation and
+does not join the B0/B1/B2 quality denominator.
+
 The first deterministic AdaMem policy adapter is now available as
 `rsimem.adamem_adapter`. It preserves AdaMem's `general_policy` /
 `by_character` patch contract, fail-closed parse/no-op behavior, terminal versus
