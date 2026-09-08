@@ -54,6 +54,16 @@ events spanning extraction, mutation, retrieval, and injection. This is one
 single-family smoke only: raw scores/tokens remain evidence, not a backend
 quality comparison, an uplift claim, or an RSI result.
 
+The AdaMem B0/B1/B2 smoke was rerun against the current Luna-compatible
+launcher revision on `SM01_preference_adoption`. The accepted trio is under
+`outputs/adamem_current_20260908/`: B0 is static, B1 terminal returned
+`NO_UPDATE/empty_patch`, and B2 full trajectory activated
+`adamem-policy.3d8896c1a48a121da88f2c55`. The trio audit additionally verifies
+that an updated B2 policy occurs as a suffix `policy_parameter` revision with
+prompt-binding provenance, rather than relying only on the policy-binding
+receipt. This remains a single orchestration/fidelity smoke, not a replicated
+matched quality result.
+
 The first deterministic AdaMem policy adapter is now available as
 `rsimem.adamem_adapter`. It preserves AdaMem's `general_policy` /
 `by_character` patch contract, fail-closed parse/no-op behavior, terminal versus

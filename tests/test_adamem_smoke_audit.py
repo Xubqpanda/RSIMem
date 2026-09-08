@@ -24,6 +24,13 @@ def _write_run(root: Path, condition: AdaMemCondition, *, outcome: str, applied:
     for phase in ("prefix", "suffix"):
         (root / phase).mkdir()
         (root / phase / "sequence_results.json").write_text(json.dumps({"episodes": [{"token_usage": {"model_usage_complete": True}}]}), encoding="utf-8")
+    if condition is AdaMemCondition.ADAMEM_FULL_TRAJECTORY and outcome == "updated":
+        operation = {"payload": {"kind": "policy_parameter", "revision": "adamem-policy.updated", "provenance_ref": "prompt-binding.test"}}
+        (root / "suffix" / "policy_ops").mkdir()
+        (root / "suffix" / "policy_ops" / "rsimem_semantic_operations.jsonl").write_text(json.dumps(operation), encoding="utf-8")
+        receipt = json.loads((root / "policy_receipt.json").read_text())
+        receipt["candidate_policy_version"] = "adamem-policy.updated"
+        (root / "policy_receipt.json").write_text(json.dumps(receipt), encoding="utf-8")
 
 
 def test_smoke_audit_accepts_valid_no_update_and_update(tmp_path: Path) -> None:

@@ -35,6 +35,32 @@ def _complete_usage(run_root: Path) -> bool:
     return True
 
 
+def _assert_updated_policy_is_used(run_root: Path, receipt: Mapping[str, object]) -> None:
+    """Prove B2's activated policy reached a later Mem0 extraction boundary."""
+    expected = receipt.get("candidate_policy_version")
+    if not isinstance(expected, str) or not expected:
+        raise ValueError("AdaMem updated receipt has no candidate policy version")
+    suffix = run_root / "suffix"
+    found = False
+    for path in suffix.rglob("rsimem_semantic_operations.jsonl"):
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            try:
+                event = json.loads(raw)
+            except ValueError as exc:
+                raise ValueError("AdaMem semantic operation evidence is malformed") from exc
+            payload = event.get("payload") if isinstance(event, Mapping) else None
+            if not isinstance(payload, Mapping) or payload.get("kind") != "policy_parameter":
+                continue
+            if payload.get("revision") != expected:
+                raise ValueError("AdaMem suffix policy revision differs from receipt")
+            provenance = payload.get("provenance_ref")
+            if not isinstance(provenance, str) or not provenance.startswith("prompt-binding."):
+                raise ValueError("AdaMem suffix policy evidence lacks binding provenance")
+            found = True
+    if not found:
+        raise ValueError("AdaMem updated run lacks suffix policy evidence")
+
+
 def audit_smoke_trio(run_roots: Mapping[AdaMemCondition, Path]) -> dict[str, object]:
     """Audit the minimum runnable comparison; never calculate a quality claim."""
     expected = set(AdaMemCondition)
@@ -64,6 +90,10 @@ def audit_smoke_trio(run_roots: Mapping[AdaMemCondition, Path]) -> dict[str, obj
         raise ValueError("B1 no-update must retain Mem0Static binding")
     if b2.get("outcome") == "updated" and bindings[AdaMemCondition.ADAMEM_FULL_TRAJECTORY].get("adamem_policy_applied") is not True:
         raise ValueError("B2 update lacks AdaMem extraction binding")
+    if b2.get("outcome") == "updated":
+        _assert_updated_policy_is_used(
+            resolved[AdaMemCondition.ADAMEM_FULL_TRAJECTORY], b2
+        )
     return {
         "schema": "rsimem-adamem-smoke-audit-v1",
         "accepted": True,
