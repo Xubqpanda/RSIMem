@@ -15,7 +15,7 @@ from typing import Mapping
 
 import yaml
 
-from .adamem_adapter import AdaMemPolicy, bind_to_mem0_flat, update_policy
+from .adamem_adapter import AdaMemFeedbackView, AdaMemPolicy, bind_to_mem0_flat, update_policy
 from .adamem_experiment import AdaMemCondition, AdaMemRunSpec, feedback_view_for_condition
 from .adamem_runtime import (
     AdaMemPolicyReceipt,
@@ -161,6 +161,8 @@ def run_trajectory(
     config: Path, registry: Path, base_model: str, meta_agent_model: str,
     base_url: str, api_key: str | None, update_budget: int, temperature: float,
     port_offset: int = 1000, dry_run: bool = False,
+    feedback_view_override: AdaMemFeedbackView | None = None,
+    condition_label: str | None = None,
 ) -> AdaMemPolicyReceipt:
     """Execute prefix/update/suffix with a policy state transition at the cutover."""
 
@@ -202,7 +204,7 @@ def run_trajectory(
         "schema": "rsimem-adamem-run-manifest-v1",
         "protocol_id": "adamem-trajectory-baseline-v1",
         "run_id": run.run_id,
-        "condition": condition.value,
+        "condition": condition_label or condition.value,
         "feedback_view": (
             feedback_view_for_condition(condition).value
             if feedback_view_for_condition(condition) is not None else None
@@ -235,13 +237,17 @@ def run_trajectory(
         )
         _require_accepted_phase(prefix_root)
 
-    feedback_view = feedback_view_for_condition(condition)
+    feedback_view = feedback_view_override or feedback_view_for_condition(condition)
     policy = policy_root
     if feedback_view is None:
         receipt = AdaMemPolicyReceipt.static(split=split, policy=policy_root)
     else:
         if dry_run:
-            feedback = {"outcome": "deterministic_dry_run"}
+            feedback = (
+                {"messages": []}
+                if feedback_view is AdaMemFeedbackView.NATIVE
+                else {"outcome": "deterministic_dry_run"}
+            )
         else:
             feedback = build_pure_process_feedback(
                 feedback_view=feedback_view, trace_paths=_trace_paths(prefix_root),
@@ -309,11 +315,30 @@ def run_trajectory(
     return receipt
 
 
+def run_native_fidelity(
+    *, source_sequence: Path, run: AdaMemRunSpec, cutover_label: str,
+    output_root: Path, past_bin: Path, past_root: Path, config: Path,
+    registry: Path, base_model: str, meta_agent_model: str, base_url: str,
+    api_key: str | None, update_budget: int, temperature: float,
+    port_offset: int = 1000, dry_run: bool = False,
+) -> AdaMemPolicyReceipt:
+    """Run the audited AdaMem-native feedback shape as a separate fidelity baseline."""
+    return run_trajectory(
+        source_sequence=source_sequence, run=run, condition=AdaMemCondition.ADAMEM_TERMINAL,
+        cutover_label=cutover_label, output_root=output_root, past_bin=past_bin,
+        past_root=past_root, config=config, registry=registry, base_model=base_model,
+        meta_agent_model=meta_agent_model, base_url=base_url, api_key=api_key,
+        update_budget=update_budget, temperature=temperature, port_offset=port_offset,
+        dry_run=dry_run, feedback_view_override=AdaMemFeedbackView.NATIVE,
+        condition_label="AdaMem-native",
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sequence", type=Path, required=True)
     parser.add_argument("--cutover-label", required=True)
-    parser.add_argument("--condition", choices=[item.value for item in AdaMemCondition], required=True)
+    parser.add_argument("--condition", choices=[item.value for item in AdaMemCondition] + ["AdaMem-native"], required=True)
     parser.add_argument("--run-id", required=True)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--past-bin", type=Path, required=True)
@@ -328,14 +353,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--port-offset", type=int, default=1000)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
-    condition = AdaMemCondition(args.condition)
+    is_native = args.condition == "AdaMem-native"
+    condition = AdaMemCondition.ADAMEM_TERMINAL if is_native else AdaMemCondition(args.condition)
     run = AdaMemRunSpec(
         run_id=args.run_id, condition=condition, replicate=1,
         state_directory="runtime-state", trace_directory="runtime-trace",
         artifact_directory="runtime-artifacts", mem0_collection="runtime-mem0",
     )
-    receipt = run_trajectory(
-        source_sequence=args.sequence.resolve(), run=run, condition=condition,
+    common = dict(
+        source_sequence=args.sequence.resolve(), run=run,
         cutover_label=args.cutover_label, output_root=args.output_root.resolve(),
         past_bin=args.past_bin.resolve(), past_root=args.past_root.resolve(),
         config=args.config.resolve(), registry=args.registry.resolve(),
@@ -343,6 +369,10 @@ def main(argv: list[str] | None = None) -> int:
         base_url=args.base_url, api_key=os.environ.get(args.api_key_env),
         update_budget=1, temperature=args.temperature, dry_run=args.dry_run,
         port_offset=args.port_offset,
+    )
+    receipt = (
+        run_native_fidelity(**common)
+        if is_native else run_trajectory(condition=condition, **common)
     )
     print(json.dumps(receipt.payload(), ensure_ascii=True, sort_keys=True))
     return 0

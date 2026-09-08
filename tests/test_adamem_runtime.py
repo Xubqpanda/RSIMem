@@ -10,6 +10,7 @@ from rsimem.adamem_launcher import (
     _require_accepted_phase,
     compare_run_manifests,
     run_trajectory,
+    run_native_fidelity,
 )
 from rsimem.adamem_runtime import (
     AdaMemPolicyReceipt,
@@ -138,6 +139,31 @@ def test_no_update_retains_mem0_root_binding(tmp_path: Path) -> None:
     receipt = AdaMemPolicyReceipt.from_update(split=split, result=result)
     assert receipt.outcome == "no_update"
     assert receipt.candidate_policy_version == receipt.parent_policy_version
+
+
+def test_native_fidelity_uses_native_feedback_shape_and_label(tmp_path: Path) -> None:
+    source = _source()
+    for episode in source["episodes"]:
+        episode["task"] = "task.yaml"
+    sequence = tmp_path / "sequence.yaml"
+    sequence.write_text(__import__("yaml").safe_dump(source), encoding="utf-8")
+    for name in ("past", "config", "registry"):
+        (tmp_path / name).write_text(name, encoding="utf-8")
+    run = AdaMemRunSpec(
+        run_id="native-fidelity", condition=AdaMemCondition.ADAMEM_TERMINAL, replicate=1,
+        state_directory="state", trace_directory="trace", artifact_directory="artifacts",
+        mem0_collection="collection",
+    )
+    receipt = run_native_fidelity(
+        source_sequence=sequence, run=run, cutover_label="learn-a", output_root=tmp_path,
+        past_bin=tmp_path / "past", past_root=tmp_path, config=tmp_path / "config",
+        registry=tmp_path / "registry", base_model=FROZEN_MODEL_ID,
+        meta_agent_model=FROZEN_MODEL_ID, base_url="https://example.test/v1",
+        api_key=None, update_budget=1, temperature=0.0, dry_run=True,
+    )
+    assert receipt.feedback_view.value == "native"
+    manifest = __import__("json").loads((tmp_path / "native-fidelity" / "run_manifest.json").read_text())
+    assert manifest["condition"] == "AdaMem-native"
 
 
 def test_run_manifest_allows_only_condition_identity_differences(tmp_path: Path) -> None:
