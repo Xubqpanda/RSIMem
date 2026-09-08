@@ -72,6 +72,20 @@ correctly excluded after provider HTTP 503 caused incomplete prefix usage.
 When provider capacity is stable, rerun B0 then B1 then B2 under the current
 manifest before comparing N+1 outcomes.
 
+That current-revision retry completed on 2026-09-08 for
+`SM01_preference_adoption`: B0 `sm01-b0-luna56-smoke-20260908-r3`, B1
+`sm01-b1-luna56-smoke-20260908-r3`, and B2
+`sm01-b2-luna56-smoke-20260908-r2`. The fail-closed trio audit accepted all
+six prefix/suffix phases, and found no unauthorized manifest drift. B0 stayed
+static, B1 returned `NO_UPDATE` and retained the Mem0Static root binding, and
+B2 applied `adamem-policy.a1b926bd864044d56b3ab0fb` to suffix extraction.
+The audit artifact is
+`outputs/adamem_smoke_20260908/sm01-current-trio-audit-20260908-r1.json`.
+The two N+1 evaluation tasks produced raw task scores of `1.0` in each
+condition, but this is one smoke per condition, not a replicate batch or a
+quality/uplift conclusion. The benchmark `passed` flags also differ because
+they include hard-pass/communication checks; they are retained as raw output.
+
 An invalid `SM01_preference_adoption` B0 infrastructure attempt was launched
 on 2026-09-08 with a
 dedicated PAST service-port offset (`10105`) and completed its prefix/suffix
