@@ -427,6 +427,21 @@ class HermesPastBenchBridge:
             adaptive_store = None
             extraction_profile = None
             extraction_revocation_registry = None
+            adamem_binding = None
+            if static_writeback_config.adamem_policy_path is not None:
+                policy_path = Path(static_writeback_config.adamem_policy_path).expanduser().resolve()
+                capture_root = self.evidence_path.parent.resolve()
+                if not policy_path.is_relative_to(capture_root):
+                    raise ValueError("AdaMem policy must stay inside capture artifacts")
+                try:
+                    import json
+                    from .adamem_adapter import AdaMemPolicy, bind_to_mem0_flat
+
+                    adamem_binding = bind_to_mem0_flat(
+                        AdaMemPolicy.from_payload(json.loads(policy_path.read_text(encoding="utf-8")))
+                    )
+                except (OSError, ValueError, json.JSONDecodeError) as exc:
+                    raise ValueError("AdaMem policy artifact is invalid") from exc
             if static_writeback_config.adaptive_enabled:
                 relative_store = Path(
                     static_writeback_config.adaptive_policy_store_path or ""
@@ -527,7 +542,11 @@ class HermesPastBenchBridge:
                 extraction_policy_artifact=(
                     extraction_profile.candidate
                     if extraction_profile is not None
-                    else None
+                    else (
+                        adamem_binding.extraction_policy_artifact
+                        if adamem_binding is not None
+                        else None
+                    )
                 ),
                 expected_extraction_policy_artifact_id=(
                     extraction_profile.candidate.artifact_id

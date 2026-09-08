@@ -669,6 +669,7 @@ class HermesPersistenceConfig(BaseModel):
     rsimem_extraction_offline_profile: RSIMemExtractionOfflineValidationProfile | None = None
     rsimem_extraction_offline_source_path: str = Field(default="", exclude=True)
     rsimem_revocation_registry_path: str = Field(default="", exclude=True)
+    rsimem_adamem_policy_source_path: str = Field(default="", exclude=True)
 
     @model_validator(mode="after")
     def _validate_adaptive_writeback_pair(self):
@@ -699,6 +700,8 @@ class HermesPersistenceConfig(BaseModel):
             raise ValueError(
                 "extraction trial cannot use legacy adaptive utility config"
             )
+        if self.rsimem_adamem_policy_source_path and self.rsimem_semantic_writeback_mode != "static":
+            raise ValueError("AdaMem policy requires static semantic writeback")
         return self
 
 

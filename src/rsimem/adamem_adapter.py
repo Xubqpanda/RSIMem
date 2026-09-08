@@ -13,12 +13,16 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Callable, Mapping, Sequence
 
+from .memory.extraction_policy_artifact import (
+    ExtractionPolicyRule,
+    ExtractionPolicySpec,
+    ExtractionPromptPolicyArtifact,
+)
 from .memory.prompt_components import PromptBindingFingerprint, PromptComponentArtifact
 from .memory_systems.mem0_flat.prompt_adapter import (
     MEM0_FLAT_EXTRACTION_SLOT,
     Mem0FlatPromptAdapter,
 )
-from .memory_systems.mem0_flat.prompts import POLICY_FACT_EXTRACTION_ROOT_BODY
 
 
 ADAMEM_SCHEMA = "rsimem-adamem-policy-v1"
@@ -119,6 +123,26 @@ class AdaMemPolicy:
             "by_character": {name: rule for name, rule in self.by_character},
         }
 
+    @classmethod
+    def from_payload(cls, value: object) -> "AdaMemPolicy":
+        if not isinstance(value, Mapping) or set(value) != {
+            "schema", "version", "parent_version", "general_policy", "by_character",
+        }:
+            raise ValueError("malformed AdaMem policy")
+        rules = value["by_character"]
+        if not isinstance(rules, Mapping):
+            raise ValueError("malformed AdaMem character rules")
+        try:
+            return cls(
+                general_policy=value["general_policy"],
+                by_character=tuple(sorted(rules.items())),
+                version=value["version"],
+                parent_version=value["parent_version"],
+                schema=value["schema"],
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("malformed AdaMem policy") from exc
+
 
 @dataclass(frozen=True, slots=True)
 class AdaMemUpdateResult:
@@ -153,6 +177,7 @@ class AdaMemMem0Binding:
 
     policy_version: str
     policy_digest: str
+    extraction_policy_artifact: ExtractionPromptPolicyArtifact
     extraction_component: PromptComponentArtifact
     binding: PromptBindingFingerprint
 
@@ -160,6 +185,10 @@ class AdaMemMem0Binding:
         _identifier(self.policy_version, "AdaMem binding policy version")
         if self.policy_digest != self.extraction_component.source_provenance:
             raise ValueError("AdaMem binding provenance differs from policy digest")
+        if self.extraction_policy_artifact.policy_version != self.policy_version:
+            raise ValueError("AdaMem policy artifact version differs")
+        if self.extraction_policy_artifact.source_provenance != self.policy_digest:
+            raise ValueError("AdaMem policy artifact provenance differs")
         if self.extraction_component.slot_id != MEM0_FLAT_EXTRACTION_SLOT.slot_id:
             raise ValueError("AdaMem binding uses an unexpected extraction slot")
         if self.binding.artifact_id != self.extraction_component.artifact_id:
@@ -175,6 +204,7 @@ def render_extraction_instructions(policy: AdaMemPolicy) -> str:
         preferences = "(none; use the default extraction behavior for each person.)"
     return (
         "User-specific memory extraction preferences:\n"
+        f"- General policy: {policy.general_policy}\n"
         f"{preferences}\n\n"
         "Treat every rule as an additional positive priority. Preserve relevant "
         "facts outside a listed preference when they concern the user's plans, "
@@ -187,18 +217,24 @@ def bind_to_mem0_flat(policy: AdaMemPolicy) -> AdaMemMem0Binding:
 
     adapter = Mem0FlatPromptAdapter()
     policy_digest = policy.digest
-    component = PromptComponentArtifact.create(
+    root = adapter.export_root_policy_artifact(MEM0_FLAT_EXTRACTION_SLOT.slot_id)
+    artifact = ExtractionPromptPolicyArtifact.create_root(
         slot=MEM0_FLAT_EXTRACTION_SLOT,
-        version=policy.version,
-        policy_body=(
-            POLICY_FACT_EXTRACTION_ROOT_BODY
-            + "\n\nAdaMem extraction preferences:\n"
-            + render_extraction_instructions(policy)
+        policy_version=policy.version,
+        spec=ExtractionPolicySpec(
+            root.spec.rules + (
+                ExtractionPolicyRule(
+                    "adamem-preferences",
+                    render_extraction_instructions(policy),
+                ),
+            )
         ),
+        max_body_chars=root.max_body_chars,
         source_provenance=policy_digest,
     )
+    component = artifact.to_prompt_component(MEM0_FLAT_EXTRACTION_SLOT)
     binding = adapter.bind(MEM0_FLAT_EXTRACTION_SLOT.slot_id, component)
-    return AdaMemMem0Binding(policy.version, policy_digest, component, binding)
+    return AdaMemMem0Binding(policy.version, policy_digest, artifact, component, binding)
 
 
 def build_feedback_request(

@@ -24,8 +24,11 @@ and [adamem_adapter_audit_20260908.md](adamem_adapter_audit_20260908.md).
 The active protocol fixes `B0_mem0_static`,
 `B1_mem0_adamem_terminal`, and `B2_mem0_adamem_full_trajectory` on the same
 Mem0 backend, train/N+1 split, base model, budget, and AdaMem patch space.
-Stage -1 documentation cleanup is in progress; no AdaMem or Mem0Static
-quality result is claimed yet.
+Stage -1 documentation cleanup is in progress. The Mem0Static runtime now
+accepts an isolated, validated AdaMem extraction policy artifact through the
+PAST/Hermes launch boundary; this is deterministic wiring only. No provider
+backed AdaMem or Mem0Static smoke has been accepted, and no quality result is
+claimed yet.
 
 The first deterministic AdaMem policy adapter is now available as
 `rsimem.adamem_adapter`. It preserves AdaMem's `general_policy` /
@@ -35,6 +38,13 @@ full-trajectory feedback allowlists, and Mem0-flat extraction-slot binding.
 `B0_mem0_static`, `B1_mem0_adamem_terminal`, and
 `B2_mem0_adamem_full_trajectory` runs; it does not claim a live smoke or quality
 result.
+
+The runtime binding is intentionally narrow: `adamem_policy_path` is copied
+into each run's artifact directory and can only enable plain static semantic
+writeback. It replaces the `mem0-flat.semantic.extraction` policy body while
+leaving retrieval, Hermes routing, task prompts, and model configuration
+unchanged. The policy file is parsed into `AdaMemPolicy`, converted to an
+immutable extraction artifact, and validated by `StaticSemanticWritebackRuntime`.
 
 ## Historical Log
 

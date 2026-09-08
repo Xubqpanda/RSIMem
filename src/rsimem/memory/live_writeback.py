@@ -431,6 +431,7 @@ class StaticSemanticWritebackConfig:
     )
     extraction_runtime_config_path: str | None = None
     revocation_registry_path: str | None = None
+    adamem_policy_path: str | None = None
     schema_version: int = STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -495,6 +496,15 @@ class StaticSemanticWritebackConfig:
         elif self.revocation_registry_path is not None:
             raise ValueError(
                 "revocation registry path requires validated extraction runtime"
+            )
+        if self.adamem_policy_path is not None and not (
+            self.mode == StaticSemanticWritebackMode.STATIC
+            and not self.validated_extraction_enabled
+            and isinstance(self.adamem_policy_path, str)
+            and self.adamem_policy_path.strip()
+        ):
+            raise ValueError(
+                "AdaMem policy requires plain static semantic writeback"
             )
 
     @property
@@ -567,6 +577,7 @@ class StaticSemanticWritebackConfig:
             "extraction_runtime_scope",
             "extraction_runtime_config_path",
             "revocation_registry_path",
+            "adamem_policy_path",
         }
         unknown = set(value) - allowed
         if unknown:
@@ -627,6 +638,11 @@ class StaticSemanticWritebackConfig:
             revocation_registry_path=(
                 str(value["revocation_registry_path"])
                 if value.get("revocation_registry_path")
+                else None
+            ),
+            adamem_policy_path=(
+                str(value["adamem_policy_path"])
+                if value.get("adamem_policy_path")
                 else None
             ),
         )

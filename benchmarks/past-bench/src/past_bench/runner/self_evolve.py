@@ -132,6 +132,7 @@ def build_hermes_extra_body(
     rsimem_extraction_offline_profile: RSIMemExtractionOfflineValidationProfile | dict | None = None,
     rsimem_extraction_offline_source_path: str = "",
     rsimem_revocation_registry_path: str = "",
+    rsimem_adamem_policy_source_path: str = "",
     rsimem_application_opportunity_schema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
@@ -155,6 +156,15 @@ def build_hermes_extra_body(
             else "disabled"
         ),
     }
+    if rsimem_adamem_policy_source_path:
+        if semantic_writeback_mode != "static":
+            raise ValueError("AdaMem policy requires enabled static semantic writeback")
+        source_policy = Path(rsimem_adamem_policy_source_path).expanduser().absolute()
+        if source_policy.is_symlink() or not source_policy.is_file():
+            raise ValueError("AdaMem policy source must be an existing regular file")
+        target_policy = artifacts_dir / "adamem_policy.json"
+        _copy_immutable_file(source_policy, target_policy)
+        semantic_writeback["adamem_policy_path"] = str(target_policy)
     attempt_revocation_registry: Path | None = None
     if rsimem_revocation_registry_path:
         if (
@@ -927,6 +937,9 @@ class HermesPersistenceBackend(PersistenceBackend):
             ),
             rsimem_revocation_registry_path=(
                 sequence.hermes.rsimem_revocation_registry_path
+            ),
+            rsimem_adamem_policy_source_path=(
+                sequence.hermes.rsimem_adamem_policy_source_path
             ),
             rsimem_application_opportunity_schema=(
                 tool_config.get("application_opportunity_schema")

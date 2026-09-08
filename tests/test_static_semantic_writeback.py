@@ -138,6 +138,11 @@ def test_static_config_is_default_disabled_and_strict() -> None:
     assert plain.utility_enabled is False
     assert plain.adaptive_enabled is False
     assert plain.method_identity == STATIC_EXTRACTION_PARENT_ID
+    adamem = StaticSemanticWritebackConfig.from_mapping({
+        "mode": "static",
+        "adamem_policy_path": "/attempt/adamem_policy.json",
+    })
+    assert adamem.adamem_policy_path == "/attempt/adamem_policy.json"
     matched = StaticSemanticWritebackConfig.from_mapping({
         "mode": "static",
         "extraction_runtime_scope": "matched_validation",
@@ -190,6 +195,11 @@ def test_static_config_is_default_disabled_and_strict() -> None:
     assert sm03_feedback.feedback_contract.value == "sm03_fact_correction_v1"
     with pytest.raises(ValueError, match="configuration is incomplete"):
         StaticSemanticWritebackConfig.from_mapping({"mode": "adaptive_utility"})
+    with pytest.raises(ValueError, match="AdaMem policy"):
+        StaticSemanticWritebackConfig.from_mapping({
+            "mode": "static_utility",
+            "adamem_policy_path": "/attempt/adamem_policy.json",
+        })
     with pytest.raises(ValueError, match="require adaptive_utility"):
         StaticSemanticWritebackConfig.from_mapping({
             "mode": "static_utility",

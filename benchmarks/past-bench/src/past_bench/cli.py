@@ -2539,6 +2539,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     rsimem_adaptive_policy_source_path=(
                         sequence.hermes.rsimem_adaptive_policy_source_path
                     ),
+                    rsimem_adamem_policy_source_path=(
+                        sequence.hermes.rsimem_adamem_policy_source_path
+                    ),
                     rsimem_extraction_trial_profile=(
                         sequence.hermes.rsimem_extraction_trial_profile
                     ),

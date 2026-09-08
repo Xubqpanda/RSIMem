@@ -25,7 +25,7 @@ def test_patch_updates_policy_and_render_boundary() -> None:
     assert result.candidate_policy.parent_version == root.version
     rendered = render_extraction_instructions(result.candidate_policy)
     assert "Ava" in rendered
-    assert root.general_policy not in rendered
+    assert result.candidate_policy.general_policy in rendered
 
 
 @pytest.mark.parametrize("raw,reason", [
@@ -73,3 +73,12 @@ def test_mem0_binding_changes_only_extraction_component() -> None:
     assert binding.extraction_component.slot_id == "mem0-flat.semantic.extraction"
     assert binding.extraction_component.source_provenance == root.digest
     assert binding.binding.artifact_id == binding.extraction_component.artifact_id
+    assert binding.extraction_policy_artifact.policy_version == root.version
+    assert binding.extraction_policy_artifact.compiled_body == binding.extraction_component.policy_body
+
+
+def test_policy_payload_round_trip_is_strict() -> None:
+    root = AdaMemPolicy.root()
+    assert AdaMemPolicy.from_payload(root.payload()) == root
+    with pytest.raises(ValueError, match="malformed"):
+        AdaMemPolicy.from_payload({"version": root.version})

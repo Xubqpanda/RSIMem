@@ -47,6 +47,31 @@ from past_bench.runtime.registry import AgentSpec
 _MISSING_TOOL = object()
 
 
+def test_adamem_policy_is_copied_into_isolated_run_artifacts(tmp_path: Path) -> None:
+    policy = tmp_path / "source-policy.json"
+    policy.write_text('{"schema":"rsimem-adamem-policy-v1"}\n', encoding="utf-8")
+    payload = build_hermes_extra_body(
+        home_dir=tmp_path / "home",
+        artifacts_dir=tmp_path / "artifacts",
+        persistence_enabled=True,
+        memory_enabled=True,
+        user_profile_enabled=True,
+        skills_enabled=True,
+        session_search_enabled=True,
+        memory_nudge_interval=1,
+        memory_flush_min_turns=1,
+        skill_creation_nudge_interval=1,
+        background_review_wait_s=0.0,
+        rsimem_mode="native+ledger",
+        rsimem_semantic_writeback_mode="static",
+        rsimem_adamem_policy_source_path=str(policy),
+    )
+    writeback = payload["hermes"]["rsimem"]["semantic_writeback"]
+    target = tmp_path / "artifacts" / "adamem_policy.json"
+    assert Path(writeback["adamem_policy_path"]) == target
+    assert target.read_bytes() == policy.read_bytes()
+
+
 def test_content_free_artifact_identity_uses_digests_not_content() -> None:
     marker = "private-memory-marker"
     value = _content_free_artifact_identity({
