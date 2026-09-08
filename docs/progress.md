@@ -48,6 +48,19 @@ usage separately and leaves `updater_input_tokens` null rather than conflating
 the two. Future formal batches must persist updater usage before a raw-resource
 comparison is reported.
 
+The resource-complete current-revision rerun is recorded by
+`sm01-b1-formal-20260908-r2` and `sm01-b2-formal-20260908-r2`; both batches
+pass the fail-closed audit. The explicit aggregate is
+`outputs/adamem_formal_20260908/sm01-comparison-aggregate-r2.json`, paired with
+the accepted B0 batch. B1 produced three `no_update` outcomes and used 143
+updater input tokens in each replicate. B2 produced two activated updates and
+one `no_update`, using 15,544, 15,540, and 19,371 updater input tokens
+respectively (mean 16,818.3, SD 2,210.7). The held-out task scores remain 1.0
+for all three conditions, with zero paired deltas. This is evidence of
+trajectory-dependent updater behavior and its raw resource overhead, not
+evidence of quality improvement; the full-trajectory prompt footprint must be
+reported with the update-rate comparison.
+
 The Stage 0 base-memory comparison now has a separate
 `base-memory-comparison-v1` contract and launcher.  It materializes isolated
 `NoMemory`, `HermesNative`, and `Mem0Static` manifests with the frozen

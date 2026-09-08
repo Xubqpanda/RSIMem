@@ -135,9 +135,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--b0-batch", default="sm01-b0-formal-20260908-r1")
+    parser.add_argument("--b1-batch", default="sm01-b1-formal-20260908-r1")
+    parser.add_argument("--b2-batch", default="sm01-b2-formal-20260908-r1")
     args = parser.parse_args(argv)
     root = args.output_root.resolve()
-    names = {AdaMemCondition.MEM0_STATIC: "sm01-b0-formal-20260908-r1", AdaMemCondition.ADAMEM_TERMINAL: "sm01-b1-formal-20260908-r1", AdaMemCondition.ADAMEM_FULL_TRAJECTORY: "sm01-b2-formal-20260908-r1"}
+    names = {AdaMemCondition.MEM0_STATIC: args.b0_batch, AdaMemCondition.ADAMEM_TERMINAL: args.b1_batch, AdaMemCondition.ADAMEM_FULL_TRAJECTORY: args.b2_batch}
     report = aggregate_batches({condition: root / name for condition, name in names.items()})
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, ensure_ascii=True, sort_keys=True, indent=2) + "\n", encoding="utf-8")
