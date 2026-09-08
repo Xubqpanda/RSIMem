@@ -30,6 +30,17 @@ PAST/Hermes launch boundary. B0, B1, and B2 each have a single accepted
 orchestration smoke, but not a single frozen-revision matched trio; no quality
 result is claimed yet.
 
+The Stage 0 base-memory comparison now has a separate
+`base-memory-comparison-v1` contract and launcher.  It materializes isolated
+`NoMemory`, `HermesNative`, and `Mem0Static` manifests with the frozen
+`gpt-5.6-luna` base model, unique service offsets/state/Hermes-home/artifact
+roots, and an explicit backend descriptor.  `NoMemory` retains PAST's
+`with_persistence` protocol and disables only semantic memory; it does not
+reuse the older `without_persistence` ablation, which also changes other
+persistence-facing tool and state behavior.  Contract tests and dry-run
+command receipts pass.  No provider-backed three-backend smoke has run yet,
+so this is execution preparation rather than base-memory quality evidence.
+
 The first deterministic AdaMem policy adapter is now available as
 `rsimem.adamem_adapter`. It preserves AdaMem's `general_policy` /
 `by_character` patch contract, fail-closed parse/no-op behavior, terminal versus
