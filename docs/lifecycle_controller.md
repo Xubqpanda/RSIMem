@@ -1,6 +1,6 @@
 # Context Lifecycle Controller
 
-Phase 1 freezes the host-neutral lifecycle contracts at `LIFECYCLE_CONTRACT_SCHEMA_VERSION=1`. The accepted interface and evidence paths are summarized in [`phase1_acceptance_20260827.md`](phase1_acceptance_20260827.md). Phase 2 extensions must reject schema mismatch and preserve the v1 source, provenance, revision, safety, and idempotency semantics rather than silently reinterpret existing plans.
+Phase 1 freezes the host-neutral lifecycle contracts at `LIFECYCLE_CONTRACT_SCHEMA_VERSION=1`. The accepted interface and evidence paths are summarized in [`phase1_acceptance_20260827.md`](archive/phase1_acceptance_20260827.md). Phase 2 extensions must reject schema mismatch and preserve the v1 source, provenance, revision, safety, and idempotency semantics rather than silently reinterpret existing plans.
 
 ## Purpose
 

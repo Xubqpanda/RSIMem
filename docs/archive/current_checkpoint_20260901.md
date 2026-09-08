@@ -3,7 +3,7 @@
 Date: 2026-09-04
 
 > Superseded on 2026-09-05. The current protocol is
-> [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md),
+> [`implementation_handoff_checklist.md`](../implementation_handoff_checklist.md),
 > with Stage 0C classification in
 > [`stage0_native_attribution_cleanup_audit_20260905.md`](stage0_native_attribution_cleanup_audit_20260905.md).
 > The five-condition matrix and extraction-first path below are historical
@@ -252,7 +252,7 @@ The following remain deliberately unavailable or deferred:
 Existing SM01 `unresolved` observations remain valid no-signal evidence.
 Historical SM02/SM05 `missed`, candidates derived from them, and associated
 offline-validation interpretations remain revoked as defined in
-[`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
+[`implementation_handoff_checklist.md`](../implementation_handoff_checklist.md).
 They may be retained for audit and regression fixtures but cannot enter a new
 proposal, validation input, ACTIVE pointer, or paper result.
 

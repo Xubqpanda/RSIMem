@@ -28,7 +28,7 @@ record. A historical document is not an entrypoint for the active protocol.
 
 ## Historical Evidence
 
-The following document families are retained at their existing paths so that
+The following document families are retained under [`archive/`](archive/) so
 old results remain reproducible, but they are not active experiment routes:
 
 - `extraction_*`: earlier extraction-only feedback and optimizer work.
@@ -38,6 +38,9 @@ old results remain reproducible, but they are not active experiment routes:
   infrastructure and dated evidence.
 - `lifecycle_implementation_plan.md`, `current_checkpoint_20260901.md`, and
   `experiment_plan.md`: prior planning or reusable implementation reference.
+
+The archive preserves original filenames and contents; only relative Markdown
+links were adjusted for the new directory depth.
 
 Do not infer a current conclusion from those documents without checking the
 current checklist and progress summary first.

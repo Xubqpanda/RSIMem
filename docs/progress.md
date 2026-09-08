@@ -193,10 +193,10 @@ entrypoint. Use [README.md](README.md) and the current checklist for the
 current route.
 
 Stage 0A, 0B, 0C, and 0D are complete. Stage 0C asset classification is recorded in
-[`stage0_native_attribution_cleanup_audit_20260905.md`](stage0_native_attribution_cleanup_audit_20260905.md).
+[`stage0_native_attribution_cleanup_audit_20260905.md`](archive/stage0_native_attribution_cleanup_audit_20260905.md).
 Sequential and concurrent service isolation tests pass. The real Stage 0D
 SM01 smoke and its manifest-to-actual-execution receipt are recorded in
-[`stage0d_native_smoke_20260905.md`](stage0d_native_smoke_20260905.md). The
+[`stage0d_native_smoke_20260905.md`](archive/stage0d_native_smoke_20260905.md). The
 receipt binds trace, state/home/session/artifact, fixture/ports, provider/model,
 and complete request usage. The next execution position is a bounded
 cross-panel native-static failure-attribution slice; one-axis repair remains
@@ -223,17 +223,17 @@ The authoritative protocol and execution order are in
 Sections below are retained as dated implementation history and may describe
 superseded milestones.
 
-This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
+This document tracks implementation progress, the current experimental boundary, and the next executable milestones. Research motivation and the full staged evaluation design remain in [`experiment_plan.md`](archive/experiment_plan.md). The detailed lifecycle implementation sequence is in [`lifecycle_implementation_plan.md`](archive/lifecycle_implementation_plan.md), and the complete two-stage serial implementation and acceptance requirements are in [`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
 
 The authoritative current operating status, including the provider gate and
 the boundary between completed runtime work and deferred experiments, is in
-[`current_checkpoint_20260901.md`](current_checkpoint_20260901.md). Historical
+[`current_checkpoint_20260901.md`](archive/current_checkpoint_20260901.md). Historical
 sections below are retained for provenance and may describe superseded attempts
 or earlier regression counts.
 
 The revised foundation checklist is now being executed from Stage 0.  A clean
-pre-cleanup baseline is frozen in [`baseline_manifest_20260901.json`](baseline_manifest_20260901.json),
-the candidate asset inventory is recorded in [`asset_inventory_20260901.md`](asset_inventory_20260901.md),
+pre-cleanup baseline is frozen in [`baseline_manifest_20260901.json`](archive/baseline_manifest_20260901.json),
+the candidate asset inventory is recorded in [`asset_inventory_20260901.md`](archive/asset_inventory_20260901.md),
 and `python -m rsimem.baseline` provides a fail-closed identity gate before any
 cleanup deletion.  Stage 0C has removed the stopped launcher group, the
 extraction-only proposal entry point, and three orphaned extraction configs;
@@ -241,7 +241,7 @@ remaining deletion is held until generalized replacement contracts are
 implemented and audited.  The cleanup-ready manifest passed its complete
 fail-closed preflight before the latest cleanup edits.  The second call-site
 audit and exact removal boundary are recorded in
-[`stage0_cleanup_audit_20260902.md`](stage0_cleanup_audit_20260902.md); three
+[`stage0_cleanup_audit_20260902.md`](archive/stage0_cleanup_audit_20260902.md); three
 configs remain only as deterministic preflight fixtures pending Stage 1
 migration.
 
@@ -289,7 +289,7 @@ Each accepted pilot completes all five conditions; excluded attempts remain
 audit evidence and are omitted from coverage and sensitivity denominators.
 Per-attempt details are kept in the dated `docs/sensitivity_*pilot*.md`
 reports. The current aggregate is
-[`stage3_coverage_20260903.md`](stage3_coverage_20260903.md).
+[`stage3_coverage_20260903.md`](archive/stage3_coverage_20260903.md).
 The source-only Stage 3 census now makes this concrete without reading task
 prompts, graders, or answers: all seven semantic, all three episodic, and all
 ten procedural target families now have registered type-matched oracle seeds.
@@ -369,7 +369,7 @@ observability.  They do not establish matched real-model equivalence, an
 extraction-owned optimization signal, or a quality improvement.
 
 The first bounded Stage 1 native-attribution slice is recorded in
-[`stage1_native_attribution_slice_20260905.md`](stage1_native_attribution_slice_20260905.md).
+[`stage1_native_attribution_slice_20260905.md`](archive/stage1_native_attribution_slice_20260905.md).
 SM02 and PC01 yielded two accepted runs, ten observations, ten unresolved
 candidates, and zero actionable repair axes. EP01 and PG01 were excluded for
 incomplete model usage after provider failures. The current decision is
@@ -378,20 +378,20 @@ remain closed.
 On 2026-09-06, a fresh manifest-bound EP01 retry completed all five tasks with
 complete model usage and passed native audit. It produced five episodic
 observations, all unresolved and none actionable; the dated audit is recorded
-in [`stage1_ep01_accepted_retry_20260906.md`](stage1_ep01_accepted_retry_20260906.md).
+in [`stage1_ep01_accepted_retry_20260906.md`](archive/stage1_ep01_accepted_retry_20260906.md).
 This incremental slice does not replace the frozen cross-panel corpus and does
 not reopen Stage 2.
 On the same date, a fresh SM02 retry also passed native audit with complete
 usage, adding five semantic observations. All five remain unresolved and none
-is actionable; see [`stage1_sm02_accepted_retry_20260906.md`](stage1_sm02_accepted_retry_20260906.md).
+is actionable; see [`stage1_sm02_accepted_retry_20260906.md`](archive/stage1_sm02_accepted_retry_20260906.md).
 The runtime's Honcho initialization diagnostic is retained as runtime evidence,
 not relabeled as a Memory failure.
 The PC01 procedural retry on the same date encountered repeated provider
 `503` responses and failed complete-usage audit; no procedural observation was
 accepted. It is recorded as infrastructure evidence in
-[`stage1_pc01_provider_attempt_20260906.md`](stage1_pc01_provider_attempt_20260906.md).
+[`stage1_pc01_provider_attempt_20260906.md`](archive/stage1_pc01_provider_attempt_20260906.md).
 A second PC01 retry had the same repeated `503`/usage-incomplete outcome and was
-also excluded; see [`stage1_pc01_provider_attempt2_20260906.md`](stage1_pc01_provider_attempt2_20260906.md).
+also excluded; see [`stage1_pc01_provider_attempt2_20260906.md`](archive/stage1_pc01_provider_attempt2_20260906.md).
 Further PC01 retries are paused until provider capacity is demonstrably stable.
 The latest provider probe on 2026-09-06 returned HTTP `503` without content or
 usage, so PG01 was not started. The three-panel accepted slice remains the
@@ -399,7 +399,7 @@ current empirical boundary; no provider probe is treated as a benchmark result.
 Merging the accepted EP01 retry with the older accepted SM02/PC01 slice now
 produces a three-panel corpus (`15 observations`, all unresolved, zero
 actionable). The merged identity and mixed replicate provenance are recorded in
-[`stage1_three_panel_merged_20260906.md`](stage1_three_panel_merged_20260906.md);
+[`stage1_three_panel_merged_20260906.md`](archive/stage1_three_panel_merged_20260906.md);
 this still does not satisfy the four-panel gate or open Stage 2.
 The frozen corpus can be independently reloaded and summarized with
 `rsimem-report-native-attribution`; the module and console entrypoints are
@@ -420,12 +420,12 @@ Stage 1 gates are deliberately empirical: two independent reviewer decisions,
 an accepted SM/EP/PC/PG cross-panel slice, and any actionable unique repair
 axis. None is claimed by the current `STOP_NO_ACTIONABLE_SIGNAL` corpus.
 The follow-up EP01/PG01 attempt is recorded in
-[`stage1_ep_pg_attempt_20260905.md`](stage1_ep_pg_attempt_20260905.md); PG01 was
+[`stage1_ep_pg_attempt_20260905.md`](archive/stage1_ep_pg_attempt_20260905.md); PG01 was
 executed with `--no-judge` but was also excluded because all six tasks reported
 incomplete model usage after provider 503 retries. Neither attempt changes the
 accepted corpus.
 The operational closure and re-entry criteria are frozen in
-[`stage1_gate_closure_20260905.md`](stage1_gate_closure_20260905.md).
+[`stage1_gate_closure_20260905.md`](archive/stage1_gate_closure_20260905.md).
 
 The formal PAST-Bench adapter does not currently expose a trusted
 application-owned memory-use attribution provider.  Since `b1f9cd1`, benchmark
@@ -449,7 +449,7 @@ effect batch is authorized.
 Current implementation priority is now Stage 2 adapter-boundary work.  Stage
 1 taxonomy, lifecycle surfaces, 26-family applicability matrix, comparison
 conditions, split contract, and raw-only metric protocol are frozen in
-[`research_protocol_v1.json`](research_protocol_v1.json).  The finite
+[`research_protocol_v1.json`](archive/research_protocol_v1.json).  The finite
 SM02/SM05 family attempt is closed as `STOP_NO_SIGNAL`; any future family must
 be separately pre-registered with a deployment-visible opportunity schema
 before another provider batch is authorized.
@@ -501,7 +501,7 @@ validation, formal extraction manifests, and raw-vector analysis are complete.
 The accepted low-cost plain-parent smoke produced two source records, two exact-
 joined feedback records, 50 successful physical requests, and an issue-free
 audit. Detailed evidence and excluded attempts are recorded in
-[`extraction_stage1_acceptance_20260828.md`](extraction_stage1_acceptance_20260828.md).
+[`extraction_stage1_acceptance_20260828.md`](archive/extraction_stage1_acceptance_20260828.md).
 SM02 boundary feedback now normalizes human-readable recipient names at the
 resolver boundary, while matching exact normalized IDs so near-collision names
 cannot be mislabeled as harmful.
@@ -515,7 +515,7 @@ The first real-provider parent-only SM01 feedback pilot completed three clean
 replicates. It produced 24 primary examples, all `unresolved`, so the strict
 optimizer gate correctly returned `NO_PROPOSAL` without a candidate. Full raw
 usage, trace, ledger, and audit evidence is recorded in
-[`extraction_stage3_s1_feedback_20260829.md`](extraction_stage3_s1_feedback_20260829.md).
+[`extraction_stage3_s1_feedback_20260829.md`](archive/extraction_stage3_s1_feedback_20260829.md).
 
 The current Stage 3B/3D process-signal work joins clean parent pilots without
 using evaluation scores. The latest SM02 and SM05 reruns use the family-free
@@ -523,7 +523,7 @@ process projection and replay-stable logical-case store. They confirm lifecycle
 observability and tool-closure joins, but both remain `STOP_NO_SIGNAL`:
 extraction is shadow `pending`, no artifact/use/outcome chain is attributable,
 and no N+1 candidate is unlocked. Detailed reports are
-[`extraction_stage2_clean_parent_20260901.md`](extraction_stage2_clean_parent_20260901.md);
+[`extraction_stage2_clean_parent_20260901.md`](archive/extraction_stage2_clean_parent_20260901.md);
 the earlier 2026-08-30 reports are retained as historical diagnostics.
 Extraction remains the first
 layer to open only after a signal-ready case; the other five layers stay
@@ -565,7 +565,7 @@ launcher and both configured endpoints. Two primary-provider replicates passed
 audit, while one primary and one backup attempt failed with HTTP 503/capacity
 errors; incomplete attempts remain excluded from optimizer and activation. Raw
 usage and process-corpus diagnostics are recorded in
-[`extraction_stage3_sm02_process_pilot_20260829.md`](extraction_stage3_sm02_process_pilot_20260829.md).
+[`extraction_stage3_sm02_process_pilot_20260829.md`](archive/extraction_stage3_sm02_process_pilot_20260829.md).
 
 A subsequent clean-worktree retry tested the same family against each endpoint
 separately. The primary retry stopped after a provider-capacity failure and the
@@ -573,7 +573,7 @@ backup retry produced empty think-only responses with missing usage on every
 trace; both audits therefore failed closed as `incomplete_model_usage`. Their
 manifests and raw traces are retained, but neither attempt is a task negative
 or optimizer input. See
-[`extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md`](extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md).
+[`extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md`](archive/extraction_stage3_sm02_provider_attempts_20260829_v3_v4.md).
 The same report includes a deduplicated process-signal census: the primary
 attempt still emitted all six policy-stage events, while the backup emitted
 only retrieval, exposure, and task-failure events. This diagnostic is not a
@@ -586,7 +586,7 @@ it; a single recovery request under the new v2 contract produced an abstract
 schema-valid candidate after the persistence fix. Static safety and the
 deterministic extraction suite pass, but the candidate remains a proposal and
 has not entered independent SM03 validation. Details are in
-[`extraction_stage3_sm02_feedback_rerun_20260829.md`](extraction_stage3_sm02_feedback_rerun_20260829.md).
+[`extraction_stage3_sm02_feedback_rerun_20260829.md`](archive/extraction_stage3_sm02_feedback_rerun_20260829.md).
 The reusable `rsimem.provider_probe` entry now performs a bounded completion
 check without exposing credentials or response content; it reports endpoint,
 content, and usage availability only and remains outside benchmark accounting.
@@ -830,7 +830,7 @@ operator/recovery handling rather than being guessed.
 
 Static PAST-Bench semantic writeback is complete for SM01: 9/9 rotated method attempts passed audit, with 81 unique traces and content-free ingestion/mutation evidence. Admission timing varied across replicates; delayed utility labels and adaptive policy updates remain later gates.
 
-The frozen static utility gate is also complete for SM01. The accepted 3-replicate static/static-utility batch has 6/6 completed scheduled slots, 54 unique traces, exact utility/ingestion joins, and one stable gate/policy/schema identity across utility replicates. Results and limitations are recorded in [`static_utility_sm01_20260827.md`](static_utility_sm01_20260827.md); no quality-superiority or adaptive-policy claim is made.
+The frozen static utility gate is also complete for SM01. The accepted 3-replicate static/static-utility batch has 6/6 completed scheduled slots, 54 unique traces, exact utility/ingestion joins, and one stable gate/policy/schema identity across utility replicates. Results and limitations are recorded in [`static_utility_sm01_20260827.md`](archive/static_utility_sm01_20260827.md); no quality-superiority or adaptive-policy claim is made.
 
 The delayed-feedback lifecycle join, exposure-bias contracts, and deterministic stage gate are complete. Versioned content-free datasets preserve artifact-specific future evidence, observation cutoffs, extraction-owned labels, attribution provenance, exposure opportunity, candidate/filter disposition, integrity audit results, aggregate censoring reports, and frozen config identity. Source-, extraction-set-, and attributable fact-level prompt feedback now use separate opportunity/use/outcome contracts; raw resource usage remains outside label and activation payloads.
 
@@ -920,10 +920,10 @@ Former Phase 2K.2 analysis plumbing is retained as legacy threshold experiment i
 - [x] Report no intervention separately when N and N+1 produce the same parsed extraction.
 - [x] Reproduce the same runtime binding fingerprint after restart.
 
-Detailed deterministic evidence is in [`extraction_stage2f_acceptance_20260828.md`](extraction_stage2f_acceptance_20260828.md). No live provider validation run or production activation is included in this milestone.
+Detailed deterministic evidence is in [`extraction_stage2f_acceptance_20260828.md`](archive/extraction_stage2f_acceptance_20260828.md). No live provider validation run or production activation is included in this milestone.
 
 The first six-layer deterministic feasibility baseline is recorded in
-[`policy_feasibility_baseline_20260829.md`](policy_feasibility_baseline_20260829.md).
+[`policy_feasibility_baseline_20260829.md`](archive/policy_feasibility_baseline_20260829.md).
 It includes replay-stable parent/candidate identities, process feedback,
 strict extraction-feedback projection, constrained N+1 hypothesis identity,
 restart-safe future N+1 loading/intervention-path identity, and a crash-safe
@@ -1075,7 +1075,7 @@ reconstructed the private optimizer corpus, but all 24 primary labels were
 unresolved. The deterministic signal gate returned `NO_PROPOSAL` with zero
 optimizer calls and no candidate. The matched Stage 2E item therefore remains
 open; details are recorded in
-[`extraction_stage2e_feedback_v10_20260828.md`](extraction_stage2e_feedback_v10_20260828.md).
+[`extraction_stage2e_feedback_v10_20260828.md`](archive/extraction_stage2e_feedback_v10_20260828.md).
 It is not a blocker for the deterministic feasibility baseline, but real N+1
 provider validation remains deferred until a family supplies sufficient
 actionable signal.
@@ -1086,7 +1086,7 @@ corpora passed; 24 primary feedback examples remained unresolved, so corpus
 preparation returned `optimizerSignalReady=false` and the optimizer made zero
 provider calls with `NO_PROPOSAL`.  This is a valid no-signal feedback pilot,
 not an effect result.  Raw usage and disposition are recorded in
-[`extraction_stage3_sm01_feedback_v9a_20260829.md`](extraction_stage3_sm01_feedback_v9a_20260829.md).
+[`extraction_stage3_sm01_feedback_v9a_20260829.md`](archive/extraction_stage3_sm01_feedback_v9a_20260829.md).
 
 On 2026-08-29, a transient successful provider probe allowed a clean SM01
 feedback attempt (`v5`) to start.  It exposed a runtime boundary bug: the
@@ -1097,7 +1097,7 @@ primary task-completed boundary, with a regression test.  A post-fix clean
 attempt (`v6`) was gated before its first task by another provider HTTP 503;
 neither attempt is eligible feedback or effect evidence.
 The complete v5–v8 diagnostics and the v7 canonical process-corpus replay are
-documented in [`extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md`](extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md).
+documented in [`extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md`](archive/extraction_stage3_sm01_feedback_attempts_20260829_v5_v8.md).
 
 The SM02 process-signal family subsequently completed three clean parent
 replicates in `s1-sm02-feedback-20260829-v5`.  It yielded 8 contract-resolved
@@ -1106,7 +1106,7 @@ useful/harmful variation.  The content-bearing corpus was reconstructed and
 the bounded optimizer request was built, but the provider returned malformed
 optimizer JSON twice; strict parsing rejected both and produced no candidate.
 This is recorded as provider/model-output diagnostics, not a task negative,
-in [`extraction_stage3_sm02_feedback_v5_20260829.md`](extraction_stage3_sm02_feedback_v5_20260829.md).
+in [`extraction_stage3_sm02_feedback_v5_20260829.md`](archive/extraction_stage3_sm02_feedback_v5_20260829.md).
 
 After the provider recovered, a bounded retry confirmed that the endpoint's
 `json_object` mode still omitted the required top-level `reason_codes`. The
@@ -1114,7 +1114,7 @@ adapter was changed in commit `d2d06fc` to send the frozen strict JSON Schema
 response contract. The unchanged SM02 corpus then yielded one schema-valid
 `PROPOSE`; candidate static safety passed and the artifact remains a proposal,
 not ACTIVE or matched-validation evidence. The retry report is in
-[`extraction_stage3_sm02_optimizer_retry_20260829.md`](extraction_stage3_sm02_optimizer_retry_20260829.md).
+[`extraction_stage3_sm02_optimizer_retry_20260829.md`](archive/extraction_stage3_sm02_optimizer_retry_20260829.md).
 
 An independent SM05 process pilot (`s1-sm05-feedback-20260829-v1`) then
 completed three clean nine-episode replicates. It produced 24 extraction-owned
@@ -1125,7 +1125,7 @@ deterministic replica compaction in commit `f194bf8` reduced it to 158,538
 characters while retaining all primary IDs. The provider returned schema-valid
 proposals, but the candidate content-safety gate rejected corpus-specific
 value copying on both attempts, so no candidate was written. Details are in
-[`extraction_stage3_sm05_optimizer_20260829.md`](extraction_stage3_sm05_optimizer_20260829.md).
+[`extraction_stage3_sm05_optimizer_20260829.md`](archive/extraction_stage3_sm05_optimizer_20260829.md).
 
 Commit `3373a78` adds an explicit `ExtractionSplitPlan` contract and optional
 matched-preflight validation. The current SM01, SM02, and SM05 pilots all
@@ -1134,7 +1134,7 @@ An explicit held-out plan now reserves SM03 fact correction for validation and
 SM04 rule migration for final test (`configs/extraction_split_plan_sm02_sm03_sm04.json`).
 SM03 is registered as an extraction-only validation contract with its update
 prompt frozen; the plan is identity bookkeeping only and no matched validation
-has run yet ([`extraction_stage3_split_audit_20260829.md`](extraction_stage3_split_audit_20260829.md)).
+has run yet ([`extraction_stage3_split_audit_20260829.md`](archive/extraction_stage3_split_audit_20260829.md)).
 
 ## Update Policy
 

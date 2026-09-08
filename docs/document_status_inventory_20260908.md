@@ -3,9 +3,9 @@
 Status: `current`  
 Date: 2026-09-08
 
-This inventory classifies every top-level file in `docs/` without moving or
-deleting evidence. The active entrypoints are intentionally small; a file not
-listed as current is not an active AdaMem experiment instruction.
+This inventory classifies every file in `docs/` without deleting evidence. The
+active entrypoints are intentionally small; a file not listed as current is
+not an active AdaMem experiment instruction.
 
 ## Current
 
@@ -38,7 +38,7 @@ read as requirements for `adamem-trajectory-baseline-v1`.
 ## Generated Evidence
 
 The following filename families are dated, immutable reports or manifests. They
-remain at their existing paths and are not active protocol definitions:
+remain under `docs/archive/` and are not active protocol definitions:
 
 | Filename family | Status |
 | --- | --- |
@@ -53,7 +53,7 @@ The following command lists any top-level document not covered by the rules
 above. It must produce no output when this inventory is updated:
 
 ```bash
-find docs -maxdepth 1 -type f -printf '%f\n' | sort | awk '
+find docs/archive -maxdepth 1 -type f -printf '%f\n' | sort | awk '
   $0 == "README.md" || $0 == "implementation_handoff_checklist.md" ||
   $0 == "progress.md" || $0 == "adamem_adapter_audit_20260908.md" ||
   $0 == "document_status_inventory_20260908.md" { next }
