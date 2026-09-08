@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -30,6 +31,10 @@ FROZEN_MODEL_ID = "gpt-5.6-luna"
 def _write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+
+def _file_digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _read_yaml(path: Path) -> dict[str, object]:
@@ -68,6 +73,27 @@ def _require_accepted_phase(root: Path) -> None:
         raise RuntimeError(
             "AdaMem infrastructure failure: incomplete model usage for " + ", ".join(rejected)
         )
+
+
+def compare_run_manifests(left_path: Path, right_path: Path) -> dict[str, tuple[object, object]]:
+    """Return only permitted B0/B1/B2 identity differences or fail closed."""
+    try:
+        left = json.loads(left_path.read_text(encoding="utf-8"))
+        right = json.loads(right_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError("AdaMem run manifest cannot be read") from exc
+    if not isinstance(left, dict) or not isinstance(right, dict) or set(left) != set(right):
+        raise ValueError("AdaMem run manifest shape differs")
+    allowed = {"run_id", "condition", "feedback_view", "port_offset"}
+    differences = {
+        key: (left[key], right[key]) for key in left if left[key] != right[key]
+    }
+    unexpected = set(differences) - allowed
+    if unexpected:
+        raise ValueError(
+            "AdaMem run identity drift: " + ", ".join(sorted(unexpected))
+        )
+    return differences
 
 
 def _reflect_via_openai(
@@ -172,6 +198,28 @@ def run_trajectory(
     prefix_manifest_file.parent.mkdir(parents=True, exist_ok=True)
     prefix_manifest_file.write_text(yaml.safe_dump(prefix_manifest, sort_keys=False), encoding="utf-8")
     _write_json(run_root / "trajectory_split.json", split.payload())
+    _write_json(run_root / "run_manifest.json", {
+        "schema": "rsimem-adamem-run-manifest-v1",
+        "protocol_id": "adamem-trajectory-baseline-v1",
+        "run_id": run.run_id,
+        "condition": condition.value,
+        "feedback_view": (
+            feedback_view_for_condition(condition).value
+            if feedback_view_for_condition(condition) is not None else None
+        ),
+        "source_sequence_digest": _file_digest(source_sequence),
+        "split_id": split.split_id,
+        "base_model": base_model,
+        "meta_agent_model": meta_agent_model,
+        "temperature": temperature,
+        "update_budget": update_budget,
+        "policy_update_space": "versioned_semantic_extraction_policy_only",
+        "mem0_backend": "mem0-flat-hermes-v1",
+        "past_bin_digest": _file_digest(past_bin),
+        "config_digest": _file_digest(config),
+        "registry_digest": _file_digest(registry),
+        "port_offset": port_offset,
+    })
 
     if not dry_run:
         subprocess.run(

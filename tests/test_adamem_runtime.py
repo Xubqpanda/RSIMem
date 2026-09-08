@@ -4,7 +4,13 @@ import pytest
 
 from rsimem.adamem_adapter import AdaMemFeedbackView, AdaMemPolicy, update_policy
 from rsimem.adamem_experiment import AdaMemCondition, AdaMemRunSpec
-from rsimem.adamem_launcher import FROZEN_MODEL_ID, _past_command, _require_accepted_phase, run_trajectory
+from rsimem.adamem_launcher import (
+    FROZEN_MODEL_ID,
+    _past_command,
+    _require_accepted_phase,
+    compare_run_manifests,
+    run_trajectory,
+)
 from rsimem.adamem_runtime import (
     AdaMemPolicyReceipt,
     build_pure_process_feedback,
@@ -129,3 +135,24 @@ def test_no_update_retains_mem0_root_binding(tmp_path: Path) -> None:
     receipt = AdaMemPolicyReceipt.from_update(split=split, result=result)
     assert receipt.outcome == "no_update"
     assert receipt.candidate_policy_version == receipt.parent_policy_version
+
+
+def test_run_manifest_allows_only_condition_identity_differences(tmp_path: Path) -> None:
+    common = {
+        "schema": "rsimem-adamem-run-manifest-v1", "protocol_id": "adamem-trajectory-baseline-v1",
+        "run_id": "a", "condition": "B0_mem0_static", "feedback_view": None,
+        "source_sequence_digest": "a" * 64, "split_id": "split", "base_model": "gpt-5.6-luna",
+        "meta_agent_model": "gpt-5.6-luna", "temperature": 0.0, "update_budget": 1,
+        "policy_update_space": "versioned_semantic_extraction_policy_only",
+        "mem0_backend": "mem0-flat-hermes-v1", "past_bin_digest": "b" * 64,
+        "config_digest": "c" * 64, "registry_digest": "d" * 64, "port_offset": 1000,
+    }
+    left = tmp_path / "left.json"; right = tmp_path / "right.json"
+    left.write_text(__import__("json").dumps(common), encoding="utf-8")
+    other = dict(common); other.update(run_id="b", condition="B1_mem0_adamem_terminal", feedback_view="terminal", port_offset=1100)
+    right.write_text(__import__("json").dumps(other), encoding="utf-8")
+    assert set(compare_run_manifests(left, right)) == {"run_id", "condition", "feedback_view", "port_offset"}
+    other["base_model"] = "gpt-5.4"
+    right.write_text(__import__("json").dumps(other), encoding="utf-8")
+    with pytest.raises(ValueError, match="identity drift"):
+        compare_run_manifests(left, right)
