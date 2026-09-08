@@ -24,11 +24,11 @@ and [adamem_adapter_audit_20260908.md](adamem_adapter_audit_20260908.md).
 The active protocol fixes `B0_mem0_static`,
 `B1_mem0_adamem_terminal`, and `B2_mem0_adamem_full_trajectory` on the same
 Mem0 backend, train/N+1 split, base model, budget, and AdaMem patch space.
-Stage -1 documentation cleanup is in progress. The Mem0Static runtime now
+Stage -1 documentation cleanup is complete. The Mem0Static runtime now
 accepts an isolated, validated AdaMem extraction policy artifact through the
-PAST/Hermes launch boundary; this is deterministic wiring only. No provider
-backed AdaMem or Mem0Static smoke has been accepted, and no quality result is
-claimed yet.
+PAST/Hermes launch boundary. B0, B1, and B2 each have a single accepted
+orchestration smoke, but not a single frozen-revision matched trio; no quality
+result is claimed yet.
 
 The first deterministic AdaMem policy adapter is now available as
 `rsimem.adamem_adapter`. It preserves AdaMem's `general_policy` /
@@ -54,6 +54,23 @@ injection, and downstream-outcome events; `memory_calls=0` in the task summary
 means the agent did not explicitly call the Hermes memory tool, not that the
 Mem0Static write path was bypassed. This is an infrastructure/fidelity smoke,
 not a quality conclusion. The earlier `gpt-5.4` attempt remains excluded.
+
+`B1_mem0_adamem_terminal` also completed one accepted smoke under the frozen
+model and split. Its updater returned `NO_UPDATE` with `empty_patch`; after the
+later no-update binding correction, that outcome correctly retains the same
+Mem0Static root binding as B0. `B2_mem0_adamem_full_trajectory` completed one
+accepted smoke with complete usage, an allowlisted pure-process feedback view
+(messages, runtime tool events, memory operations, state summary, and visible
+output), and an activated policy version
+`adamem-policy.a1b926bd864044d56b3ab0fb` used by suffix extraction.
+
+Those B0/B1/B2 attempts span two launcher revisions: the initially accepted
+B0/B1 runs predate the no-update binding correction and B2 uses the current run
+identity manifest. They are fidelity/orchestration evidence only, not a
+matched quality comparison. A new B0 r2 attempt on the current launcher was
+correctly excluded after provider HTTP 503 caused incomplete prefix usage.
+When provider capacity is stable, rerun B0 then B1 then B2 under the current
+manifest before comparing N+1 outcomes.
 
 An invalid `SM01_preference_adoption` B0 infrastructure attempt was launched
 on 2026-09-08 with a
