@@ -61,6 +61,18 @@ trajectory-dependent updater behavior and its raw resource overhead, not
 evidence of quality improvement; the full-trajectory prompt footprint must be
 reported with the update-rate comparison.
 
+The current launcher-revision rerun with explicit batch provenance is frozen
+under `sm01-b0-formal-20260908-r2`, `sm01-b1-formal-20260908-r3`, and
+`sm01-b2-formal-20260908-r3`; each manifest/result records UTC start and end
+times, condition order, provider-health evidence, and retry reason. The final
+aggregate is
+`outputs/adamem_formal_20260908/sm01-comparison-aggregate-r3.json`. B1 had
+three `no_update` outcomes with 143 updater input tokens each. B2 had three
+activated updates with updater inputs 15,294, 15,517, and 16,646 tokens (mean
+15,819, SD 724.8). Every held-out evaluation score remained 1.0 in all
+conditions and every paired delta remained 0.0. The reproducible conclusion is
+therefore update behavior and resource overhead, not task-quality improvement.
+
 The Stage 0 base-memory comparison now has a separate
 `base-memory-comparison-v1` contract and launcher.  It materializes isolated
 `NoMemory`, `HermesNative`, and `Mem0Static` manifests with the frozen

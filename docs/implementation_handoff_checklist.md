@@ -158,11 +158,11 @@ policy schema
 
 - [x] 正式比较每个 `family x condition` 至少取得 3 个 accepted replicate；每个 replicate 都完整运行 train -> update/abstain -> matched N+1。provider/service/usage 失败不计入 3 次，但必须保留 attempt audit，并以新的隔离 run 重试。
 - [x] replicate 指独立的完整执行，不是对同一次 policy proposal 或同一份 N+1 输出重复评分。每个 replicate 必须拥有独立 policy state、Mem0 storage/collection、Hermes HOME、session、service/port、fixture copy、trace/artifact root 和 run manifest。
-- [ ] 所有开发、adapter 调试、fidelity、文档检查、single-family smoke 和 condition 切换均串行执行。先串行完成一个 family 的 B0/B1/B2 smoke 和 manifest review，再开始正式 batch。
-- [ ] 正式 batch 的唯一并发单位是同一个 `family x condition` 的 3 个 replicate：固定同时启动 3 个独立 run。一个三-replicate batch 完成、审计并冻结后，才启动下一个 condition 或 family；不跨 family 或 condition 并发。
-- [ ] 全局 provider-backed run 上限固定为 3，不随机器资源提高。出现 429/503、usage-incomplete 或延迟急剧上升时，停止启动新的 batch；失败 replicate 仅在该 batch 完全结束后，以新的隔离 run 串行或重新组成三-replicate batch 重试。
-- [ ] 不同 replicate/condition 不共享 policy、Mem0 collection、Hermes state、service process、fixture directory、trace 或 artifact root；唯一允许共享的是只读代码、冻结任务源和只读模型配置。
-- [ ] 记录每个 batch 的启动/结束时间、provider health、condition 顺序和重试原因。不同 family 的 B0/B1/B2 batch 顺序轮换，避免长期 provider drift 总是与同一 condition 相关。
+- [x] 所有开发、adapter 调试、fidelity、文档检查、single-family smoke 和 condition 切换均串行执行。先串行完成一个 family 的 B0/B1/B2 smoke 和 manifest review，再开始正式 batch。
+- [x] 正式 batch 的唯一并发单位是同一个 `family x condition` 的 3 个 replicate：固定同时启动 3 个独立 run。一个三-replicate batch 完成、审计并冻结后，才启动下一个 condition 或 family；不跨 family 或 condition 并发。
+- [x] 全局 provider-backed run 上限固定为 3，不随机器资源提高。出现 429/503、usage-incomplete 或延迟急剧上升时，停止启动新的 batch；失败 replicate 仅在该 batch 完全结束后，以新的隔离 run 串行或重新组成三-replicate batch 重试。
+- [x] 不同 replicate/condition 不共享 policy、Mem0 collection、Hermes state、service process、fixture directory、trace 或 artifact root；唯一允许共享的是只读代码、冻结任务源和只读模型配置。
+- [x] 记录每个 batch 的启动/结束时间、provider health、condition 顺序和重试原因。不同 family 的 B0/B1/B2 batch 顺序轮换，避免长期 provider drift 总是与同一 condition 相关。
 - [ ] 额外保留 `AdaMem-native` 输入条件，确认 adapter 接线没有改变 AdaMem 原始行为；它是方法 fidelity baseline，不替代 B0/B1/B2。
 - [x] 对每个 case 保存 `P_n`、`P_{n+1}`、是否更新、N+1 score/component delta、proposal/acceptance/rollback 与资源记录。
 - [x] 聚合时只使用 accepted matched pairs；报告全部 3 个 raw replicate、均值/标准差和 paired delta，不用 infrastructure failure 填补缺失值。若某个 condition 未达到 3 个 accepted replicate，不报告正式主结论。
