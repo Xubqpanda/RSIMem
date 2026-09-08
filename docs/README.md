@@ -12,6 +12,12 @@ Start here for current work:
 4. [Documentation status inventory](document_status_inventory_20260908.md):
    current, reference, historical, and generated-evidence classification.
 
+Stage 0 base-memory preparation is implemented by
+`rsimem.base_memory_experiment` and `rsimem.base_memory_launcher`.  The
+contract fixes the three backend identities `NoMemory`, `HermesNative`, and
+`Mem0Static`; its dry-run output is preparation evidence only until a
+provider-backed smoke is accepted.
+
 ## Status Labels
 
 `current` documents define an active protocol or current result.
