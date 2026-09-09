@@ -354,5 +354,7 @@ async def audit():
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("X_PORT", "3300"))
+    # TaskDefinition.apply_port_offset supplies the common PORT variable for
+    # every mock service.  Keep X_PORT as a backwards-compatible fallback.
+    port = int(os.environ.get("PORT", os.environ.get("X_PORT", "3300")))
     uvicorn.run(app, host="0.0.0.0", port=port)
