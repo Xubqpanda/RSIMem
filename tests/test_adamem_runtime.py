@@ -164,6 +164,37 @@ def test_launcher_rejects_model_drift_before_execution(tmp_path: Path) -> None:
         )
 
 
+def test_static_screening_uses_one_complete_family_manifest(tmp_path: Path) -> None:
+    source = _source()
+    for episode in source["episodes"]:
+        episode["task"] = "task.yaml"
+    sequence = tmp_path / "sequence.yaml"
+    sequence.write_text(__import__("yaml").safe_dump(source), encoding="utf-8")
+    for name in ("past", "config", "registry"):
+        (tmp_path / name).write_text(name, encoding="utf-8")
+    run = AdaMemRunSpec(
+        run_id="static-screening", condition=AdaMemCondition.MEM0_STATIC, replicate=1,
+        state_directory="state", trace_directory="trace", artifact_directory="artifacts",
+        mem0_collection="collection",
+    )
+    receipt = run_trajectory(
+        source_sequence=sequence, run=run, condition=AdaMemCondition.MEM0_STATIC,
+        cutover_label="learn-a", output_root=tmp_path, past_bin=tmp_path / "past",
+        past_root=tmp_path, config=tmp_path / "config", registry=tmp_path / "registry",
+        base_model=FROZEN_MODEL_ID, meta_agent_model=FROZEN_MODEL_ID,
+        base_url="https://example.test/v1", api_key=None, update_budget=1,
+        temperature=0.0, dry_run=True,
+    )
+    manifest = __import__("yaml").safe_load(
+        (tmp_path / "static-screening" / "manifests" / "static.yaml").read_text()
+    )
+    assert receipt.outcome == "static"
+    assert [item["label"] for item in manifest["episodes"]] == [
+        "learn-a", "learn-b", "eval-n1", "control",
+    ]
+    assert not (tmp_path / "static-screening" / "manifests" / "prefix.yaml").exists()
+
+
 def test_no_update_retains_mem0_root_binding(tmp_path: Path) -> None:
     split = split_family_manifest(_source(), cutover_label="learn-a")
     parent = AdaMemPolicy.root()

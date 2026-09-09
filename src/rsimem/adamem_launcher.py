@@ -21,6 +21,7 @@ from .adamem_runtime import (
     AdaMemPolicyReceipt,
     build_pure_process_feedback,
     materialize_phase_manifest,
+    materialize_static_screening_manifest,
     split_family_manifest,
 )
 
@@ -251,10 +252,6 @@ def run_trajectory(
     policy_root = AdaMemPolicy.root()
     root_file = run_root / "policies" / "policy_root.json"
     _write_json(root_file, policy_root.payload())
-    prefix_manifest = materialize_phase_manifest(source, split=split, phase="prefix")
-    prefix_manifest_file = run_root / "manifests" / "prefix.yaml"
-    prefix_manifest_file.parent.mkdir(parents=True, exist_ok=True)
-    prefix_manifest_file.write_text(yaml.safe_dump(prefix_manifest, sort_keys=False), encoding="utf-8")
     _write_json(run_root / "trajectory_split.json", split.payload())
     _write_json(run_root / "run_manifest.json", {
         "schema": "rsimem-adamem-run-manifest-v1",
@@ -283,6 +280,38 @@ def run_trajectory(
         "artifact_directory": run.artifact_directory,
         "mem0_collection": run.mem0_collection,
     })
+
+    if condition is AdaMemCondition.MEM0_STATIC:
+        # B0 has no update boundary.  Preserve the family's original history
+        # anchors by executing its complete sequence in one PAST process.
+        static_manifest_file = run_root / "manifests" / "static.yaml"
+        static_manifest_file.parent.mkdir(parents=True, exist_ok=True)
+        static_manifest_file.write_text(
+            yaml.safe_dump(materialize_static_screening_manifest(source), sort_keys=False),
+            encoding="utf-8",
+        )
+        if not dry_run:
+            environment = _past_environment(base_url=base_url, api_key=api_key)
+            subprocess.run(
+                _past_command(
+                    past_bin=past_bin, past_root=past_root, sequence=static_manifest_file,
+                    trace_dir=run_root / "static", config=config, registry=registry,
+                    model=base_model, base_url=base_url, policy_path=None,
+                    port_offset=port_offset,
+                    state_dir=run_root / run.state_directory / "static",
+                    hermes_home_dir=run_root / "hermes_home" / "static",
+                    artifact_dir=run_root / run.artifact_directory / "static",
+                ), cwd=past_root, check=True, env=environment,
+            )
+            _require_accepted_phase(run_root / "static")
+        receipt = AdaMemPolicyReceipt.static(split=split, policy=policy_root)
+        _write_json(run_root / "policy_receipt.json", receipt.payload())
+        return receipt
+
+    prefix_manifest = materialize_phase_manifest(source, split=split, phase="prefix")
+    prefix_manifest_file = run_root / "manifests" / "prefix.yaml"
+    prefix_manifest_file.parent.mkdir(parents=True, exist_ok=True)
+    prefix_manifest_file.write_text(yaml.safe_dump(prefix_manifest, sort_keys=False), encoding="utf-8")
 
     if not dry_run:
         environment = _past_environment(base_url=base_url, api_key=api_key)

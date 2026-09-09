@@ -155,6 +155,23 @@ def materialize_phase_manifest(
     return document
 
 
+def materialize_static_screening_manifest(source: Mapping[str, object]) -> dict[str, object]:
+    """Materialize the full original family for a no-update B0 screening run."""
+    document = copy.deepcopy(dict(source))
+    episodes = document.get("episodes")
+    if not isinstance(episodes, list) or not episodes:
+        raise ValueError("static screening manifest requires episodes")
+    hermes = document.get("hermes")
+    if isinstance(hermes, dict):
+        hermes["reasoning_effort"] = "none"
+    for episode in episodes:
+        if not isinstance(episode, dict):
+            raise ValueError("static screening episode is invalid")
+        episode["shared_cold_run"] = False
+    document["name"] = f"{source.get('name', 'family')}_adamem_static_screening"
+    return document
+
+
 def build_pure_process_feedback(
     *, feedback_view: AdaMemFeedbackView, trace_paths: Sequence[Path],
     operation_paths: Sequence[Path] = (),
