@@ -222,6 +222,16 @@ def test_trajectory_allows_evaluation_only_suffix_when_fixture_has_no_post_learn
     assert receipt.outcome == "no_update"
 
 
+def test_suffix_materialization_does_not_require_process_local_history_anchor() -> None:
+    source = _source()
+    source["episodes"][1]["history_mode"] = "from_anchor"
+    source["episodes"][1]["history_load_anchor"] = "anchor"
+    split = split_family_manifest(source, cutover_label="learn-a")
+    suffix = materialize_phase_manifest(source, split=split, phase="suffix", initial_home_fixture_dir="prefix-home")
+    assert suffix["episodes"][0]["history_mode"] == "continue"
+    assert suffix["episodes"][0]["history_load_anchor"] == ""
+
+
 def test_no_update_retains_mem0_root_binding(tmp_path: Path) -> None:
     split = split_family_manifest(_source(), cutover_label="learn-a")
     parent = AdaMemPolicy.root()

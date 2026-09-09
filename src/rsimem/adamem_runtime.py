@@ -152,6 +152,13 @@ def materialize_phase_manifest(
         if not isinstance(first, dict):
             raise ValueError("AdaMem suffix episode is invalid")
         first["initial_home_fixture_dir"] = initial_home_fixture_dir
+        # Prefix state is copied into the suffix process, but PAST's in-memory
+        # history-anchor map is process-local.  Continue from that copied state
+        # instead of attempting to resolve an anchor that cannot exist here.
+        for episode in document["episodes"]:
+            if isinstance(episode, dict) and episode.get("history_mode") == "from_anchor":
+                episode["history_mode"] = "continue"
+                episode["history_load_anchor"] = ""
     return document
 
 
