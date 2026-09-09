@@ -28,8 +28,9 @@ def _mean_sd(values: list[float]) -> dict[str, object]:
     return {"values": values, "mean": statistics.fmean(values), "sd": statistics.stdev(values) if len(values) > 1 else 0.0}
 
 
-def _episodes(run_root: Path) -> dict[str, Mapping[str, object]]:
-    result = _load(run_root / "suffix" / "sequence_results.json")
+def _episodes(run_root: Path, condition: AdaMemCondition) -> dict[str, Mapping[str, object]]:
+    phase = "static" if condition is AdaMemCondition.MEM0_STATIC and (run_root / "static").is_dir() else "suffix"
+    result = _load(run_root / phase / "sequence_results.json")
     episodes = result.get("episodes")
     if not isinstance(episodes, list):
         raise ValueError("suffix sequence results lack episodes")
@@ -67,11 +68,12 @@ def aggregate_batches(batch_roots: Mapping[AdaMemCondition, Path]) -> dict[str, 
             if not isinstance(item, Mapping):
                 raise ValueError("malformed replicate audit")
             run_id, replicate = item.get("run_id"), item.get("replicate")
-            episodes = _episodes(root / str(run_id))
+            episodes = _episodes(root / str(run_id), condition)
             outcome = item.get("outcome")
             if not isinstance(outcome, Mapping):
                 raise ValueError("replicate lacks policy outcome")
-            suffix_result = _load(root / str(run_id) / "suffix" / "sequence_results.json")
+            phase = "static" if condition is AdaMemCondition.MEM0_STATIC and (root / str(run_id) / "static").is_dir() else "suffix"
+            suffix_result = _load(root / str(run_id) / phase / "sequence_results.json")
             usage = [e.get("token_usage") for e in suffix_result.get("episodes", ()) if isinstance(e, Mapping)]
             complete_usage = [u for u in usage if isinstance(u, Mapping) and u.get("model_usage_complete") is True]
             if len(complete_usage) != len(usage):

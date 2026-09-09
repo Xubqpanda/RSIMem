@@ -42,8 +42,16 @@ def audit_batch(batch_root: Path) -> dict[str, object]:
             raise ValueError("AdaMem replicate condition differs from batch")
         if manifest.get("replicate") not in {1, 2, 3}:
             raise ValueError("AdaMem replicate number is invalid")
-        _require_accepted_phase(root / "prefix")
-        _require_accepted_phase(root / "suffix")
+        if condition is AdaMemCondition.MEM0_STATIC:
+            if (root / "static").is_dir():
+                _require_accepted_phase(root / "static")
+            else:
+                # Backward compatibility for pre-static-topology evidence.
+                _require_accepted_phase(root / "prefix")
+                _require_accepted_phase(root / "suffix")
+        else:
+            _require_accepted_phase(root / "prefix")
+            _require_accepted_phase(root / "suffix")
         if condition is not AdaMemCondition.MEM0_STATIC and (root / "updater_usage.json").exists():
             usage = _load(root / "updater_usage.json")
             if usage.get("usage_complete") is not True:
