@@ -46,6 +46,18 @@ def test_split_requires_explicit_learning_cutover_and_filters_controls() -> None
         split_family_manifest(_source(), cutover_label="control")
 
 
+def test_static_screening_accepts_an_evaluation_only_suffix() -> None:
+    source = _source()
+    source["episodes"] = source["episodes"][:3]
+    split = split_family_manifest(
+        source, cutover_label="learn-b", require_post_update_learning=False,
+    )
+    assert [item["label"] for item in split.suffix_episodes] == ["eval-n1"]
+    assert split.require_post_update_learning is False
+    with pytest.raises(ValueError, match="post-update"):
+        split_family_manifest(source, cutover_label="learn-b")
+
+
 def test_feedback_excludes_grading_and_forbidden_fields(tmp_path: Path) -> None:
     trace = tmp_path / "trace.jsonl"
     trace.write_text(

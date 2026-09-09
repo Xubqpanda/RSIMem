@@ -238,7 +238,10 @@ def run_trajectory(
         task = Path(episode["task"])
         if not task.is_absolute():
             episode["task"] = str((source_sequence.parent / task).resolve())
-    split = split_family_manifest(source, cutover_label=cutover_label)
+    split = split_family_manifest(
+        source, cutover_label=cutover_label,
+        require_post_update_learning=condition is not AdaMemCondition.MEM0_STATIC,
+    )
     if split.family_id not in source_sequence.name:
         # The source filename is audit metadata, never a replacement for YAML identity.
         pass

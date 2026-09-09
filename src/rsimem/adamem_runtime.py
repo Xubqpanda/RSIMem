@@ -61,6 +61,7 @@ class AdaMemTrajectorySplit:
     cutover_label: str
     prefix_episodes: tuple[dict[str, object], ...]
     suffix_episodes: tuple[dict[str, object], ...]
+    require_post_update_learning: bool = True
 
     def __post_init__(self) -> None:
         _require_identifier(self.family_id, "AdaMem family ID")
@@ -69,7 +70,7 @@ class AdaMemTrajectorySplit:
             raise ValueError("AdaMem source digest is invalid")
         if not self.prefix_episodes or not self.suffix_episodes:
             raise ValueError("AdaMem trajectory split requires prefix and suffix episodes")
-        if not any(item.get("bucket") == "learn" for item in self.suffix_episodes):
+        if self.require_post_update_learning and not any(item.get("bucket") == "learn" for item in self.suffix_episodes):
             raise ValueError("AdaMem suffix needs a post-update learning episode")
         if not any(item.get("bucket") == "evaluation" for item in self.suffix_episodes):
             raise ValueError("AdaMem suffix needs an N+1 evaluation episode")
@@ -84,13 +85,15 @@ class AdaMemTrajectorySplit:
             "family_id": self.family_id,
             "source_digest": self.source_digest,
             "cutover_label": self.cutover_label,
+            "require_post_update_learning": self.require_post_update_learning,
             "prefix_episodes": list(self.prefix_episodes),
             "suffix_episodes": list(self.suffix_episodes),
         }
 
 
 def split_family_manifest(
-    source: Mapping[str, object], *, cutover_label: str
+    source: Mapping[str, object], *, cutover_label: str,
+    require_post_update_learning: bool = True,
 ) -> AdaMemTrajectorySplit:
     """Split after an explicit prefix episode; never infer a causal cutover."""
 
@@ -114,6 +117,7 @@ def split_family_manifest(
     return AdaMemTrajectorySplit(
         family_id=next(iter(family_ids)), source_digest=_digest(source),
         cutover_label=cutover_label, prefix_episodes=copied[:index + 1], suffix_episodes=suffix,
+        require_post_update_learning=require_post_update_learning,
     )
 
 
