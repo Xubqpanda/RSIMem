@@ -28,6 +28,26 @@ from .adamem_runtime import (
 FROZEN_MODEL_ID = "gpt-5.6-luna"
 
 
+def _past_environment(*, base_url: str, api_key: str | None) -> dict[str, str]:
+    """Build the isolated PAST environment with audited auxiliary routing.
+
+    Hermes' session_search may make a secondary model request.  Keep that
+    request on the same OpenAI-compatible endpoint/model as the primary agent
+    so its usage is attributable to the trajectory and cannot silently fall
+    through to an unrelated provider.
+    """
+    environment = os.environ.copy()
+    if not environment.get("ANTHROPIC_API_KEY"):
+        compatibility_key = api_key or environment.get("GPT_LUNA_API_KEY")
+        if compatibility_key:
+            environment["ANTHROPIC_API_KEY"] = compatibility_key
+    environment["AUXILIARY_SESSION_SEARCH_BASE_URL"] = base_url
+    environment["AUXILIARY_SESSION_SEARCH_MODEL"] = FROZEN_MODEL_ID
+    if api_key:
+        environment["AUXILIARY_SESSION_SEARCH_API_KEY"] = api_key
+    return environment
+
+
 def _write_json(path: Path, value: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=True, sort_keys=True, indent=2) + "\n", encoding="utf-8")
@@ -262,9 +282,7 @@ def run_trajectory(
     })
 
     if not dry_run:
-        environment = os.environ.copy()
-        if environment.get("GPT_LUNA_API_KEY") and not environment.get("ANTHROPIC_API_KEY"):
-            environment["ANTHROPIC_API_KEY"] = environment["GPT_LUNA_API_KEY"]
+        environment = _past_environment(base_url=base_url, api_key=api_key)
         subprocess.run(
             _past_command(
                 past_bin=past_bin, past_root=past_root, sequence=prefix_manifest_file,
@@ -353,9 +371,7 @@ def run_trajectory(
     suffix_manifest_file = run_root / "manifests" / "suffix.yaml"
     suffix_manifest_file.write_text(yaml.safe_dump(suffix_manifest, sort_keys=False), encoding="utf-8")
     if not dry_run:
-        environment = os.environ.copy()
-        if environment.get("GPT_LUNA_API_KEY") and not environment.get("ANTHROPIC_API_KEY"):
-            environment["ANTHROPIC_API_KEY"] = environment["GPT_LUNA_API_KEY"]
+        environment = _past_environment(base_url=base_url, api_key=api_key)
         subprocess.run(
             _past_command(
                 past_bin=past_bin, past_root=past_root, sequence=suffix_manifest_file,

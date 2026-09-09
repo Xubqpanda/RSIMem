@@ -6,6 +6,7 @@ from rsimem.adamem_adapter import AdaMemFeedbackView, AdaMemPolicy, update_polic
 from rsimem.adamem_experiment import AdaMemCondition, AdaMemRunSpec
 from rsimem.adamem_launcher import (
     FROZEN_MODEL_ID,
+    _past_environment,
     _past_command,
     _require_accepted_phase,
     compare_run_manifests,
@@ -116,6 +117,20 @@ def test_launcher_rejects_incomplete_usage_and_preserves_port_isolation(tmp_path
         state_dir=Path("state"), hermes_home_dir=Path("home"), artifact_dir=Path("artifacts"),
     )
     assert "--rsimem-state-dir" in isolated
+
+
+def test_past_environment_routes_session_search_to_frozen_luna_endpoint(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("GPT_LUNA_API_KEY", "agent-key")
+    environment = _past_environment(
+        base_url="https://provider.example/v1", api_key="run-key",
+    )
+    assert environment["AUXILIARY_SESSION_SEARCH_BASE_URL"] == "https://provider.example/v1"
+    assert environment["AUXILIARY_SESSION_SEARCH_MODEL"] == FROZEN_MODEL_ID
+    assert environment["AUXILIARY_SESSION_SEARCH_API_KEY"] == "run-key"
+    assert environment["ANTHROPIC_API_KEY"] == "run-key"
 
 
 def test_launcher_rejects_model_drift_before_execution(tmp_path: Path) -> None:
