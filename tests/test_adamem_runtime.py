@@ -195,6 +195,33 @@ def test_static_screening_uses_one_complete_family_manifest(tmp_path: Path) -> N
     assert not (tmp_path / "static-screening" / "manifests" / "prefix.yaml").exists()
 
 
+def test_trajectory_allows_evaluation_only_suffix_when_fixture_has_no_post_learn(
+    tmp_path: Path,
+) -> None:
+    source = _source()
+    source["episodes"] = [source["episodes"][0], source["episodes"][1], source["episodes"][2]]
+    for episode in source["episodes"]:
+        episode["task"] = "task.yaml"
+    sequence = tmp_path / "sequence.yaml"
+    sequence.write_text(__import__("yaml").safe_dump(source), encoding="utf-8")
+    for name in ("past", "config", "registry"):
+        (tmp_path / name).write_text(name, encoding="utf-8")
+    run = AdaMemRunSpec(
+        run_id="terminal-eval-only", condition=AdaMemCondition.ADAMEM_TERMINAL, replicate=1,
+        state_directory="state", trace_directory="trace", artifact_directory="artifacts",
+        mem0_collection="collection",
+    )
+    receipt = run_trajectory(
+        source_sequence=sequence, run=run, condition=run.condition,
+        cutover_label="learn-b", output_root=tmp_path, past_bin=tmp_path / "past",
+        past_root=tmp_path, config=tmp_path / "config", registry=tmp_path / "registry",
+        base_model=FROZEN_MODEL_ID, meta_agent_model=FROZEN_MODEL_ID,
+        base_url="https://example.test/v1", api_key=None, update_budget=1,
+        temperature=0.0, dry_run=True,
+    )
+    assert receipt.outcome == "no_update"
+
+
 def test_no_update_retains_mem0_root_binding(tmp_path: Path) -> None:
     split = split_family_manifest(_source(), cutover_label="learn-a")
     parent = AdaMemPolicy.root()

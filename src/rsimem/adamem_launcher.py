@@ -239,9 +239,18 @@ def run_trajectory(
         task = Path(episode["task"])
         if not task.is_absolute():
             episode["task"] = str((source_sequence.parent / task).resolve())
+    cutover_index = next(
+        (index for index, item in enumerate(episodes)
+         if isinstance(item, dict) and item.get("label") == cutover_label),
+        None,
+    )
+    post_cutover = episodes[cutover_index + 1:] if cutover_index is not None else []
+    has_post_update_learning = any(item.get("bucket") == "learn" for item in post_cutover)
     split = split_family_manifest(
         source, cutover_label=cutover_label,
-        require_post_update_learning=condition is not AdaMemCondition.MEM0_STATIC,
+        require_post_update_learning=(
+            condition is not AdaMemCondition.MEM0_STATIC and has_post_update_learning
+        ),
     )
     if split.family_id not in source_sequence.name:
         # The source filename is audit metadata, never a replacement for YAML identity.
