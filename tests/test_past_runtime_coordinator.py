@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from rsimem.adapter_contracts import (
+from rsimem.benchmarks.past.adapter_contracts import (
     BenchmarkSplit,
     BenchmarkTaskRequest,
     CanonicalHostEvent,
@@ -15,7 +15,7 @@ from rsimem.adapter_contracts import (
 )
 from rsimem.memory import MemoryKind
 from rsimem.memory.lifecycle_surfaces import MemoryLifecycleSurface
-from rsimem.past_runtime_coordinator import PastRuntimeTerminalCoordinator
+from rsimem.benchmarks.past.past_runtime_coordinator import PastRuntimeTerminalCoordinator
 
 
 def _request() -> BenchmarkTaskRequest:

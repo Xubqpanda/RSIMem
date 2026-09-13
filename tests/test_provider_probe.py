@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from rsimem.provider_probe import ProviderProbeResult, probe_provider
+from rsimem.evaluation.provider_probe import ProviderProbeResult, probe_provider
 
 
 def test_probe_accepts_content_and_keeps_secret_out_of_result() -> None:

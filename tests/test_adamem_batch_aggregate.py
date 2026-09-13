@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adamem_batch_aggregate import aggregate_batches
-from rsimem.adamem_experiment import AdaMemCondition
+from experiments.adamem.adamem_batch_aggregate import aggregate_batches
+from experiments.adamem.adamem_experiment import AdaMemCondition
 
 
 def _batch(root: Path, condition: AdaMemCondition, *, count: int = 3) -> None:

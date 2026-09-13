@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.extraction_experiment_manifest import (
+from experiments.legacy.extraction.extraction_experiment_manifest import (
     EXTRACTION_FEEDBACK_METHOD_VARIANTS,
     EXTRACTION_METHOD_VARIANTS,
     CleanRepositoryRevision,

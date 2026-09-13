@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.native_attribution_protocol import NativeAttributionRepairProtocol
-from rsimem.native_attribution_run import (
+from experiments.legacy.native.native_attribution_protocol import NativeAttributionRepairProtocol
+from experiments.legacy.native.native_attribution_run import (
     NativeAttributionRunManifest,
     NativeAttributionRunManifestStore,
     NativeAttributionRunSpec,

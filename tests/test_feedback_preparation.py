@@ -11,7 +11,7 @@ from rsimem.experiment_manifest import (
     initialize_batch_manifest,
     record_attempt,
 )
-from rsimem.feedback_preparation import (
+from experiments.legacy.sensitivity.feedback_preparation import (
     assemble_feedback_batch,
     load_prepared_feedback_dataset,
 )
@@ -22,8 +22,8 @@ from rsimem.memory.operation_graph import (
     OperationGraph,
 )
 from rsimem.memory.utility import MEM0_UTILITY_PARAMETER_IDS, UtilityTarget
-from rsimem.memory_systems.mem0_flat import FrozenMem0UtilityGate
-from rsimem.memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
+from rsimem.memory_systems.semantic.mem0_flat import FrozenMem0UtilityGate
+from rsimem.memory_systems.semantic.mem0_flat.policy import Mem0FlatSemanticPolicy
 from test_experiment_manifest import _manifest_kwargs
 from test_feedback_dataset import _graph
 

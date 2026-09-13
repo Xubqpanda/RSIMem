@@ -33,7 +33,7 @@ from .evidence_planes import (
 from .ingestion import InternalMemoryAction, MemoryIngestStatus
 from .live_writeback import ExtractionRuntimeBinding, StaticSemanticBoundaryResult
 from .prompt_components import SemanticPolicyManifest
-from ..memory_systems.mem0_flat.policy import (
+from ..memory_systems.semantic.mem0_flat.policy import (
     ExtractionInvocationFingerprint,
     Mem0FlatSemanticPolicy,
 )

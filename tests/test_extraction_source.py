@@ -13,7 +13,7 @@ from rsimem.memory.extraction_source import (
     ExtractionSourceProjector,
 )
 from rsimem.memory.ingestion import build_completed_task_semantic_ingest_request
-from rsimem.memory_systems.mem0_flat import POLICY_FACT_EXTRACTION_PROMPT
+from rsimem.memory_systems.semantic.mem0_flat import POLICY_FACT_EXTRACTION_PROMPT
 
 
 def _messages(*, changed: str = "Keep TSV output.") -> tuple[HermesMessage, ...]:

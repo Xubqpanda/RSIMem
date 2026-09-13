@@ -3,10 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from rsimem.provider_probe import ProviderProbeResult
-from rsimem.sensitivity import SensitivityPanel
-from rsimem.sensitivity_pilot import run_sensitivity_pilot
-from rsimem.sensitivity_pilot_audit import _usage
+from rsimem.evaluation.provider_probe import ProviderProbeResult
+from experiments.legacy.sensitivity.sensitivity import SensitivityPanel
+from experiments.legacy.sensitivity.sensitivity_pilot import run_sensitivity_pilot
+from experiments.legacy.sensitivity.sensitivity_pilot_audit import _usage
 
 
 def _kwargs(tmp_path: Path) -> dict[str, object]:

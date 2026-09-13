@@ -5,7 +5,7 @@ This report is generated from the content-free pilot audits under
 answers, or raw model responses. The reproducible command is:
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m rsimem.sensitivity_coverage \
+PYTHONPATH=src .venv/bin/python -m experiments.legacy.sensitivity.sensitivity_coverage \
   outputs/sensitivity --output outputs/sensitivity/stage3_coverage.json
 ```
 

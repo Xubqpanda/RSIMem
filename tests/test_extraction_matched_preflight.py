@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.extraction_experiment_manifest import CleanRepositoryRevision
-from rsimem.extraction_matched_preflight import (
+from experiments.legacy.extraction.extraction_experiment_manifest import CleanRepositoryRevision
+from experiments.legacy.extraction.extraction_matched_preflight import (
     build_parser,
     initialize_formal_matched_validation_batch,
 )
-from rsimem.extraction_validation_runtime import (
+from rsimem.memory.extraction_validation_runtime import (
     prepare_extraction_matched_trial_runtime,
 )
-from rsimem.extraction_split_plan import (
+from experiments.legacy.extraction.extraction_split_plan import (
     ExtractionSplitAssignment,
     ExtractionSplitPlan,
     ExtractionSplitRole,
@@ -43,15 +43,15 @@ def test_matched_preflight_builds_validation_manifest_with_only_extraction_drift
     captured = {}
 
     monkeypatch.setattr(
-        "rsimem.extraction_matched_preflight.resolve_clean_repository",
+        "experiments.legacy.extraction.extraction_matched_preflight.resolve_clean_repository",
         lambda path: CleanRepositoryRevision("a" * 40, "b" * 40),
     )
     monkeypatch.setattr(
-        "rsimem.extraction_matched_preflight.resolved_task_template_profile",
+        "experiments.legacy.extraction.extraction_matched_preflight.resolved_task_template_profile",
         lambda path: {"taskManifestDigest": "c" * 64, "tasks": []},
     )
     monkeypatch.setattr(
-        "rsimem.extraction_matched_preflight.resolved_model_profile",
+        "experiments.legacy.extraction.extraction_matched_preflight.resolved_model_profile",
         lambda *args, **kwargs: {
             "agentProfile": "hermes-luna",
             "modelId": "fixture",
@@ -65,7 +65,7 @@ def test_matched_preflight_builds_validation_manifest_with_only_extraction_drift
         },
     )
     monkeypatch.setattr(
-        "rsimem.extraction_matched_preflight.initialize_extraction_batch_manifest",
+        "experiments.legacy.extraction.extraction_matched_preflight.initialize_extraction_batch_manifest",
         lambda path, **kwargs: captured.update(kwargs) or "experiment.fixture-v1",
     )
     revocation_registry = JsonRevocationRegistry(tmp_path / "revocations.jsonl")

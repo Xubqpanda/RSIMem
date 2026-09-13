@@ -21,7 +21,7 @@ from rsimem.memory import (
     MemoryMutationResult,
     MemoryQuery,
 )
-from rsimem.memory.backends import HermesSemanticBackend
+from rsimem.memory_systems.semantic.hermes_native import HermesSemanticBackend
 from rsimem.memory.executor import (
     MUTATION_EXECUTOR_SCHEMA_VERSION,
     CrashPoint,

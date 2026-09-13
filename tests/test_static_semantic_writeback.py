@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import pytest
 
-from rsimem.ledger import LifecycleLedgerObserver
+from rsimem.evaluation.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import (
     DryRunStatus,
     EvaluationTrigger,
@@ -41,7 +41,7 @@ from rsimem.memory.operation_graph import (
     materialize_operation_graph,
 )
 from rsimem.memory.receipts import MutationReceiptStatus
-from rsimem.memory_systems.mem0_flat import (
+from rsimem.memory_systems.semantic.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT_ID,
     Mem0FlatPromptAdapter,
     FakeCompletionClient,

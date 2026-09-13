@@ -15,7 +15,7 @@ from rsimem.memory import (
     MemoryKindCapability,
     MemoryQuery,
 )
-from rsimem.memory.backends import HermesSemanticBackend
+from rsimem.memory_systems.semantic.hermes_native import HermesSemanticBackend
 from rsimem.memory.ingestion import (
     HERMES_NATIVE_ROUTES,
     InternalMemoryAction,

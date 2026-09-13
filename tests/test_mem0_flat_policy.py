@@ -8,7 +8,7 @@ import pytest
 
 from rsimem.lifecycle import RawResourceUsage
 from rsimem.memory import MemoryKind, MemoryQuery
-from rsimem.memory.backends import HermesSemanticBackend
+from rsimem.memory_systems.semantic.hermes_native import HermesSemanticBackend
 from rsimem.memory.ingestion import (
     InternalMemoryAction,
     MemoryIngestStatus,
@@ -35,7 +35,7 @@ from rsimem.memory.validation import (
     TrustedTargetBinding,
     ValidationProvenance,
 )
-from rsimem.memory_systems.mem0_flat import (
+from rsimem.memory_systems.semantic.mem0_flat import (
     FACT_EXTRACTION_PROMPT,
     INTERNAL_OPERATION_PROMPT,
     MEM0_FLAT_POLICY_SCHEMA_VERSION,

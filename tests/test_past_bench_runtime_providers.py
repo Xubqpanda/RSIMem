@@ -18,12 +18,42 @@ from past_bench.runtime.adapters.hermes import (
 from past_bench.models.task import TaskDefinition
 from past_bench.runner.self_evolve import build_past_bench_application_opportunity_schema
 from past_bench.runner.self_evolve import build_hermes_extra_body
+from past_bench.runner.self_evolve import resolve_episode_tool_config
 from rsimem.memory.extraction_feedback import (
     ExtractedFactEvidence,
     ExtractionSetStatus,
     ExtractionSourceEvidence,
     FactDisposition,
 )
+
+
+@pytest.mark.parametrize("mechanism", ["memory", "session_search", "skill", "mixed"])
+def test_all_memory_off_overrides_every_per_episode_mechanism_toolset(mechanism: str) -> None:
+    assert resolve_episode_tool_config(
+        persistence_enabled=True,
+        expected_signal=mechanism,
+        memory_enabled=False,
+        user_profile_enabled=False,
+        skills_enabled=False,
+        session_search_enabled=False,
+        all_memory_off=True,
+    ) == {
+        "memory_enabled": False,
+        "user_profile_enabled": False,
+        "skills_enabled": False,
+        "session_search_enabled": False,
+    }
+
+
+def test_all_memory_off_rejects_a_reenabled_hermes_switch(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="AllMemoryOff"):
+        build_hermes_extra_body(
+            home_dir=tmp_path / "home", artifacts_dir=tmp_path / "artifacts",
+            persistence_enabled=True, memory_enabled=True, user_profile_enabled=False,
+            skills_enabled=False, session_search_enabled=False, all_memory_off=True,
+            memory_nudge_interval=1, memory_flush_min_turns=1,
+            skill_creation_nudge_interval=1, background_review_wait_s=0.0,
+        )
 
 
 def test_past_opportunity_provider_uses_source_provenance_and_visible_surface() -> None:
@@ -301,7 +331,7 @@ def test_past_opportunity_provider_treats_supplied_schema_as_authoritative() -> 
 def test_past_opportunity_provider_rejects_scoring_or_answer_payloads() -> None:
     """The bridge must reject evaluation evidence before provider execution."""
 
-    from rsimem.hermes_past_bridge import HermesPastBenchBridge
+    from rsimem.hosts.hermes.hermes_past_bridge import HermesPastBenchBridge
 
     called = []
     bridge = SimpleNamespace(

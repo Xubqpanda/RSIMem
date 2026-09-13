@@ -1509,7 +1509,7 @@ class PureExtractionSourceProjector:
         from .executor import MutationExecutionStatus
         from .ingestion import InternalMemoryAction, MemoryIngestStatus
         from .live_writeback import ExtractionRuntimeBinding, StaticSemanticBoundaryResult
-        from ..memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
+        from ..memory_systems.semantic.mem0_flat.policy import Mem0FlatSemanticPolicy
 
         if not isinstance(boundary, StaticSemanticBoundaryResult):
             raise TypeError("pure extraction projector boundary has the wrong type")

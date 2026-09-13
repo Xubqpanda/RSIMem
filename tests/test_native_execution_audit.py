@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.native_attribution_protocol import NativeAttributionRepairProtocol
-from rsimem.native_attribution_run import build_native_attribution_manifest
-from rsimem.native_execution_audit import NativeExecutionAuditStore, audit_native_execution
+from experiments.legacy.native.native_attribution_protocol import NativeAttributionRepairProtocol
+from experiments.legacy.native.native_attribution_run import build_native_attribution_manifest
+from experiments.legacy.native.native_execution_audit import NativeExecutionAuditStore, audit_native_execution
 
 
 ROOT = Path(__file__).resolve().parents[1]

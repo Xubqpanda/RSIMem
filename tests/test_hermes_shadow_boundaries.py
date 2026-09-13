@@ -5,11 +5,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from rsimem.hermes_past_bridge import HermesPastBenchBridge
-from rsimem.hermes_integration import HermesExecutionMode, HermesExperimentConfig
+from rsimem.hosts.hermes.hermes_past_bridge import HermesPastBenchBridge
+from rsimem.hosts.hermes.hermes_integration import HermesExecutionMode, HermesExperimentConfig
 from rsimem.lifecycle import HermesLifecycleConfig, TaskLifecycleState
 from rsimem.memory.tool_exact_join import ToolJoinResolutionStatus, resolve_tool_call_result
-from rsimem.adapter_contracts import HostEventKind
+from rsimem.benchmarks.past.adapter_contracts import HostEventKind
 
 
 def _home(tmp_path):

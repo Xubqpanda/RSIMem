@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adamem_experiment import AdaMemCondition
-from rsimem.adamem_smoke_audit import audit_smoke_trio
+from experiments.adamem.adamem_experiment import AdaMemCondition
+from experiments.adamem.adamem_smoke_audit import audit_smoke_trio
 
 
 def _write_run(root: Path, condition: AdaMemCondition, *, outcome: str, applied: bool) -> None:

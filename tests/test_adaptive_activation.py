@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adaptive_activation import (
+from experiments.legacy.adaptive.adaptive_activation import (
     MATCHED_OBSERVATION_BATCH_SCHEMA_VERSION,
     _OBSERVATION_BATCH_IDENTITY_FIELDS,
     _digest,
     activate_adaptive_policy,
     load_matched_observation_batch,
 )
-from rsimem.adaptive_preparation import (
+from experiments.legacy.adaptive.adaptive_preparation import (
     load_offline_adaptive_preparation,
     prepare_adaptive_policy,
 )

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.base_memory_experiment import BaseMemoryCondition
-from rsimem.base_memory_smoke_audit import audit_smoke_trio
+from experiments.base_memory.base_memory_experiment import HISTORICAL_BASE_MEMORY_CONDITIONS, BaseMemoryCondition
+from experiments.base_memory.base_memory_smoke_audit import audit_smoke_trio
 
 
 def _run(root: Path, condition: BaseMemoryCondition) -> None:
@@ -25,7 +25,7 @@ def _run(root: Path, condition: BaseMemoryCondition) -> None:
 
 
 def test_accepts_complete_three_backend_smoke(tmp_path: Path) -> None:
-    roots = {condition: tmp_path / condition.value for condition in BaseMemoryCondition}
+    roots = {condition: tmp_path / condition.value for condition in HISTORICAL_BASE_MEMORY_CONDITIONS}
     for condition, root in roots.items(): _run(root, condition)
     report = audit_smoke_trio(roots)
     assert report["accepted"] is True
@@ -33,7 +33,7 @@ def test_accepts_complete_three_backend_smoke(tmp_path: Path) -> None:
 
 
 def test_rejects_missing_mem0_injection_evidence(tmp_path: Path) -> None:
-    roots = {condition: tmp_path / condition.value for condition in BaseMemoryCondition}
+    roots = {condition: tmp_path / condition.value for condition in HISTORICAL_BASE_MEMORY_CONDITIONS}
     for condition, root in roots.items(): _run(root, condition)
     path = roots[BaseMemoryCondition.MEM0_STATIC] / "rsimem_semantic_operations.jsonl"
     path.write_text(json.dumps({"payload": {"kind": "fact_extraction"}}), encoding="utf-8")

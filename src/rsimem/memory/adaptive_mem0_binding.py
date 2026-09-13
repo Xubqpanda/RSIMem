@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import math
 
-from ..memory_systems.mem0_flat.utility_gate import FrozenMem0UtilityGate
+from ..memory_systems.semantic.mem0_flat.utility_gate import FrozenMem0UtilityGate
 from .adaptive_policy import (
     ADAPTIVE_POLICY_ARTIFACT_SCHEMA,
     ADAPTIVE_POLICY_OBJECTIVE,

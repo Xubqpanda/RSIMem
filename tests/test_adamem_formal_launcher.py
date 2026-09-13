@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from rsimem.adamem_formal_launcher import FORMAL_SCHEMA, build_formal_manifest
+from experiments.adamem.adamem_formal_launcher import FORMAL_SCHEMA, build_formal_manifest
 
 
 def test_formal_manifest_requires_all_current_screening_families(tmp_path: Path) -> None:

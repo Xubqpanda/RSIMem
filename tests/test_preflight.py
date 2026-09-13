@@ -80,6 +80,42 @@ def test_preflight_reports_wrong_python_missing_dependency_and_unwritable_state(
     assert "PermissionError" not in serialized
 
 
+def test_preflight_accepts_explicit_launcher_provider_without_registry_profile(
+    tmp_path: Path,
+) -> None:
+    past_root, registry = _fixture_paths(tmp_path)
+    report = run_preflight(
+        state_directory=tmp_path / "state",
+        past_bench_root=past_root,
+        registry_path=registry,
+        agent="hermes",
+        require_provider=True,
+        provider_base_url="https://provider.example/v1",
+        provider_api_key_env="TEST_EXPLICIT_KEY",
+        python_version=(3, 11),
+        distribution_version=lambda _: "1.0",
+        environ={"TEST_EXPLICIT_KEY": "secret"},
+    )
+    assert report.ok
+    assert _codes(report)["provider"] == "provider_configured"
+
+
+def test_preflight_requires_both_explicit_provider_fields(tmp_path: Path) -> None:
+    past_root, registry = _fixture_paths(tmp_path)
+    report = run_preflight(
+        state_directory=tmp_path / "state",
+        past_bench_root=past_root,
+        registry_path=registry,
+        require_provider=True,
+        provider_base_url="https://provider.example/v1",
+        python_version=(3, 11),
+        distribution_version=lambda _: "1.0",
+        environ={},
+    )
+    assert not report.ok
+    assert _codes(report)["provider"] == "provider_profile_incomplete"
+
+
 def test_cli_never_prints_provider_secret_or_machine_paths(
     tmp_path: Path,
     monkeypatch: object,

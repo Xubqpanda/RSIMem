@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.extraction_experiment_manifest import (
+from experiments.legacy.extraction.extraction_experiment_manifest import (
     EXTRACTION_METHOD_VARIANTS,
     extraction_execution_order,
     initialize_extraction_batch_manifest,
     record_extraction_attempt,
 )
-from rsimem.extraction_validation_evidence import (
+from experiments.legacy.extraction.extraction_validation_evidence import (
     ExtractionMatchedEvidenceBatch,
     assemble_extraction_matched_evidence_batch,
     load_extraction_matched_evidence_batch,
@@ -40,7 +40,7 @@ from rsimem.memory.process_feedback import (
     ProcessEventKind,
     ProcessEventStatus,
 )
-from rsimem.memory_systems.mem0_flat import (
+from rsimem.memory_systems.semantic.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT,
     MEM0_FLAT_EXTRACTION_SLOT_ID,
     Mem0FlatPromptAdapter,

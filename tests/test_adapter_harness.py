@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from rsimem.adapter_contracts import (
+from rsimem.benchmarks.past.adapter_contracts import (
     AdapterResult,
     AdapterStatus,
     BenchmarkPublicEvent,
@@ -20,10 +20,10 @@ from rsimem.adapter_contracts import (
     MethodCapabilities,
     MethodRunIdentity,
 )
-from rsimem.adapter_harness import AdapterHarness
+from rsimem.benchmarks.past.adapter_harness import AdapterHarness
 from rsimem.memory import MemoryKind
 from rsimem.memory.lifecycle_surfaces import MemoryLifecycleSurface
-from rsimem.past_bench_adapter import PastExecutionTrace
+from rsimem.benchmarks.past.past_bench_adapter import PastExecutionTrace
 
 
 class _Benchmark:

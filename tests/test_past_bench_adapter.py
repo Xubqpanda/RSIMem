@@ -6,9 +6,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from rsimem.adapter_contracts import BenchmarkSplit
+from rsimem.benchmarks.past.adapter_contracts import BenchmarkSplit
 from rsimem.memory.family_matrix import PastFamilyMatrix
-from rsimem.past_bench_adapter import PastBenchAdapter, PastExecutionTrace
+from rsimem.benchmarks.past.past_bench_adapter import PastBenchAdapter, PastExecutionTrace
 
 
 def _fixture_root(tmp_path):

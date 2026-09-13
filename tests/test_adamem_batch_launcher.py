@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-import rsimem.adamem_batch_launcher as launcher
-from rsimem.adamem_experiment import AdaMemCondition
+import experiments.adamem.adamem_batch_launcher as launcher
+from experiments.adamem.adamem_experiment import AdaMemCondition
 
 
 def _inputs(tmp_path: Path):
@@ -45,7 +45,7 @@ def test_batch_writes_manifest_before_replicate_execution(tmp_path: Path, monkey
     def fake_run(**kwargs):
         path = kwargs["output_root"] / kwargs["run"].run_id / ".." / "batch_manifest.json"
         seen.append(path.resolve())
-        from rsimem.adamem_runtime import AdaMemPolicyReceipt
+        from experiments.adamem.adamem_runtime import AdaMemPolicyReceipt
         return type("Receipt", (), {"payload": lambda self: {"outcome": "static"}})()
     monkeypatch.setattr(launcher, "run_trajectory", fake_run)
     report = launcher.run_replicate_batch(

@@ -206,8 +206,8 @@ def resolved_adaptive_policy_profile(config_path: Path) -> dict[str, Any]:
     from .memory.adaptive_mem0_binding import ActiveAdaptiveMem0Binder
     from .memory.adaptive_policy_store import JsonAdaptivePolicyStore
     from .memory.live_writeback import StaticSemanticWritebackConfig
-    from .memory_systems.mem0_flat import FrozenMem0UtilityGate
-    from .memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
+    from .memory_systems.semantic.mem0_flat import FrozenMem0UtilityGate
+    from .memory_systems.semantic.mem0_flat.policy import Mem0FlatSemanticPolicy
 
     runtime = StaticSemanticWritebackConfig.from_mapping({
         "mode": "adaptive_utility",

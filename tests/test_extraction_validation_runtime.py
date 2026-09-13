@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from rsimem.extraction_validation_runtime import (
+from rsimem.memory.extraction_validation_runtime import (
     EXTRACTION_OFFLINE_CONFIG_FILE,
     EXTRACTION_MATCHED_TRIAL_SCOPE,
     EXTRACTION_PRODUCTION_SCOPE,
@@ -29,7 +29,7 @@ from rsimem.memory.extraction_policy_store import (
 )
 from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
-from rsimem.memory_systems.mem0_flat import MEM0_FLAT_EXTRACTION_SLOT
+from rsimem.memory_systems.semantic.mem0_flat import MEM0_FLAT_EXTRACTION_SLOT
 from rsimem.memory.prompt_components import content_digest
 from test_extraction_matched_activation import _offline_decision
 from test_extraction_offline_validation import _candidate, _parent, _cases, _outputs

@@ -1,0 +1,34 @@
+{
+  "schema": "rsimem-refactor-stage0-baseline-v1",
+  "date": "2026-09-11",
+  "git": {
+    "head": "e1830e3afa33fad92b5cf9ad1921aba5961d9005",
+    "working_tree_dirty": true,
+    "dirty_paths_recorded_in": "docs/refactor_stage0_inventory_20260911.md"
+  },
+  "checks": {
+    "compileall": "passed",
+    "pip_check": "passed",
+    "pytest": {
+      "passed": 1302,
+      "failed": 2,
+      "failure_class": "stale archived baseline manifest test path"
+    },
+    "git_diff_check": "passed"
+  },
+  "formal_manifests": {
+    "adamem": {
+      "path": "outputs/adamem_full_suite_20260908/formal_manifest.json",
+      "schema": "rsimem-adamem-full-suite-formal-manifest-v1",
+      "manifest_digest": "153689a96e7f6245d1771ae5079da76af0fc3332d3e15e48a1e7d8b156835f76",
+      "file_sha256": "c2a349320414c73d856d3ec770ad36a9f723d7970f39f194678b007c3c012001"
+    },
+    "base_memory": {
+      "path": "outputs/base_memory_formal_20260909/formal_manifest.json",
+      "schema": "rsimem-base-memory-full-suite-formal-manifest-v1",
+      "manifest_digest": "34be3c17a3d066a46889c5141e70533c44ad0b7a5280cce08516ee418490f153",
+      "file_sha256": "6a880f0ab819881ad906d4516841253054a18f82fb0d3a2c4dd0ca7080e6be95"
+    }
+  },
+  "provider_batch_running": false
+}

@@ -20,6 +20,22 @@ from .contracts import (
     MemoryQuery,
     MemoryResource,
 )
+from .hook_contract import (
+    MEMORY_HOOK_SCHEMA,
+    MEMORY_HOOK_SCHEMA_VERSION,
+    MemoryHookDecision,
+    MemoryHookEvent,
+    MemoryHookPoint,
+    MemoryHookType,
+)
+from .surface_policy import (
+    RUNTIME_SURFACE_POLICY_SCHEMA,
+    RUNTIME_SURFACE_POLICY_SCHEMA_VERSION,
+    MemorySurface,
+    RuntimeSurfacePolicy,
+    SurfaceOperation,
+    capability_check,
+)
 from .taxonomy import (
     MEMORY_TAXONOMY_SCHEMA,
     MEMORY_TAXONOMY_SCHEMA_VERSION,
@@ -50,12 +66,6 @@ from .family_matrix import (
     default_past_family_specs,
 )
 from .runtime import MemoryBackendRegistry, MemoryRuntime
-from .backends import (
-    HermesEpisodicBackend,
-    HermesProceduralBackend,
-    HermesSemanticBackend,
-    build_hermes_native_registry,
-)
 from .prompt_components import (
     MemoryPromptAdapter,
     PromptAdapterRegistry,
@@ -331,10 +341,6 @@ __all__ = [
     "PastFamilySpec",
     "default_past_family_specs",
     "MemoryRuntime",
-    "HermesEpisodicBackend",
-    "HermesProceduralBackend",
-    "HermesSemanticBackend",
-    "build_hermes_native_registry",
     "MemoryPromptAdapter",
     "PromptAdapterRegistry",
     "PromptSlotDescriptor",

@@ -9,33 +9,57 @@ description = "Experiment instrumentation and evaluation for LightRSI memory res
 requires-python = ">=3.11,<3.12"
 
 [project.scripts]
-rsimem-ledger = "rsimem.ledger:main"
-rsimem-audit = "rsimem.audit:main"
-rsimem-preflight = "rsimem.preflight:main"
-rsimem-preflight-baseline = "rsimem.baseline:main"
-rsimem-freeze-research-protocol = "rsimem.research_protocol:main"
-rsimem-freeze-native-attribution-protocol = "rsimem.native_attribution_protocol:main"
-rsimem-audit-native-execution = "rsimem.native_execution_audit:main"
-rsimem-report-native-attribution = "rsimem.native_attribution_report:main"
-rsimem-merge-native-attribution = "rsimem.native_attribution_corpus:main"
-rsimem-assemble-native-attribution = "rsimem.native_attribution_batch:main"
-rsimem-prepare-attribution-review = "rsimem.native_attribution_review:main"
-rsimem-freeze-native-repair-cases = "rsimem.native_repair_selection:main"
-rsimem-analyze-matched = "rsimem.matched_analysis:main"
-rsimem-prepare-adaptive = "rsimem.adaptive_preparation:main"
-rsimem-activate-adaptive = "rsimem.adaptive_activation:main"
-rsimem-prepare-adaptive-validation = "rsimem.adaptive_validation_runtime:main"
-rsimem-assemble-adaptive-validation = "rsimem.adaptive_validation_evidence:main"
-rsimem-analyze-adaptive = "rsimem.adaptive_analysis:main"
-rsimem-preflight-extraction = "rsimem.extraction_experiment_preflight:main"
-rsimem-analyze-extraction = "rsimem.extraction_experiment_analysis:main"
-rsimem-prepare-extraction = "rsimem.extraction_preparation:main"
-rsimem-preflight-extraction-matched = "rsimem.extraction_matched_preflight:main"
-rsimem-policy-feasibility = "rsimem.memory.policy_feasibility_fixture:main"
-rsimem-final-report = "rsimem.memory.final_evaluation:main"
+rsimem-ledger = "rsimem.cli.ledger:main"
+rsimem-audit = "rsimem.cli.audit:main"
+rsimem-preflight = "rsimem.cli.preflight:main"
+rsimem-preflight-baseline = "rsimem.cli.baseline:main"
+rsimem-freeze-research-protocol = "rsimem.cli.research_protocol:main"
+rsimem-freeze-native-attribution-protocol = "rsimem.cli.native_attribution_protocol:main"
+rsimem-audit-native-execution = "rsimem.cli.native_execution_audit:main"
+rsimem-report-native-attribution = "rsimem.cli.native_attribution_report:main"
+rsimem-merge-native-attribution = "rsimem.cli.native_attribution_corpus:main"
+rsimem-assemble-native-attribution = "rsimem.cli.native_attribution_batch:main"
+rsimem-prepare-attribution-review = "rsimem.cli.native_attribution_review:main"
+rsimem-freeze-native-repair-cases = "rsimem.cli.native_repair_selection:main"
+rsimem-analyze-matched = "rsimem.cli.matched_analysis:main"
+rsimem-prepare-adaptive = "rsimem.cli.adaptive_preparation:main"
+rsimem-activate-adaptive = "rsimem.cli.adaptive_activation:main"
+rsimem-prepare-adaptive-validation = "rsimem.cli.adaptive_validation_runtime:main"
+rsimem-assemble-adaptive-validation = "rsimem.cli.adaptive_validation_evidence:main"
+rsimem-analyze-adaptive = "rsimem.cli.adaptive_analysis:main"
+rsimem-preflight-extraction = "rsimem.cli.extraction_experiment_preflight:main"
+rsimem-analyze-extraction = "rsimem.cli.extraction_experiment_analysis:main"
+rsimem-prepare-extraction = "rsimem.cli.extraction_preparation:main"
+rsimem-preflight-extraction-matched = "rsimem.cli.extraction_matched_preflight:main"
+rsimem-policy-feasibility = "rsimem.cli.policy_feasibility:main"
+rsimem-final-report = "rsimem.cli.final_report:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.setuptools]
+package-dir = {"" = "src", "experiments" = "experiments"}
+packages = [
+    "rsimem",
+    "rsimem.benchmarks",
+    "rsimem.benchmarks.past",
+    "rsimem.cli",
+    "rsimem.evaluation",
+    "rsimem.hosts",
+    "rsimem.hosts.hermes",
+    "rsimem.lifecycle",
+    "rsimem.memory",
+    "rsimem.memory_systems",
+    "rsimem.memory_systems.semantic",
+    "rsimem.memory_systems.semantic.mem0_flat",
+    "rsimem.memory_systems.episodic",
+    "rsimem.memory_systems.procedural",
+    "experiments",
+    "experiments.base_memory",
+    "experiments.adamem",
+    "experiments.legacy",
+    "experiments.legacy.adaptive",
+    "experiments.legacy.extraction",
+    "experiments.legacy.native",
+    "experiments.legacy.sensitivity",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

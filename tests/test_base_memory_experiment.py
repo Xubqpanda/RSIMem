@@ -5,9 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.base_memory_experiment import BaseMemoryComparisonManifest, BaseMemoryCondition, compare_run_manifests
-from rsimem.base_memory_launcher import (
-    _backend_descriptor, _materialize_sequence, _past_command, prepare_comparison,
+from experiments.base_memory.base_memory_experiment import (
+    HISTORICAL_BASE_MEMORY_CONDITIONS,
+    BaseMemoryComparisonManifest,
+    BaseMemoryCondition,
+    compare_run_manifests,
+)
+from experiments.base_memory.base_memory_launcher import (
+    _backend_descriptor, _materialize_sequence, _past_command, _past_environment,
+    prepare_comparison,
     run_comparison,
 )
 
@@ -21,7 +27,7 @@ def test_manifest_requires_all_isolated_backends() -> None:
         family_id="SM01", source_sequence_digest=_digest("a"), fixture_digest=_digest("b"),
         config_digest=_digest("c"), registry_digest=_digest("d"), token_budget=4096,
     )
-    assert {run.condition for run in manifest.runs} == set(BaseMemoryCondition)
+    assert {run.condition for run in manifest.runs} == set(HISTORICAL_BASE_MEMORY_CONDITIONS)
     assert len({run.hermes_home_directory for run in manifest.runs}) == 3
     assert manifest.base_model == "gpt-5.6-luna"
 
@@ -36,6 +42,52 @@ def test_no_memory_preserves_persistence_and_only_removes_semantic_memory() -> N
     assert _backend_descriptor(BaseMemoryCondition.NO_MEMORY)["persistence_variant"] == "with_persistence"
     static = _materialize_sequence(source, BaseMemoryCondition.MEM0_STATIC)
     assert static["hermes"]["rsimem_semantic_writeback_mode"] == "static"
+
+
+def test_all_memory_off_disables_every_memory_surface_without_changing_topology() -> None:
+    source = {
+        "name": "fixture",
+        "episodes": [
+            {"task": "semantic.yaml", "mechanism": "memory"},
+            {"task": "episodic.yaml", "mechanism": "session_search"},
+            {"task": "procedural.yaml", "mechanism": "skill"},
+            {"task": "mixed.yaml", "mechanism": "mixed"},
+        ],
+        "hermes": {"memory_enabled": True, "user_profile_enabled": True, "skills_enabled": True, "session_search_enabled": True},
+    }
+    materialized = _materialize_sequence(source, BaseMemoryCondition.ALL_MEMORY_OFF)
+    assert materialized["hermes"] == {
+        "memory_enabled": False,
+        "user_profile_enabled": False,
+        "skills_enabled": False,
+        "session_search_enabled": False,
+        "all_memory_off": True,
+        "rsimem_mode": "native+ledger",
+        "rsimem_semantic_writeback_mode": "disabled",
+        "reasoning_effort": "none",
+    }
+    assert all(episode["shared_cold_run"] is False for episode in materialized["episodes"])
+    descriptor = _backend_descriptor(BaseMemoryCondition.ALL_MEMORY_OFF)
+    assert descriptor["persistence_variant"] == "with_persistence"
+    assert descriptor["semantic_memory_enabled"] is False
+    assert descriptor["episodic_memory_enabled"] is False
+    assert descriptor["procedural_memory_enabled"] is False
+
+
+def test_all_memory_off_materializes_only_its_explicit_run(tmp_path: Path) -> None:
+    sequence = tmp_path / "source.yaml"
+    sequence.write_text("name: fixture\nepisodes:\n  - task: task.yaml\n", encoding="utf-8")
+    config = tmp_path / "config.yaml"; config.write_text("x: 1\n", encoding="utf-8")
+    registry = tmp_path / "registry.yaml"; registry.write_text("x: 1\n", encoding="utf-8")
+    manifest = run_comparison(
+        source_sequence=sequence, output_root=tmp_path / "out", family_id="SM01",
+        past_bin=tmp_path / "past-bench", past_root=tmp_path, config=config,
+        registry=registry, base_url="https://example.test/v1", token_budget=32,
+        condition=BaseMemoryCondition.ALL_MEMORY_OFF, dry_run=True,
+    )
+    assert [run.condition for run in manifest.runs] == [BaseMemoryCondition.ALL_MEMORY_OFF]
+    payload = json.loads((tmp_path / "out" / "base-memory-allmemoryoff" / "run_manifest.json").read_text())
+    assert payload["backend"]["memory_surface_policy"] == "all_memory_off"
 
 
 def test_compare_rejects_model_or_fixture_drift() -> None:
@@ -121,3 +173,12 @@ def test_launcher_does_not_put_api_key_in_receipts(tmp_path: Path, monkeypatch: 
         condition=BaseMemoryCondition.NO_MEMORY, dry_run=True,
     )
     assert "sk-secret-test" not in (tmp_path / "out" / "base-memory-nomemory" / "launch.json").read_text()
+
+
+def test_auxiliary_session_search_uses_same_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    env = _past_environment(base_url="https://provider.example/v1", api_key="run-key")
+    assert env["AUXILIARY_SESSION_SEARCH_BASE_URL"] == "https://provider.example/v1"
+    assert env["AUXILIARY_SESSION_SEARCH_MODEL"] == "gpt-5.6-luna"
+    assert env["AUXILIARY_SESSION_SEARCH_API_KEY"] == "run-key"
+    assert env["ANTHROPIC_API_KEY"] == "run-key"

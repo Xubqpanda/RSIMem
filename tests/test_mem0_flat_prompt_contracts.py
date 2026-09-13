@@ -7,7 +7,7 @@ from dataclasses import replace
 import pytest
 
 from rsimem.lifecycle import RawResourceUsage
-from rsimem.memory_systems.mem0_flat import (
+from rsimem.memory_systems.semantic.mem0_flat import (
     FACT_EXTRACTION_PROMPT,
     INTERNAL_OPERATION_PROMPT,
     MEMBASE_COMMIT,

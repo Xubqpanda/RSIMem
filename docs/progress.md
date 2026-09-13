@@ -1,6 +1,95 @@
 # RSIMem Progress
 
-Last updated: 2026-09-08
+## 2026-09-13: Refactor Freeze And 26-Family B0/B2 Validation
+
+Stage 1 is frozen after the canonical `memory_systems` topology, capability
+registry, runtime surface policy, lifecycle hook contract, reachability audit,
+full RSIMem tests, compile, package, and dependency checks passed. The active
+validation manifest is
+`outputs/adamem_mem0_full_trajectory_26family_20260912/formal_manifest.json`;
+its digest is
+`3a558d406e19e95f06268762a5fdb0f25a99c8c6e4ec3595acefd7a57bcba40b`.
+The provider artifact is bound to frozen code revision
+`2dec36716b0fcdf95a1441c6159a544f6c31e92e`; subsequent family-set validator
+and documentation edits are verification changes and do not alter the
+accepted provider runs.
+
+Stage 2 completed the B0 `Mem0Static` versus B2 `Mem0 + AdaMem full trajectory`
+comparison over all 26 frozen families. The run contains 52 accepted batches,
+52 batch audits, 26 matched audits, and 156 accepted runs (78 per condition).
+The aggregate is
+`outputs/adamem_mem0_full_trajectory_26family_20260912/provider_runs/validation_aggregate.json`.
+B0 evaluation mean is `0.69204`; B2 is `0.71190`. B2 updated 58/78 runs,
+abstained 20/78, rolled back 0/78, and had 9/78 harmful updates. Mean updater
+usage was 11,357.7 input tokens, 229.1 output tokens, and 4,833.3 ms latency.
+This is a frozen B0/B2 result under the declared protocol; it is not an RSIMem
+effect result and does not establish that updates always improve quality.
+
+The detailed report is
+[`adamem_mem0_full_trajectory_26family_results_20260913.md`](adamem_mem0_full_trajectory_26family_results_20260913.md).
+
+Last updated: 2026-09-13
+
+## 2026-09-11: AllMemoryOff Baseline Gate
+
+The next-stage `AllMemoryOff` condition is implemented as a separate Base
+Memory condition. It disables semantic, episodic, and procedural Memory by
+materializing all four Hermes switches as false and by overriding every
+per-episode mechanism route. Fail-closed smoke and replicate audits reject
+Memory operation, injection, session-search, skill, semantic-storage, and
+policy-writeback evidence.
+
+The new formal manifest is
+`outputs/all_memory_off_formal_20260911/formal_manifest.json`, with 26 frozen
+families, three required replicates per family, and digest
+`81b4cdd9480b8414bb6d3fad3cfc397c841f2a772b3c476f09c7694470d2344d`. The
+complete no-provider dry-run passed under its separate output root. The
+provider-backed representative smoke and 78-run formal batch are complete and
+frozen. Compatibility-shim deletion remains deferred until the canonical
+reachability audit is accepted.
+
+## 2026-09-09: Current Execution Boundary
+
+The current formal priority is the base-memory main-table baseline, not a new
+AdaMem or RSIMem batch. The frozen PAST-Bench screening suite now covers all
+`26/26` families: 25 accepted `single_full_sequence` screenings plus precovered
+SM01. Its manifest digest is
+`975bba8c6610b1ada3be3fe0800e63d2e8fae58080d9b10b8613651be799c5d9`.
+
+The next required evidence is `26 families x 3 backends x 3 accepted
+replicates = 234 accepted runs` under the same train -> matched Near/Far N+1
+protocol:
+
+- `AllMemoryOff`, preserving `with_persistence` while disabling all three
+  Memory types.
+- `HermesNative`, using actual native-memory write/retrieval/injection.
+- `Mem0Static`, using the audited Hermes adapter and fixed extraction policy.
+
+Each backend-family batch must complete and pass audit before moving to the
+next; provider-backed concurrency is restricted to the three isolated
+replicates inside that batch. The current single-family SM01 base-memory trio
+is a smoke only and is excluded from the formal denominator.
+
+AdaMem has accepted three-replicate B0/B1/B2 results for SM01, SM02, and SM03.
+They establish trajectory-sensitive update behavior but not a full-suite
+quality claim. No further AdaMem family batch starts until the static
+three-backend baseline is complete. The current result ledger is
+[`current_experiment_results.md`](current_experiment_results.md), and the
+binding execution protocol is
+[`implementation_handoff_checklist.md`](implementation_handoff_checklist.md).
+
+The formal base-memory run is complete and frozen. All `26/26` families have
+three accepted audited backend batches for `AllMemoryOff`, `HermesNative`, and
+`Mem0Static`, totaling `234/234` accepted runs. The completed result ledger is
+[`current_experiment_results.md`](current_experiment_results.md). The formal
+AdaMem trajectory comparison remains paused while code refactoring proceeds.
+
+The code refactor has completed Stage 0 inventory, Stage 1 package boundaries,
+and canonical migration of the active and historical experiment routes. Base
+Memory and AdaMem implementations live under `experiments/`; historical
+replay lives under `experiments/legacy/`. Root-level compatibility imports
+have been removed. The AllMemoryOff baseline is frozen separately from the
+historical 234-run comparison.
 
 ## Authoritative Current Status
 
@@ -73,7 +162,8 @@ activated updates with updater inputs 15,294, 15,517, and 16,646 tokens (mean
 conditions and every paired delta remained 0.0. The reproducible conclusion is
 therefore update behavior and resource overhead, not task-quality improvement.
 
-The Stage 0 base-memory comparison now has a separate
+Historical snapshot (2026-09-08, superseded by the formal baseline above): the
+Stage 0 base-memory comparison then had a separate
 `base-memory-comparison-v1` contract and launcher.  It materializes isolated
 `NoMemory`, `HermesNative`, and `Mem0Static` manifests with the frozen
 `gpt-5.6-luna` base model, unique service offsets/state/Hermes-home/artifact
@@ -81,8 +171,9 @@ roots, and an explicit backend descriptor.  `NoMemory` retains PAST's
 `with_persistence` protocol and disables only semantic memory; it does not
 reuse the older `without_persistence` ablation, which also changes other
 persistence-facing tool and state behavior.  Contract tests and dry-run
-command receipts pass.  No provider-backed three-backend smoke has run yet,
-so this is execution preparation rather than base-memory quality evidence.
+command receipts pass.  The accepted SM01 three-backend smoke is recorded
+below; no full-suite formal baseline has run yet, so this preparation section
+is not base-memory quality evidence.
 
 The first accepted three-backend Stage 0 smoke is now available for
 `SM01_preference_adoption`: `NoMemory`
@@ -116,10 +207,10 @@ matches the stored receipt. The native run activated
 does not join the B0/B1/B2 quality denominator.
 
 The first deterministic AdaMem policy adapter is now available as
-`rsimem.adamem_adapter`. It preserves AdaMem's `general_policy` /
+`rsimem.memory_systems.semantic.mem0_flat.adamem_adapter`. It preserves AdaMem's `general_policy` /
 `by_character` patch contract, fail-closed parse/no-op behavior, terminal versus
 full-trajectory feedback allowlists, and Mem0-flat extraction-slot binding.
-`rsimem.adamem_experiment` adds a manifest contract for isolated
+`experiments.adamem.adamem_experiment` adds a manifest contract for isolated
 `B0_mem0_static`, `B1_mem0_adamem_terminal`, and
 `B2_mem0_adamem_full_trajectory` runs; it does not claim a live smoke or quality
 result.
@@ -179,7 +270,7 @@ smoke: that attempt accidentally passed `gpt-5.4` instead of the frozen
 `gpt-5.6-luna` model, every provider request returned HTTP 503, and every
 episode reported incomplete model usage with zero input/output tokens. The ignored raw
 evidence is under `outputs/adamem_smoke_20260908/sm01-b0-smoke-20260908-r3/`.
-`rsimem.adamem_launcher` now fails closed on this state rather than accepting a
+`experiments.adamem.adamem_launcher` now fails closed on this state rather than accepting a
 zero-token PAST result. When provider inference recovers, restart from a new
 isolated B0 run, require complete usage for prefix and suffix, then proceed
 serially to B1 and B2.
@@ -587,7 +678,7 @@ schema-valid candidate after the persistence fix. Static safety and the
 deterministic extraction suite pass, but the candidate remains a proposal and
 has not entered independent SM03 validation. Details are in
 [`extraction_stage3_sm02_feedback_rerun_20260829.md`](archive/extraction_stage3_sm02_feedback_rerun_20260829.md).
-The reusable `rsimem.provider_probe` entry now performs a bounded completion
+The reusable `rsimem.evaluation.provider_probe` entry now performs a bounded completion
 check without exposing credentials or response content; it reports endpoint,
 content, and usage availability only and remains outside benchmark accounting.
 Its result contract rejects inconsistent manually constructed states, so a
@@ -611,7 +702,7 @@ an earlier process-audit snapshot recorded RSIMem `676 passed` and PAST-Bench
 Both formal extraction launchers now run `audit_process_events()` before
 persisting `process_corpus.json`; malformed terminal receipt joins or
 stage-specific failure semantics fail the attempt instead of entering analysis.
-The standard `rsimem.audit` report also emits `processEvidence` rows and marks
+The standard `rsimem.cli.audit` report also emits `processEvidence` rows and marks
 the run failed when a process ledger cannot be structurally or semantically
 audited; policy-bound process events are additionally joined against the
 corresponding policy-decision ledger and fail closed when that ledger is absent

@@ -6,18 +6,18 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adaptive_activation import (
+from experiments.legacy.adaptive.adaptive_activation import (
     activate_adaptive_policy,
     load_matched_observation_batch,
 )
-from rsimem.adaptive_preparation import (
+from experiments.legacy.adaptive.adaptive_preparation import (
     load_offline_adaptive_preparation,
     prepare_adaptive_policy,
 )
-from rsimem.adaptive_validation_evidence import (
+from experiments.legacy.adaptive.adaptive_validation_evidence import (
     assemble_matched_validation_observations,
 )
-from rsimem.adaptive_validation_runtime import (
+from experiments.legacy.adaptive.adaptive_validation_runtime import (
     prepare_matched_validation_runtime,
     resolved_matched_validation_trial_profile,
 )

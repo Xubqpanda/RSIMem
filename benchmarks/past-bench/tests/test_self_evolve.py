@@ -446,7 +446,7 @@ def test_extraction_trial_transport_is_attempt_local_and_content_free(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    import rsimem.extraction_validation_runtime as runtime_module
+    import rsimem.memory.extraction_validation_runtime as runtime_module
 
     source = tmp_path / "prepared"
     source.mkdir()
@@ -520,7 +520,7 @@ def test_validated_extraction_transports_owner_revocation_registry(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    import rsimem.extraction_validation_runtime as runtime_module
+    import rsimem.memory.extraction_validation_runtime as runtime_module
 
     source = tmp_path / "prepared"
     source.mkdir()
@@ -571,7 +571,7 @@ def test_extraction_trial_transport_rejects_profile_or_mode_drift(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    import rsimem.extraction_validation_runtime as runtime_module
+    import rsimem.memory.extraction_validation_runtime as runtime_module
 
     source = tmp_path / "prepared"
     source.mkdir()
@@ -638,7 +638,7 @@ def test_extraction_trial_transport_rejects_profile_or_mode_drift(
 def test_extraction_offline_transport_is_attempt_local_and_scope_bound(
     tmp_path: Path, monkeypatch
 ) -> None:
-    import rsimem.extraction_validation_runtime as runtime_module
+    import rsimem.memory.extraction_validation_runtime as runtime_module
 
     source = tmp_path / "prepared"
     source.mkdir()
@@ -890,7 +890,7 @@ def test_cli_extraction_trial_override_records_profile_without_machine_path(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    import rsimem.extraction_validation_runtime as runtime_module
+    import rsimem.memory.extraction_validation_runtime as runtime_module
 
     manifest = tmp_path / "sequence.yaml"
     task_dir = tmp_path / "tasks" / "T_demo"
@@ -946,7 +946,7 @@ def test_hermes_adapter_activates_and_closes_opt_in_rsimem_bridge(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import rsimem.hermes_past_bridge as bridge_module
+    import rsimem.hosts.hermes.hermes_past_bridge as bridge_module
 
     captured = {}
 
@@ -995,7 +995,7 @@ def test_hermes_adapter_parses_adaptive_writeback_transport(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import rsimem.hermes_past_bridge as bridge_module
+    import rsimem.hosts.hermes.hermes_past_bridge as bridge_module
 
     captured = {}
 
@@ -1054,7 +1054,7 @@ def test_hermes_adapter_keeps_native_default_and_rejects_evidence_escape(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import rsimem.hermes_past_bridge as bridge_module
+    import rsimem.hosts.hermes.hermes_past_bridge as bridge_module
 
     monkeypatch.setattr(
         bridge_module,
@@ -1100,7 +1100,7 @@ def test_injected_lifecycle_uses_recorded_hermes_model_call(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import rsimem.hermes_past_bridge as bridge_module
+    import rsimem.hosts.hermes.hermes_past_bridge as bridge_module
     from agent import auxiliary_client
 
     captured: dict[str, object] = {}
@@ -1178,7 +1178,7 @@ def test_static_completion_uses_hermes_accounting_and_raw_usage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from agent import auxiliary_client
-    from rsimem.memory_systems.mem0_flat import POLICY_FACT_EXTRACTION_PROMPT
+    from rsimem.memory_systems.semantic.mem0_flat import POLICY_FACT_EXTRACTION_PROMPT
 
     captured: dict[str, object] = {}
 

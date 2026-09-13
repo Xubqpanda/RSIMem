@@ -17,7 +17,7 @@ from rsimem.memory.adaptive_policy import AdaptiveParameterName
 from rsimem.memory.adaptive_policy_store import JsonAdaptivePolicyStore
 from rsimem.memory.ingestion import InternalMemoryAction
 from rsimem.memory.utility import UtilityTarget
-from rsimem.memory_systems.mem0_flat import FrozenMem0UtilityGate
+from rsimem.memory_systems.semantic.mem0_flat import FrozenMem0UtilityGate
 from test_adaptive_matched_validation import _observations, _offline_validated
 from test_mem0_flat_policy import _operation_response, _setup
 

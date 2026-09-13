@@ -25,7 +25,7 @@ from .adaptive_mem0_binding import (
     TrustedAdaptiveMem0Parameter,
 )
 from .adaptive_policy_store import JsonAdaptivePolicyStore
-from .backends import build_hermes_native_registry
+from ..memory_systems.registry import build_hermes_native_registry
 from .contracts import MemoryExperience, MemoryKind, MemoryMessage, MemoryObserver
 from .executor import TransactionalMutationExecutor
 from .extraction_policy_artifact import ExtractionPromptPolicyArtifact
@@ -57,16 +57,16 @@ from .receipt_audit import (
 from .receipts import SemanticMutationWriter
 from .semantic_loop import SemanticWritebackLoop, SemanticWritebackLoopResult
 from .validation import MutationValidator
-from ..memory_systems.mem0_flat.policy import (
+from ..memory_systems.semantic.mem0_flat.policy import (
     FlatSemanticCandidateReader,
     Mem0FlatSemanticPolicy,
 )
-from ..memory_systems.mem0_flat.prompt_adapter import (
+from ..memory_systems.semantic.mem0_flat.prompt_adapter import (
     MEM0_FLAT_EXTRACTION_SLOT_ID,
     Mem0FlatPromptAdapter,
 )
-from ..memory_systems.mem0_flat.prompts import CompletionClient
-from ..memory_systems.mem0_flat.utility_gate import FrozenMem0UtilityGate
+from ..memory_systems.semantic.mem0_flat.prompts import CompletionClient
+from ..memory_systems.semantic.mem0_flat.utility_gate import FrozenMem0UtilityGate
 
 
 STATIC_SEMANTIC_WRITEBACK_SCHEMA_VERSION = 2

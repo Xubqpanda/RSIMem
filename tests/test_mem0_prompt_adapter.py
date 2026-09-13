@@ -22,7 +22,7 @@ from rsimem.memory.prompt_components import (
     PromptAdapterRegistry,
     PromptComponentArtifact,
 )
-from rsimem.memory_systems.mem0_flat import (
+from rsimem.memory_systems.semantic.mem0_flat import (
     MEM0_FLAT_EXTRACTION_MAX_BODY_CHARS,
     MEM0_FLAT_EXTRACTION_SLOT,
     MEM0_FLAT_EXTRACTION_SLOT_ID,

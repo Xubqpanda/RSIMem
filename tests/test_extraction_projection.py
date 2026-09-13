@@ -21,7 +21,7 @@ from rsimem.memory.extraction_projection import Mem0FlatExtractionSourceProjecto
 from rsimem.memory.extraction_projection import JsonExtractionSourceRecordStore
 from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
 from rsimem.memory.live_writeback import StaticSemanticWritebackRuntime
-from rsimem.memory_systems.mem0_flat import (
+from rsimem.memory_systems.semantic.mem0_flat import (
     FakeCompletionClient,
     POLICY_FACT_EXTRACTION_PROMPT,
     POLICY_INTERNAL_OPERATION_PROMPT,

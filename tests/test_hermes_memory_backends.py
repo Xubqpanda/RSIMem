@@ -6,9 +6,6 @@ import sqlite3
 from pathlib import Path
 
 from rsimem.memory import (
-    HermesEpisodicBackend,
-    HermesProceduralBackend,
-    HermesSemanticBackend,
     MemoryArtifact,
     MemoryEvent,
     MemoryEventKind,
@@ -18,8 +15,11 @@ from rsimem.memory import (
     MemoryQuery,
     MemoryResource,
     MemoryRuntime,
-    build_hermes_native_registry,
 )
+from rsimem.memory_systems.episodic.hermes_native import HermesEpisodicBackend
+from rsimem.memory_systems.procedural.hermes_native import HermesProceduralBackend
+from rsimem.memory_systems.semantic.hermes_native import HermesSemanticBackend
+from rsimem.memory_systems.registry import build_hermes_native_registry
 
 
 def _artifact(

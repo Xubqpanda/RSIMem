@@ -1700,7 +1700,7 @@ def cmd_cleanup(args: argparse.Namespace) -> None:
 
 
 def _safe_label(value: str) -> str:
-    return "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in value).strip("_") or "episode"
+    return "".join(ch if ch.isalnum() or ch in ("-", "_") else "_" for ch in value).strip("_").lower() or "episode"
 
 
 def _empty_artifact_summary(artifacts_dir: Path) -> dict:
@@ -1938,6 +1938,8 @@ def _save_episode_history_anchor(
 
 def _resolve_episode_preseed_dir(sequence, episode) -> Path | None:
     """Prefer an episode-level preseed overlay over the sequence default."""
+    if sequence.hermes.all_memory_off:
+        return None
     preseed_value = getattr(episode, "preseed_artifacts_dir", "") or sequence.hermes.preseed_artifacts_dir
     if not preseed_value:
         return None
@@ -1949,6 +1951,8 @@ def _resolve_episode_preseed_dir(sequence, episode) -> Path | None:
 
 def _resolve_episode_initial_home_fixture_dir(sequence, episode) -> Path | None:
     """Prefer an episode-level native Hermes home fixture over the sequence default."""
+    if sequence.hermes.all_memory_off:
+        return None
     fixture_value = (
         getattr(episode, "initial_home_fixture_dir", "")
         or sequence.hermes.initial_home_fixture_dir
@@ -1963,6 +1967,8 @@ def _resolve_episode_initial_home_fixture_dir(sequence, episode) -> Path | None:
 
 def _resolve_episode_oracle_home_seed_dir(sequence, episode) -> Path | None:
     """Resolve a complete Hermes-home seed for a registered oracle only."""
+    if sequence.hermes.all_memory_off:
+        return None
     value = getattr(episode, "oracle_home_seed_dir", "")
     if not value:
         return None
@@ -2175,7 +2181,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
             raise SystemExit(f"invalid RSIMem adaptive config: {exc}") from exc
     if extraction_trial_path is not None:
         from .models.self_evolve import RSIMemExtractionTrialProfile
-        from rsimem.extraction_validation_runtime import (
+        from rsimem.memory.extraction_validation_runtime import (
             load_extraction_matched_trial_profile,
         )
 
@@ -2200,7 +2206,7 @@ def _apply_rsimem_execution_overrides(sequence, args: argparse.Namespace) -> Non
             ) from exc
     if extraction_offline_path is not None:
         from .models.self_evolve import RSIMemExtractionOfflineValidationProfile
-        from rsimem.extraction_validation_runtime import (
+        from rsimem.memory.extraction_validation_runtime import (
             load_extraction_offline_validation_profile,
         )
         path = Path(extraction_offline_path).expanduser().resolve()
@@ -2457,12 +2463,12 @@ def cmd_evolve(args: argparse.Namespace) -> None:
             if args.agent.startswith("hermes"):
                 _materialize_episode_home_inputs(
                     hermes_home=hermes_home,
-                    initial_home_fixture_dir=Path(sequence.hermes.initial_home_fixture_dir).expanduser()
+                    initial_home_fixture_dir=(Path(sequence.hermes.initial_home_fixture_dir).expanduser()
                     if sequence.hermes.initial_home_fixture_dir
-                    else None,
-                    preseed_artifacts_dir=Path(sequence.hermes.preseed_artifacts_dir).expanduser()
+                    else None) if not sequence.hermes.all_memory_off else None,
+                    preseed_artifacts_dir=(Path(sequence.hermes.preseed_artifacts_dir).expanduser()
                     if sequence.hermes.preseed_artifacts_dir
-                    else None,
+                    else None) if not sequence.hermes.all_memory_off else None,
                 )
             artifact_before = (
                 snapshot_hermes_home(hermes_home, include_contents=True)
@@ -2479,6 +2485,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     user_profile_enabled=sequence.hermes.user_profile_enabled,
                     skills_enabled=sequence.hermes.skills_enabled,
                     session_search_enabled=sequence.hermes.session_search_enabled,
+                    all_memory_off=sequence.hermes.all_memory_off,
                 )
                 tool_config["application_opportunity_schema"] = (
                     build_past_bench_application_opportunity_schema(task)
@@ -2494,6 +2501,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     base_preseed_dir=Path(sequence.hermes.preseed_artifacts_dir).expanduser()
                     if sequence.hermes.preseed_artifacts_dir
                     else None,
+                    allow_memory_seed=not sequence.hermes.all_memory_off,
                 )
                 model_extra_body_override = build_hermes_extra_body(
                     home_dir=hermes_home,
@@ -2503,6 +2511,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     user_profile_enabled=tool_config["user_profile_enabled"],
                     skills_enabled=tool_config["skills_enabled"],
                     session_search_enabled=tool_config["session_search_enabled"],
+                    all_memory_off=sequence.hermes.all_memory_off,
                     memory_nudge_interval=sequence.hermes.memory_nudge_interval,
                     memory_flush_min_turns=sequence.hermes.memory_flush_min_turns,
                     skill_creation_nudge_interval=sequence.hermes.skill_creation_nudge_interval,
@@ -2946,6 +2955,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 user_profile_enabled=sequence.hermes.user_profile_enabled,
                 skills_enabled=sequence.hermes.skills_enabled,
                 session_search_enabled=sequence.hermes.session_search_enabled,
+                all_memory_off=sequence.hermes.all_memory_off,
             )
             _sc_tool_config["application_opportunity_schema"] = (
                 build_past_bench_application_opportunity_schema(_sc_task)
@@ -2954,6 +2964,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 task=_sc_task,
                 target_dir=_sc_episode_dir / "preseed",
                 base_preseed_dir=_resolve_episode_preseed_dir(sequence, _sc_episode),
+                allow_memory_seed=not sequence.hermes.all_memory_off,
             )
             persistence_backend.materialize_inputs(
                 state_root=_sc_state_root,
@@ -3101,6 +3112,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
         elif persistence_backend is not None:
             _reset_runtime_dir(family_homes_root)
         episode_results: list[dict] = []
+        initialized_family_ids: set[str] = set()
 
         print(f"\n=== Sequence: {sequence.name} [{variant_label}] ===")
         print(sequence.description or "(no description)")
@@ -3122,6 +3134,9 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                 else:
                     state_root, anchors_dir = persistence_backend.family_paths(variant_dir, episode.family_id)
                 history_anchors = history_anchors_by_family.setdefault(episode.family_id, {})
+                if episode.family_id not in initialized_family_ids:
+                    _reset_runtime_dir(state_root)
+                    initialized_family_ids.add(episode.family_id)
             else:
                 state_root = variant_dir / "runtime_state"
                 anchors_dir = variant_dir / "history_anchors"
@@ -3192,6 +3207,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     user_profile_enabled=sequence.hermes.user_profile_enabled,
                     skills_enabled=sequence.hermes.skills_enabled,
                     session_search_enabled=sequence.hermes.session_search_enabled,
+                    all_memory_off=sequence.hermes.all_memory_off,
                 )
                 tool_config["application_opportunity_schema"] = (
                     build_past_bench_application_opportunity_schema(task)
@@ -3205,6 +3221,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     task=task,
                     target_dir=episode_dir / "preseed",
                     base_preseed_dir=_resolve_episode_preseed_dir(sequence, episode),
+                    allow_memory_seed=not sequence.hermes.all_memory_off,
                 )
                 persistence_backend.materialize_inputs(
                     state_root=state_root,
@@ -3408,6 +3425,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     user_profile_enabled=sequence.hermes.user_profile_enabled,
                     skills_enabled=sequence.hermes.skills_enabled,
                     session_search_enabled=sequence.hermes.session_search_enabled,
+                    all_memory_off=sequence.hermes.all_memory_off,
                 )
                 reflection_tool_config["application_opportunity_schema"] = (
                     build_past_bench_application_opportunity_schema(task)
@@ -3416,6 +3434,7 @@ def cmd_evolve(args: argparse.Namespace) -> None:
                     task=task,
                     target_dir=reflection_dir / "preseed",
                     base_preseed_dir=_resolve_episode_preseed_dir(sequence, episode),
+                    allow_memory_seed=not sequence.hermes.all_memory_off,
                 )
                 persistence_backend.materialize_inputs(
                     state_root=state_root,

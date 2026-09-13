@@ -4,21 +4,35 @@ Start here for current work:
 
 1. [Current checklist](implementation_handoff_checklist.md): the only active
    execution protocol.
-2. [Current progress](progress.md): implemented boundary, accepted evidence,
+2. [AllMemoryOff baseline preparation](all_memory_off_baseline_20260911.md):
+   current formal-control definition, frozen manifest, and execution gate.
+3. [Current goal](current_goal.md): immediate result-analysis and refactor
+   objective.
+4. [Current progress](progress.md): implemented boundary, accepted evidence,
    and next blocked or executable step.
-3. [AdaMem adaptation audit](adamem_adapter_audit_20260908.md): upstream
+5. [AdaMem adaptation audit](adamem_adapter_audit_20260908.md): upstream
    mechanism, permitted adaptation boundary, and leakage boundary for the
    current Semantic RSI baseline.
-4. [SM01 formal results](sm01_adamem_trajectory_results_20260908.md): final
+6. [SM01 formal results](sm01_adamem_trajectory_results_20260908.md): final
    provenance-complete B0/B1/B2 comparison and its limits.
-5. [Documentation status inventory](document_status_inventory_20260908.md):
+7. [Current experiment results](current_experiment_results.md): formal-result
+   ledger, full-suite screening coverage, and explicit interpretation boundary.
+8. [Planned main tables](main_table.md): paper-facing quality, resource, and
+   per-family table templates.
+9. [Codebase refactor checklist](codebase_refactor_checklist.md): staged
+   package ownership, compatibility, and verification plan.
+10. [Documentation status inventory](document_status_inventory_20260908.md):
    current, reference, historical, and generated-evidence classification.
+11. [Refactor reachability audit](refactor_reachability_audit_20260911.md):
+   completed canonical import and compatibility-shim removal evidence.
+12. [Refactor release notes](refactor_release_notes_20260912.md): breaking
+   module-path change and replay guidance.
 
-Stage 0 base-memory preparation is implemented by
-`rsimem.base_memory_experiment` and `rsimem.base_memory_launcher`.  The
-contract fixes the three backend identities `NoMemory`, `HermesNative`, and
-`Mem0Static`; its dry-run output is preparation evidence only until a
-provider-backed smoke is accepted.
+The completed 234-run `NoMemory`/`HermesNative`/`Mem0Static` comparison is
+historical. Its `NoMemory` control is now named `SemanticDisabled`: it did not
+disable episodic or procedural surfaces. The active formal control is the new
+`AllMemoryOff` baseline; its 26-family, 78-replicate provider-backed run is
+frozen and independently aggregated.
 
 ## Status Labels
 

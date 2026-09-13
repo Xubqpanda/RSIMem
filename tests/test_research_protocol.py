@@ -7,7 +7,7 @@ import pytest
 from rsimem.memory import MemoryKind
 from rsimem.memory.family_matrix import PastFamilyMatrix
 from rsimem.memory.taxonomy import MemoryControlKind
-from rsimem.research_protocol import (
+from experiments.legacy.sensitivity.research_protocol import (
     ComparisonLevel,
     ExperimentSplit,
     JsonResearchProtocolStore,
@@ -35,7 +35,7 @@ def test_default_protocol_freezes_taxonomy_split_conditions_and_raw_metrics() ->
 
 
 def test_protocol_can_be_instantiated_for_each_target_kind() -> None:
-    from rsimem.research_protocol import ResearchProtocol
+    from experiments.legacy.sensitivity.research_protocol import ResearchProtocol
 
     matrix = PastFamilyMatrix.create_default()
     split = ExperimentSplit(
@@ -74,7 +74,7 @@ def test_protocol_store_is_immutable_and_restart_safe(tmp_path) -> None:
     changed_base = default_research_protocol()
     # Constructing a different protocol ID is intentional: protocol changes
     # must be a new manifest rather than an in-place edit.
-    from rsimem.research_protocol import ExperimentSplit, ResearchProtocol
+    from experiments.legacy.sensitivity.research_protocol import ExperimentSplit, ResearchProtocol
     changed = ResearchProtocol.create(
         memory_units=changed_base.memory_units,
         family_matrix=PastFamilyMatrix.create_default(),

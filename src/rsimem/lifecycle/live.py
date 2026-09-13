@@ -224,7 +224,7 @@ class HermesLifecycleDryRunRuntime:
         self.task_id = task_id
         self._collector = HermesStateSnapshotCollector()
         self._processed: dict[str, HermesLifecycleDryRunResult] = {}
-        from ..ledger import LifecycleLedgerObserver
+        from ..evaluation.ledger import LifecycleLedgerObserver
 
         self.observer = LifecycleLedgerObserver(
             variant=variant,

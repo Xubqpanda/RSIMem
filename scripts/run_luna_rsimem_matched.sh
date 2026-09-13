@@ -199,7 +199,7 @@ print("\n".join(execution_order(int(sys.argv[1]))))
       exit 1
     fi
 
-    if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.ledger \
+    if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.cli.ledger \
       "${trace_dir}/sequence_comparison.json" \
       --output "${trace_dir}/ledger.jsonl" \
       --judge-disabled; then
@@ -207,7 +207,7 @@ print("\n".join(execution_order(int(sys.argv[1]))))
       exit 1
     fi
 
-    if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.audit \
+    if ! PYTHONPATH="${RSIMEM_ROOT}/src" "${PYTHON_BIN}" -m rsimem.cli.audit \
       "${trace_dir}" \
       --output "${trace_dir}/audit.json"; then
       record_attempt "${replicate}" "${ordinal}" "${mode}" "${run_name}" failed audit

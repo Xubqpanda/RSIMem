@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adamem_adapter import AdaMemFeedbackView, AdaMemPolicy, update_policy
-from rsimem.adamem_experiment import AdaMemCondition, AdaMemRunSpec
-from rsimem.adamem_launcher import (
+from rsimem.memory_systems.semantic.mem0_flat.adamem_adapter import AdaMemFeedbackView, AdaMemPolicy, update_policy
+from experiments.adamem.adamem_experiment import AdaMemCondition, AdaMemRunSpec
+from experiments.adamem.adamem_launcher import (
     FROZEN_MODEL_ID,
     _past_environment,
     _past_command,
@@ -13,7 +13,7 @@ from rsimem.adamem_launcher import (
     run_trajectory,
     run_native_fidelity,
 )
-from rsimem.adamem_runtime import (
+from experiments.adamem.adamem_runtime import (
     AdaMemPolicyReceipt,
     build_pure_process_feedback,
     materialize_phase_manifest,

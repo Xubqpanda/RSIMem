@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from rsimem.adamem_adapter import AdaMemFeedbackView
-from rsimem.adamem_experiment import (
+from rsimem.memory_systems.semantic.mem0_flat.adamem_adapter import AdaMemFeedbackView
+from experiments.adamem.adamem_experiment import (
     AdaMemComparisonManifest,
     AdaMemCondition,
     feedback_view_for_condition,

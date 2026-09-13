@@ -6,9 +6,9 @@ import yaml
 
 from rsimem.memory import MemoryKind
 from rsimem.memory.family_matrix import PastFamilyMatrix
-from rsimem.past_sensitivity_catalog import build_past_sensitivity_catalog
-from rsimem.research_protocol import ResearchProtocol, SensitivityCondition, default_research_protocol
-from rsimem.sensitivity import SensitivityMatrix, SensitivityPanel
+from experiments.legacy.sensitivity.past_sensitivity_catalog import build_past_sensitivity_catalog
+from experiments.legacy.sensitivity.research_protocol import ResearchProtocol, SensitivityCondition, default_research_protocol
+from experiments.legacy.sensitivity.sensitivity import SensitivityMatrix, SensitivityPanel
 
 
 ROOT = Path(__file__).resolve().parents[1] / "benchmarks" / "past-bench"

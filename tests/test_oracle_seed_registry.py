@@ -7,14 +7,14 @@ from pathlib import Path
 
 from rsimem.memory import MemoryKind
 from rsimem.memory.family_matrix import PastFamilyMatrix
-from rsimem.oracle_seed_registry import (
+from experiments.legacy.sensitivity.oracle_seed_registry import (
     OracleSeedRegistry,
     create_oracle_seed_registration,
     create_oracle_seed_registry,
     oracle_seed_tree_digest,
 )
-from rsimem.research_protocol import ResearchProtocol, SensitivityCondition, default_research_protocol
-from rsimem.sensitivity import SensitivityMatrix, SensitivityPanel
+from experiments.legacy.sensitivity.research_protocol import ResearchProtocol, SensitivityCondition, default_research_protocol
+from experiments.legacy.sensitivity.sensitivity import SensitivityMatrix, SensitivityPanel
 
 
 def _digest(value: str) -> str:
@@ -141,7 +141,7 @@ def test_checked_in_semantic_registry_resolves_every_semantic_oracle_case() -> N
 
 
 def test_checked_in_episodic_registry_resolves_and_searches_each_oracle_case() -> None:
-    from rsimem.memory.backends.hermes_native import HermesEpisodicBackend
+    from rsimem.memory_systems.episodic.hermes_native import HermesEpisodicBackend
     from rsimem.memory import MemoryQuery
 
     root = Path(__file__).resolve().parents[1]

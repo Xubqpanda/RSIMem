@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adaptive_preparation import (
+from experiments.legacy.adaptive.adaptive_preparation import (
     load_offline_adaptive_preparation,
     prepare_adaptive_policy,
 )
-from rsimem.feedback_preparation import (
+from experiments.legacy.sensitivity.feedback_preparation import (
     FEEDBACK_PREPARATION_SCHEMA_VERSION,
     _digest,
     _stage_gate_payload,
@@ -25,8 +25,8 @@ from rsimem.memory.feedback_dataset import (
 )
 from rsimem.memory.operation_graph import OperationKind
 from rsimem.memory.utility import MEM0_UTILITY_PARAMETER_IDS, UtilityTarget
-from rsimem.memory_systems.mem0_flat import FrozenMem0UtilityGate
-from rsimem.memory_systems.mem0_flat.policy import Mem0FlatSemanticPolicy
+from rsimem.memory_systems.semantic.mem0_flat import FrozenMem0UtilityGate
+from rsimem.memory_systems.semantic.mem0_flat.policy import Mem0FlatSemanticPolicy
 from test_adaptive_policy_validation import (
     _multi_dataset,
     _payload_digest,

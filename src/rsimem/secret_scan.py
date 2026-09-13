@@ -59,7 +59,14 @@ def tracked_files(root: Path) -> tuple[Path, ...]:
     except (OSError, subprocess.CalledProcessError) as exc:
         raise ValueError("tracked secret scan requires a Git worktree") from exc
     names = tuple(item for item in output.decode("utf-8", "strict").split("\0") if item)
-    paths = tuple(Path(name) for name in names)
+    # `git ls-files` includes tracked files deleted in the working tree. They
+    # contain no current bytes to scan; explicit scan_paths() calls still
+    # reject missing files so callers cannot silently skip requested inputs.
+    paths = tuple(
+        Path(name)
+        for name in names
+        if (repository / Path(name)).is_file()
+    )
     if any(path.is_absolute() or ".." in path.parts for path in paths):
         raise ValueError("Git returned an unsafe tracked path")
     return paths

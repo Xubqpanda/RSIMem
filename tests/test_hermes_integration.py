@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from rsimem.hermes_integration import (
+from rsimem.hosts.hermes.hermes_integration import (
     HermesAdapterExecutionError,
     HermesAdapterFailurePolicy,
     HermesEquivalenceProbe,
@@ -23,12 +23,12 @@ from rsimem.hermes_integration import (
     _bound_hermes_memory_dir,
     _bound_hermes_skills_dir,
 )
-from rsimem.hermes_past_bridge import HermesPastBenchBridge
-from rsimem.extraction_validation_runtime import (
+from rsimem.hosts.hermes.hermes_past_bridge import HermesPastBenchBridge
+from rsimem.memory.extraction_validation_runtime import (
     EXTRACTION_TRIAL_CONFIG_FILE,
     prepare_extraction_matched_trial_runtime,
 )
-from rsimem.ledger import LifecycleLedgerObserver
+from rsimem.evaluation.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import (
     HermesLifecycleConfig,
     RawResourceUsage,
@@ -87,7 +87,7 @@ from rsimem.memory.use_attribution import (
 )
 from rsimem.memory.adaptive_policy import AdaptiveParameterName
 from rsimem.memory.adaptive_mem0_binding import TrustedAdaptiveMem0Parameter
-from rsimem.memory_systems.mem0_flat import (
+from rsimem.memory_systems.semantic.mem0_flat import (
     FakeCompletionClient,
     POLICY_FACT_EXTRACTION_PROMPT,
     POLICY_INTERNAL_OPERATION_PROMPT,
@@ -345,7 +345,7 @@ def test_adapter_failure_policy_is_explicit_and_content_free(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import rsimem.hermes_integration as integration
+    import rsimem.hosts.hermes.hermes_integration as integration
 
     home = _hermes_home(tmp_path)
     probe = HermesEquivalenceProbe(

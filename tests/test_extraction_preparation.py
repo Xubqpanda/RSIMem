@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.extraction_preparation import (
+from experiments.legacy.extraction.extraction_preparation import (
     build_pure_extraction_corpus_from_batch,
     _process_signal_gate,
     _optimizer_signal_is_ready,

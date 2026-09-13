@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from rsimem.adamem_adapter import (
+from rsimem.memory_systems.semantic.mem0_flat.adamem_adapter import (
     AdaMemFeedbackView,
     AdaMemPolicy,
     apply_policy_patch,

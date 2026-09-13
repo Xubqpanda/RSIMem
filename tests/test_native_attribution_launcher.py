@@ -6,9 +6,9 @@ import shutil
 import pytest
 import yaml
 
-from rsimem.native_attribution_launcher import prepare_native_attribution_launch
-from rsimem.native_attribution_protocol import NativeAttributionRepairProtocol
-from rsimem.native_attribution_run import build_native_attribution_manifest
+from experiments.legacy.native.native_attribution_launcher import prepare_native_attribution_launch
+from experiments.legacy.native.native_attribution_protocol import NativeAttributionRepairProtocol
+from experiments.legacy.native.native_attribution_run import build_native_attribution_manifest
 
 
 ROOT = Path(__file__).resolve().parents[1]

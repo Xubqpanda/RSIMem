@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from rsimem.audit import audit_run
-from rsimem.ledger import (
+from rsimem.evaluation.audit import audit_run
+from rsimem.evaluation.ledger import (
     LifecycleLedgerObserver,
     MemoryLedgerObserver,
     build_events,

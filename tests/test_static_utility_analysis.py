@@ -9,7 +9,7 @@ from rsimem.experiment_manifest import (
     initialize_batch_manifest,
     record_attempt,
 )
-from rsimem.static_utility_analysis import analyze_static_utility_batch
+from experiments.legacy.sensitivity.static_utility_analysis import analyze_static_utility_batch
 
 
 PRIVATE_MEMORY = "Always use a private formatting preference."

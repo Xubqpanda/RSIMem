@@ -9,7 +9,7 @@ from rsimem.experiment_manifest import (
     initialize_batch_manifest,
     record_attempt,
 )
-from rsimem.matched_analysis import analyze_batch
+from rsimem.evaluation.matched_analysis import analyze_batch
 
 
 def _batch(tmp_path: Path) -> Path:

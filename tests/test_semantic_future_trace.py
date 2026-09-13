@@ -6,7 +6,7 @@ import pytest
 
 from rsimem.lifecycle import RawResourceUsage
 from rsimem.memory.attribution import DeterministicFirstAttributor, FailureCategory
-from rsimem.memory.backends import build_hermes_native_registry
+from rsimem.memory_systems.registry import build_hermes_native_registry
 from rsimem.memory.contracts import MemoryKind, MemoryQuery
 from rsimem.memory.future_trace import (
     SemanticFeedbackContract,

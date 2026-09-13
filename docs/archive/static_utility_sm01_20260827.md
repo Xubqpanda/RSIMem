@@ -122,7 +122,7 @@ RSIMEM_REPLICATES=3 \
 RSIMEM_BATCH_ID=static_utility_sm01_20260827_v1 \
 scripts/run_luna_static_sm01.sh
 
-PYTHONPATH=src .venv/bin/python -m rsimem.static_utility_analysis \
+PYTHONPATH=src .venv/bin/python -m experiments.legacy.sensitivity.static_utility_analysis \
   outputs/static_utility_sm01/hermes_luna/static_utility_sm01_20260827_v1 \
   --output outputs/static_utility_sm01/hermes_luna/static_utility_sm01_20260827_v1/analysis.json
 ```

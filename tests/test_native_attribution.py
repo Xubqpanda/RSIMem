@@ -1,12 +1,12 @@
-from rsimem.native_attribution import (
+from experiments.legacy.native.native_attribution import (
     FailureSurface,
     NativeAttributionExpectation,
     attribute_native_observation,
     expectation_from_benchmark_contract,
 )
-from rsimem.native_observation import NativeLifecycleEventType, ObservationStatus
+from experiments.legacy.native.native_observation import NativeLifecycleEventType, ObservationStatus
 from test_native_execution_audit import _fixture
-from rsimem.native_observation import extract_native_observations
+from experiments.legacy.native.native_observation import extract_native_observations
 
 
 def _expectation(task_id, *events):

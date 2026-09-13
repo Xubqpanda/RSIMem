@@ -309,7 +309,7 @@ def test_rsimem_bridge_receives_automatic_task_completion_boundary(
     """
 
     import past_bench.runtime.adapters.hermes as hermes_module
-    import rsimem.hermes_past_bridge as bridge_module
+    import rsimem.hosts.hermes.hermes_past_bridge as bridge_module
 
     calls: dict[str, object] = {"completed": [], "closed": False}
 

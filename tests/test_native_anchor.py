@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.native_anchor import NativeAnchorStore, state_tree_digest
+from experiments.legacy.native.native_anchor import NativeAnchorStore, state_tree_digest
 
 
 def _state(path: Path) -> Path:

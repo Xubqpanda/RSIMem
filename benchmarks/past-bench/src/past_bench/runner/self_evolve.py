@@ -107,6 +107,7 @@ def build_hermes_extra_body(
     user_profile_enabled: bool,
     skills_enabled: bool,
     session_search_enabled: bool,
+    all_memory_off: bool = False,
     memory_nudge_interval: int,
     memory_flush_min_turns: int,
     skill_creation_nudge_interval: int,
@@ -137,6 +138,16 @@ def build_hermes_extra_body(
     rsimem_application_opportunity_schema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return a ``model.extra_body`` override for the Hermes adapter."""
+
+    from rsimem.memory.surface_policy import RuntimeSurfacePolicy
+
+    surface_policy = RuntimeSurfacePolicy.from_hermes_flags(
+        memory_enabled=memory_enabled,
+        user_profile_enabled=user_profile_enabled,
+        skills_enabled=skills_enabled,
+        session_search_enabled=session_search_enabled,
+        all_memory_off=all_memory_off,
+    )
 
     enabled_toolsets = ["memory"] if memory_enabled or user_profile_enabled else []
     if skills_enabled:
@@ -305,6 +316,8 @@ def build_hermes_extra_body(
     return {
         "hermes": {
             "persistence_enabled": persistence_enabled,
+            "all_memory_off": all_memory_off,
+            "surface_policy": surface_policy.payload(),
             "session_search_enabled": session_search_enabled,
             "home_dir": str(home_dir),
             "capture_artifacts_dir": str(artifacts_dir),
@@ -350,7 +363,7 @@ def _materialize_extraction_trial_bundle(
     if not source_config_path:
         raise ValueError("extraction matched trial requires a source config")
     source = Path(source_config_path).expanduser().resolve()
-    from rsimem.extraction_validation_runtime import (
+    from rsimem.memory.extraction_validation_runtime import (
         EXTRACTION_TRIAL_CONFIG_FILE,
         EXTRACTION_TRIAL_OFFLINE_DECISION_FILE,
         EXTRACTION_TRIAL_POLICY_STORE_FILE,
@@ -414,7 +427,7 @@ def _materialize_extraction_offline_bundle(
     if not source_config_path:
         raise ValueError("extraction offline validation requires a source config")
     source = Path(source_config_path).expanduser().resolve()
-    from rsimem.extraction_validation_runtime import (
+    from rsimem.memory.extraction_validation_runtime import (
         EXTRACTION_OFFLINE_CANDIDATE_FILE,
         EXTRACTION_OFFLINE_CONFIG_FILE,
         load_extraction_offline_validation_profile,
@@ -466,6 +479,7 @@ def materialize_task_hermes_seed(
     task: TaskDefinition,
     target_dir: Path,
     base_preseed_dir: Path | None = None,
+    allow_memory_seed: bool = True,
 ) -> Path | None:
     """Materialize a task-level Hermes seed overlay into `target_dir`.
 
@@ -473,7 +487,7 @@ def materialize_task_hermes_seed(
     when neither sequence-level nor task-level seed data exists.
     """
 
-    seed = task.hermes_home_seed
+    seed = task.hermes_home_seed if allow_memory_seed else None
     has_task_seed = bool(
         seed
         and any(
@@ -883,6 +897,7 @@ class HermesPersistenceBackend(PersistenceBackend):
             user_profile_enabled=tool_config["user_profile_enabled"],
             skills_enabled=tool_config["skills_enabled"],
             session_search_enabled=tool_config["session_search_enabled"],
+            all_memory_off=sequence.hermes.all_memory_off,
             memory_nudge_interval=sequence.hermes.memory_nudge_interval,
             memory_flush_min_turns=sequence.hermes.memory_flush_min_turns,
             skill_creation_nudge_interval=sequence.hermes.skill_creation_nudge_interval,
@@ -1135,6 +1150,7 @@ def resolve_episode_tool_config(
     user_profile_enabled: bool,
     skills_enabled: bool,
     session_search_enabled: bool,
+    all_memory_off: bool = False,
 ) -> dict[str, bool]:
     """Resolve Hermes persistence toolsets for one episode.
 
@@ -1143,41 +1159,19 @@ def resolve_episode_tool_config(
     so score gains are easier to attribute.
     """
 
-    if not persistence_enabled:
-        return {
-            "memory_enabled": False,
-            "user_profile_enabled": False,
-            "skills_enabled": False,
-            "session_search_enabled": False,
-        }
+    from rsimem.memory.surface_policy import RuntimeSurfacePolicy
 
-    if expected_signal == "skill":
-        return {
-            "memory_enabled": False,
-            "user_profile_enabled": False,
-            "skills_enabled": skills_enabled,
-            "session_search_enabled": False,
-        }
-    if expected_signal == "memory":
-        return {
-            "memory_enabled": memory_enabled,
-            "user_profile_enabled": user_profile_enabled,
-            "skills_enabled": False,
-            "session_search_enabled": False,
-        }
-    if expected_signal == "session_search":
-        return {
-            "memory_enabled": False,
-            "user_profile_enabled": False,
-            "skills_enabled": False,
-            "session_search_enabled": session_search_enabled,
-        }
-    return {
-        "memory_enabled": memory_enabled,
-        "user_profile_enabled": user_profile_enabled,
-        "skills_enabled": skills_enabled,
-        "session_search_enabled": session_search_enabled,
-    }
+    policy = RuntimeSurfacePolicy.from_hermes_flags(
+        memory_enabled=memory_enabled,
+        user_profile_enabled=user_profile_enabled,
+        skills_enabled=skills_enabled,
+        session_search_enabled=session_search_enabled,
+        all_memory_off=all_memory_off,
+    )
+    return policy.for_expected_signal(
+        expected_signal,
+        persistence_enabled=persistence_enabled,
+    ).hermes_flags()
 
 
 _MEMORY_ENTRY_DELIMITER = "\n§\n"

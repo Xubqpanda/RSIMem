@@ -25,7 +25,8 @@ while it renders the per-character preference list into Mem0 instructions. The
 RSIMem adapter must preserve that distinction rather than treating the whole
 policy object as a host prompt.
 
-The RSIMem binding is implemented by `rsimem.adamem_adapter.bind_to_mem0_flat`.
+The RSIMem binding is implemented by
+`rsimem.memory_systems.semantic.mem0_flat.adamem_adapter.bind_to_mem0_flat`.
 It creates a versioned component for the existing
 `mem0-flat.semantic.extraction` slot, appending the rendered AdaMem preference
 block to the fixed Mem0-flat extraction policy. The component provenance is the

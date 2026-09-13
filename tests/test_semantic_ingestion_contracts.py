@@ -6,8 +6,8 @@ from dataclasses import replace
 
 import pytest
 
-from rsimem.audit import summarize_ingestion_usage
-from rsimem.ledger import LifecycleLedgerObserver
+from rsimem.evaluation.audit import summarize_ingestion_usage
+from rsimem.evaluation.ledger import LifecycleLedgerObserver
 from rsimem.lifecycle import (
     DeterministicPreferenceEvaluator,
     EvaluationTrigger,
@@ -26,7 +26,7 @@ from rsimem.memory import (
     MemoryKind,
     MemoryMessage,
 )
-from rsimem.memory.backends import HermesSemanticBackend
+from rsimem.memory_systems.semantic.hermes_native import HermesSemanticBackend
 from rsimem.memory.ingestion import (
     BoundSemanticPolicy,
     ContextExitSemantics,

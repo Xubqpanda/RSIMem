@@ -5,8 +5,8 @@ import pytest
 from rsimem.memory import MemoryKind
 from rsimem.memory.evidence_planes import EvidencePlane
 from rsimem.memory.family_matrix import PastFamilyMatrix
-from rsimem.research_protocol import ResearchProtocol, default_research_protocol
-from rsimem.sensitivity import (
+from experiments.legacy.sensitivity.research_protocol import ResearchProtocol, default_research_protocol
+from experiments.legacy.sensitivity.sensitivity import (
     OracleArtifact,
     SensitivityMatrix,
     SensitivityPanel,

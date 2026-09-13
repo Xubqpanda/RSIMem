@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.native_attribution_protocol import NativeAttributionRepairProtocol
-from rsimem.native_attribution_run import build_native_attribution_manifest
-from rsimem.native_scheduler import (
+from experiments.legacy.native.native_attribution_protocol import NativeAttributionRepairProtocol
+from experiments.legacy.native.native_attribution_run import build_native_attribution_manifest
+from experiments.legacy.native.native_scheduler import (
     BoundedNativeRunScheduler,
     InfrastructureFailure,
     NativeRunObservation,

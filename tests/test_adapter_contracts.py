@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from rsimem.adapter_contracts import (
+from rsimem.benchmarks.past.adapter_contracts import (
     AdapterResult,
     AdapterStatus,
     BenchmarkPublicEvent,

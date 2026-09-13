@@ -7,25 +7,25 @@ from dataclasses import replace
 
 import pytest
 
-from rsimem.native_attribution import attribute_native_observation
-from rsimem.native_attribution import _digest as attribution_digest
-from rsimem.native_attribution import NativeAttributionCandidate
-from rsimem.native_repair_selection import (
+from experiments.legacy.native.native_attribution import attribute_native_observation
+from experiments.legacy.native.native_attribution import _digest as attribution_digest
+from experiments.legacy.native.native_attribution import NativeAttributionCandidate
+from experiments.legacy.native.native_repair_selection import (
     NativeRepairCaseList,
     NativeRepairCaseListStore,
     select_native_repair_cases,
     build_case_list_payload,
     freeze_native_repair_case_list,
 )
-from rsimem.native_attribution_corpus import (
+from experiments.legacy.native.native_attribution_corpus import (
     NativeAttributionCorpus, NativeAttributionCorpusStore, merge_native_attribution_corpora,
 )
-from rsimem.native_attribution_report import (
+from experiments.legacy.native.native_attribution_report import (
     assess_stage2_gate,
     build_attribution_report,
     main as report_main,
 )
-from rsimem.native_attribution_review import (
+from experiments.legacy.native.native_attribution_review import (
     NativeAttributionReviewRecord,
     NativeAttributionReviewStore,
     ReviewDecision,
@@ -33,7 +33,7 @@ from rsimem.native_attribution_review import (
     build_review_summary,
     validate_review_record,
 )
-from rsimem.native_observation import extract_native_observations
+from experiments.legacy.native.native_observation import extract_native_observations
 from test_native_execution_audit import _fixture
 
 
@@ -103,7 +103,7 @@ def test_corpus_merge_cli_writes_canonical_output(tmp_path) -> None:
     NativeAttributionCorpusStore(first).put(corpus)
     NativeAttributionCorpusStore(second).put(corpus)
     with pytest.raises(ValueError, match="duplicate accepted runs"):
-        __import__("rsimem.native_attribution_corpus", fromlist=["main"]).main(
+        __import__("experiments.legacy.native.native_attribution_corpus", fromlist=["main"]).main(
             [str(first), str(second), "--output", str(tmp_path / "merged.json")]
         )
 
@@ -309,7 +309,7 @@ def test_attribution_report_module_entrypoint(tmp_path) -> None:
     store = NativeAttributionCorpusStore(tmp_path / "corpus.json")
     store.put(corpus)
     result = subprocess.run(
-        [sys.executable, "-m", "rsimem.native_attribution_report", str(store.path)],
+        [sys.executable, "-m", "experiments.legacy.native.native_attribution_report", str(store.path)],
         check=True,
         capture_output=True,
         text=True,
@@ -394,7 +394,7 @@ def test_review_packet_module_entrypoint(tmp_path) -> None:
     store = NativeAttributionCorpusStore(tmp_path / "corpus.json")
     store.put(corpus)
     result = subprocess.run(
-        [sys.executable, "-m", "rsimem.native_attribution_review", str(store.path)],
+        [sys.executable, "-m", "experiments.legacy.native.native_attribution_review", str(store.path)],
         check=True,
         capture_output=True,
         text=True,

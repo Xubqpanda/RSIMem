@@ -9,12 +9,12 @@ import yaml
 
 from rsimem.memory import MemoryKind
 from rsimem.memory.family_matrix import PastFamilyMatrix
-from rsimem.past_sensitivity_catalog import build_past_sensitivity_catalog
-from rsimem.past_sensitivity_launcher import prepare_past_sensitivity_launch
-from rsimem.oracle_seed_registry import create_oracle_seed_registration, create_oracle_seed_registry, oracle_seed_tree_digest
-from rsimem.research_protocol import ResearchProtocol, SensitivityCondition, default_research_protocol
-from rsimem.sensitivity import SensitivityMatrix, SensitivityPanel
-from rsimem.sensitivity_run import build_sensitivity_run_manifest, planned_deployments_from_catalog
+from experiments.legacy.sensitivity.past_sensitivity_catalog import build_past_sensitivity_catalog
+from experiments.legacy.sensitivity.past_sensitivity_launcher import prepare_past_sensitivity_launch
+from experiments.legacy.sensitivity.oracle_seed_registry import create_oracle_seed_registration, create_oracle_seed_registry, oracle_seed_tree_digest
+from experiments.legacy.sensitivity.research_protocol import ResearchProtocol, SensitivityCondition, default_research_protocol
+from experiments.legacy.sensitivity.sensitivity import SensitivityMatrix, SensitivityPanel
+from experiments.legacy.sensitivity.sensitivity_run import build_sensitivity_run_manifest, planned_deployments_from_catalog
 
 
 ROOT = Path(__file__).resolve().parents[1] / "benchmarks" / "past-bench"

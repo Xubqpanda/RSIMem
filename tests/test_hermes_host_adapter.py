@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from rsimem.adapter_contracts import AdapterStatus, CanonicalHostEvent, HostEventKind, MethodRunIdentity
-from rsimem.hermes_host_adapter import HermesHostAdapter
+from rsimem.benchmarks.past.adapter_contracts import AdapterStatus, CanonicalHostEvent, HostEventKind, MethodRunIdentity
+from rsimem.hosts.hermes.hermes_host_adapter import HermesHostAdapter
 
 
 class _Bridge:

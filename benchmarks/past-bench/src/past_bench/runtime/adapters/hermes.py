@@ -15,6 +15,13 @@ import time
 from pathlib import Path
 from typing import Any, Mapping
 
+from rsimem.memory.surface_policy import (
+    MemorySurface,
+    RuntimeSurfacePolicy,
+    SurfaceOperation,
+    capability_check,
+)
+
 import yaml
 
 from ...models.content import TextBlock
@@ -538,7 +545,7 @@ class _RecordedHermesCompletionClient:
     def complete(self, prompt: Any) -> Any:
         from agent.auxiliary_client import call_llm
         from rsimem.lifecycle import RawResourceUsage
-        from rsimem.memory_systems.mem0_flat import (
+        from rsimem.memory_systems.semantic.mem0_flat import (
             CompletionResult,
             POLICY_FACT_EXTRACTION_PROMPT,
         )
@@ -749,6 +756,24 @@ class HermesAdapter(RuntimeAdapter):
                 provider = "anthropic"
 
         enabled_toolsets = hermes_cfg.get("enabled_toolsets")
+        memory_cfg = hermes_cfg.get("config_overrides", {}).get("memory", {})
+        all_memory_off = bool(hermes_cfg.get("all_memory_off", False))
+        policy_payload = hermes_cfg.get("surface_policy")
+        if isinstance(policy_payload, Mapping):
+            surface_policy = RuntimeSurfacePolicy.from_payload(policy_payload)
+        else:
+            surface_policy = RuntimeSurfacePolicy.from_hermes_flags(
+                memory_enabled=bool(memory_cfg.get("memory_enabled", not all_memory_off)),
+                user_profile_enabled=bool(memory_cfg.get("user_profile_enabled", not all_memory_off)),
+                skills_enabled=("skills" in (enabled_toolsets or [])) and not all_memory_off,
+                session_search_enabled=bool(hermes_cfg.get("session_search_enabled", False)),
+                all_memory_off=all_memory_off,
+            )
+        if all_memory_off:
+            if any(capability_check(surface_policy, surface, SurfaceOperation.RETRIEVE)
+                   for surface in MemorySurface):
+                raise ValueError("AllMemoryOff Hermes configuration enables a Memory surface")
+            enabled_toolsets = []
         if self.request.tools:
             if enabled_toolsets is None:
                 enabled_toolsets = [_PAST_BENCH_TOOLSET]
@@ -757,6 +782,10 @@ class HermesAdapter(RuntimeAdapter):
                 if _PAST_BENCH_TOOLSET not in enabled_toolsets:
                     enabled_toolsets.append(_PAST_BENCH_TOOLSET)
         disabled_toolsets = list(hermes_cfg.get("disabled_toolsets") or [])
+        if all_memory_off:
+            for toolset in ("memory", "skills", "session_search"):
+                if toolset not in disabled_toolsets:
+                    disabled_toolsets.append(toolset)
         if rsimem_writeback_enabled:
             enabled_toolsets = [
                 toolset
@@ -766,7 +795,6 @@ class HermesAdapter(RuntimeAdapter):
             if "memory" not in disabled_toolsets:
                 disabled_toolsets.append("memory")
 
-        memory_cfg = hermes_cfg.get("config_overrides", {}).get("memory", {})
         from hermes_constants import parse_reasoning_effort
         reasoning_config = parse_reasoning_effort(
             str(hermes_cfg.get("reasoning_effort") or "")
@@ -1012,12 +1040,12 @@ class HermesAdapter(RuntimeAdapter):
         if not evidence_path.is_relative_to(capture_dir):
             raise ValueError("RSIMem evidence_path must stay inside capture_artifacts_dir")
 
-        from rsimem.hermes_integration import (
+        from rsimem.hosts.hermes.hermes_integration import (
             HermesAdapterFailurePolicy,
             HermesExecutionMode,
             HermesExperimentConfig,
         )
-        from rsimem.hermes_past_bridge import HermesPastBenchBridge
+        from rsimem.hosts.hermes.hermes_past_bridge import HermesPastBenchBridge
         from rsimem.lifecycle import (
             HermesLifecycleConfig,
             HermesLifecycleEvaluatorMode,

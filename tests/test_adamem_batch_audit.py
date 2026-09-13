@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adamem_batch_audit import audit_batch
-from rsimem.adamem_experiment import AdaMemCondition
+from experiments.adamem.adamem_batch_audit import audit_batch
+from experiments.adamem.adamem_experiment import AdaMemCondition
 
 
 def _fixture(root: Path, *, count: int = 3) -> None:

@@ -48,11 +48,11 @@ cd "${PAST_BENCH_ROOT}"
   "${proxy_args[@]}" \
   "$@"
 
-PYTHONPATH="${RSIMEM_ROOT}/src" "${RSIMEM_ROOT}/.venv/bin/python" -m rsimem.ledger \
+PYTHONPATH="${RSIMEM_ROOT}/src" "${RSIMEM_ROOT}/.venv/bin/python" -m rsimem.cli.ledger \
   "${trace_dir}/sequence_comparison.json" \
   --output "${trace_dir}/ledger.jsonl" \
   --judge-disabled
 
-PYTHONPATH="${RSIMEM_ROOT}/src" "${RSIMEM_ROOT}/.venv/bin/python" -m rsimem.audit \
+PYTHONPATH="${RSIMEM_ROOT}/src" "${RSIMEM_ROOT}/.venv/bin/python" -m rsimem.cli.audit \
   "${trace_dir}" \
   --output "${trace_dir}/audit.json"

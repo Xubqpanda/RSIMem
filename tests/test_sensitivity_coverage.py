@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.sensitivity_coverage import aggregate_sensitivity_coverage
+from experiments.legacy.sensitivity.sensitivity_coverage import aggregate_sensitivity_coverage
 
 
 def _write_pilot(root: Path, *, pilot_id: str = "pilot.one", forbidden: bool = False, legacy_audit_name: bool = False) -> None:

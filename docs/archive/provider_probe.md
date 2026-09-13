@@ -9,7 +9,7 @@ the exact base URL and model that the manifest will use:
 
 ```bash
 OPENAI_API_KEY="$GPT_LUNA_API_KEY" \
-  .venv/bin/python -m rsimem.provider_probe \
+  .venv/bin/python -m rsimem.evaluation.provider_probe \
   --base-url "$RSIMEM_PAST_BASE_URL" \
   --model "$RSIMEM_PAST_MODEL"
 ```

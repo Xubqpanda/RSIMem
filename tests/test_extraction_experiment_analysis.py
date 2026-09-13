@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.extraction_experiment_analysis import (
+from experiments.legacy.extraction.extraction_experiment_analysis import (
     analyze_extraction_batch,
     classify_extraction_audit_failure,
 )
-from rsimem.extraction_experiment_manifest import (
+from experiments.legacy.extraction.extraction_experiment_manifest import (
     EXTRACTION_METHOD_VARIANTS,
     extraction_execution_order,
     initialize_extraction_batch_manifest,

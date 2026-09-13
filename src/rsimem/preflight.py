@@ -52,7 +52,16 @@ def _provider_configuration(
     registry_path: Path,
     agent: str,
     environ: Mapping[str, str],
+    *,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
 ) -> str:
+    if base_url is not None or api_key_env is not None:
+        if not isinstance(base_url, str) or not base_url.strip():
+            return "provider_profile_incomplete"
+        if not isinstance(api_key_env, str) or not api_key_env.strip():
+            return "provider_profile_incomplete"
+        return "provider_configured" if environ.get(api_key_env) else "provider_credential_missing"
     try:
         import yaml
     except ImportError:
@@ -88,6 +97,8 @@ def run_preflight(
     distribution_version: Callable[[str], str] = version,
     state_probe: Callable[[Path], None] = _probe_state_directory,
     environ: Mapping[str, str] | None = None,
+    provider_base_url: str | None = None,
+    provider_api_key_env: str | None = None,
 ) -> PreflightReport:
     checks: list[CheckResult] = []
     actual_python = python_version or (sys.version_info.major, sys.version_info.minor)
@@ -133,6 +144,8 @@ def run_preflight(
         registry_path,
         agent,
         environ if environ is not None else os.environ,
+        base_url=provider_base_url,
+        api_key_env=provider_api_key_env,
     )
     provider_ok = provider_code == "provider_configured"
     checks.append(CheckResult(
@@ -154,6 +167,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--past-bench-root", type=Path, default=Path("benchmarks/past-bench"))
     parser.add_argument("--registry", type=Path, default=Path("configs/agents.yaml"))
     parser.add_argument("--agent", default="hermes-luna")
+    parser.add_argument("--base-url", help="Explicit provider base URL for a launcher that does not use a registry profile")
+    parser.add_argument("--api-key-env", help="Environment variable holding the explicit provider credential")
     parser.add_argument("--require-provider", action="store_true")
     return parser
 
@@ -166,6 +181,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         registry_path=args.registry,
         agent=args.agent,
         require_provider=args.require_provider,
+        provider_base_url=args.base_url,
+        provider_api_key_env=args.api_key_env,
     )
     print(report.to_json())
     return 0 if report.ok else 2

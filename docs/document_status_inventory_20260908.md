@@ -11,7 +11,7 @@ not an active AdaMem experiment instruction.
 
 | Files | Status | Role |
 | --- | --- | --- |
-| `README.md`, `implementation_handoff_checklist.md`, `progress.md`, `sm01_adamem_trajectory_results_20260908.md` | `current` | Entry, active protocol, execution state, and final SM01 result. |
+| `README.md`, `current_goal.md`, `implementation_handoff_checklist.md`, `progress.md`, `sm01_adamem_trajectory_results_20260908.md`, `current_experiment_results.md`, `main_table.md`, `codebase_refactor_checklist.md`, `refactor_stage0_inventory_20260911.md`, `refactor_stage0_baseline_20260911.json`, `refactor_reachability_audit_20260911.md` | `current` | Entry, immediate goal, active protocol, execution state, SM01 result, cross-run result ledger, paper-table template, staged refactor plan, and refactor baseline/reachability evidence. |
 | `adamem_adapter_audit_20260908.md` | `reference` | Frozen upstream/adaptation boundary for the current protocol. |
 | `document_status_inventory_20260908.md` | `current` | This classification index. |
 
@@ -56,6 +56,10 @@ above. It must produce no output when this inventory is updated:
 find docs/archive -maxdepth 1 -type f -printf '%f\n' | sort | awk '
   $0 == "README.md" || $0 == "implementation_handoff_checklist.md" ||
   $0 == "progress.md" || $0 == "sm01_adamem_trajectory_results_20260908.md" ||
+  $0 == "current_experiment_results.md" ||
+  $0 == "current_goal.md" ||
+  $0 == "main_table.md" ||
+  $0 == "codebase_refactor_checklist.md" ||
   $0 == "adamem_adapter_audit_20260908.md" ||
   $0 == "document_status_inventory_20260908.md" { next }
   $0 ~ /^(dataset_selection|memory_adapters|usage_accounting|lifecycle_controller)\.md$/ { next }

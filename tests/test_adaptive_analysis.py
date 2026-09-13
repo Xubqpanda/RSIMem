@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adaptive_analysis import analyze_adaptive_batch
+from experiments.legacy.adaptive.adaptive_analysis import analyze_adaptive_batch
 from rsimem.experiment_manifest import (
     ADAPTIVE_METHOD_VARIANTS,
     execution_order,

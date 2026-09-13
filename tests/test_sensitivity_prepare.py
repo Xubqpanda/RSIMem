@@ -5,9 +5,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from rsimem.research_protocol import SensitivityCondition
-from rsimem.sensitivity import SensitivityPanel
-from rsimem.sensitivity_prepare import prepare_registered_sensitivity_batch
+from experiments.legacy.sensitivity.research_protocol import SensitivityCondition
+from experiments.legacy.sensitivity.sensitivity import SensitivityPanel
+from experiments.legacy.sensitivity.sensitivity_prepare import prepare_registered_sensitivity_batch
 
 
 @pytest.mark.parametrize("condition", tuple(SensitivityCondition))
@@ -16,7 +16,7 @@ def test_prepares_all_sm01_conditions_without_provider_execution(
 ) -> None:
     root = Path(__file__).resolve().parents[1]
     past_root = root / "benchmarks" / "past-bench"
-    from rsimem.sensitivity_prepare import _matrix
+    from experiments.legacy.sensitivity.sensitivity_prepare import _matrix
 
     _, matrix = _matrix(SensitivityPanel.SEMANTIC)
     case_id = next(
@@ -69,8 +69,8 @@ def test_prepares_all_sm01_conditions_without_provider_execution(
 def test_prepares_every_semantic_oracle_slice_without_provider_execution(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
     past_root = root / "benchmarks" / "past-bench"
-    from rsimem.research_protocol import SensitivityCondition
-    from rsimem.sensitivity_prepare import _matrix
+    from experiments.legacy.sensitivity.research_protocol import SensitivityCondition
+    from experiments.legacy.sensitivity.sensitivity_prepare import _matrix
 
     _, matrix = _matrix(SensitivityPanel.SEMANTIC)
     oracle_cases = tuple(

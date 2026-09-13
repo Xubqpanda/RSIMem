@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.extraction_split_plan import (
+from experiments.legacy.extraction.extraction_split_plan import (
     ExtractionSplitAssignment,
     ExtractionSplitPlan,
     ExtractionSplitRole,

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.native_observation import (
+from experiments.legacy.native.native_observation import (
     NativeLifecycleEventType,
     ObservationStatus,
     extract_native_observations,

@@ -7,7 +7,7 @@ from rsimem.memory.live_writeback import (
 )
 from rsimem.memory.prompt_components import SemanticPolicyManifest, content_digest
 from rsimem.memory.extraction_policy_artifact import ExtractionPromptPolicyArtifact
-from rsimem.memory_systems.mem0_flat.policy import ExtractionInvocationFingerprint
+from rsimem.memory_systems.semantic.mem0_flat.policy import ExtractionInvocationFingerprint
 
 
 def extraction_activation_fixture(

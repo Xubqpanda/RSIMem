@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from rsimem.native_attribution_protocol import (
+from experiments.legacy.native.native_attribution_protocol import (
     HISTORICAL_STATUS,
     NativeAttributionProtocolStore,
     NativeAttributionRepairProtocol,

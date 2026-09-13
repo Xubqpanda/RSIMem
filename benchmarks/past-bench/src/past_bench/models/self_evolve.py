@@ -621,6 +621,7 @@ class HermesPersistenceConfig(BaseModel):
     user_profile_enabled: bool = True
     skills_enabled: bool = True
     session_search_enabled: bool = True
+    all_memory_off: bool = False
     reflection_enabled: bool = True
     memory_nudge_interval: int = 1
     memory_flush_min_turns: int = 1
@@ -671,6 +672,17 @@ class HermesPersistenceConfig(BaseModel):
     rsimem_extraction_offline_source_path: str = Field(default="", exclude=True)
     rsimem_revocation_registry_path: str = Field(default="", exclude=True)
     rsimem_adamem_policy_source_path: str = Field(default="", exclude=True)
+
+    @model_validator(mode="after")
+    def _validate_all_memory_off(self):
+        if self.all_memory_off and any((
+            self.memory_enabled,
+            self.user_profile_enabled,
+            self.skills_enabled,
+            self.session_search_enabled,
+        )):
+            raise ValueError("all_memory_off requires all Hermes Memory switches to be false")
+        return self
 
     @model_validator(mode="after")
     def _validate_adaptive_writeback_pair(self):

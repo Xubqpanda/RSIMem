@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from rsimem.native_attribution_batch import (
+from experiments.legacy.native.native_attribution_batch import (
     assemble_native_attribution_corpus,
     load_native_attribution_batch_audit,
 )
-from rsimem.native_attribution_run import (
+from experiments.legacy.native.native_attribution_run import (
     NativeAttributionRunManifest,
     NativeAttributionRunManifestStore,
     _digest,

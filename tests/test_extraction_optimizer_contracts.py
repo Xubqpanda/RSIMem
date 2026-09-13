@@ -51,7 +51,7 @@ from rsimem.memory.optimizer_content_boundary import OptimizerSecretBoundary
 from rsimem.memory.prompt_components import text_digest
 from rsimem.memory.revocation import JsonRevocationRegistry, RevocationEntry
 from rsimem.memory.evidence_planes import EvidencePlane, EvidenceSourceKind
-from rsimem.memory_systems.mem0_flat import (
+from rsimem.memory_systems.semantic.mem0_flat import (
     MEM0_FLAT_EXTRACTION_SLOT_ID,
     Mem0FlatPromptAdapter,
 )

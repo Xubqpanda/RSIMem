@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def _manifest_copy(tmp_path: Path) -> Path:
     source = json.loads(
-        (ROOT / "docs/baseline_manifest_20260901.json").read_text(encoding="utf-8")
+        (ROOT / "docs/archive/baseline_manifest_20260901.json").read_text(encoding="utf-8")
     )
     source["repository"]["commit"] = "test-baseline-commit"
     source["repository"]["allowedPostBaselinePaths"] = []

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from rsimem.adaptive_activation import activate_adaptive_policy
+from experiments.legacy.adaptive.adaptive_activation import activate_adaptive_policy
 from rsimem.memory.adaptive_policy_store import (
     ADAPTIVE_POLICY_STORE_SCHEMA_VERSION,
 )

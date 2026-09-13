@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import rsimem.adamem_screening_launcher as launcher
+import experiments.adamem.adamem_screening_launcher as launcher
 
 
 def _manifest(path: Path, records: list[dict[str, object]]) -> Path:

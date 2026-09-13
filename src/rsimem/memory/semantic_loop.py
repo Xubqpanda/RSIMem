@@ -24,7 +24,7 @@ from .operation_graph import (
     OperationSpec,
 )
 from .validation import TrustedValidationContext, ValidationProvenance
-from ..memory_systems.mem0_flat.policy import (
+from ..memory_systems.semantic.mem0_flat.policy import (
     FlatSemanticCandidateReader,
     Mem0FlatSemanticPolicy,
     build_validation_candidate,

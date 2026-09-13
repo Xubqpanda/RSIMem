@@ -3,11 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 
-from rsimem.hermes_integration import capture_native_hermes_system_prompt
-from rsimem.ledger import MemoryLedgerObserver
+from rsimem.hosts.hermes.hermes_integration import capture_native_hermes_system_prompt
+from rsimem.evaluation.ledger import MemoryLedgerObserver
 from rsimem.lifecycle import RawResourceUsage
 from rsimem.memory import MemoryExperience, MemoryKind, MemoryMessage, MemoryQuery
-from rsimem.memory.backends import build_hermes_native_registry
+from rsimem.memory_systems.registry import build_hermes_native_registry
 from rsimem.memory.executor import MutationExecutionStatus, TransactionalMutationExecutor
 from rsimem.memory.future_trace import SemanticFutureTraceRecorder
 from rsimem.memory.feedback_dataset import (
@@ -39,7 +39,7 @@ from rsimem.memory.receipts import JsonMutationReceiptStore, MutationReceiptStat
 from rsimem.memory.runtime import MemoryBackendRegistry
 from rsimem.memory.semantic_loop import SEMANTIC_LOOP_SCHEMA_VERSION, SemanticWritebackLoop
 from rsimem.memory.validation import MutationValidator
-from rsimem.memory_systems.mem0_flat import (
+from rsimem.memory_systems.semantic.mem0_flat import (
     POLICY_FACT_EXTRACTION_PROMPT,
     POLICY_INTERNAL_OPERATION_PROMPT,
     FakeCompletionClient,

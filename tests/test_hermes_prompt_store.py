@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from rsimem.hermes_past_bridge import _PromptMemoryStore
+from rsimem.hosts.hermes.hermes_past_bridge import _PromptMemoryStore
 from rsimem.memory.contracts import MemoryArtifact, MemoryHit, MemoryKind
 
 
 def test_projection_wrapper_is_owned_by_host_adapter_module() -> None:
-    assert _PromptMemoryStore.__module__ == "rsimem.hermes_host_adapter"
+    assert _PromptMemoryStore.__module__ == "rsimem.hosts.hermes.hermes_host_adapter"
 
 
 class _NativeStore:

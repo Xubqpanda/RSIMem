@@ -5,13 +5,13 @@ from pathlib import Path
 
 import pytest
 
-import rsimem.extraction_experiment_preflight as preflight
-from rsimem.extraction_experiment_manifest import (
+import experiments.legacy.extraction.extraction_experiment_preflight as preflight
+from experiments.legacy.extraction.extraction_experiment_manifest import (
     CleanRepositoryRevision,
     load_extraction_manifest,
 )
-from rsimem.extraction_experiment_preflight import resolved_task_template_profile
-from rsimem.extraction_split_plan import (
+from experiments.legacy.extraction.extraction_experiment_preflight import resolved_task_template_profile
+from experiments.legacy.extraction.extraction_split_plan import (
     ExtractionSplitAssignment,
     ExtractionSplitPlan,
     ExtractionSplitRole,
